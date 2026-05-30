@@ -1,4 +1,5 @@
 {
+  "build": "tsc --noEmit"
   "name": "hrm-system",
   "version": "0.1.0",
   "private": true,
