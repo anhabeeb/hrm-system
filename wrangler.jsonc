@@ -1,0 +1,48 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hrm-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-05-29",
+
+  // Non-sensitive runtime values can live here.
+  "vars": {
+    "ENVIRONMENT": "local"
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "hrm-db-local",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "preview_database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  "r2_buckets": [
+    {
+      "binding": "DOCUMENTS_BUCKET",
+      "bucket_name": "hrm-documents-placeholder"
+    },
+    {
+      "binding": "BACKUP_BUCKET",
+      "bucket_name": "hrm-backups-placeholder"
+    }
+  ],
+
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "REALTIME_ROOM",
+        "class_name": "RealtimeRoom"
+      }
+    ]
+  },
+
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["RealtimeRoom"]
+    }
+  ]
+}
