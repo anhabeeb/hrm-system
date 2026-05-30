@@ -1,0 +1,28 @@
+INSERT OR IGNORE INTO approval_thresholds (
+  id,
+  company_id,
+  workflow_key,
+  threshold_name,
+  threshold_type,
+  amount_min,
+  amount_max,
+  percentage_min,
+  percentage_max,
+  currency,
+  required_roles_json,
+  required_permissions_json,
+  is_active,
+  effective_from,
+  created_at,
+  updated_at
+) VALUES
+('threshold_advance_small', 'company_seed_default', 'advance_payment', 'Small advance', 'amount', 0, 100000, NULL, NULL, 'MVR', '["hr_admin","accountant"]', '["advances.approve"]', 1, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+('threshold_advance_medium', 'company_seed_default', 'advance_payment', 'Medium advance', 'amount', 100001, 500000, NULL, NULL, 'MVR', '["hr_admin","accountant","owner"]', '["advances.approve"]', 1, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+('threshold_advance_large', 'company_seed_default', 'advance_payment', 'Large advance', 'amount', 500001, NULL, NULL, NULL, 'MVR', '["owner","super_admin"]', '["advances.approve","approvals.approve"]', 1, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+('threshold_salary_increment_any', 'company_seed_default', 'salary_increment', 'Any salary increment', 'amount', 0, NULL, NULL, NULL, 'MVR', '["hr_admin","owner","super_admin"]', '["salary.increment_approve"]', 1, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+('threshold_payroll_finalization_any', 'company_seed_default', 'payroll_finalization', 'Any payroll finalization', 'status_change', NULL, NULL, NULL, NULL, 'MVR', '["accountant","owner","super_admin"]', '["payroll.review","payroll.approve","payroll.lock"]', 1, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+('threshold_asset_deduction_any', 'company_seed_default', 'asset_deduction', 'Any asset deduction', 'amount', 0, 100000, NULL, NULL, 'MVR', '["hr_admin","accountant"]', '["assets.approve_deduction"]', 1, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+('threshold_asset_deduction_large', 'company_seed_default', 'asset_deduction', 'Large asset deduction', 'amount', 100001, NULL, NULL, NULL, 'MVR', '["owner","super_admin"]', '["assets.approve_deduction","approvals.approve"]', 1, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+('threshold_profile_update_normal', 'company_seed_default', 'profile_update_request', 'Normal profile update', 'request_type', NULL, NULL, NULL, NULL, 'MVR', '["hr_admin","admin"]', '["profile_update_requests.approve"]', 1, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+('threshold_profile_update_bank', 'company_seed_default', 'profile_update_request', 'Bank detail update', 'request_type', NULL, NULL, NULL, NULL, 'MVR', '["hr_admin","admin","owner","super_admin"]', '["profile_update_requests.approve","approvals.approve"]', 1, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+('threshold_approval_threshold_change_any', 'company_seed_default', 'approval_threshold_change', 'Any approval threshold change', 'settings_change', NULL, NULL, NULL, NULL, 'MVR', '["owner","super_admin"]', '["approval_thresholds.approve_changes"]', 1, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z');
