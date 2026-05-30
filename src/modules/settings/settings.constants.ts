@@ -1,0 +1,166 @@
+export const ALLOWED_SETTINGS_GROUPS = [
+  "company",
+  "features",
+  "employees",
+  "outlets",
+  "departments_positions",
+  "payroll",
+  "payroll_earnings",
+  "leave",
+  "long_leave",
+  "holidays",
+  "attendance",
+  "roster",
+  "assets_uniforms",
+  "documents",
+  "users_permissions",
+  "approval_workflows",
+  "approval_thresholds",
+  "notifications",
+  "reports",
+  "offline_sync",
+  "realtime_websocket",
+  "import_export",
+  "backup_recovery",
+  "audit_security",
+  "my_profile",
+  "ui_preferences",
+] as const;
+
+export const APPROVAL_MODES = [
+  "disabled",
+  "manual",
+  "auto_admin_superadmin",
+  "full_workflow",
+] as const;
+
+export const PAYROLL_IMPACTING_GROUPS = new Set([
+  "payroll",
+  "payroll_earnings",
+  "long_leave",
+  "holidays",
+]);
+
+export const SENSITIVE_SETTING_GROUPS = new Set([
+  "company",
+  "features",
+  "payroll",
+  "payroll_earnings",
+  "leave",
+  "long_leave",
+  "holidays",
+  "attendance",
+  "roster",
+  "assets_uniforms",
+  "documents",
+  "users_permissions",
+  "approval_workflows",
+  "approval_thresholds",
+  "offline_sync",
+  "realtime_websocket",
+  "import_export",
+  "backup_recovery",
+  "audit_security",
+  "my_profile",
+  "ui_preferences",
+]);
+
+export const FEATURE_DEPENDENCIES: Record<string, string[]> = {
+  payslips: ["payroll"],
+  long_leave: ["leave_management", "payroll"],
+  offline_sync: ["attendance"],
+  kiosk_attendance: ["attendance"],
+  biometric_attendance: ["attendance"],
+  employee_portal: ["employee_login"],
+  employee_login: ["employee_management"],
+  approval_workflows: ["approvals"],
+  payroll: ["employee_management"],
+  roster: ["employee_management"],
+  documents: ["employee_management"],
+  assets_uniforms: ["employee_management"],
+};
+
+export const FEATURE_DEPENDENCY_LABELS: Record<string, string> = {
+  payroll: "Payroll",
+  leave_management: "Leave Management",
+  attendance: "Attendance",
+  employee_login: "Employee Login",
+  employee_management: "Employee Management",
+  approvals: "Approvals",
+};
+
+export const REPORTABLE_FEATURES = [
+  "employee_management",
+  "attendance",
+  "leave_management",
+  "payroll",
+  "roster",
+  "assets_uniforms",
+  "documents",
+] as const;
+
+type SettingsGroupKey = (typeof ALLOWED_SETTINGS_GROUPS)[number];
+
+export const SETTINGS_GROUP_VIEW_PERMISSIONS: Record<
+  SettingsGroupKey,
+  readonly string[]
+> = {
+  company: ["settings.view"],
+  features: ["feature_settings.view", "settings.view"],
+  employees: ["settings.view"],
+  outlets: ["settings.view"],
+  departments_positions: ["settings.view"],
+  payroll: ["payroll_settings.view", "settings.view"],
+  payroll_earnings: ["payroll_settings.view", "settings.view"],
+  leave: ["leave_settings.view", "settings.view"],
+  long_leave: ["leave_settings.view", "settings.view"],
+  holidays: ["holiday_settings.view", "settings.view"],
+  attendance: ["attendance_settings.view", "settings.view"],
+  roster: ["roster_settings.manage", "settings.view"],
+  assets_uniforms: ["assets_settings.manage", "settings.view"],
+  documents: ["documents_settings.manage", "settings.view"],
+  users_permissions: ["security_settings.view", "settings.view"],
+  approval_workflows: ["approval_workflows.view", "settings.view"],
+  approval_thresholds: ["approval_thresholds.view", "settings.view"],
+  notifications: ["settings.view"],
+  reports: ["settings.view"],
+  offline_sync: ["sync_settings.view", "settings.view"],
+  realtime_websocket: ["realtime_settings.view", "settings.view"],
+  import_export: ["import_export_settings.view", "settings.view"],
+  backup_recovery: ["backup_settings.view", "settings.view"],
+  audit_security: ["audit_settings.view", "settings.view"],
+  my_profile: ["settings.view"],
+  ui_preferences: ["settings.view"],
+};
+
+export const SETTINGS_GROUP_MANAGE_PERMISSIONS: Record<
+  SettingsGroupKey,
+  readonly string[]
+> = {
+  company: ["settings.manage"],
+  features: ["feature_settings.manage", "settings.manage"],
+  employees: ["settings.manage"],
+  outlets: ["settings.manage"],
+  departments_positions: ["settings.manage"],
+  payroll: ["payroll_settings.manage", "settings.manage"],
+  payroll_earnings: ["payroll_settings.manage", "settings.manage"],
+  leave: ["leave_settings.manage", "settings.manage"],
+  long_leave: ["leave_settings.manage", "settings.manage"],
+  holidays: ["holiday_settings.manage", "settings.manage"],
+  attendance: ["attendance_settings.manage", "settings.manage"],
+  roster: ["roster_settings.manage", "settings.manage"],
+  assets_uniforms: ["assets_settings.manage", "settings.manage"],
+  documents: ["documents_settings.manage", "settings.manage"],
+  users_permissions: ["security_settings.manage", "settings.manage"],
+  approval_workflows: ["approval_workflows.manage", "settings.manage"],
+  approval_thresholds: ["approval_thresholds.edit", "settings.manage"],
+  notifications: ["settings.manage"],
+  reports: ["settings.manage"],
+  offline_sync: ["sync_settings.manage", "settings.manage"],
+  realtime_websocket: ["realtime_settings.manage", "settings.manage"],
+  import_export: ["import_export_settings.manage", "settings.manage"],
+  backup_recovery: ["backup_settings.manage", "settings.manage"],
+  audit_security: ["audit_settings.manage", "settings.manage"],
+  my_profile: ["settings.manage"],
+  ui_preferences: ["settings.manage"],
+};
