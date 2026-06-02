@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 
 import { API_PREFIX, NOT_FOUND_MESSAGE } from "./config/constants";
+import { corsMiddleware } from "./middleware/cors.middleware";
 import { errorMiddleware } from "./middleware/error.middleware";
 import { requestIdMiddleware } from "./middleware/request-id.middleware";
 import { authRoutes } from "./routes/auth.routes";
@@ -37,6 +38,7 @@ const app = new Hono<AppContext>();
 const apiV1 = new Hono<AppContext>();
 
 app.use("*", requestIdMiddleware);
+app.use("*", corsMiddleware);
 app.onError(errorMiddleware);
 
 apiV1.route("/", healthRoutes);
