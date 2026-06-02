@@ -3,6 +3,7 @@
   "name": "hrm-system",
   "main": "src/index.ts",
   "compatibility_date": "2026-05-29",
+  "account_id": "766f9d377c626e9ee513edd4efca1224",
 
   // Non-sensitive runtime values can live here.
   // Keep secrets such as SESSION_SECRET, PASSWORD_PEPPER, and TOTP_ENCRYPTION_KEY
