@@ -12,7 +12,7 @@ This prompt sets up:
 - Cloudflare D1, R2, and Durable Object bindings
 - A versioned API base at `/api/v1`
 - A health check route at `GET /api/v1/health`
-- Standard response helpers and user-friendly error handling
+- Standard response helpers and user-friendly err or handling
 - Request ID middleware for traceability
 - Placeholder services for database, audit, notifications, and realtime events
 
