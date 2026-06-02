@@ -1,10 +1,13 @@
-import { InlineAlert } from "./InlineAlert";
+import type { ApiError } from "@/lib/api-errors";
 
-export const FormError = ({ message, requestId }: { message?: string; requestId?: string }) => {
-  if (!message) return null;
-  return (
-    <InlineAlert title={message} variant="error" requestId={requestId}>
-      Please review the form and try again.
-    </InlineAlert>
-  );
-};
+import { FormErrorPanel } from "./FormErrorPanel";
+
+export const FormError = ({
+  error,
+  message,
+  requestId,
+}: {
+  error?: ApiError | null;
+  message?: string;
+  requestId?: string;
+}) => <FormErrorPanel error={error} message={message} requestId={requestId} />;
