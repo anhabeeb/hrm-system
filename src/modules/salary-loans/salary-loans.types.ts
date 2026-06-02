@@ -13,6 +13,7 @@ export interface SalaryLoanFilters {
   employee_id?: string;
   outlet_id?: string;
   status?: string;
+  start_month?: string;
   page: number;
   page_size: number;
 }

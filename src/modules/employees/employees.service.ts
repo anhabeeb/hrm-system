@@ -197,6 +197,27 @@ const maskEmployee = <T extends EmployeeListRow | EmployeeRecord>(
         bank_name: null,
       };
 
+const sanitizeEmployeeDocument = (
+  document: Record<string, unknown>,
+  includeSensitive: boolean,
+) => {
+  const {
+    file_key: _fileKey,
+    storage_path: _storagePath,
+    bucket_path: _bucketPath,
+    private_object_key: _privateObjectKey,
+    company_id: _companyId,
+    deleted_at: _deletedAt,
+    ...safe
+  } = document;
+
+  if (safe.is_sensitive === 1 && !includeSensitive) {
+    safe.file_name = "Sensitive document";
+  }
+
+  return safe;
+};
+
 const ensureEmployeeAccess = async (
   env: Env,
   context: AuthActor,
@@ -848,11 +869,20 @@ export const listDocuments = async (
   employeeId: string,
 ) => {
   await ensureEmployeeAccess(env, context, employeeId);
+  const includeSensitiveDocuments = permissionService.hasPermission(
+    context,
+    "documents.view_sensitive",
+  );
+
   return employeesRepository.listDocuments(
     env,
     context.companyId,
     employeeId,
-    permissionService.hasPermission(context, "documents.view_sensitive"),
+    includeSensitiveDocuments,
+  ).then((documents) =>
+    documents.map((document) =>
+      sanitizeEmployeeDocument(document as Record<string, unknown>, includeSensitiveDocuments),
+    ),
   );
 };
 

@@ -432,14 +432,17 @@ export const listDocuments = (
 ) =>
   queryMany(
     env,
-    `SELECT id, company_id, employee_id, document_type, file_key, file_name,
-      mime_type, expiry_date, status, is_sensitive, uploaded_by, created_at,
-      updated_at, deleted_at
+    `SELECT id, employee_id, document_type,
+      CASE
+        WHEN is_sensitive = 1 AND ? = 0 THEN 'Sensitive document'
+        ELSE file_name
+      END AS file_name,
+      mime_type, expiry_date, status, is_sensitive, uploaded_by,
+      created_at AS uploaded_at, created_at, updated_at
      FROM employee_documents
      WHERE company_id = ? AND employee_id = ? AND deleted_at IS NULL
-       AND (? = 1 OR is_sensitive = 0)
      ORDER BY expiry_date ASC, created_at DESC`,
-    [companyId, employeeId, includeSensitive ? 1 : 0],
+    [includeSensitive ? 1 : 0, companyId, employeeId],
   );
 
 export const createDocument = (

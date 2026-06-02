@@ -25,11 +25,14 @@ const requireMoney = (value: unknown, label: string) => {
 
 export const validateLoanFilters = (query: Record<string, unknown>): SalaryLoanFilters => {
   const status = asString(query.status);
+  const startMonth = asString(query.start_month);
   if (status && !SALARY_LOAN_STATUSES.includes(status as any)) throw new ValidationError("Please select a valid salary loan status.");
+  if (startMonth && !isMonth(startMonth)) throw new ValidationError("Please select a valid start month.");
   return {
     employee_id: asString(query.employee_id),
     outlet_id: asString(query.outlet_id),
     status,
+    start_month: startMonth,
     page: page(query.page),
     page_size: pageSize(query.page_size),
   };

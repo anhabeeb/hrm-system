@@ -21,6 +21,7 @@ const query = (c: Context<AppContext>) => ({
   employee_id: c.req.query("employee_id"),
   outlet_id: c.req.query("outlet_id"),
   status: c.req.query("status"),
+  start_month: c.req.query("start_month"),
   page: c.req.query("page"),
   page_size: c.req.query("page_size"),
 });

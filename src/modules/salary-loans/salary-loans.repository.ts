@@ -38,6 +38,7 @@ const where = (companyId: string, filters: SalaryLoanFilters, outletIds: string[
   if (filters.outlet_id) { clauses.push("e.primary_outlet_id = ?"); values.push(filters.outlet_id); }
   if (filters.employee_id) { clauses.push("l.employee_id = ?"); values.push(filters.employee_id); }
   if (filters.status) { clauses.push("l.status = ?"); values.push(filters.status); }
+  if (filters.start_month) { clauses.push("l.start_month = ?"); values.push(filters.start_month); }
   return { sql: clauses.join(" AND "), values };
 };
 export const listLoans = (env: Env, companyId: string, filters: SalaryLoanFilters, outletIds: string[], isSuperAdmin: boolean) => {
