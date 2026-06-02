@@ -330,6 +330,103 @@ describe("bootstrap validators", () => {
     }
   });
 
+  it("bootstrap maps PBKDF2 iteration limit failures to password hash configuration errors", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const deriveBits = vi
+      .spyOn(crypto.subtle, "deriveBits")
+      .mockRejectedValue(new Error("Pbkdf2 failed: iteration counts above 100000 are not supported (requested 210000)."));
+    const env = {
+      ENVIRONMENT: "production",
+      BOOTSTRAP_ADMIN_TOKEN: "bootstrap-token",
+      PASSWORD_PEPPER: "pepper-for-test",
+      DB: {
+        prepare: (sql: string) => ({
+          bind: () => ({
+            run: async () => ({ success: true }),
+            first: async () => {
+              if (sql.includes("FROM system_bootstrap")) {
+                return {
+                  id: "default",
+                  is_initialized: 0,
+                  company_id: null,
+                  initialized_by_user_id: null,
+                  initialized_at: null,
+                  created_at: "2026-06-03T00:00:00Z",
+                  updated_at: "2026-06-03T00:00:00Z",
+                };
+              }
+              if (sql.includes("COUNT")) return { total: 0 };
+              if (sql.includes("FROM roles")) {
+                return {
+                  id: "seed_super_admin",
+                  role_key: "SUPER_ADMIN",
+                  role_name: "Super Admin",
+                  description: "Full access",
+                  is_system_role: 1,
+                };
+              }
+              return null;
+            },
+          }),
+        }),
+      },
+    } as unknown as Env;
+
+    try {
+      const response = await app.request(
+        "/api/v1/bootstrap/initialize",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: "Bearer bootstrap-token",
+          },
+          body: JSON.stringify({
+            company: { company_name: "Cafe Asiana" },
+            super_admin: {
+              full_name: "Ahmed Naish",
+              email: "admin@example.com",
+              password: "StrongPassword123!",
+            },
+          }),
+        },
+        env,
+      );
+      const body = await response.json() as {
+        error: {
+          code: string;
+          title: string;
+          requestId: string;
+          route: string;
+          method: string;
+          status: number;
+          step: string;
+          technicalMessage: string;
+          suggestedAction: string;
+          details?: unknown;
+        };
+      };
+
+      expect(response.status).toBe(500);
+      expect(body.error.code).toBe("PASSWORD_HASH_CONFIGURATION_ERROR");
+      expect(body.error.title).toBe("Password hashing configuration error");
+      expect(body.error.step).toBe("hash_super_admin_password");
+      expect(body.error.route).toBe("/api/v1/bootstrap/initialize");
+      expect(body.error.method).toBe("POST");
+      expect(body.error.status).toBe(500);
+      expect(body.error.technicalMessage).toContain("iteration counts above 100000");
+      expect(body.error.suggestedAction).toContain("PASSWORD_HASH_ITERATIONS");
+      expect(body.error.requestId).toMatch(/^req_/);
+      expect(JSON.stringify(body)).not.toContain("at ");
+      expect(body.error.details).toBeUndefined();
+    } finally {
+      deriveBits.mockRestore();
+      error.mockRestore();
+      warn.mockRestore();
+    }
+  });
+
   it("partially initialized setup retry is handled safely without duplicate writes", async () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
     let coreWriteCount = 0;

@@ -43,6 +43,19 @@ describe("application error classifier", () => {
     expect(classifyError(new Error("INTERNAL_SECRET is missing")).code).toBe("CONFIG_MISSING_SECRET");
   });
 
+  it("maps Cloudflare PBKDF2 iteration limit failures to password hash configuration errors", () => {
+    const error = classifyError(
+      new Error("Pbkdf2 failed: iteration counts above 100000 are not supported (requested 210000)."),
+      { step: "hash_super_admin_password" },
+    );
+
+    expect(error.code).toBe("PASSWORD_HASH_CONFIGURATION_ERROR");
+    expect(error.title).toBe("Password hashing configuration error");
+    expect(error.retryable).toBe(false);
+    expect(error.step).toBe("hash_super_admin_password");
+    expect(error.suggestedAction).toContain("PASSWORD_HASH_ITERATIONS");
+  });
+
   it("maps unknown runtime failures to UNKNOWN_ERROR", () => {
     const error = classifyError(new Error("Unexpected banana"));
 
