@@ -26,7 +26,7 @@
       "bucket_name": "hrm-documents-placeholder"
     },
     {
-      "binding": "BACKUPS_BUCKET",
+      "binding": "BACKUP_BUCKET",
       "bucket_name": "hrm-backups-placeholder"
     }
   ],

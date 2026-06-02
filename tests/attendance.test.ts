@@ -92,6 +92,16 @@ describe("attendance placeholders", () => {
   it.todo("employee from inaccessible outlet cannot be viewed");
   it.todo("employee from inaccessible outlet cannot be manually clocked in");
   it.todo("attendance list count is outlet-filtered");
+  it.todo("GET /attendance/summary returns data as an array with top-level pagination");
+  it.todo("GET /attendance/summary does not return nested data.rows");
+  it.todo("GET /attendance/events route exists and is registered before /attendance/events/:id");
+  it.todo("GET /attendance/events accepts device_id as an optional query filter");
+  it.todo("GET /attendance/events?device_id=device_123 filters rows by ev.device_id");
+  it.todo("GET /attendance/events?device_id=device_123 applies the same device filter to the count query");
+  it.todo("GET /attendance/events device_id filter does not bypass outlet access");
+  it.todo("GET /attendance/events applies outlet access inside SQL and count queries");
+  it.todo("GET /attendance/events returns top-level data array and pagination");
+  it.todo("GET /attendance/events does not expose device token hashes or raw sensitive payloads");
   it.todo("attendance event detail returns safe fields only");
   it.todo("attendance event detail applies outlet access");
   it.todo("missing attendance event detail returns NOT_FOUND");
