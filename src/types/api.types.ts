@@ -18,13 +18,26 @@ export interface ApiSuccessResponse<T> {
 
 export interface ApiErrorDetails {
   code: string;
+  title: string;
   message: string;
+  technicalMessage?: string;
+  requestId: string;
+  route?: string;
+  method?: string;
+  step?: string;
+  status: number;
+  retryable: boolean;
+  suggestedAction?: string;
+  fieldErrors?: Record<string, string>;
+  details?: unknown;
 }
 
 export interface ApiErrorResponse {
   success: false;
   error: ApiErrorDetails;
   request_id?: string;
+  requestId?: string;
+  message?: string;
 }
 
 export interface PaginationMeta {
@@ -44,6 +57,15 @@ export interface ApiPaginatedResponse<T> {
 export interface ResponseOptions {
   headers?: HeadersInit;
   requestId?: string;
+  route?: string;
+  method?: string;
+  step?: string;
+  title?: string;
+  retryable?: boolean;
+  technicalMessage?: string;
+  suggestedAction?: string;
+  fieldErrors?: Record<string, string>;
+  details?: unknown;
 }
 
 export interface AuthActor {

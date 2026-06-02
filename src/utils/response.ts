@@ -7,6 +7,14 @@ import type {
 } from "../types/api.types";
 
 import { UNKNOWN_ERROR_MESSAGE } from "../config/constants";
+import type { AppError } from "./errors";
+
+const titleFromCode = (code: string): string =>
+  code
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 
 const createHeaders = (options: ResponseOptions = {}): Headers => {
   const headers = new Headers(options.headers);
@@ -78,17 +86,46 @@ export const errorResponse = (
   message: string,
   options: ResponseOptions = {},
 ): Response => {
+  const requestId = options.requestId ?? "req_unavailable";
   const payload: ApiErrorResponse = {
     success: false,
+    message,
     error: {
       code,
+      title: options.title ?? titleFromCode(code),
       message,
+      technicalMessage: options.technicalMessage,
+      requestId,
+      route: options.route,
+      method: options.method,
+      step: options.step,
+      status,
+      retryable: options.retryable ?? status >= 500,
+      suggestedAction: options.suggestedAction,
+      fieldErrors: options.fieldErrors,
+      details: options.details,
     },
-    ...(options.requestId ? { request_id: options.requestId } : {}),
+    request_id: requestId,
+    requestId,
   };
 
   return json(payload, status, options);
 };
+
+export const appErrorResponse = (
+  error: AppError,
+  options: ResponseOptions = {},
+): Response =>
+  errorResponse(error.statusCode, error.code, error.message, {
+    ...options,
+    title: error.title,
+    retryable: error.retryable,
+    technicalMessage: error.technicalMessage,
+    suggestedAction: error.suggestedAction,
+    step: error.step ?? options.step,
+    fieldErrors: error.fieldErrors,
+    details: error.details,
+  });
 
 export const badRequest = (
   message = "We could not process this request. Please review the details and try again.",
