@@ -66,7 +66,13 @@ export const initializeBootstrap = async (
   const userId = crypto.randomUUID();
   const passwordHash = await hashPassword(input.super_admin.password, env.PASSWORD_PEPPER);
 
-  await repository.cloneCompanyDefaults(env, companyId, input.company);
+  try {
+    await repository.cloneCompanyDefaults(env, companyId, input.company);
+  } catch (error) {
+    console.warn("Bootstrap default role templates could not be fully copied", { error });
+  }
+
+  await repository.ensureCompanySuperAdminRole(env, companyId, seedRole);
   await repository.ensureProductionFallbackDefaults(env, companyId);
   const companyRole = await repository.findCompanyRoleByKey(env, companyId, "super_admin");
   if (!companyRole) {

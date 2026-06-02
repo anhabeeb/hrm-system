@@ -8,6 +8,13 @@ const run = (env: Env, sql: string, values: readonly unknown[] = []) => bind(env
 
 const now = () => new Date().toISOString();
 
+const logOptionalBootstrapDefaultFailure = (label: string, error: unknown) => {
+  console.warn("Optional bootstrap defaults could not be copied", {
+    default_group: label,
+    error,
+  });
+};
+
 export const countCompanies = async (env: Env) => {
   const row = await one<{ total: number }>(env, "SELECT COUNT(*) AS total FROM companies WHERE deleted_at IS NULL");
   return row?.total ?? 0;
@@ -33,9 +40,9 @@ export const countSuperAdmins = async (env: Env) => {
 };
 
 export const findSeedSuperAdminRole = (env: Env) =>
-  one<{ id: string; role_key: string; role_name: string }>(
+  one<{ id: string; role_key: string; role_name: string; description: string | null; is_system_role: number }>(
     env,
-    `SELECT id, role_key, role_name
+    `SELECT id, role_key, role_name, description, is_system_role
      FROM roles
      WHERE is_active = 1
        AND (lower(role_key) = 'super_admin' OR lower(role_name) = 'super admin' OR role_key = 'SUPER_ADMIN')
@@ -179,6 +186,45 @@ export const createBootstrapCore = (
   return env.DB.batch(statements);
 };
 
+export const ensureCompanySuperAdminRole = (
+  env: Env,
+  companyId: string,
+  seedRole: { role_key: string; role_name: string; description: string | null; is_system_role: number },
+) => {
+  const roleKey = seedRole.role_key.toLowerCase() === "super_admin" ? "super_admin" : seedRole.role_key;
+
+  return run(
+    env,
+    `INSERT OR IGNORE INTO roles (
+      id, company_id, role_key, role_name, description, is_system_role, is_active, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+    [
+      `${companyId}_role_${roleKey}`,
+      companyId,
+      roleKey,
+      seedRole.role_name,
+      seedRole.description,
+      seedRole.is_system_role,
+      now(),
+      now(),
+    ],
+  );
+};
+
+const copyOptionalBootstrapDefaults = async (
+  env: Env,
+  label: string,
+  statements: D1PreparedStatement[],
+) => {
+  if (statements.length === 0) return;
+
+  try {
+    await env.DB.batch(statements);
+  } catch (error) {
+    logOptionalBootstrapDefaultFailure(label, error);
+  }
+};
+
 export const cloneCompanyDefaults = async (env: Env, companyId: string, company: BootstrapCompanyInput) => {
   const timestamp = now();
   await env.DB.batch([
@@ -187,6 +233,9 @@ export const cloneCompanyDefaults = async (env: Env, companyId: string, company:
        SELECT ? || '_role_' || role_key, ?, role_key, role_name, description, is_system_role, is_active, ?, ?
        FROM roles WHERE company_id = ?`,
     ).bind(companyId, companyId, timestamp, timestamp, SEED_COMPANY_ID),
+  ]);
+
+  await copyOptionalBootstrapDefaults(env, "role_permissions", [
     env.DB.prepare(
       `INSERT OR IGNORE INTO role_permissions (id, company_id, role_id, permission_key, created_at)
        SELECT ? || '_rp_' || r.role_key || '_' || replace(rp.permission_key, '.', '_'), ?, ? || '_role_' || r.role_key, rp.permission_key, ?
@@ -194,6 +243,9 @@ export const cloneCompanyDefaults = async (env: Env, companyId: string, company:
        JOIN roles r ON r.id = rp.role_id
        WHERE rp.company_id = ? AND r.company_id = ?`,
     ).bind(companyId, companyId, companyId, timestamp, SEED_COMPANY_ID, SEED_COMPANY_ID),
+  ]);
+
+  await copyOptionalBootstrapDefaults(env, "company_settings", [
     env.DB.prepare(
       `INSERT OR IGNORE INTO company_settings (
         id, company_id, setting_key, setting_group, setting_value_json, effective_from,
@@ -222,6 +274,9 @@ export const cloneCompanyDefaults = async (env: Env, companyId: string, company:
       timestamp,
       SEED_COMPANY_ID,
     ),
+  ]);
+
+  await copyOptionalBootstrapDefaults(env, "feature_settings", [
     env.DB.prepare(
       `INSERT OR IGNORE INTO feature_settings (
         id, company_id, feature_key, feature_name, is_enabled, status,
@@ -235,6 +290,9 @@ export const cloneCompanyDefaults = async (env: Env, companyId: string, company:
         offline_enabled, audit_enabled, effective_from, ?, ?
        FROM feature_settings WHERE company_id = ?`,
     ).bind(companyId, companyId, timestamp, timestamp, SEED_COMPANY_ID),
+  ]);
+
+  await copyOptionalBootstrapDefaults(env, "approval_workflows", [
     env.DB.prepare(
       `INSERT OR IGNORE INTO approval_workflows (
         id, company_id, workflow_key, workflow_name, module, is_enabled, approval_mode, created_at, updated_at
@@ -242,6 +300,9 @@ export const cloneCompanyDefaults = async (env: Env, companyId: string, company:
        SELECT ? || '_workflow_' || workflow_key, ?, workflow_key, workflow_name, module, is_enabled, approval_mode, ?, ?
        FROM approval_workflows WHERE company_id = ?`,
     ).bind(companyId, companyId, timestamp, timestamp, SEED_COMPANY_ID),
+  ]);
+
+  await copyOptionalBootstrapDefaults(env, "approval_steps", [
     env.DB.prepare(
       `INSERT OR IGNORE INTO approval_steps (
         id, company_id, workflow_id, step_order, step_name, required_role_key,
@@ -254,6 +315,9 @@ export const cloneCompanyDefaults = async (env: Env, companyId: string, company:
        JOIN approval_workflows w ON w.id = s.workflow_id AND w.company_id = s.company_id
        WHERE s.company_id = ?`,
     ).bind(companyId, companyId, companyId, timestamp, timestamp, SEED_COMPANY_ID),
+  ]);
+
+  await copyOptionalBootstrapDefaults(env, "approval_thresholds", [
     env.DB.prepare(
       `INSERT OR IGNORE INTO approval_thresholds (
         id, company_id, workflow_key, threshold_name, threshold_type,
@@ -266,6 +330,9 @@ export const cloneCompanyDefaults = async (env: Env, companyId: string, company:
         required_roles_json, required_permissions_json, is_active, effective_from, ?, ?
        FROM approval_thresholds WHERE company_id = ?`,
     ).bind(companyId, companyId, timestamp, timestamp, SEED_COMPANY_ID),
+  ]);
+
+  await copyOptionalBootstrapDefaults(env, "leave_types", [
     env.DB.prepare(
       `INSERT OR IGNORE INTO leave_types (
         id, company_id, leave_key, leave_name, is_statutory, is_enabled, is_paid,
@@ -275,6 +342,9 @@ export const cloneCompanyDefaults = async (env: Env, companyId: string, company:
         default_days, requires_attachment, affects_payroll, ?, ?
        FROM leave_types WHERE company_id = ?`,
     ).bind(companyId, companyId, timestamp, timestamp, SEED_COMPANY_ID),
+  ]);
+
+  await copyOptionalBootstrapDefaults(env, "document_categories", [
     env.DB.prepare(
       `INSERT OR IGNORE INTO document_categories (
         id, company_id, category_key, category_name, is_sensitive, requires_expiry_date,
@@ -287,7 +357,7 @@ export const cloneCompanyDefaults = async (env: Env, companyId: string, company:
   ]);
 };
 
-export const ensureProductionFallbackDefaults = (env: Env, companyId: string) => {
+export const ensureProductionFallbackDefaults = async (env: Env, companyId: string) => {
   const timestamp = now();
   const approvalRules = JSON.stringify({
     approval_workflows_enabled: true,
@@ -309,13 +379,16 @@ export const ensureProductionFallbackDefaults = (env: Env, companyId: string) =>
     ["approvals", "Approvals"],
   ];
 
-  return env.DB.batch([
+  await copyOptionalBootstrapDefaults(env, "fallback_company_settings", [
     env.DB.prepare(
       `INSERT OR IGNORE INTO company_settings (
         id, company_id, setting_key, setting_group, setting_value_json,
         effective_from, created_by, updated_by, created_at, updated_at
       ) VALUES (?, ?, 'approvals.default_rules', 'approvals', ?, NULL, NULL, NULL, ?, ?)`,
     ).bind(`${companyId}_setting_approvals_default_rules`, companyId, approvalRules, timestamp, timestamp),
+  ]);
+
+  await copyOptionalBootstrapDefaults(env, "fallback_feature_settings", [
     ...features.map(([featureKey, featureName]) =>
       env.DB.prepare(
         `INSERT OR IGNORE INTO feature_settings (
