@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { BOOTSTRAP_MESSAGES, DEFAULT_COUNTRY, DEFAULT_CURRENCY, DEFAULT_TIMEZONE } from "../src/modules/bootstrap/bootstrap.constants";
+import { cloneCompanyDefaults, ensureCompanySuperAdminRole } from "../src/modules/bootstrap/bootstrap.repository";
 import { isStrongBootstrapPassword, validateBootstrapInitialize } from "../src/modules/bootstrap/bootstrap.validators";
 import { ValidationError } from "../src/utils/errors";
 
@@ -78,6 +79,65 @@ describe("bootstrap validators", () => {
     expect(BOOTSTRAP_MESSAGES.required).toBe("Initial setup is required.");
     expect(BOOTSTRAP_MESSAGES.completed).toBe("Initial setup has already been completed.");
     expect(BOOTSTRAP_MESSAGES.invalidToken).toBe("Bootstrap token is invalid.");
+  });
+
+  it("does not fail bootstrap default cloning when optional defaults are unavailable", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    let batchCalls = 0;
+    const env = {
+      DB: {
+        prepare: (sql: string) => ({
+          bind: (...values: unknown[]) => ({ sql, values }),
+        }),
+        batch: async () => {
+          batchCalls += 1;
+          if (batchCalls > 1) {
+            throw new Error("Optional table is not available.");
+          }
+          return [];
+        },
+      },
+    } as unknown as Env;
+
+    try {
+      await expect(cloneCompanyDefaults(env, "company_1", {
+        company_name: "Cafe Asiana",
+        legal_name: null,
+        registration_number: null,
+        country: "MV",
+        timezone: "Indian/Maldives",
+        currency: "MVR",
+      })).resolves.toBeUndefined();
+      expect(batchCalls).toBeGreaterThan(1);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("ensures fallback Super Admin role uses the expected role key", async () => {
+    let capturedValues: unknown[] = [];
+    const env = {
+      DB: {
+        prepare: () => ({
+          bind: (...values: unknown[]) => {
+            capturedValues = values;
+            return {
+              run: async () => ({ success: true }),
+            };
+          },
+        }),
+      },
+    } as unknown as Env;
+
+    await ensureCompanySuperAdminRole(env, "company_1", {
+      role_key: "SUPER_ADMIN",
+      role_name: "Super Admin",
+      description: "Full access",
+      is_system_role: 1,
+    });
+
+    expect(capturedValues[0]).toBe("company_1_role_super_admin");
+    expect(capturedValues[2]).toBe("super_admin");
   });
 });
 
