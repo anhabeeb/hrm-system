@@ -26,11 +26,18 @@ const assertBootstrapToken = (env: Env, authorization: string | null | undefined
 };
 
 export const getBootstrapStatus = async (env: Env): Promise<BootstrapStatus> => {
+  const bootstrapState = await repository.findSystemBootstrap(env);
   const [companyCount, userCount, superAdminCount] = await Promise.all([
     repository.countCompanies(env),
     repository.countUsers(env),
     repository.countSuperAdmins(env),
   ]);
+
+  if (bootstrapState?.is_initialized === 1) {
+    return {
+      setup_required: false,
+    };
+  }
 
   return {
     setup_required: userCount === 0 && superAdminCount === 0 && companyCount === 0,
@@ -96,6 +103,15 @@ export const initializeBootstrap = async (
     // adapter weakens that guarantee, this is the safe place to disable user.
     console.error("Initial setup could not be completed", { error });
     throw new AppError("Initial setup could not be completed. Please review the setup details and try again.", "BOOTSTRAP_INITIALIZE_FAILED", 500);
+  }
+
+  try {
+    await repository.markSystemBootstrapInitialized(env, {
+      companyId,
+      initializedByUserId: userId,
+    });
+  } catch (error) {
+    console.warn("System bootstrap status could not be marked initialized", { error });
   }
 
   return {

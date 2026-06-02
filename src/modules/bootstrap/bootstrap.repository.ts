@@ -1,5 +1,5 @@
 import { SEED_COMPANY_ID } from "./bootstrap.constants";
-import type { BootstrapCompanyInput, BootstrapOutletInput, BootstrapSuperAdminInput } from "./bootstrap.types";
+import type { BootstrapCompanyInput, BootstrapOutletInput, BootstrapSuperAdminInput, SystemBootstrapRow } from "./bootstrap.types";
 
 const bind = (statement: D1PreparedStatement, values: readonly unknown[]) =>
   statement.bind(...(values as Parameters<D1PreparedStatement["bind"]>));
@@ -7,6 +7,16 @@ const one = <T>(env: Env, sql: string, values: readonly unknown[] = []) => bind(
 const run = (env: Env, sql: string, values: readonly unknown[] = []) => bind(env.DB.prepare(sql), values).run();
 
 const now = () => new Date().toISOString();
+
+const isMissingSystemBootstrapTableError = (error: unknown): boolean =>
+  error instanceof Error && /no such table:\s*system_bootstrap/i.test(error.message);
+
+const logSystemBootstrapTableMissing = (operation: string, error: unknown) => {
+  console.warn("System bootstrap table is not available yet", {
+    operation,
+    error,
+  });
+};
 
 const logOptionalBootstrapDefaultFailure = (label: string, error: unknown) => {
   console.warn("Optional bootstrap defaults could not be copied", {
@@ -37,6 +47,84 @@ export const countSuperAdmins = async (env: Env) => {
        AND (lower(r.role_key) = 'super_admin' OR lower(r.role_name) = 'super admin')`,
   );
   return row?.total ?? 0;
+};
+
+export const ensureSystemBootstrapRow = async (env: Env): Promise<boolean> => {
+  try {
+    await run(
+      env,
+      `INSERT OR IGNORE INTO system_bootstrap (
+        id,
+        is_initialized,
+        created_at,
+        updated_at
+      ) VALUES (
+        'default',
+        0,
+        CURRENT_TIMESTAMP,
+        CURRENT_TIMESTAMP
+      )`,
+    );
+    return true;
+  } catch (error) {
+    if (isMissingSystemBootstrapTableError(error)) {
+      logSystemBootstrapTableMissing("ensure_default_row", error);
+      return false;
+    }
+
+    throw error;
+  }
+};
+
+export const findSystemBootstrap = async (env: Env): Promise<SystemBootstrapRow | null> => {
+  const available = await ensureSystemBootstrapRow(env);
+  if (!available) return null;
+
+  try {
+    return await one<SystemBootstrapRow>(
+      env,
+      "SELECT * FROM system_bootstrap WHERE id = 'default' LIMIT 1",
+    ) ?? null;
+  } catch (error) {
+    if (isMissingSystemBootstrapTableError(error)) {
+      logSystemBootstrapTableMissing("read_default_row", error);
+      return null;
+    }
+
+    throw error;
+  }
+};
+
+export const markSystemBootstrapInitialized = async (
+  env: Env,
+  input: {
+    companyId: string;
+    initializedByUserId: string;
+  },
+): Promise<void> => {
+  const available = await ensureSystemBootstrapRow(env);
+  if (!available) return;
+
+  try {
+    await run(
+      env,
+      `UPDATE system_bootstrap
+       SET is_initialized = 1,
+           company_id = ?,
+           initialized_by_user_id = ?,
+           initialized_at = COALESCE(initialized_at, CURRENT_TIMESTAMP),
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = 'default'`,
+      [input.companyId, input.initializedByUserId],
+    );
+  } catch (error) {
+    if (isMissingSystemBootstrapTableError(error)) {
+      logSystemBootstrapTableMissing("mark_initialized", error);
+      return;
+    }
+
+    throw error;
+  }
 };
 
 export const findSeedSuperAdminRole = (env: Env) =>

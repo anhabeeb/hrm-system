@@ -28,3 +28,13 @@ export interface BootstrapInitializeInput {
 export interface BootstrapStatus {
   setup_required: boolean;
 }
+
+export interface SystemBootstrapRow {
+  id: string;
+  is_initialized: number;
+  company_id: string | null;
+  initialized_by_user_id: string | null;
+  initialized_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
