@@ -10,6 +10,7 @@ declare global {
     PASSWORD_PEPPER: string;
     DEVICE_TOKEN_SECRET: string;
     TOTP_ENCRYPTION_KEY: string;
+    BOOTSTRAP_ADMIN_TOKEN?: string;
   }
 }
 

@@ -19,20 +19,20 @@ approvalsRoutes.get("/workflows", requirePermission("approval_workflows.view"), 
 approvalsRoutes.post("/workflows", requirePermission("approval_workflows.manage"), requireReason(), controller.createWorkflow);
 approvalsRoutes.get("/workflows/:workflowId", requirePermission("approval_workflows.view"), controller.getWorkflow);
 approvalsRoutes.patch("/workflows/:workflowId", requirePermission("approval_workflows.manage"), controller.updateWorkflow);
-approvalsRoutes.post("/workflows/:workflowId/enable", requirePermission("approval_workflows.enable_disable"), requireReason(), controller.enableWorkflow);
-approvalsRoutes.post("/workflows/:workflowId/disable", requirePermission("approval_workflows.enable_disable"), requireReason(), controller.disableWorkflow);
-approvalsRoutes.get("/workflows/:workflowId/steps", requirePermission("approval_steps.view"), controller.listWorkflowSteps);
-approvalsRoutes.post("/workflows/:workflowId/steps", requirePermission("approval_steps.manage"), requireReason(), controller.createWorkflowStep);
-approvalsRoutes.patch("/workflows/:workflowId/steps/:stepId", requirePermission("approval_steps.manage"), requireReason(), controller.updateWorkflowStep);
-approvalsRoutes.delete("/workflows/:workflowId/steps/:stepId", requirePermission("approval_steps.manage"), requireReason(), controller.deleteWorkflowStep);
+approvalsRoutes.post("/workflows/:workflowId/enable", requirePermission("approval_workflows.manage"), requireReason(), controller.enableWorkflow);
+approvalsRoutes.post("/workflows/:workflowId/disable", requirePermission("approval_workflows.manage"), requireReason(), controller.disableWorkflow);
+approvalsRoutes.get("/workflows/:workflowId/steps", requirePermission("approval_workflows.view"), controller.listWorkflowSteps);
+approvalsRoutes.post("/workflows/:workflowId/steps", requirePermission("approval_workflows.manage"), requireReason(), controller.createWorkflowStep);
+approvalsRoutes.patch("/workflows/:workflowId/steps/:stepId", requirePermission("approval_workflows.manage"), requireReason(), controller.updateWorkflowStep);
+approvalsRoutes.delete("/workflows/:workflowId/steps/:stepId", requirePermission("approval_workflows.manage"), requireReason(), controller.deleteWorkflowStep);
 
 approvalsRoutes.get("/thresholds", requirePermission("approval_thresholds.view"), controller.listThresholds);
-approvalsRoutes.post("/thresholds", requirePermission("approval_thresholds.manage"), requireReason(), controller.createThreshold);
+approvalsRoutes.post("/thresholds", requirePermission("approval_thresholds.edit"), requireReason(), controller.createThreshold);
 approvalsRoutes.get("/thresholds/:thresholdId", requirePermission("approval_thresholds.view"), controller.getThreshold);
-approvalsRoutes.patch("/thresholds/:thresholdId", requirePermission("approval_thresholds.manage"), requireReason(), controller.updateThreshold);
-approvalsRoutes.post("/thresholds/:thresholdId/enable", requirePermission("approval_thresholds.enable_disable"), requireReason(), controller.enableThreshold);
-approvalsRoutes.post("/thresholds/:thresholdId/disable", requirePermission("approval_thresholds.enable_disable"), requireReason(), controller.disableThreshold);
-approvalsRoutes.get("/thresholds/:thresholdId/history", requirePermission("approval_thresholds.view_history"), controller.getThresholdHistory);
+approvalsRoutes.patch("/thresholds/:thresholdId", requirePermission("approval_thresholds.edit"), requireReason(), controller.updateThreshold);
+approvalsRoutes.post("/thresholds/:thresholdId/enable", requirePermission("approval_thresholds.edit"), requireReason(), controller.enableThreshold);
+approvalsRoutes.post("/thresholds/:thresholdId/disable", requirePermission("approval_thresholds.edit"), requireReason(), controller.disableThreshold);
+approvalsRoutes.get("/thresholds/:thresholdId/history", requirePermission("approval_thresholds.view"), controller.getThresholdHistory);
 
 approvalsRoutes.get("/", requirePermission("approvals.view"), controller.listApprovals);
 approvalsRoutes.get("/:id/history", requirePermission("approvals.view_history"), controller.getHistory);

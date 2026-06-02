@@ -16,6 +16,7 @@ attendanceRoutes.get("/", requirePermission("attendance.view"), controller.listA
 attendanceRoutes.get("/today", requirePermission("attendance.view"), controller.today);
 attendanceRoutes.get("/monthly", requirePermission("attendance.view"), controller.monthly);
 attendanceRoutes.get("/summary", requirePermission("attendance.view"), controller.summary);
+attendanceRoutes.get("/events", requirePermission("attendance.view"), controller.listEvents);
 attendanceRoutes.get("/events/:id", requirePermission("attendance.view"), controller.getEvent);
 attendanceRoutes.post("/clock-in", requireAnyPermission(["attendance.create", "attendance.manual_entry"]), controller.clockIn);
 attendanceRoutes.post("/clock-out", requireAnyPermission(["attendance.create", "attendance.manual_entry"]), controller.clockOut);

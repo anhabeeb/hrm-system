@@ -18,7 +18,7 @@ export const broadcastEvent = async <TPayload>(
     headers: {
       "content-type": "application/json",
     },
-    body: JSON.stringify(input),
+    body: JSON.stringify(sanitizeSensitivePayload(input)),
   });
 
   return {
@@ -27,3 +27,4 @@ export const broadcastEvent = async <TPayload>(
     status: response.status,
   };
 };
+import { sanitizeSensitivePayload } from "../utils/sanitize";
