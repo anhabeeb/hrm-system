@@ -1,7 +1,14 @@
 import { getApiUrl } from "@/app/config";
 import type { ApiErrorResponse, ApiResponse, StandardApiResponse } from "@/types/api";
 
-import { ApiError, friendlyMessageForStatus, handleSessionExpired } from "./api-errors";
+import {
+  ApiError,
+  createInvalidApiResponseError,
+  createNetworkError,
+  createTimeoutError,
+  friendlyMessageForStatus,
+  handleSessionExpired,
+} from "./api-errors";
 import { getAuthToken } from "./auth-token";
 
 type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE";
@@ -9,22 +16,45 @@ type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE";
 interface RequestOptions {
   headers?: Record<string, string>;
   suppressSessionExpired?: boolean;
+  timeoutMs?: number;
 }
 
-const parseResponse = async <T>(response: Response, options: RequestOptions = {}): Promise<ApiResponse<T>> => {
+const DEFAULT_TIMEOUT_MS = 30_000;
+
+const parseResponse = async <T>(
+  response: Response,
+  requestMeta: { method: HttpMethod; path: string },
+  options: RequestOptions = {},
+): Promise<ApiResponse<T>> => {
   const contentType = response.headers.get("content-type") ?? "";
   const body = contentType.includes("application/json")
     ? ((await response.json()) as StandardApiResponse<T>)
     : null;
 
   if (!response.ok || !body || body.success === false) {
+    if (!body) {
+      const invalidError = createInvalidApiResponseError(response.status);
+      if (!options.suppressSessionExpired) {
+        handleSessionExpired(invalidError);
+      }
+      throw invalidError;
+    }
+
     const errorBody = body as ApiErrorResponse | null;
     const message = errorBody?.error?.message ?? friendlyMessageForStatus(response.status);
     const error = new ApiError(message, {
       code: errorBody?.error?.code ?? `HTTP_${response.status}`,
       status: response.status,
-      requestId: errorBody?.request_id,
-      details: "details" in (errorBody?.error ?? {}) ? (errorBody?.error as { details?: unknown }).details : undefined,
+      title: errorBody?.error?.title,
+      requestId: errorBody?.error?.requestId ?? errorBody?.requestId ?? errorBody?.request_id ?? response.headers.get("x-request-id") ?? undefined,
+      technicalMessage: errorBody?.error?.technicalMessage,
+      route: errorBody?.error?.route ?? requestMeta.path,
+      method: errorBody?.error?.method ?? requestMeta.method,
+      step: errorBody?.error?.step,
+      retryable: errorBody?.error?.retryable,
+      suggestedAction: errorBody?.error?.suggestedAction,
+      fieldErrors: errorBody?.error?.fieldErrors,
+      details: errorBody?.error?.details,
     });
     if (!options.suppressSessionExpired) {
       handleSessionExpired(error);
@@ -59,21 +89,26 @@ const request = async <T>(
   }
 
   let response: Response;
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   try {
     response = await fetch(getApiUrl(path), {
       method,
       headers,
       credentials: "include",
       body: body === undefined ? undefined : JSON.stringify(body),
+      signal: controller.signal,
     });
-  } catch {
-    throw new ApiError("Unable to connect to the server. Please check your connection and try again.", {
-      code: "NETWORK_ERROR",
-      status: 0,
-    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw createTimeoutError();
+    }
+    throw createNetworkError();
+  } finally {
+    window.clearTimeout(timeoutId);
   }
 
-  return parseResponse<T>(response, options);
+  return parseResponse<T>(response, { method, path }, options);
 };
 
 export const api = {
@@ -92,7 +127,7 @@ export const api = {
     });
 
     if (!response.ok) {
-      await parseResponse<never>(response);
+      await parseResponse<never>(response, { method: "GET", path });
     }
 
     return response.blob();
