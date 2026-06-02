@@ -8,6 +8,7 @@ declare global {
     SESSION_SECRET: string;
     JWT_SECRET: string;
     PASSWORD_PEPPER: string;
+    PASSWORD_HASH_ITERATIONS?: string;
     DEVICE_TOKEN_SECRET: string;
     TOTP_ENCRYPTION_KEY: string;
     BOOTSTRAP_ADMIN_TOKEN?: string;

@@ -59,6 +59,21 @@ export const classifyError = (
   const technicalMessage = sanitizeTechnicalMessage(rawMessage);
   const lower = rawMessage.toLowerCase();
 
+  if (/pbkdf2 failed: iteration counts above 100000 are not supported/i.test(rawMessage)) {
+    return withContext(
+      new ConfigurationError({
+        code: "PASSWORD_HASH_CONFIGURATION_ERROR",
+        title: "Password hashing configuration error",
+        message: "The password could not be securely hashed because the configured PBKDF2 iteration count is not supported by the current runtime.",
+        technicalMessage,
+        suggestedAction: "Set PASSWORD_HASH_ITERATIONS to 100000 or lower for Cloudflare Workers, then retry.",
+        retryable: false,
+        cause: error,
+      }),
+      context,
+    );
+  }
+
   const missingTableMatch = rawMessage.match(/no such table:\s*([a-zA-Z0-9_]+)/i);
   if (missingTableMatch) {
     return withContext(
