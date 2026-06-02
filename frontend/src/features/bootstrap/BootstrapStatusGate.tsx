@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 
 import { LoadingState } from "@/components/data/LoadingState";
-import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { AppErrorAlert } from "@/components/feedback/AppErrorAlert";
 
 import { bootstrapApi } from "./bootstrap.api";
 
@@ -22,9 +22,12 @@ export const BootstrapStatusGate = ({ children }: { children: ReactNode }) => {
   if (statusQuery.isError) {
     return (
       <div className="mx-auto flex min-h-screen max-w-xl items-center px-6">
-        <InlineAlert title="Unable to check setup status" variant="warning">
-          You can still try refreshing the page. If this continues, please contact your administrator.
-        </InlineAlert>
+        <AppErrorAlert
+          error={statusQuery.error instanceof Error ? statusQuery.error : null}
+          fallbackTitle="Unable to check setup status"
+          fallbackMessage="You can still try refreshing the page. If this continues, please contact your administrator."
+          onRetry={() => void statusQuery.refetch()}
+        />
       </div>
     );
   }

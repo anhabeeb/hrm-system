@@ -68,7 +68,7 @@ const toPayload = (values: SetupValues): BootstrapInitializePayload => ({
 export const FirstTimeSetupForm = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [error, setError] = useState<{ message: string; requestId?: string } | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
   const [success, setSuccess] = useState(false);
   const form = useForm<SetupValues>({
     resolver: zodResolver(setupSchema),
@@ -91,19 +91,19 @@ export const FirstTimeSetupForm = () => {
       window.setTimeout(() => navigate("/login", { replace: true, state: { message: "Initial setup completed. Please log in." } }), 900);
     } catch (err) {
       if (err instanceof ApiError) {
-        const message =
-          err.code === "BOOTSTRAP_ALREADY_COMPLETED"
-            ? "Initial setup has already been completed."
-            : err.code === "BOOTSTRAP_TOKEN_INVALID"
-              ? "Bootstrap token is invalid."
-              : err.code === "BOOTSTRAP_ROLE_MISSING"
-                ? "Super Admin role is missing. Please run the seed files first."
-                : err.status === 422
-                  ? "The setup could not be completed. Please review the form and try again."
-                  : err.message;
-        setError({ message, requestId: err.requestId });
+        for (const [field, message] of Object.entries(err.fieldErrors ?? {})) {
+          if (field in defaults) {
+            form.setError(field as keyof SetupValues, { type: "server", message });
+          }
+        }
+        setError(err);
       } else {
-        setError({ message: "The setup could not be completed. Please review the form and try again." });
+        setError(new ApiError("The setup could not be completed. Please review the form and try again.", {
+          code: "SETUP_FAILED",
+          title: "Setup failed",
+          status: 0,
+          retryable: true,
+        }));
       }
     }
   };
@@ -112,7 +112,7 @@ export const FirstTimeSetupForm = () => {
     <Form {...form}>
       <form className="space-y-6" onSubmit={form.handleSubmit(onSubmit)}>
         {success ? <InlineAlert title="Initial setup completed successfully." variant="success">Redirecting to login...</InlineAlert> : null}
-        <FormError message={error?.message} requestId={error?.requestId} />
+        <FormError error={error} />
 
         <section className="space-y-4">
           <div>
