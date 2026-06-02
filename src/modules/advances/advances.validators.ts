@@ -26,12 +26,19 @@ const requireMinorUnits = (value: unknown, label = "Amount") => {
 
 export const validateAdvanceFilters = (query: Record<string, unknown>): AdvanceFilters => {
   const status = asString(query.status);
+  const dateFrom = asString(query.date_from);
+  const dateTo = asString(query.date_to);
   if (status && !ADVANCE_STATUSES.includes(status as any)) throw new ValidationError("Please select a valid advance status.");
+  if (dateFrom && !isDate(dateFrom)) throw new ValidationError("Please choose a valid start date.");
+  if (dateTo && !isDate(dateTo)) throw new ValidationError("Please choose a valid end date.");
+  if (dateFrom && dateTo && dateFrom > dateTo) throw new ValidationError("Start date must be before or equal to end date.");
   return {
     employee_id: asString(query.employee_id),
     outlet_id: asString(query.outlet_id),
     status,
     deduction_month: asString(query.deduction_month),
+    date_from: dateFrom,
+    date_to: dateTo,
     page: page(query.page),
     page_size: pageSize(query.page_size),
   };

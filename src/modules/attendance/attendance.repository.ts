@@ -1,5 +1,6 @@
 import type {
   AttendanceEventRecord,
+  AttendanceEventListRow,
   AttendanceListFilters,
   AttendanceListRow,
   AttendanceOutletScope,
@@ -130,6 +131,127 @@ export const listAttendance = (
      LEFT JOIN outlets o ON o.id = s.outlet_id
      WHERE ${built.sql}
      ORDER BY ${filters.sort_by === "employee_name" ? "e.full_name" : filters.sort_by === "employee_code" ? "e.employee_code" : filters.sort_by === "outlet_name" ? "o.name" : `s.${filters.sort_by}`} ${filters.sort_direction.toUpperCase()}
+     LIMIT ? OFFSET ?`,
+    [...built.values, filters.page_size, (filters.page - 1) * filters.page_size],
+  );
+};
+
+const eventWhere = (
+  companyId: string,
+  filters: AttendanceListFilters,
+  scope: AttendanceOutletScope,
+) => {
+  const clauses = ["ev.company_id = ?"];
+  const values: unknown[] = [companyId];
+  applyOutletScope(clauses, values, "ev", filters, scope);
+
+  if (filters.employee_id) {
+    clauses.push("ev.employee_id = ?");
+    values.push(filters.employee_id);
+  }
+  if (filters.outlet_id) {
+    clauses.push("ev.outlet_id = ?");
+    values.push(filters.outlet_id);
+  }
+  if (filters.device_id) {
+    clauses.push("ev.device_id = ?");
+    values.push(filters.device_id);
+  }
+  if (filters.event_type) {
+    clauses.push("ev.event_type = ?");
+    values.push(filters.event_type);
+  }
+  if (filters.attendance_method) {
+    clauses.push("ev.attendance_method = ?");
+    values.push(filters.attendance_method);
+  }
+  if (filters.source) {
+    clauses.push("ev.source = ?");
+    values.push(filters.source);
+  }
+  if (filters.sync_status) {
+    clauses.push("ev.sync_status = ?");
+    values.push(filters.sync_status);
+  }
+  if (filters.approval_status) {
+    clauses.push("ev.approval_status = ?");
+    values.push(filters.approval_status);
+  }
+  if (filters.date_from) {
+    clauses.push("substr(ev.event_time, 1, 10) >= ?");
+    values.push(filters.date_from);
+  }
+  if (filters.date_to) {
+    clauses.push("substr(ev.event_time, 1, 10) <= ?");
+    values.push(filters.date_to);
+  }
+
+  return { sql: clauses.join(" AND "), values };
+};
+
+const eventOrderBy = (sortBy: AttendanceListFilters["sort_by"]) => {
+  if (sortBy === "employee_name") return "e.full_name";
+  if (sortBy === "employee_code") return "e.employee_code";
+  if (sortBy === "outlet_name") return "o.name";
+  if (sortBy === "created_at") return "ev.created_at";
+  if (sortBy === "updated_at") return "ev.updated_at";
+  if (sortBy === "status") return "ev.approval_status";
+  return "ev.event_time";
+};
+
+export const countAttendanceEvents = async (
+  env: Env,
+  companyId: string,
+  filters: AttendanceListFilters,
+  scope: AttendanceOutletScope,
+) => {
+  const built = eventWhere(companyId, filters, scope);
+  const row = await one<{ total: number }>(
+    env,
+    `SELECT COUNT(*) AS total
+     FROM attendance_events ev
+     LEFT JOIN employees e ON e.id = ev.employee_id AND e.company_id = ev.company_id
+     LEFT JOIN devices d ON d.id = ev.device_id AND d.company_id = ev.company_id
+     WHERE ${built.sql}`,
+    built.values,
+  );
+  return row?.total ?? 0;
+};
+
+export const listAttendanceEvents = (
+  env: Env,
+  companyId: string,
+  filters: AttendanceListFilters,
+  scope: AttendanceOutletScope,
+) => {
+  const built = eventWhere(companyId, filters, scope);
+  return many<AttendanceEventListRow>(
+    env,
+    `SELECT
+       ev.id,
+       ev.employee_id,
+       e.employee_code,
+       e.full_name AS employee_name,
+       ev.outlet_id,
+       o.name AS outlet_name,
+       ev.device_id,
+       d.device_name,
+       ev.event_type,
+       ev.event_time,
+       ev.event_time AS event_timestamp,
+       ev.attendance_method,
+       ev.source,
+       ev.sync_status,
+       ev.approval_status,
+       ev.approval_status AS status,
+       ev.created_at,
+       ev.updated_at
+     FROM attendance_events ev
+     LEFT JOIN employees e ON e.id = ev.employee_id AND e.company_id = ev.company_id
+     LEFT JOIN outlets o ON o.id = ev.outlet_id AND o.company_id = ev.company_id
+     LEFT JOIN devices d ON d.id = ev.device_id AND d.company_id = ev.company_id
+     WHERE ${built.sql}
+     ORDER BY ${eventOrderBy(filters.sort_by)} ${filters.sort_direction.toUpperCase()}
      LIMIT ? OFFSET ?`,
     [...built.values, filters.page_size, (filters.page - 1) * filters.page_size],
   );

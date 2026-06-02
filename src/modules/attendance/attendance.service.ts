@@ -392,6 +392,25 @@ export const listAttendance = async (
   return { rows, pagination };
 };
 
+export const listAttendanceEvents = async (
+  env: Env,
+  context: AuthActor,
+  filters: AttendanceListFilters,
+) => {
+  const scope = outletScope(context);
+  const [total, rows] = await Promise.all([
+    repository.countAttendanceEvents(env, context.companyId, filters, scope),
+    repository.listAttendanceEvents(env, context.companyId, filters, scope),
+  ]);
+  const pagination: PaginationMeta = {
+    page: filters.page,
+    page_size: filters.page_size,
+    total,
+    total_pages: Math.ceil(total / filters.page_size),
+  };
+  return { rows, pagination };
+};
+
 export const clockIn = async (
   env: Env,
   context: AuthActor,

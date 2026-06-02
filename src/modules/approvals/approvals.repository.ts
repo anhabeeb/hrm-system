@@ -56,6 +56,24 @@ const requestWhere = (companyId: string, filters: ApprovalListFilters, scope: Ap
   return { sql: clauses.join(" AND "), values };
 };
 
+const requestFilterWhere = (companyId: string, filters: ApprovalListFilters) => {
+  const clauses = ["r.company_id = ?"];
+  const values: unknown[] = [companyId];
+  if (filters.status) { clauses.push("r.status = ?"); values.push(filters.status); }
+  if (filters.module) { clauses.push("r.module = ?"); values.push(filters.module); }
+  if (filters.workflow_id) { clauses.push("r.workflow_id = ?"); values.push(filters.workflow_id); }
+  if (filters.workflow_key) { clauses.push("w.workflow_key = ?"); values.push(filters.workflow_key); }
+  if (filters.entity_type) { clauses.push("r.entity_type = ?"); values.push(filters.entity_type); }
+  if (filters.entity_id) { clauses.push("r.entity_id = ?"); values.push(filters.entity_id); }
+  if (filters.employee_id) { clauses.push("r.employee_id = ?"); values.push(filters.employee_id); }
+  if (filters.outlet_id) { clauses.push("e.primary_outlet_id = ?"); values.push(filters.outlet_id); }
+  if (filters.requested_by) { clauses.push("r.requested_by = ?"); values.push(filters.requested_by); }
+  if (filters.current_step) { clauses.push("r.current_step = ?"); values.push(filters.current_step); }
+  if (filters.date_from) { clauses.push("r.created_at >= ?"); values.push(filters.date_from); }
+  if (filters.date_to) { clauses.push("r.created_at <= ?"); values.push(filters.date_to); }
+  return { sql: clauses.join(" AND "), values };
+};
+
 const requestSelect = `
   FROM approval_requests r
   JOIN approval_workflows w ON w.id = r.workflow_id AND w.company_id = r.company_id
@@ -85,6 +103,22 @@ export const listRequests = (env: Env, companyId: string, filters: ApprovalListF
      ORDER BY r.${filters.sort_by} ${filters.sort_direction.toUpperCase()}
      LIMIT ? OFFSET ?`,
     [...built.values, filters.page_size, (filters.page - 1) * filters.page_size],
+  );
+};
+
+export const listRequestCandidates = (env: Env, companyId: string, filters: ApprovalListFilters) => {
+  const built = requestFilterWhere(companyId, filters);
+  return many<any>(
+    env,
+    `SELECT r.*, w.workflow_key, w.workflow_name, w.approval_mode,
+      e.full_name AS employee_name, e.primary_outlet_id AS outlet_id, o.name AS outlet_name,
+      u.full_name AS requested_by_name,
+      s.required_role_key AS waiting_for_role_key, s.required_permission_key AS waiting_for_permission_key
+     ${requestSelect}
+     WHERE ${built.sql}
+     GROUP BY r.id
+     ORDER BY r.${filters.sort_by} ${filters.sort_direction.toUpperCase()}`,
+    built.values,
   );
 };
 
@@ -123,6 +157,23 @@ export const updateRequestStatus = (env: Env, companyId: string, id: string, sta
      WHERE company_id = ? AND id = ?`,
     [status, currentStep ?? null, new Date().toISOString(), companyId, id],
   );
+
+export const runApprovalActionStatements = (
+  env: Env,
+  input: { actionId: string; companyId: string; requestId: string; stepOrder: number; action: string; actedBy: string; comment: string; oldStatus: string; newStatus: string; currentStep?: number },
+) =>
+  env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO approval_actions (
+        id, company_id, approval_request_id, step_order, action, acted_by,
+        comment, old_status, new_status, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(input.actionId, input.companyId, input.requestId, input.stepOrder, input.action, input.actedBy, input.comment, input.oldStatus, input.newStatus, new Date().toISOString()),
+    env.DB.prepare(
+      `UPDATE approval_requests SET status = ?, current_step = COALESCE(?, current_step), updated_at = ?
+       WHERE company_id = ? AND id = ?`,
+    ).bind(input.newStatus, input.currentStep ?? null, new Date().toISOString(), input.companyId, input.requestId),
+  ]);
 
 export const createAction = (env: Env, input: { id: string; companyId: string; requestId: string; stepOrder: number; action: string; actedBy: string; comment: string; oldStatus: string; newStatus: string }) =>
   run(
@@ -230,6 +281,24 @@ export const countPendingRequestsAtStep = async (env: Env, companyId: string, wo
   return row?.total ?? 0;
 };
 
+export const findStepByOrder = (env: Env, companyId: string, workflowId: string, stepOrder: number, excludeStepId?: string) =>
+  one<any>(
+    env,
+    `SELECT * FROM approval_steps WHERE company_id = ? AND workflow_id = ? AND step_order = ?
+     ${excludeStepId ? "AND id <> ?" : ""}
+     LIMIT 1`,
+    excludeStepId ? [companyId, workflowId, stepOrder, excludeStepId] : [companyId, workflowId, stepOrder],
+  );
+
+export const countOpenRequestsForWorkflow = async (env: Env, companyId: string, workflowId: string) => {
+  const row = await one<{ total: number }>(
+    env,
+    "SELECT COUNT(*) AS total FROM approval_requests WHERE company_id = ? AND workflow_id = ? AND status IN ('pending', 'in_progress', 'returned', 'returned_for_more_info')",
+    [companyId, workflowId],
+  );
+  return row?.total ?? 0;
+};
+
 const thresholdWhere = (companyId: string, filters: ThresholdFilters) => {
   const clauses = ["company_id = ?"];
   const values: unknown[] = [companyId];
@@ -249,6 +318,15 @@ export const listThresholds = (env: Env, companyId: string, filters: ThresholdFi
 };
 export const findThresholdById = (env: Env, companyId: string, id: string) =>
   one<any>(env, "SELECT * FROM approval_thresholds WHERE company_id = ? AND id = ? LIMIT 1", [companyId, id]);
+export const listActiveThresholdsForWorkflow = (env: Env, companyId: string, workflowKey: string, effectiveDate: string) =>
+  many<any>(
+    env,
+    `SELECT * FROM approval_thresholds
+     WHERE company_id = ? AND workflow_key = ? AND is_active = 1
+       AND (effective_from IS NULL OR effective_from <= ?)
+     ORDER BY effective_from DESC, created_at DESC`,
+    [companyId, workflowKey, effectiveDate],
+  );
 export const createThreshold = (env: Env, id: string, companyId: string, input: ThresholdInput) =>
   run(
     env,

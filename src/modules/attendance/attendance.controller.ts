@@ -31,6 +31,7 @@ const filters = (c: Context<AppContext>) =>
     attendance_date: c.req.query("attendance_date"),
     employee_id: c.req.query("employee_id"),
     outlet_id: c.req.query("outlet_id"),
+    device_id: c.req.query("device_id"),
     department_id: c.req.query("department_id"),
     position_id: c.req.query("position_id"),
     status: c.req.query("status"),
@@ -70,8 +71,15 @@ export const monthly = async (c: Context<AppContext>) => {
   return paginated(result.rows, result.pagination, "Monthly attendance loaded successfully.", { requestId: c.get("requestId") });
 };
 
-export const summary = async (c: Context<AppContext>) =>
-  ok(await service.listAttendance(c.env, actor(c), filters(c)), "Attendance summary loaded successfully.", { requestId: c.get("requestId") });
+export const summary = async (c: Context<AppContext>) => {
+  const result = await service.listAttendance(c.env, actor(c), filters(c));
+  return paginated(result.rows, result.pagination, "Attendance summary loaded successfully.", { requestId: c.get("requestId") });
+};
+
+export const listEvents = async (c: Context<AppContext>) => {
+  const result = await service.listAttendanceEvents(c.env, actor(c), filters(c));
+  return paginated(result.rows, result.pagination, "Attendance events loaded successfully.", { requestId: c.get("requestId") });
+};
 
 export const clockIn = async (c: Context<AppContext>) => {
   const result = await service.clockIn(c.env, actor(c), validateClockInput(await body(c)));

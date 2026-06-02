@@ -414,10 +414,11 @@ export const logout = async (
 
 export const getMe = async (env: Env, userId: string) => {
   const user = await ensureAuthenticated(env, userId);
-  const [roles, permissions, outletIds] = await Promise.all([
+  const [roles, permissions, outletIds, features] = await Promise.all([
     authRepository.getUserRoles(env, user.id),
     authRepository.getUserPermissions(env, user.id),
     authRepository.getUserOutletIds(env, user.id),
+    authRepository.getEnabledFeatureKeys(env, user.company_id),
   ]);
 
   return {
@@ -425,6 +426,7 @@ export const getMe = async (env: Env, userId: string) => {
     roles,
     permissions,
     outlet_ids: outletIds,
+    features,
   };
 };
 

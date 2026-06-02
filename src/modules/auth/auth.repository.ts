@@ -72,6 +72,17 @@ export const getUserOutletIds = (env: Env, userId: string): Promise<string[]> =>
     [userId, new Date().toISOString()],
   ).then((rows) => rows.map((row) => row.outlet_id));
 
+export const getEnabledFeatureKeys = (env: Env, companyId: string): Promise<string[]> =>
+  queryMany<{ feature_key: string }>(
+    env,
+    `SELECT feature_key
+     FROM feature_settings
+     WHERE company_id = ?
+       AND is_enabled = 1
+       AND status IN ('active', 'enabled')`,
+    [companyId],
+  ).then((rows) => rows.map((row) => row.feature_key));
+
 export const updateFailedLogin = (
   env: Env,
   userId: string,

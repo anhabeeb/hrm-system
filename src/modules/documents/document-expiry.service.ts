@@ -31,6 +31,7 @@ export const getMissingDocuments = async (env: Env, companyId: string, scope: Do
           employee_id: employee.id,
           employee_code: employee.employee_code,
           employee_name: employee.full_name,
+          employee_type: employee.employee_type,
           outlet_id: employee.primary_outlet_id,
           document_type: category.category_key,
           document_category_name: category.category_name,

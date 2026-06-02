@@ -26,6 +26,7 @@ export interface AttendanceListFilters {
   attendance_date?: string;
   employee_id?: string;
   outlet_id?: string;
+  device_id?: string;
   department_id?: string;
   position_id?: string;
   status?: string;
@@ -54,6 +55,27 @@ export interface AttendanceEventRecord {
   created_offline: number;
   sync_status: string;
   approval_status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AttendanceEventListRow {
+  id: string;
+  employee_id: string;
+  employee_code: string | null;
+  employee_name: string | null;
+  outlet_id: string;
+  outlet_name: string | null;
+  device_id: string | null;
+  device_name: string | null;
+  event_type: AttendanceEventType;
+  event_time: string;
+  event_timestamp: string;
+  attendance_method: AttendanceMethod;
+  source: AttendanceSource;
+  sync_status: string;
+  approval_status: string;
+  status: string;
   created_at: string;
   updated_at: string;
 }

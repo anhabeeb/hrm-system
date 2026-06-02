@@ -33,6 +33,18 @@ export interface ApprovalActionInput {
   comment?: string;
 }
 
+export interface ApprovalRequestCreateInput {
+  workflowKey: string;
+  module: string;
+  entityType: string;
+  entityId: string;
+  employeeId?: string | null;
+  summary?: string;
+  payload?: Record<string, unknown>;
+  amount?: number;
+  currency?: string;
+}
+
 export interface ApprovalOverrideInput extends ApprovalActionInput {
   decision: "approve" | "reject";
 }

@@ -39,6 +39,8 @@ const where = (companyId: string, filters: AdvanceFilters, outletIds: string[], 
   if (filters.employee_id) { clauses.push("a.employee_id = ?"); values.push(filters.employee_id); }
   if (filters.status) { clauses.push("a.status = ?"); values.push(filters.status); }
   if (filters.deduction_month) { clauses.push("a.deduction_month = ?"); values.push(filters.deduction_month); }
+  if (filters.date_from) { clauses.push("a.paid_date >= ?"); values.push(filters.date_from); }
+  if (filters.date_to) { clauses.push("a.paid_date <= ?"); values.push(filters.date_to); }
   return { sql: clauses.join(" AND "), values };
 };
 

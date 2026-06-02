@@ -15,6 +15,8 @@ export interface AdvanceFilters {
   outlet_id?: string;
   status?: string;
   deduction_month?: string;
+  date_from?: string;
+  date_to?: string;
   page: number;
   page_size: number;
 }

@@ -36,6 +36,7 @@ export const validateAttendanceListFilters = (
       attendance_date: z.string().optional(),
       employee_id: z.string().optional(),
       outlet_id: z.string().optional(),
+      device_id: z.string().trim().min(1).max(128).optional(),
       department_id: z.string().optional(),
       position_id: z.string().optional(),
       status: z.string().optional(),
