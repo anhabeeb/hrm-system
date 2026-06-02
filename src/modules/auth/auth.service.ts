@@ -28,7 +28,7 @@ import type {
   UserRecord,
 } from "./auth.types";
 import { createAuditLog } from "../../services/audit.service";
-import { hashPassword, verifyPassword } from "../../services/password.service";
+import { hashPassword, passwordNeedsRehash, verifyPassword } from "../../services/password.service";
 import {
   buildClearSessionCookie,
   buildSessionCookie,
@@ -329,6 +329,23 @@ export const login = async (
     throw new AuthError(LOGIN_ERROR_MESSAGE);
   }
 
+  if (passwordNeedsRehash(user.password_hash, env)) {
+    try {
+      const upgradedPasswordHash = await hashPassword(input.password, env.PASSWORD_PEPPER, env);
+      await authRepository.updatePassword(
+        env,
+        user.id,
+        upgradedPasswordHash,
+        PASSWORD_HASH_ALGORITHM,
+      );
+    } catch (error) {
+      console.warn("Password hash upgrade failed after successful login", {
+        userId: user.id,
+        error,
+      });
+    }
+  }
+
   if (user.two_factor_enabled === 1) {
     const twoFactor = await authRepository.getTwoFactorByUserId(env, user.id);
 
@@ -496,7 +513,7 @@ export const resetPassword = async (
   }
 
   const user = await ensureAuthenticated(env, resetToken.user_id);
-  const passwordHash = await hashPassword(input.new_password, env.PASSWORD_PEPPER);
+  const passwordHash = await hashPassword(input.new_password, env.PASSWORD_PEPPER, env);
 
   await authRepository.updatePassword(
     env,
@@ -532,7 +549,7 @@ export const changePassword = async (
     throw new AuthError("The current password is incorrect.");
   }
 
-  const passwordHash = await hashPassword(input.new_password, env.PASSWORD_PEPPER);
+  const passwordHash = await hashPassword(input.new_password, env.PASSWORD_PEPPER, env);
 
   await authRepository.updatePassword(
     env,

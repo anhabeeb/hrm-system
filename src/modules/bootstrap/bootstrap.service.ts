@@ -1,6 +1,7 @@
 import { PASSWORD_HASH_ALGORITHM } from "../auth/auth.constants";
 import { hashPassword } from "../../services/password.service";
 import { constantTimeEqual } from "../../utils/crypto";
+import { withErrorStep } from "../../utils/error-step";
 import { AppError, ValidationError } from "../../utils/errors";
 
 import { BOOTSTRAP_MESSAGES } from "./bootstrap.constants";
@@ -71,7 +72,10 @@ export const initializeBootstrap = async (
   const companyId = crypto.randomUUID();
   const outletId = input.outlet ? crypto.randomUUID() : null;
   const userId = crypto.randomUUID();
-  const passwordHash = await hashPassword(input.super_admin.password, env.PASSWORD_PEPPER);
+  const passwordHash = await withErrorStep(
+    "hash_super_admin_password",
+    () => hashPassword(input.super_admin.password, env.PASSWORD_PEPPER, env),
+  );
 
   try {
     await repository.cloneCompanyDefaults(env, companyId, input.company);
