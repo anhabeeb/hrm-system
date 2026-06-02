@@ -7,6 +7,7 @@ const envWithEmptyBootstrapDb = {
   DB: {
     prepare: () => ({
       bind: () => ({
+        run: async () => ({ success: true }),
         first: async () => ({ total: 0 }),
       }),
     }),
