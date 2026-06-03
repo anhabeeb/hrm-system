@@ -20,14 +20,39 @@ describe("route consistency", () => {
     expect(response.status).toBe(200);
   });
 
-  it("returns the standard not-found code for unknown routes", async () => {
+  it("returns a structured API route not-found code for unknown API routes", async () => {
     const response = await app.request("/api/v1/does-not-exist", {}, { ENVIRONMENT: "test" } as Env);
-    const body = await response.json() as { success: boolean; error: { code: string; message: string } };
+    const body = await response.json() as {
+      success: boolean;
+      error: {
+        code: string;
+        title: string;
+        message: string;
+        route: string;
+        status: number;
+        retryable: boolean;
+      };
+    };
 
     expect(response.status).toBe(404);
     expect(body.success).toBe(false);
-    expect(body.error.code).toBe("ENDPOINT_NOT_FOUND");
-    expect(body.error.message).toBe("The requested API endpoint was not found. Please check the URL and try again.");
+    expect(body.error.code).toBe("API_ROUTE_NOT_FOUND");
+    expect(body.error.title).toBe("API route not found");
+    expect(body.error.message).toBe("The requested API endpoint does not exist.");
+    expect(body.error.route).toBe("/api/v1/does-not-exist");
+    expect(body.error.status).toBe(404);
+    expect(body.error.retryable).toBe(false);
+    expect(JSON.stringify(body)).not.toContain("<!doctype html");
+  });
+
+  it("/api/* unknown routes never fall through to an HTML SPA response", async () => {
+    const response = await app.request("/api/not-real", {}, { ENVIRONMENT: "test" } as Env);
+    const text = await response.text();
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    expect(text).toContain("API_ROUTE_NOT_FOUND");
+    expect(text).not.toContain("<!doctype html");
   });
 
   it("rejects protected routes without auth before touching business handlers", async () => {
@@ -91,7 +116,50 @@ describe("route consistency", () => {
     expect(response.headers.get("Access-Control-Allow-Methods")).toContain("OPTIONS");
     expect(response.headers.get("Access-Control-Allow-Headers")).toContain("Content-Type");
     expect(response.headers.get("Access-Control-Allow-Headers")).toContain("Authorization");
+    expect(response.headers.get("Access-Control-Allow-Headers")).toContain("X-Request-ID");
     expect(response.headers.get("Access-Control-Max-Age")).toBe("86400");
+  });
+
+  it("allows CORS origins configured from the environment", async () => {
+    const response = await app.request(
+      "/api/v1/health",
+      {
+        method: "OPTIONS",
+        headers: {
+          Origin: "https://preview.hrm.pages.dev",
+          "Access-Control-Request-Method": "GET",
+        },
+      },
+      {
+        ENVIRONMENT: "test",
+        CORS_ALLOWED_ORIGINS: "https://preview.hrm.pages.dev, https://another.example.com",
+      } as Env,
+    );
+
+    expect(response.status).toBe(204);
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("https://preview.hrm.pages.dev");
+    expect(response.headers.get("Access-Control-Allow-Credentials")).toBe("true");
+  });
+
+  it("does not allow unknown CORS origins or wildcard credentials", async () => {
+    const response = await app.request(
+      "/api/v1/health",
+      {
+        method: "OPTIONS",
+        headers: {
+          Origin: "https://evil.example.com",
+          "Access-Control-Request-Method": "GET",
+        },
+      },
+      {
+        ENVIRONMENT: "test",
+        CORS_ALLOWED_ORIGINS: "https://preview.hrm.pages.dev",
+      } as Env,
+    );
+
+    expect(response.status).toBe(204);
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
+    expect(response.headers.get("Access-Control-Allow-Credentials")).toBeNull();
   });
 
   it("adds CORS headers to allowed production-origin unauthorized responses", async () => {

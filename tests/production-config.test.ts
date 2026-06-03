@@ -65,8 +65,30 @@ describe("production config placeholders", () => {
 
   it("frontend env example documents API base URL without secrets", () => {
     const envExample = readText("frontend/.env.example");
-    expect(envExample).toContain("VITE_API_BASE_URL=https://your-worker-url.workers.dev");
+    expect(envExample).toContain("VITE_API_BASE_URL=");
+    expect(envExample).toContain("same-origin /api/v1");
+    expect(envExample).not.toContain("workers.dev");
     expect(envExample).not.toMatch(/SECRET|TOKEN|PASSWORD|PEPPER/i);
+  });
+
+  it("wrangler config serves frontend assets through the Worker with API routes worker-first", () => {
+    const wrangler = readText("wrangler.jsonc");
+
+    expect(wrangler).toContain('"assets"');
+    expect(wrangler).toContain('"directory": "./frontend/dist"');
+    expect(wrangler).toContain('"not_found_handling": "single-page-application"');
+    expect(wrangler).toContain('"binding": "ASSETS"');
+    expect(wrangler).toContain('"run_worker_first": ["/api/*"]');
+  });
+
+  it("root deploy script builds API and frontend before deploying", () => {
+    const pkg = JSON.parse(readText("package.json")) as { scripts?: Record<string, string> };
+
+    expect(pkg.scripts?.["build:api"]).toBe("tsc --noEmit");
+    expect(pkg.scripts?.["build:frontend"]).toContain("npm --prefix frontend run build");
+    expect(pkg.scripts?.["build:all"]).toContain("build:api");
+    expect(pkg.scripts?.["build:all"]).toContain("build:frontend");
+    expect(pkg.scripts?.deploy).toBe("npm run build:all && wrangler deploy");
   });
 
   it.todo("fresh D1 migrations and seeds apply in order without inserting real users or passwords");
