@@ -5,6 +5,7 @@ import type { AppContext } from "../types/api.types";
 
 export const ALLOWED_CORS_ORIGINS = [
   "https://hrm.cafeasiana.com.mv",
+  "https://www.hrm.cafeasiana.com.mv",
   "http://localhost:5173",
   "http://localhost:5174",
   "http://127.0.0.1:5173",
@@ -12,11 +13,23 @@ export const ALLOWED_CORS_ORIGINS = [
 ] as const;
 
 const CORS_METHODS = "GET, POST, PUT, PATCH, DELETE, OPTIONS";
-const CORS_HEADERS = "Content-Type, Authorization";
+const CORS_HEADERS = "Content-Type, Authorization, X-Request-ID";
 const CORS_MAX_AGE = "86400";
 
-export const getCorsHeaders = (origin: string | null | undefined): HeadersInit => {
-  if (!origin || !ALLOWED_CORS_ORIGINS.includes(origin as (typeof ALLOWED_CORS_ORIGINS)[number])) {
+export const getAllowedCorsOrigins = (env?: Pick<Env, "CORS_ALLOWED_ORIGINS">): string[] => {
+  const configured = env?.CORS_ALLOWED_ORIGINS
+    ?.split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean) ?? [];
+
+  return Array.from(new Set([...ALLOWED_CORS_ORIGINS, ...configured]));
+};
+
+export const getCorsHeaders = (
+  origin: string | null | undefined,
+  env?: Pick<Env, "CORS_ALLOWED_ORIGINS">,
+): HeadersInit => {
+  if (!origin || !getAllowedCorsOrigins(env).includes(origin)) {
     return {};
   }
 
@@ -31,7 +44,7 @@ export const getCorsHeaders = (origin: string | null | undefined): HeadersInit =
 };
 
 const applyCorsHeaders = (c: Context<AppContext>) => {
-  const headers = getCorsHeaders(c.req.header("origin"));
+  const headers = getCorsHeaders(c.req.header("origin"), c.env);
 
   for (const [name, value] of Object.entries(headers)) {
     c.header(name, value);

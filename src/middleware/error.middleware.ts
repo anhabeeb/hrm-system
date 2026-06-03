@@ -8,7 +8,7 @@ import { getCorsHeaders } from "./cors.middleware";
 
 export const errorMiddleware = async (error: Error | unknown, c: Context<AppContext>) => {
   const requestId = c.get("requestId");
-  const headers = getCorsHeaders(c.req.header("origin"));
+  const headers = getCorsHeaders(c.req.header("origin"), c.env);
   const appError = classifyError(error, {
     requestId,
     route: c.req.path,

@@ -32,7 +32,7 @@ import { salaryLoansRoutes } from "./routes/salary-loans.routes";
 import { syncRoutes } from "./routes/sync.routes";
 import { uniformsRoutes } from "./routes/uniforms.routes";
 import type { AppContext } from "./types/api.types";
-import { notFound } from "./utils/response";
+import { errorResponse, notFound } from "./utils/response";
 
 const app = new Hono<AppContext>();
 const apiV1 = new Hono<AppContext>();
@@ -71,10 +71,27 @@ apiV1.route("/profile-update-requests", profileUpdateRequestsRoutes);
 
 app.route(API_PREFIX, apiV1);
 
-app.notFound((c) =>
-  notFound(NOT_FOUND_MESSAGE, "ENDPOINT_NOT_FOUND", {
+app.notFound((c) => {
+  if (c.req.path.startsWith("/api/")) {
+    return errorResponse(
+      404,
+      "API_ROUTE_NOT_FOUND",
+      "The requested API endpoint does not exist.",
+      {
+        requestId: c.get("requestId"),
+        route: c.req.path,
+        method: c.req.method,
+        title: "API route not found",
+        retryable: false,
+      },
+    );
+  }
+
+  return notFound(NOT_FOUND_MESSAGE, "ENDPOINT_NOT_FOUND", {
     requestId: c.get("requestId"),
-  }),
-);
+    route: c.req.path,
+    method: c.req.method,
+  });
+});
 
 export default app;

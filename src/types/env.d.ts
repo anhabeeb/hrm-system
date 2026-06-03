@@ -5,6 +5,8 @@ declare global {
     BACKUP_BUCKET: R2Bucket;
     REALTIME_ROOM: DurableObjectNamespace;
     ENVIRONMENT: string;
+    APP_VERSION?: string;
+    CORS_ALLOWED_ORIGINS?: string;
     SESSION_SECRET: string;
     JWT_SECRET: string;
     PASSWORD_PEPPER: string;
