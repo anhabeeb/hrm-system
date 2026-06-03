@@ -1,0 +1,21 @@
+INSERT OR IGNORE INTO company_settings (
+  id,
+  company_id,
+  setting_key,
+  setting_group,
+  setting_value_json,
+  effective_from,
+  created_by,
+  updated_by,
+  created_at,
+  updated_at
+) VALUES
+('setting_company_basic', 'company_seed_default', 'company.basic', 'company', '{"currency":"MVR","timezone":"Indian/Maldives","default_language":"en","date_format":"YYYY-MM-DD","time_format":"24h"}', NULL, NULL, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+('setting_ui_preferences', 'company_seed_default', 'ui.preferences', 'ui', '{"layout_style":"professional_list","avoid_bubble_card_heavy_ui":true,"use_compact_tables":true,"show_row_action_icons":true,"collapsible_sidebar":true,"sidebar_default_state":"expanded","remember_sidebar_state":true,"mobile_sidebar_mode":"drawer","show_tooltips_when_sidebar_collapsed":true}', NULL, NULL, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+('setting_payroll_default_rules', 'company_seed_default', 'payroll.default_rules', 'payroll', '{"salary_calculation_basis":"fixed_30_days","custom_salary_days":30,"standard_working_hours":8,"attendance_to_payroll_enabled":true,"deduct_absent_days":true,"deduct_late_minutes":false,"deduct_early_checkout":false,"allow_negative_salary":false,"carry_forward_unpaid_deductions":true,"payroll_lock_enabled":true}', NULL, NULL, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+('setting_payroll_earnings_toggles', 'company_seed_default', 'payroll.earnings_toggles', 'payroll', '{"overtime_enabled":true,"allowances_enabled":true,"benefits_enabled":true,"service_charge_enabled":true,"bonus_enabled":true,"commission_enabled":false,"tips_distribution_enabled":false}', NULL, NULL, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+('setting_attendance_default_rules', 'company_seed_default', 'attendance.default_rules', 'attendance', '{"manual_attendance_enabled":true,"pin_attendance_enabled":true,"qr_attendance_enabled":true,"kiosk_mode_enabled":true,"offline_attendance_enabled":true,"late_tracking_enabled":true,"late_grace_minutes":10,"early_out_tracking_enabled":true,"early_out_grace_minutes":10,"auto_mark_absent":true,"biometric_enabled":false}', NULL, NULL, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+('setting_sync_default_rules', 'company_seed_default', 'sync.default_rules', 'sync', '{"batch_push_enabled":true,"incremental_pull_enabled":true,"max_offline_days":7,"max_records_per_batch":100,"auto_sync_when_online":true,"manual_sync_button":true,"block_payroll_if_pending_sync":true,"conflict_review_required":true}', NULL, NULL, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+('setting_approvals_default_rules', 'company_seed_default', 'approvals.default_rules', 'approvals', '{"approval_workflows_enabled":true,"approval_mode":"auto_admin_superadmin","require_approval_if_only_admin_superadmin_exist":false,"auto_approve_for_admin_superadmin":true,"require_reason_when_approvals_disabled":true,"audit_when_approvals_disabled":true}', NULL, NULL, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+('setting_security_default_rules', 'company_seed_default', 'security.default_rules', 'security', '{"password_min_length":10,"failed_login_limit":5,"lock_minutes":15,"require_2fa_for_super_admin":true,"require_2fa_for_it_admin":true,"recommend_2fa_for_hr_admin":true,"recommend_2fa_for_accountant":true,"totp_google_authenticator_enabled":true,"backup_codes_enabled":true}', NULL, NULL, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+('setting_my_profile_default_rules', 'company_seed_default', 'my_profile.default_rules', 'my_profile', '{"my_profile_enabled":true,"allow_change_password":true,"allow_manage_own_2fa":true,"allow_kyc_update_request":true,"allow_document_update_request":true,"direct_profile_editing_allowed":false,"kyc_update_requires_review":true}', NULL, NULL, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z');

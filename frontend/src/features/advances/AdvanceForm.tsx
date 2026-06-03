@@ -1,0 +1,50 @@
+import { useState } from "react";
+
+import { FormError } from "@/components/feedback/FormError";
+import { LoadingButton } from "@/components/forms/LoadingButton";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import type { AdvancePayload } from "./advances.types";
+
+export const AdvanceForm = ({
+  open,
+  loading,
+  error,
+  onOpenChange,
+  onSubmit,
+}: {
+  open: boolean;
+  loading?: boolean;
+  error?: string | null;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (payload: AdvancePayload) => void;
+}) => {
+  const [payload, setPayload] = useState({ employee_id: "", amount: "", paid_date: "", deduction_month: "", reason: "" });
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Create advance payment</DialogTitle>
+          <DialogDescription>Amounts are submitted as integer minor units to match payroll storage.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <Label className="space-y-1 text-sm">Employee ID<Input value={payload.employee_id} onChange={(event) => setPayload((current) => ({ ...current, employee_id: event.target.value }))} /></Label>
+          <Label className="space-y-1 text-sm">Amount minor units<Input type="number" min="1" step="1" value={payload.amount} onChange={(event) => setPayload((current) => ({ ...current, amount: event.target.value }))} /></Label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Label className="space-y-1 text-sm">Paid date<Input type="date" value={payload.paid_date} onChange={(event) => setPayload((current) => ({ ...current, paid_date: event.target.value }))} /></Label>
+            <Label className="space-y-1 text-sm">Deduction month<Input type="month" value={payload.deduction_month} onChange={(event) => setPayload((current) => ({ ...current, deduction_month: event.target.value }))} /></Label>
+          </div>
+          <Label className="space-y-1 text-sm">Reason<Textarea value={payload.reason} onChange={(event) => setPayload((current) => ({ ...current, reason: event.target.value }))} /></Label>
+          <FormError message={error ?? undefined} />
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+          <LoadingButton loading={loading} onClick={() => onSubmit({ ...payload, amount: Number(payload.amount) })}>Create advance</LoadingButton>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};

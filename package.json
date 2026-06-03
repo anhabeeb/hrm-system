@@ -1,0 +1,34 @@
+{
+  "name": "hrm-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "npm run build:all",
+    "build:api": "tsc --noEmit",
+    "build:frontend": "npm --prefix frontend install && npm --prefix frontend run build",
+    "build:all": "npm run build:api && npm run build:frontend && npm run verify:frontend-assets && npm run verify:critical-routes",
+    "verify:frontend-assets": "node scripts/verify-frontend-assets.mjs",
+    "verify:critical-routes": "node scripts/verify-critical-routes.mjs",
+    "deploy": "npm run build && wrangler deploy && npm run smoke:production",
+    "smoke:users-access": "node scripts/smoke-users-access.mjs",
+    "smoke:production": "node scripts/smoke-production.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
+    "db:execute:local": "wrangler d1 execute DB --local --command \"SELECT 1 AS ok;\"",
+    "db:execute:remote": "wrangler d1 execute DB --remote --command \"SELECT 1 AS ok;\""
+  },
+  "dependencies": {
+    "hono": "^4.7.11",
+    "zod": "^3.24.4"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250510.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.4",
+    "wrangler": "^4.18.0"
+  }
+}

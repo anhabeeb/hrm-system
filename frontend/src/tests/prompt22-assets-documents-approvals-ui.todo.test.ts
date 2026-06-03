@@ -1,0 +1,31 @@
+import { describe, it } from "vitest";
+
+describe.todo("Prompt 22 Assets, Uniforms, Documents, and Approvals frontend", () => {
+  it.todo("AssetsPage renders Assets, Pending Returns, and Deductions tabs with backend pagination");
+  it.todo("assets.view user does not call /assets/deductions or show a generic deductions 403");
+  it.todo("assets.approve_deduction user can see Deductions tab and the deductions query has an enabled guard");
+  it.todo("Asset assign, return, lost, damaged, and deduction actions are hidden without seeded permissions");
+  it.todo("Lost/damaged asset dialogs require reason and preserve pending-return visibility when backend returns those rows");
+  it.todo("Asset deduction locked payroll errors map to a friendly deduction message");
+  it.todo("UniformsPage renders Issues and Pending Returns tabs");
+  it.todo("uniforms.view user does not call /uniforms/pending-return or show a generic pending-return 403");
+  it.todo("uniforms.pending_return user can see Pending Returns tab and the pending query has an enabled guard");
+  it.todo("Uniform issue action is hidden without uniforms.issue and return is hidden without uniforms.return");
+  it.todo("Uniform issue quantity rejects non-positive values");
+  it.todo("DocumentsPage renders Documents, Expiring, Missing, and Categories tabs");
+  it.todo("documents.view user does not call /documents/expiring or /documents/missing");
+  it.todo("documents.view_expiring and documents.view_missing users see their tabs and queries have enabled guards");
+  it.todo("Document upload rejects dangerous MIME types and clears base64 after success");
+  it.todo("Document download uses the existing API download helper");
+  it.todo("Document rows never render file_key, R2 object keys, or private storage paths");
+  it.todo("Sensitive document names are masked without documents.view_sensitive");
+  it.todo("ApprovalsPage renders Inbox, Workflows, Thresholds, and Settings Summary tabs");
+  it.todo("approvals.view user does not call /approvals/workflows or /approvals/thresholds");
+  it.todo("approval_workflows.view and approval_thresholds.view users see their tabs and queries have enabled guards");
+  it.todo("Approval approve/reject/return/override actions require both permission and backend can_* flags");
+  it.todo("Approval action dialogs require reasons and show friendly locked-payroll messages");
+  it.todo("Approval payload sanitizer redacts nested file_key, token, password, secret, and hash fields");
+  it.todo("Workflow and threshold actions are hidden without approval_workflows.manage or approval_thresholds.edit");
+  it.todo("hidden protected tab queries do not contribute unauthorized 403 errors to page-level alerts");
+  it.todo("No dark mode toggle or theme switcher is introduced");
+});

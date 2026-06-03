@@ -1,0 +1,275 @@
+import type { Context } from "hono";
+
+import * as employeesService from "./employees.service";
+import {
+  validateDocumentMetadataInput,
+  validateEmployeeCreateInput,
+  validateEmployeeListFilters,
+  validateEmployeeNoteInput,
+  validateEmployeeStatusInput,
+  validateEmployeeUpdateInput,
+  validateJobChangeInput,
+  validateOutletAssignmentInput,
+  validateSalaryHistoryInput,
+} from "./employees.validators";
+import type { AppContext, AuthActor } from "../../types/api.types";
+import { AuthError, ValidationError } from "../../utils/errors";
+import { created, ok, paginated } from "../../utils/response";
+
+const actor = (c: Context<AppContext>): AuthActor => {
+  const authUser = c.get("authUser");
+
+  if (!authUser) {
+    throw new AuthError("Please sign in to continue.");
+  }
+
+  return authUser;
+};
+
+const readJson = async (c: Context<AppContext>): Promise<unknown> =>
+  c.req.json().catch(() => ({}));
+
+const requiredId = (c: Context<AppContext>): string => {
+  const id = c.req.param("id");
+
+  if (!id) {
+    throw new ValidationError("Employee is required.");
+  }
+
+  return id;
+};
+
+const reasonFromBody = async (c: Context<AppContext>): Promise<string> => {
+  const body = (await readJson(c)) as { reason?: unknown; review_notes?: unknown };
+  const reason =
+    typeof body.reason === "string"
+      ? body.reason.trim()
+      : typeof body.review_notes === "string"
+        ? body.review_notes.trim()
+        : "";
+
+  if (reason.length < 3) {
+    throw new ValidationError("A reason is required for this action.");
+  }
+
+  return reason;
+};
+
+export const listEmployees = async (c: Context<AppContext>) => {
+  const result = await employeesService.listEmployees(
+    c.env,
+    actor(c),
+    validateEmployeeListFilters({
+      search: c.req.query("search"),
+      outlet_id: c.req.query("outlet_id"),
+      department_id: c.req.query("department_id"),
+      position_id: c.req.query("position_id"),
+      employment_status: c.req.query("employment_status"),
+      employee_type: c.req.query("employee_type"),
+      nationality: c.req.query("nationality"),
+      joined_from: c.req.query("joined_from"),
+      joined_to: c.req.query("joined_to"),
+      document_expiring_before: c.req.query("document_expiring_before"),
+      page: c.req.query("page"),
+      page_size: c.req.query("page_size"),
+      sort_by: c.req.query("sort_by"),
+      sort_direction: c.req.query("sort_direction"),
+    }),
+  );
+
+  return paginated(result.rows, result.pagination, "Employees loaded successfully.", {
+    requestId: c.get("requestId"),
+  });
+};
+
+export const getEmployee = async (c: Context<AppContext>) =>
+  ok(
+    { employee: await employeesService.getEmployee(c.env, actor(c), requiredId(c)) },
+    "Employee loaded successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const createEmployee = async (c: Context<AppContext>) =>
+  created(
+    await employeesService.createEmployee(
+      c.env,
+      actor(c),
+      validateEmployeeCreateInput(await readJson(c)),
+    ),
+    "Employee created successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const updateEmployee = async (c: Context<AppContext>) =>
+  ok(
+    await employeesService.updateEmployee(
+      c.env,
+      actor(c),
+      requiredId(c),
+      validateEmployeeUpdateInput(await readJson(c)),
+    ),
+    "Employee updated successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const archiveEmployee = async (c: Context<AppContext>) =>
+  ok(
+    await employeesService.archiveEmployee(
+      c.env,
+      actor(c),
+      requiredId(c),
+      await reasonFromBody(c),
+    ),
+    "Employee archived successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const restoreEmployee = async (c: Context<AppContext>) =>
+  ok(
+    await employeesService.restoreEmployee(
+      c.env,
+      actor(c),
+      requiredId(c),
+      await reasonFromBody(c),
+    ),
+    "Employee restored successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const changeStatus = async (c: Context<AppContext>) =>
+  ok(
+    await employeesService.changeStatus(
+      c.env,
+      actor(c),
+      requiredId(c),
+      validateEmployeeStatusInput(await readJson(c)),
+    ),
+    "Employee status updated successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const assignOutlet = async (c: Context<AppContext>) =>
+  ok(
+    await employeesService.assignOutlet(
+      c.env,
+      actor(c),
+      requiredId(c),
+      validateOutletAssignmentInput(await readJson(c)),
+    ),
+    "Employee outlet assignment updated successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const changeJob = async (c: Context<AppContext>) =>
+  ok(
+    await employeesService.changeJob(
+      c.env,
+      actor(c),
+      requiredId(c),
+      validateJobChangeInput(await readJson(c)),
+    ),
+    "Employee job details updated successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const listJobHistory = async (c: Context<AppContext>) =>
+  ok(
+    { history: await employeesService.listJobHistory(c.env, actor(c), requiredId(c)) },
+    "Employee job history loaded successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const listStatusHistory = async (c: Context<AppContext>) =>
+  ok(
+    {
+      history: await employeesService.listStatusHistory(
+        c.env,
+        actor(c),
+        requiredId(c),
+      ),
+    },
+    "Employee status history loaded successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const listSalaryHistory = async (c: Context<AppContext>) =>
+  ok(
+    {
+      history: await employeesService.listSalaryHistory(
+        c.env,
+        actor(c),
+        requiredId(c),
+      ),
+    },
+    "Employee salary history loaded successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const addSalaryHistory = async (c: Context<AppContext>) =>
+  created(
+    await employeesService.addSalaryHistory(
+      c.env,
+      actor(c),
+      requiredId(c),
+      validateSalaryHistoryInput(await readJson(c)),
+    ),
+    "Salary record added successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const listDocuments = async (c: Context<AppContext>) =>
+  ok(
+    {
+      documents: await employeesService.listDocuments(
+        c.env,
+        actor(c),
+        requiredId(c),
+      ),
+    },
+    "Employee documents loaded successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const addDocument = async (c: Context<AppContext>) =>
+  created(
+    await employeesService.addDocument(
+      c.env,
+      actor(c),
+      requiredId(c),
+      validateDocumentMetadataInput(await readJson(c)),
+    ),
+    "Document metadata saved successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const listNotes = async (c: Context<AppContext>) =>
+  ok(
+    { notes: await employeesService.listNotes(c.env, actor(c), requiredId(c)) },
+    "Employee notes loaded successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const addNote = async (c: Context<AppContext>) =>
+  created(
+    await employeesService.addNote(
+      c.env,
+      actor(c),
+      requiredId(c),
+      validateEmployeeNoteInput(await readJson(c)),
+    ),
+    "Employee note added successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const listAuditLog = async (c: Context<AppContext>) =>
+  ok(
+    {
+      audit_log: await employeesService.listAuditLog(
+        c.env,
+        actor(c),
+        requiredId(c),
+      ),
+    },
+    "Employee audit log loaded successfully.",
+    { requestId: c.get("requestId") },
+  );

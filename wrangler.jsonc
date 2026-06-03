@@ -1,0 +1,58 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hrm-system",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-05-29",
+  "account_id": "766f9d377c626e9ee513edd4efca1224",
+
+  // Non-sensitive runtime values can live here.
+  // Keep secrets such as SESSION_SECRET, PASSWORD_PEPPER, and TOTP_ENCRYPTION_KEY
+  // in Cloudflare secrets using `wrangler secret put`, not in this file.
+  "vars": {
+    "ENVIRONMENT": "production",
+    "CORS_ALLOWED_ORIGINS": "https://hrm.cafeasiana.com.mv,https://www.hrm.cafeasiana.com.mv"
+  },
+
+  "assets": {
+    "directory": "./frontend/dist",
+    "not_found_handling": "single-page-application",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "hrm-system",
+      "database_id": "59ded11f-6298-4b0b-9970-6000fbd0dca1",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  "r2_buckets": [
+    {
+      "binding": "DOCUMENTS_BUCKET",
+      "bucket_name": "hrm-documents-placeholder"
+    },
+    {
+      "binding": "BACKUP_BUCKET",
+      "bucket_name": "hrm-backups-placeholder"
+    }
+  ],
+
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "REALTIME_ROOM",
+        "class_name": "RealtimeRoom"
+      }
+    ]
+  },
+
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["RealtimeRoom"]
+    }
+  ]
+}
