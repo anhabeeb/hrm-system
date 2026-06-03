@@ -10,6 +10,21 @@ export const ErrorDetailsAccordion = ({ error }: { error: ApiError }) => {
     ["Retryable", error.retryable ? "Yes" : "No"],
     ["Technical detail", error.technicalMessage],
     ["Suggested action", error.suggestedAction],
+<<<<<<< HEAD
+=======
+    ["Request URL", error.diagnostics?.requestUrl],
+    ["API base URL", error.diagnostics?.apiBaseUrl || (error.diagnostics?.apiBaseUrl === "" ? "(same-origin)" : undefined)],
+    ["API base source", error.diagnostics?.apiBaseUrlSource],
+    ["Current page URL", error.diagnostics?.currentPageUrl],
+    ["Browser online", error.diagnostics?.browserOnline === undefined ? undefined : error.diagnostics.browserOnline ? "Yes" : "No"],
+    ["Fetch error name", error.diagnostics?.errorName],
+    ["Fetch error message", error.diagnostics?.errorMessage],
+    ["Timeout", error.diagnostics?.timeout === undefined ? undefined : error.diagnostics.timeout ? "Yes" : "No"],
+    ["CORS suspected", error.diagnostics?.corsSuspected === undefined ? undefined : error.diagnostics.corsSuspected ? "Yes" : "No"],
+    ["Mixed content suspected", error.diagnostics?.mixedContentSuspected === undefined ? undefined : error.diagnostics.mixedContentSuspected ? "Yes" : "No"],
+    ["Build version", error.diagnostics?.buildVersion],
+    ["Elapsed ms", error.diagnostics?.elapsedMs === undefined ? undefined : String(error.diagnostics.elapsedMs)],
+>>>>>>> 79432d0 (Initial HRM system source)
   ].filter(([, value]) => value);
 
   if (rows.length === 0) return null;

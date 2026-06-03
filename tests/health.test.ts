@@ -63,4 +63,56 @@ describe("GET /api/v1/health", () => {
     expect(body.checks.db_binding).toBe(true);
     expect(body.checks.d1_query).toBe(true);
   });
+<<<<<<< HEAD
+=======
+
+  it("version endpoint returns safe Git build metadata", async () => {
+    const response = await app.request(
+      "/api/v1/version",
+      {},
+      {
+        ENVIRONMENT: "production",
+        APP_VERSION: "0.1.0",
+        GIT_BRANCH: "main",
+        GIT_COMMIT_SHA: "abc123",
+        BUILD_TIMESTAMP: "2026-06-03T00:00:00Z",
+      } as Env,
+    );
+    const body = await response.json() as {
+      success: boolean;
+      service: string;
+      version: string;
+      environment: string;
+      build: {
+        source: string;
+        branch: string;
+        commit: string;
+        timestamp: string;
+      };
+      features: {
+        usersRoutes: boolean;
+        rolesRoutes: boolean;
+        permissionsRoutes: boolean;
+        employeeIdentity: boolean;
+        workerAssetsRouting: boolean;
+      };
+      requestId: string;
+    };
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    expect(body.success).toBe(true);
+    expect(body.service).toBe("hrm-api");
+    expect(body.environment).toBe("production");
+    expect(body.build.source).toBe("git");
+    expect(body.build.branch).toBe("main");
+    expect(body.build.commit).toBe("abc123");
+    expect(body.features.usersRoutes).toBe(true);
+    expect(body.features.rolesRoutes).toBe(true);
+    expect(body.features.permissionsRoutes).toBe(true);
+    expect(body.features.employeeIdentity).toBe(true);
+    expect(body.features.workerAssetsRouting).toBe(true);
+    expect(JSON.stringify(body)).not.toMatch(/secret|token|password/i);
+  });
+>>>>>>> 79432d0 (Initial HRM system source)
 });

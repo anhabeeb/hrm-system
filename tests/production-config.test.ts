@@ -87,10 +87,21 @@ describe("production config placeholders", () => {
     expect(pkg.scripts?.["build:api"]).toBe("tsc --noEmit");
     expect(pkg.scripts?.["build:frontend"]).toContain("npm --prefix frontend run build");
     expect(pkg.scripts?.["verify:frontend-assets"]).toBe("node scripts/verify-frontend-assets.mjs");
+<<<<<<< HEAD
     expect(pkg.scripts?.["build:all"]).toContain("build:api");
     expect(pkg.scripts?.["build:all"]).toContain("build:frontend");
     expect(pkg.scripts?.["build:all"]).toContain("verify:frontend-assets");
     expect(pkg.scripts?.deploy).toBe("npm run build:all && wrangler deploy");
+=======
+    expect(pkg.scripts?.["verify:critical-routes"]).toBe("node scripts/verify-critical-routes.mjs");
+    expect(pkg.scripts?.["build:all"]).toContain("build:api");
+    expect(pkg.scripts?.["build:all"]).toContain("build:frontend");
+    expect(pkg.scripts?.["build:all"]).toContain("verify:frontend-assets");
+    expect(pkg.scripts?.["build:all"]).toContain("verify:critical-routes");
+    expect(pkg.scripts?.deploy).toContain("npm run build");
+    expect(pkg.scripts?.deploy).toContain("wrangler deploy");
+    expect(pkg.scripts?.deploy).toContain("smoke:production");
+>>>>>>> 79432d0 (Initial HRM system source)
   });
 
   it("frontend asset deploy guard checks index and assets directory", () => {

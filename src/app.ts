@@ -24,13 +24,25 @@ import { longLeaveRoutes } from "./routes/long-leave.routes";
 import { outletsRoutes } from "./routes/outlets.routes";
 import { payrollRoutes } from "./routes/payroll.routes";
 import { payslipsRoutes } from "./routes/payslips.routes";
+<<<<<<< HEAD
 import { positionsRoutes } from "./routes/positions.routes";
 import { profileUpdateRequestsRoutes } from "./routes/profile-update-requests.routes";
 import { reportsRoutes } from "./routes/reports.routes";
+=======
+import { permissionsRoutes } from "./routes/permissions.routes";
+import { positionsRoutes } from "./routes/positions.routes";
+import { profileUpdateRequestsRoutes } from "./routes/profile-update-requests.routes";
+import { reportsRoutes } from "./routes/reports.routes";
+import { rolesRoutes } from "./routes/roles.routes";
+>>>>>>> 79432d0 (Initial HRM system source)
 import { settingsRoutes } from "./routes/settings.routes";
 import { salaryLoansRoutes } from "./routes/salary-loans.routes";
 import { syncRoutes } from "./routes/sync.routes";
 import { uniformsRoutes } from "./routes/uniforms.routes";
+<<<<<<< HEAD
+=======
+import { usersRoutes } from "./routes/users.routes";
+>>>>>>> 79432d0 (Initial HRM system source)
 import type { AppContext } from "./types/api.types";
 import { errorResponse, notFound } from "./utils/response";
 
@@ -64,6 +76,12 @@ apiV1.route("/reports", reportsRoutes);
 apiV1.route("/import-export", importExportRoutes);
 apiV1.route("/backup-recovery", backupRecoveryRoutes);
 apiV1.route("/employees", employeesRoutes);
+<<<<<<< HEAD
+=======
+apiV1.route("/users", usersRoutes);
+apiV1.route("/roles", rolesRoutes);
+apiV1.route("/permissions", permissionsRoutes);
+>>>>>>> 79432d0 (Initial HRM system source)
 apiV1.route("/outlets", outletsRoutes);
 apiV1.route("/departments", departmentsRoutes);
 apiV1.route("/positions", positionsRoutes);

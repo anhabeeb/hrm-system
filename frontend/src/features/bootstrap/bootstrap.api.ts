@@ -5,7 +5,21 @@ export interface BootstrapStatus {
   setup_required: boolean;
 }
 
+<<<<<<< HEAD
 export const bootstrapApi = {
+=======
+export interface ApiHealthStatus {
+  success: true;
+  status: "ok" | string;
+  service: string;
+  timestamp: string;
+  version: string;
+  requestId: string;
+}
+
+export const bootstrapApi = {
+  health: () => api.get<ApiHealthStatus>("/health", { suppressSessionExpired: true }),
+>>>>>>> 79432d0 (Initial HRM system source)
   status: () => api.get<BootstrapStatus>("/bootstrap/status"),
   initialize: (payload: BootstrapInitializePayload, token: string) =>
     api.post<Record<string, unknown>>("/bootstrap/initialize", payload, {

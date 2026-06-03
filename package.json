@@ -8,10 +8,19 @@
     "build": "npm run build:all",
     "build:api": "tsc --noEmit",
     "build:frontend": "npm --prefix frontend install && npm --prefix frontend run build",
+<<<<<<< HEAD
     "build:all": "npm run build:api && npm run build:frontend && npm run verify:frontend-assets",
     "verify:frontend-assets": "node scripts/verify-frontend-assets.mjs",
     "deploy": "npm run build:all && wrangler deploy",
     "smoke:users-access": "node scripts/smoke-users-access.mjs",
+=======
+    "build:all": "npm run build:api && npm run build:frontend && npm run verify:frontend-assets && npm run verify:critical-routes",
+    "verify:frontend-assets": "node scripts/verify-frontend-assets.mjs",
+    "verify:critical-routes": "node scripts/verify-critical-routes.mjs",
+    "deploy": "npm run build && wrangler deploy && npm run smoke:production",
+    "smoke:users-access": "node scripts/smoke-users-access.mjs",
+    "smoke:production": "node scripts/smoke-production.mjs",
+>>>>>>> 79432d0 (Initial HRM system source)
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",

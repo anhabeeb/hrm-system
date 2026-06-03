@@ -313,8 +313,19 @@ Important rules:
 
 - Employee Profile is separate from User Login
 - Creating an employee does not automatically create a user account
+<<<<<<< HEAD
 - Employees can be local or foreign
 - Foreign employee records support passport, visa, work permit, and document expiry tracking foundations
+=======
+- Employee ID / `employee_code` is system-generated on employee creation and is not manually required in the create form
+- Generated employee codes use a company-scoped sequence such as `EMP-000001`, preserving existing employee codes
+- Employees can be local or foreign
+- Local employee records require a National ID number
+- Foreign employee records require nationality, passport number, passport expiry date, work permit number, and work permit expiry date
+- Duplicate National ID, passport number, work permit number, and employee code values are blocked per company
+- The main employee record stores searchable identity numbers; `employee_documents` remains the document/upload and expiry evidence layer
+- The employee create/edit UI keeps generated Employee ID read-only, switches identity fields by employee type, and keeps the light table-first admin style
+>>>>>>> 79432d0 (Initial HRM system source)
 - HR/Admin manages employee data; users submit My Profile/KYC update requests instead of directly editing HR-controlled fields
 - General employee edit cannot change employment status, resignation, termination, archive state, or primary outlet
 - Employee status changes must use the status action, archive action, or restore action

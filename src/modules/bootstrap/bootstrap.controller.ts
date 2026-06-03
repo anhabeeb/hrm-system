@@ -62,7 +62,11 @@ const bootstrapErrorResponse = (
   }
 
   return appErrorResponse(appError, {
+<<<<<<< HEAD
     headers: getCorsHeaders(c.req.header("origin")),
+=======
+    headers: getCorsHeaders(c.req.header("origin"), c.env),
+>>>>>>> 79432d0 (Initial HRM system source)
     requestId: requestIdValue,
     route: c.req.path,
     method: c.req.method,
