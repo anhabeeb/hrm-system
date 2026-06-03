@@ -89,7 +89,8 @@ describe("production config placeholders", () => {
     expect(pkg.scripts?.["verify:frontend-assets"]).toBe("node scripts/verify-frontend-assets.mjs");
     expect(pkg.scripts?.["build:all"]).toContain("build:api");
     expect(pkg.scripts?.["build:all"]).toContain("build:frontend");
-    expect(pkg.scripts?.deploy).toBe("npm run build:all && npm run verify:frontend-assets && wrangler deploy");
+    expect(pkg.scripts?.["build:all"]).toContain("verify:frontend-assets");
+    expect(pkg.scripts?.deploy).toBe("npm run build:all && wrangler deploy");
   });
 
   it("frontend asset deploy guard checks index and assets directory", () => {
