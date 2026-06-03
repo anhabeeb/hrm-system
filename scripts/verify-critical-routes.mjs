@@ -37,9 +37,10 @@ export const verifyCriticalRoutes = (baseDir = rootDir) => {
     "src/routes/users.routes.ts",
     "src/routes/roles.routes.ts",
     "src/routes/permissions.routes.ts",
+    "src/routes/version.routes.ts",
   ]) {
     if (!exists(file, baseDir)) {
-      failures.push(`${file}: critical Users & Access route file is missing.`);
+      failures.push(`${file}: critical API route file is missing.`);
     }
   }
 
@@ -74,8 +75,16 @@ export const verifyCriticalRoutes = (baseDir = rootDir) => {
     /import\s*\{\s*permissionsRoutes\s*\}\s*from\s*["']\.\/routes\/permissions\.routes["'];/,
     "missing permissionsRoutes import.",
   );
+  assertContains(
+    failures,
+    appPath,
+    app,
+    /import\s*\{\s*versionRoutes\s*\}\s*from\s*["']\.\/routes\/version\.routes["'];/,
+    "missing versionRoutes import.",
+  );
 
   for (const [route, variable] of [
+    ["/version", "versionRoutes"],
     ["/users", "usersRoutes"],
     ["/roles", "rolesRoutes"],
     ["/permissions", "permissionsRoutes"],

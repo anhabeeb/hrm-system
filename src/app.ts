@@ -34,6 +34,7 @@ import { salaryLoansRoutes } from "./routes/salary-loans.routes";
 import { syncRoutes } from "./routes/sync.routes";
 import { uniformsRoutes } from "./routes/uniforms.routes";
 import { usersRoutes } from "./routes/users.routes";
+import { versionRoutes } from "./routes/version.routes";
 import type { AppContext } from "./types/api.types";
 import { errorResponse, notFound } from "./utils/response";
 
@@ -45,6 +46,7 @@ app.use("*", corsMiddleware);
 app.onError(errorMiddleware);
 
 apiV1.route("/", healthRoutes);
+apiV1.route("/version", versionRoutes);
 apiV1.route("/bootstrap", bootstrapRoutes);
 apiV1.route("/", authRoutes);
 apiV1.route("/settings", settingsRoutes);
