@@ -1,5 +1,6 @@
 import type {
   EmployeeOutletRecord,
+  PermissionRecord,
   PermissionOverrideRecord,
   RoleRecord,
 } from "./permissions.types";
@@ -94,4 +95,12 @@ export const findEmployeeOutlet = (
     env,
     "SELECT id, primary_outlet_id FROM employees WHERE company_id = ? AND id = ? AND deleted_at IS NULL LIMIT 1",
     [companyId, employeeId],
+  );
+
+export const listPermissions = (env: Env): Promise<PermissionRecord[]> =>
+  queryMany<PermissionRecord>(
+    env,
+    `SELECT id, permission_key, module, action, description
+       FROM permissions
+      ORDER BY module ASC, action ASC, permission_key ASC`,
   );

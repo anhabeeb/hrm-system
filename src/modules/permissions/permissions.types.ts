@@ -16,4 +16,12 @@ export interface EmployeeOutletRecord {
   primary_outlet_id: string | null;
 }
 
+export interface PermissionRecord {
+  id: string;
+  permission_key: string;
+  module: string;
+  action: string;
+  description: string | null;
+}
+
 export type PermissionContext = AuthActor;
