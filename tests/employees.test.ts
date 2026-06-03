@@ -10,28 +10,78 @@ import { AppError, ValidationError } from "../src/utils/errors";
 describe("employee validators", () => {
   it("accepts a local employee without creating any user login data", () => {
     const input = validateEmployeeCreateInput({
-      employee_code: "EMP-001",
       full_name: "Ahmed Ali",
       employee_type: "local",
+      id_card_number: "A123456",
       primary_outlet_id: "outlet_1",
       employment_status: "active",
       joined_at: "2026-05-01",
     });
 
-    expect(input.employee_code).toBe("EMP-001");
+    expect(input.employee_code).toBeUndefined();
+    expect(input.id_card_number).toBe("A123456");
     expect("password" in input).toBe(false);
   });
 
-  it("requires nationality for foreign employees", () => {
+  it("requires National ID for local employees", () => {
     expect(() =>
       validateEmployeeCreateInput({
-        employee_code: "EMP-002",
+        full_name: "Local Employee",
+        employee_type: "local",
+        primary_outlet_id: "outlet_1",
+        employment_status: "active",
+      }),
+    ).toThrow("National ID number is required for local employees.");
+  });
+
+  it("requires nationality, passport, and work permit details for foreign employees", () => {
+    expect(() =>
+      validateEmployeeCreateInput({
         full_name: "Foreign Employee",
         employee_type: "foreign",
         primary_outlet_id: "outlet_1",
         employment_status: "active",
       }),
-    ).toThrow("Nationality is required for foreign employees.");
+    ).toThrow("Please complete the required foreign employee identity fields.");
+  });
+
+  it("accepts complete foreign employee identity details", () => {
+    const input = validateEmployeeCreateInput({
+      full_name: "Foreign Employee",
+      employee_type: "foreign",
+      nationality: "Sri Lankan",
+      passport_number: "n1234567",
+      passport_expiry_date: "2028-06-01",
+      work_permit_number: "wp-9988",
+      work_permit_expiry_date: "2027-06-01",
+      primary_outlet_id: "outlet_1",
+      employment_status: "active",
+    });
+
+    expect(input.passport_number).toBe("n1234567");
+    expect(input.work_permit_number).toBe("wp-9988");
+  });
+
+  it("normalizes blank identity strings to null", () => {
+    const input = validateEmployeeCreateInput({
+      full_name: "Ahmed Ali",
+      employee_type: "local",
+      id_card_number: " A123456 ",
+      passport_number: "   ",
+      primary_outlet_id: "outlet_1",
+      employment_status: "active",
+    });
+
+    expect(input.id_card_number).toBe("A123456");
+    expect(input.passport_number).toBeNull();
+  });
+
+  it("rejects employee code changes from general employee update", () => {
+    expect(() =>
+      validateEmployeeUpdateInput({
+        employee_code: "EMP-999999",
+      }),
+    ).toThrow("Employee ID is system-generated and cannot be changed here.");
   });
 
   it("requires salary values to be integer minor units", () => {
@@ -78,7 +128,21 @@ describe("employee validators", () => {
 });
 
 describe("employee module placeholders", () => {
-  it.todo("duplicate employee code is blocked by the service");
+  it.todo("creating local employee without employee_code generates EMP-000001 style code");
+  it.todo("creating second employee generates the next company-scoped employee code");
+  it.todo("duplicate employee code is blocked by the service with DUPLICATE_EMPLOYEE_CODE");
+  it.todo("duplicate National ID in the same company returns DUPLICATE_NATIONAL_ID");
+  it.todo("duplicate passport number in the same company returns DUPLICATE_PASSPORT_NUMBER");
+  it.todo("duplicate work permit number in the same company returns DUPLICATE_WORK_PERMIT_NUMBER");
+  it.todo("same identity numbers in different companies are allowed when tenant scoping permits");
+  it.todo("existing employee_code values are not overwritten by migrations or updates");
+  it.todo("employee list and detail return identity fields without document storage internals");
+  it.todo("migration creates employee_code_sequences and employee identity unique indexes safely");
+  it.todo("create employee form does not require employee_code");
+  it.todo("create employee form shows System generated after save");
+  it.todo("employee table displays generated Employee ID");
+  it.todo("employee detail shows generated Employee ID and identity section");
+  it.todo("duplicate identity field errors show beside the correct frontend fields");
   it.todo("list employees supports filters for professional table views");
   it.todo("employee detail masks sensitive fields without employees.view_sensitive");
   it.todo("archive employee requires reason");
