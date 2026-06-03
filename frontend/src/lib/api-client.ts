@@ -1,13 +1,18 @@
-import { getApiUrl } from "@/app/config";
+import { appConfig, getApiRequestInfo } from "@/app/config";
 import type { ApiErrorResponse, ApiResponse, StandardApiResponse } from "@/types/api";
 
 import {
   ApiError,
+  createApiBaseUrlInvalidError,
+  createCorsBlockedError,
+  createHtmlApiResponseError,
   createInvalidApiResponseError,
+  createMixedContentError,
   createNetworkError,
   createTimeoutError,
   friendlyMessageForStatus,
   handleSessionExpired,
+  type ApiErrorDiagnostics,
 } from "./api-errors";
 import { getAuthToken } from "./auth-token";
 
@@ -19,21 +24,105 @@ interface RequestOptions {
   timeoutMs?: number;
 }
 
-const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_TIMEOUT_MS = 15_000;
+
+const nowIso = () => new Date().toISOString();
+
+const currentPageUrl = () =>
+  typeof window === "undefined" ? undefined : window.location.href;
+
+const browserOnline = () =>
+  typeof navigator === "undefined" ? undefined : navigator.onLine;
+
+const isCrossOrigin = (url: string) => {
+  if (typeof window === "undefined") return false;
+  try {
+    return new URL(url, window.location.origin).origin !== window.location.origin;
+  } catch {
+    return false;
+  }
+};
+
+const isMixedContent = (url: string) => {
+  if (typeof window === "undefined") return false;
+  try {
+    const resolved = new URL(url, window.location.origin);
+    return window.location.protocol === "https:" && resolved.protocol === "http:";
+  } catch {
+    return false;
+  }
+};
+
+const validateApiBaseUrl = (apiBaseUrl: string) => {
+  if (!apiBaseUrl) return;
+  const url = new URL(apiBaseUrl);
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    throw new Error("API base URL must use http or https.");
+  }
+};
+
+const diagnostics = (input: {
+  requestUrl: string;
+  apiBaseUrl: string;
+  apiBaseUrlSource: string;
+  method: HttpMethod;
+  startedAt: number;
+  requestStartedAt: string;
+  error?: unknown;
+  timeout?: boolean;
+}): ApiErrorDiagnostics => {
+  const endedAt = Date.now();
+  const error = input.error;
+  const errorName = error instanceof Error ? error.name : error ? String(error) : undefined;
+  const errorMessage = error instanceof Error ? error.message : undefined;
+
+  return {
+    requestUrl: input.requestUrl,
+    apiBaseUrl: input.apiBaseUrl,
+    apiBaseUrlSource: input.apiBaseUrlSource,
+    method: input.method,
+    browserOnline: browserOnline(),
+    errorName,
+    errorMessage,
+    timeout: input.timeout ?? false,
+    corsSuspected: isCrossOrigin(input.requestUrl) && browserOnline() !== false && errorName === "TypeError",
+    mixedContentSuspected: isMixedContent(input.requestUrl),
+    currentPageUrl: currentPageUrl(),
+    buildVersion: appConfig.buildVersion,
+    requestStartedAt: input.requestStartedAt,
+    requestEndedAt: nowIso(),
+    elapsedMs: endedAt - input.startedAt,
+  };
+};
+
+const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
+const shouldRetryStartupGet = (method: HttpMethod, path: string, attempt: number) =>
+  attempt === 0 &&
+  method === "GET" &&
+  ["/health", "/bootstrap/status", "/auth/me"].some((prefix) => path === prefix || path.endsWith(prefix));
 
 const parseResponse = async <T>(
   response: Response,
-  requestMeta: { method: HttpMethod; path: string },
+  requestMeta: { method: HttpMethod; path: string; diagnostics: ApiErrorDiagnostics },
   options: RequestOptions = {},
 ): Promise<ApiResponse<T>> => {
   const contentType = response.headers.get("content-type") ?? "";
-  const body = contentType.includes("application/json")
-    ? ((await response.json()) as StandardApiResponse<T>)
-    : null;
+  let body: StandardApiResponse<T> | null = null;
+
+  if (contentType.includes("application/json")) {
+    try {
+      body = (await response.json()) as StandardApiResponse<T>;
+    } catch {
+      throw createInvalidApiResponseError(response.status, requestMeta.diagnostics);
+    }
+  }
 
   if (!response.ok || !body || body.success === false) {
     if (!body) {
-      const invalidError = createInvalidApiResponseError(response.status);
+      const invalidError = contentType.includes("text/html")
+        ? createHtmlApiResponseError(response.status, requestMeta.diagnostics)
+        : createInvalidApiResponseError(response.status, requestMeta.diagnostics);
       if (!options.suppressSessionExpired) {
         handleSessionExpired(invalidError);
       }
@@ -55,6 +144,7 @@ const parseResponse = async <T>(
       suggestedAction: errorBody?.error?.suggestedAction,
       fieldErrors: errorBody?.error?.fieldErrors,
       details: errorBody?.error?.details,
+      diagnostics: requestMeta.diagnostics,
     });
     if (!options.suppressSessionExpired) {
       handleSessionExpired(error);
@@ -70,7 +160,35 @@ const request = async <T>(
   path: string,
   body?: unknown,
   options: RequestOptions = {},
+  attempt = 0,
 ): Promise<ApiResponse<T>> => {
+  const requestInfo = getApiRequestInfo(path);
+  const startedAt = Date.now();
+  const requestStartedAt = nowIso();
+  const baseDiagnostics = () =>
+    diagnostics({
+      requestUrl: requestInfo.url,
+      apiBaseUrl: requestInfo.apiBaseUrl,
+      apiBaseUrlSource: requestInfo.apiBaseUrlSource,
+      method,
+      startedAt,
+      requestStartedAt,
+    });
+
+  try {
+    validateApiBaseUrl(requestInfo.apiBaseUrl);
+  } catch (error) {
+    throw createApiBaseUrlInvalidError(requestInfo.apiBaseUrl, {
+      ...baseDiagnostics(),
+      errorName: error instanceof Error ? error.name : undefined,
+      errorMessage: error instanceof Error ? error.message : undefined,
+    });
+  }
+
+  if (isMixedContent(requestInfo.url)) {
+    throw createMixedContentError(baseDiagnostics());
+  }
+
   const token = getAuthToken();
   const headers = new Headers({
     Accept: "application/json",
@@ -92,7 +210,7 @@ const request = async <T>(
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), options.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   try {
-    response = await fetch(getApiUrl(path), {
+    response = await fetch(requestInfo.url, {
       method,
       headers,
       credentials: "include",
@@ -100,15 +218,41 @@ const request = async <T>(
       signal: controller.signal,
     });
   } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
-      throw createTimeoutError();
+    const failureDiagnostics = diagnostics({
+      requestUrl: requestInfo.url,
+      apiBaseUrl: requestInfo.apiBaseUrl,
+      apiBaseUrlSource: requestInfo.apiBaseUrlSource,
+      method,
+      startedAt,
+      requestStartedAt,
+      error,
+      timeout: error instanceof DOMException && error.name === "AbortError",
+    });
+
+    if (shouldRetryStartupGet(method, path, attempt)) {
+      await sleep(250);
+      return request<T>(method, path, body, options, attempt + 1);
     }
-    throw createNetworkError();
+
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw createTimeoutError(failureDiagnostics);
+    }
+    if (failureDiagnostics.mixedContentSuspected) {
+      throw createMixedContentError(failureDiagnostics);
+    }
+    if (failureDiagnostics.corsSuspected) {
+      throw createCorsBlockedError(failureDiagnostics);
+    }
+    throw createNetworkError(failureDiagnostics);
   } finally {
     window.clearTimeout(timeoutId);
   }
 
-  return parseResponse<T>(response, { method, path }, options);
+  return parseResponse<T>(response, {
+    method,
+    path,
+    diagnostics: baseDiagnostics(),
+  }, options);
 };
 
 export const api = {
@@ -121,13 +265,26 @@ export const api = {
     const headers = new Headers();
     if (token) headers.set("Authorization", `Bearer ${token}`);
 
-    const response = await fetch(getApiUrl(path), {
+    const requestInfo = getApiRequestInfo(path);
+    const response = await fetch(requestInfo.url, {
       headers,
       credentials: "include",
     });
 
     if (!response.ok) {
-      await parseResponse<never>(response, { method: "GET", path });
+      const startedAt = Date.now();
+      await parseResponse<never>(response, {
+        method: "GET",
+        path,
+        diagnostics: diagnostics({
+          requestUrl: requestInfo.url,
+          apiBaseUrl: requestInfo.apiBaseUrl,
+          apiBaseUrlSource: requestInfo.apiBaseUrlSource,
+          method: "GET",
+          startedAt,
+          requestStartedAt: new Date(startedAt).toISOString(),
+        }),
+      });
     }
 
     return response.blob();
