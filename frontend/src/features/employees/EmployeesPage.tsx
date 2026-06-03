@@ -102,11 +102,12 @@ export const EmployeesPage = () => {
 
   const submitForm = (values: EmployeeFormValues) => {
     if (formMode === "edit" && selectedEmployee) {
-      const { primary_outlet_id: _primaryOutletId, employment_status: _employmentStatus, ...payload } = values;
+      const { employee_code: _employeeCode, primary_outlet_id: _primaryOutletId, employment_status: _employmentStatus, ...payload } = values;
       updateMutation.mutate({ id: selectedEmployee.id, payload });
       return;
     }
-    createMutation.mutate(values);
+    const { employee_code: _employeeCode, ...payload } = values;
+    createMutation.mutate(payload);
   };
 
   const canCreate = auth.hasPermission("employees.create");

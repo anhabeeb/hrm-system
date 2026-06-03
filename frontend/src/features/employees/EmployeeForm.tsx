@@ -19,7 +19,7 @@ import { employeeSchema, type EmployeeFormValues } from "./employees.schema";
 import type { Employee } from "./employees.types";
 
 const defaults: EmployeeFormValues = {
-  employee_code: "",
+  employee_code: null,
   full_name: "",
   employee_type: "local",
   primary_outlet_id: "",
@@ -28,6 +28,11 @@ const defaults: EmployeeFormValues = {
   employment_status: "active",
   joined_at: null,
   nationality: null,
+  id_card_number: null,
+  passport_number: null,
+  passport_expiry_date: null,
+  work_permit_number: null,
+  work_permit_expiry_date: null,
   phone: null,
   contract_type: null,
   notes: null,
@@ -58,6 +63,7 @@ export const EmployeeForm = ({
 }) => {
   const form = useForm<EmployeeFormValues>({ resolver: zodResolver(employeeSchema), defaultValues: defaults });
   const isEdit = mode === "edit";
+  const employeeType = form.watch("employee_type");
 
   useEffect(() => {
     if (!open) return;
@@ -71,6 +77,11 @@ export const EmployeeForm = ({
       employment_status: employee.employment_status,
       joined_at: employee.joined_at ?? null,
       nationality: employee.nationality ?? null,
+      id_card_number: employee.id_card_number ?? null,
+      passport_number: employee.passport_number ?? null,
+      passport_expiry_date: employee.passport_expiry_date ?? null,
+      work_permit_number: employee.work_permit_number ?? null,
+      work_permit_expiry_date: employee.work_permit_expiry_date ?? null,
       phone: employee.phone ?? null,
       contract_type: employee.contract_type ?? null,
       notes: null,
@@ -89,7 +100,17 @@ export const EmployeeForm = ({
             <FormError message={error?.message} requestId={error?.requestId} />
             <div className="grid gap-4 md:grid-cols-2">
               <FormField control={form.control} name="employee_code" render={({ field }) => (
-                <FormItem><FormLabel><RequiredLabel>Employee code</RequiredLabel></FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem>
+                  <FormLabel>Employee ID</FormLabel>
+                  <FormControl>
+                    <Input
+                      value={isEdit ? field.value ?? "" : "System generated after save"}
+                      disabled
+                      readOnly
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
               )} />
               <FormField control={form.control} name="full_name" render={({ field }) => (
                 <FormItem><FormLabel><RequiredLabel>Full name</RequiredLabel></FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
@@ -112,9 +133,29 @@ export const EmployeeForm = ({
               <FormField control={form.control} name="joined_at" render={({ field }) => (
                 <FormItem><FormLabel>Joined date</FormLabel><FormControl><Input type="date" value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value || null)} /></FormControl><FormMessage /></FormItem>
               )} />
-              <FormField control={form.control} name="nationality" render={({ field }) => (
-                <FormItem><FormLabel>Nationality</FormLabel><FormControl><Input value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value || null)} /></FormControl><FormMessage /></FormItem>
-              )} />
+              {employeeType === "local" ? (
+                <FormField control={form.control} name="id_card_number" render={({ field }) => (
+                  <FormItem><FormLabel><RequiredLabel>National ID number</RequiredLabel></FormLabel><FormControl><Input value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value || null)} /></FormControl><FormMessage /></FormItem>
+                )} />
+              ) : (
+                <>
+                  <FormField control={form.control} name="nationality" render={({ field }) => (
+                    <FormItem><FormLabel><RequiredLabel>Nationality</RequiredLabel></FormLabel><FormControl><Input value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value || null)} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="passport_number" render={({ field }) => (
+                    <FormItem><FormLabel><RequiredLabel>Passport number</RequiredLabel></FormLabel><FormControl><Input value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value || null)} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="passport_expiry_date" render={({ field }) => (
+                    <FormItem><FormLabel><RequiredLabel>Passport expiry date</RequiredLabel></FormLabel><FormControl><Input type="date" value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value || null)} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="work_permit_number" render={({ field }) => (
+                    <FormItem><FormLabel><RequiredLabel>Work permit number</RequiredLabel></FormLabel><FormControl><Input value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value || null)} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="work_permit_expiry_date" render={({ field }) => (
+                    <FormItem><FormLabel><RequiredLabel>Work permit expiry date</RequiredLabel></FormLabel><FormControl><Input type="date" value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value || null)} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                </>
+              )}
               <FormField control={form.control} name="phone" render={({ field }) => (
                 <FormItem><FormLabel>Phone</FormLabel><FormControl><Input value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value || null)} /></FormControl><FormMessage /></FormItem>
               )} />

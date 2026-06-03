@@ -9,6 +9,11 @@ export interface Employee {
   full_name: string;
   employee_type: EmployeeType;
   nationality?: string | null;
+  id_card_number?: string | null;
+  passport_number?: string | null;
+  passport_expiry_date?: string | null;
+  work_permit_number?: string | null;
+  work_permit_expiry_date?: string | null;
   phone?: string | null;
   email?: string | null;
   primary_outlet_id?: string | null;
@@ -37,7 +42,6 @@ export interface EmployeeFilters {
 }
 
 export interface EmployeePayload {
-  employee_code: string;
   full_name: string;
   employee_type: EmployeeType;
   primary_outlet_id: string;
@@ -46,6 +50,11 @@ export interface EmployeePayload {
   employment_status: EmploymentStatus;
   joined_at?: string | null;
   nationality?: string | null;
+  id_card_number?: string | null;
+  passport_number?: string | null;
+  passport_expiry_date?: string | null;
+  work_permit_number?: string | null;
+  work_permit_expiry_date?: string | null;
   phone?: string | null;
   contract_type?: string | null;
   notes?: string | null;

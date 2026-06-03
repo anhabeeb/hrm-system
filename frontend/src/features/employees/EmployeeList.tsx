@@ -5,6 +5,11 @@ import { displayDate } from "./employee-format";
 import type { Employee } from "./employees.types";
 import type { Pagination } from "@/types/api";
 
+const identityValue = (employee: Employee) =>
+  employee.employee_type === "foreign"
+    ? employee.passport_number ?? "Passport not recorded"
+    : employee.id_card_number ?? "National ID not recorded";
+
 export const EmployeeList = ({
   rows,
   loading,
@@ -36,9 +41,10 @@ export const EmployeeList = ({
     emptyTitle="No employees found."
     emptyDescription="Try adjusting filters or add the first employee if you have permission."
     columns={[
-      { key: "employee_code", header: "Employee Code" },
+      { key: "employee_code", header: "Employee ID" },
       { key: "full_name", header: "Full Name" },
       { key: "employee_type", header: "Employee Type" },
+      { key: "id_card_number", header: "National ID / Passport", cell: identityValue },
       { key: "primary_outlet_name", header: "Outlet", cell: (row) => row.primary_outlet_name ?? "Not assigned" },
       { key: "department_name", header: "Department", cell: (row) => row.department_name ?? "Not assigned" },
       { key: "position_title", header: "Position", cell: (row) => row.position_title ?? "Not assigned" },

@@ -8,6 +8,18 @@ import { EmployeeDocumentsPanel } from "./EmployeeDocumentsPanel";
 import { EmployeeNotesPanel } from "./EmployeeNotesPanel";
 import { EmployeeSalaryHistoryPanel } from "./EmployeeSalaryHistoryPanel";
 
+const expiryStatus = (date?: string | null) => {
+  if (!date) return "Not available";
+  const expiry = new Date(`${date}T00:00:00`);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const days = Math.ceil((expiry.getTime() - today.getTime()) / 86_400_000);
+
+  if (days < 0) return `${displayDate(date)} (expired)`;
+  if (days <= 60) return `${displayDate(date)} (expires within 60 days)`;
+  return displayDate(date);
+};
+
 interface EmployeeDetailDrawerProps {
   employee: Employee | null;
   open: boolean;
@@ -44,11 +56,26 @@ export const EmployeeDetailDrawer = ({
       <DetailSection
         title="Basic Information"
         rows={[
-          { label: "Employee code", value: employee.employee_code },
+          { label: "Employee ID", value: employee.employee_code },
           { label: "Full name", value: employee.full_name },
           { label: "Employee type", value: employee.employee_type },
-          { label: "Nationality", value: employee.nationality ?? "Not available" },
           { label: "Status", value: <EmployeeStatusBadge status={employee.employment_status} /> },
+        ]}
+      />
+      <DetailSection
+        title="Employee Identity"
+        rows={[
+          { label: "Employee ID", value: employee.employee_code },
+          { label: "Employee type", value: employee.employee_type },
+          ...(employee.employee_type === "local"
+            ? [{ label: "National ID number", value: employee.id_card_number ?? "Not available" }]
+            : [
+                { label: "Nationality", value: employee.nationality ?? "Not available" },
+                { label: "Passport number", value: employee.passport_number ?? "Not available" },
+                { label: "Passport expiry date", value: expiryStatus(employee.passport_expiry_date) },
+                { label: "Work permit number", value: employee.work_permit_number ?? "Not available" },
+                { label: "Work permit expiry date", value: expiryStatus(employee.work_permit_expiry_date) },
+              ]),
         ]}
       />
       <DetailSection
