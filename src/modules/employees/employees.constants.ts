@@ -24,4 +24,5 @@ export const EMPLOYEE_SORT_FIELDS = [
 export const EMPLOYEE_SENSITIVE_FIELDS = [
   "id_card_number",
   "passport_number",
+  "work_permit_number",
 ] as const;

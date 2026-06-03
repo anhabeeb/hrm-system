@@ -38,6 +38,9 @@ export interface EmployeeRecord {
   nationality: string | null;
   id_card_number: string | null;
   passport_number: string | null;
+  passport_expiry_date: string | null;
+  work_permit_number: string | null;
+  work_permit_expiry_date: string | null;
   phone: string | null;
   emergency_contact_name: string | null;
   emergency_contact_phone: string | null;
@@ -67,7 +70,7 @@ export interface EmployeeListRow extends EmployeeRecord {
 }
 
 export interface EmployeeWriteInput {
-  employee_code: string;
+  employee_code?: string | null;
   full_name: string;
   employee_type: EmployeeType;
   primary_outlet_id: string;
@@ -78,6 +81,9 @@ export interface EmployeeWriteInput {
   nationality?: string | null;
   id_card_number?: string | null;
   passport_number?: string | null;
+  passport_expiry_date?: string | null;
+  work_permit_number?: string | null;
+  work_permit_expiry_date?: string | null;
   phone?: string | null;
   emergency_contact_name?: string | null;
   emergency_contact_phone?: string | null;
@@ -90,6 +96,8 @@ export interface EmployeeWriteInput {
 export type EmployeeUpdateInput = Partial<
   Omit<EmployeeWriteInput, "primary_outlet_id" | "employment_status">
 >;
+
+export type EmployeePersistInput = EmployeeWriteInput & { employee_code: string };
 
 export interface EmployeeAccessibleOutletScope {
   isSuperAdmin: boolean;

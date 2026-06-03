@@ -35,10 +35,12 @@ const optionalDate = z
   .nullable()
   .optional();
 
+const optionalTrimmed = z.string().trim().nullable().optional();
+
 const reason = z.string().trim().min(3, "A reason is required for this action.");
 
 const employeeBase = z.object({
-  employee_code: z.string().trim().min(1, "Employee code is required."),
+  employee_code: z.string().trim().nullable().optional(),
   full_name: z.string().trim().min(1, "Employee name is required."),
   employee_type: z.enum(EMPLOYEE_TYPES),
   primary_outlet_id: z.string().trim().min(1, "Primary outlet is required."),
@@ -46,21 +48,63 @@ const employeeBase = z.object({
   position_id: z.string().trim().min(1).nullable().optional(),
   employment_status: z.enum(EMPLOYMENT_STATUSES),
   joined_at: optionalDate,
-  nationality: z.string().trim().nullable().optional(),
-  id_card_number: z.string().trim().nullable().optional(),
-  passport_number: z.string().trim().nullable().optional(),
-  phone: z.string().trim().nullable().optional(),
-  emergency_contact_name: z.string().trim().nullable().optional(),
-  emergency_contact_phone: z.string().trim().nullable().optional(),
-  contract_type: z.string().trim().nullable().optional(),
-  bank_name: z.string().trim().nullable().optional(),
-  bank_account_masked: z.string().trim().nullable().optional(),
-  notes: z.string().trim().nullable().optional(),
+  nationality: optionalTrimmed,
+  id_card_number: optionalTrimmed,
+  passport_number: optionalTrimmed,
+  passport_expiry_date: optionalDate,
+  work_permit_number: optionalTrimmed,
+  work_permit_expiry_date: optionalDate,
+  phone: optionalTrimmed,
+  emergency_contact_name: optionalTrimmed,
+  emergency_contact_phone: optionalTrimmed,
+  contract_type: optionalTrimmed,
+  bank_name: optionalTrimmed,
+  bank_account_masked: optionalTrimmed,
+  notes: optionalTrimmed,
 });
 
-const ensureForeignEmployeeDetails = (input: EmployeeWriteInput | EmployeeUpdateInput) => {
-  if (input.employee_type === "foreign" && !input.nationality) {
-    throw new ValidationError("Nationality is required for foreign employees.");
+const blankToNull = <T extends Record<string, unknown>>(input: T): T => {
+  const normalized = { ...input };
+
+  for (const [key, value] of Object.entries(normalized)) {
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      normalized[key as keyof T] = (trimmed === "" ? null : trimmed) as T[keyof T];
+    }
+  }
+
+  return normalized;
+};
+
+const ensureEmployeeIdentityDetails = (input: EmployeeWriteInput | EmployeeUpdateInput) => {
+  if (input.employee_type === "local" && !input.id_card_number) {
+    throw new ValidationError("National ID number is required for local employees.", {
+      id_card_number: "National ID number is required for local employees.",
+    });
+  }
+
+  if (input.employee_type === "foreign") {
+    const fieldErrors: Record<string, string> = {};
+
+    if (!input.nationality) {
+      fieldErrors.nationality = "Nationality is required for foreign employees.";
+    }
+    if (!input.passport_number) {
+      fieldErrors.passport_number = "Passport number is required for foreign employees.";
+    }
+    if (!input.passport_expiry_date) {
+      fieldErrors.passport_expiry_date = "Passport expiry date is required for foreign employees.";
+    }
+    if (!input.work_permit_number) {
+      fieldErrors.work_permit_number = "Work permit number is required for foreign employees.";
+    }
+    if (!input.work_permit_expiry_date) {
+      fieldErrors.work_permit_expiry_date = "Work permit expiry date is required for foreign employees.";
+    }
+
+    if (Object.keys(fieldErrors).length > 0) {
+      throw new ValidationError("Please complete the required foreign employee identity fields.", fieldErrors);
+    }
   }
 };
 
@@ -93,8 +137,8 @@ export const validateEmployeeListFilters = (
 };
 
 export const validateEmployeeCreateInput = (payload: unknown): EmployeeWriteInput => {
-  const input = parse(employeeBase, payload);
-  ensureForeignEmployeeDetails(input);
+  const input = blankToNull(parse(employeeBase, payload));
+  ensureEmployeeIdentityDetails(input);
   return input;
 };
 
@@ -122,14 +166,22 @@ export const validateEmployeeUpdateInput = (payload: unknown): EmployeeUpdateInp
     );
   }
 
-  const input = parse(
+  if ("employee_code" in rawPayload) {
+    throw new AppError(
+      "Employee ID is system-generated and cannot be changed here.",
+      "EMPLOYEE_CODE_SYSTEM_GENERATED",
+      400,
+    );
+  }
+
+  const input = blankToNull(parse(
     employeeBase.omit({
+      employee_code: true,
       primary_outlet_id: true,
       employment_status: true,
     }).partial(),
     payload,
-  );
-  ensureForeignEmployeeDetails(input);
+  ));
   return input;
 };
 

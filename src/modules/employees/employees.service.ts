@@ -2,6 +2,7 @@ import type {
   DocumentMetadataInput,
   EmployeeListFilters,
   EmployeeListRow,
+  EmployeePersistInput,
   EmployeeNoteInput,
   EmployeeRecord,
   EmployeeStatusInput,
@@ -19,7 +20,6 @@ import { createSyncChange } from "../sync/sync-change.service";
 import type { AuthActor, PaginationMeta } from "../../types/api.types";
 import {
   AppError,
-  ConflictError,
   NotFoundError,
   OutletAccessError,
   PermissionError,
@@ -194,8 +194,199 @@ const maskEmployee = <T extends EmployeeListRow | EmployeeRecord>(
         ...employee,
         id_card_number: maskValue(employee.id_card_number),
         passport_number: maskValue(employee.passport_number),
+        work_permit_number: maskValue(employee.work_permit_number),
         bank_name: null,
       };
+
+const normalizeOptionalText = (
+  value: string | null | undefined,
+  options: { uppercase?: boolean } = {},
+): string | null | undefined => {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === null) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  return options.uppercase ? trimmed.toUpperCase() : trimmed;
+};
+
+const normalizeEmployeeInput = <T extends EmployeeWriteInput | EmployeeUpdateInput>(
+  input: T,
+): T => ({
+  ...input,
+  nationality: normalizeOptionalText(input.nationality),
+  id_card_number: normalizeOptionalText(input.id_card_number, { uppercase: true }),
+  passport_number: normalizeOptionalText(input.passport_number, { uppercase: true }),
+  work_permit_number: normalizeOptionalText(input.work_permit_number, { uppercase: true }),
+  passport_expiry_date: normalizeOptionalText(input.passport_expiry_date),
+  work_permit_expiry_date: normalizeOptionalText(input.work_permit_expiry_date),
+  phone: normalizeOptionalText(input.phone),
+  emergency_contact_name: normalizeOptionalText(input.emergency_contact_name),
+  emergency_contact_phone: normalizeOptionalText(input.emergency_contact_phone),
+  contract_type: normalizeOptionalText(input.contract_type),
+  bank_name: normalizeOptionalText(input.bank_name),
+  bank_account_masked: normalizeOptionalText(input.bank_account_masked),
+  notes: normalizeOptionalText(input.notes),
+});
+
+const normalizeEmployeeForPersist = (input: EmployeePersistInput): EmployeePersistInput => {
+  const normalized = normalizeEmployeeInput(input) as EmployeePersistInput;
+
+  if (normalized.employee_type === "local" && !normalized.nationality) {
+    normalized.nationality = "Maldives";
+  }
+
+  return normalized;
+};
+
+const ensureIdentityRequirements = (input: EmployeePersistInput) => {
+  if (input.employee_type === "local" && !input.id_card_number) {
+    throw new ValidationError("National ID number is required for local employees.", {
+      id_card_number: "National ID number is required for local employees.",
+    });
+  }
+
+  if (input.employee_type !== "foreign") {
+    return;
+  }
+
+  const fieldErrors: Record<string, string> = {};
+  if (!input.nationality) fieldErrors.nationality = "Nationality is required for foreign employees.";
+  if (!input.passport_number) fieldErrors.passport_number = "Passport number is required for foreign employees.";
+  if (!input.passport_expiry_date) fieldErrors.passport_expiry_date = "Passport expiry date is required for foreign employees.";
+  if (!input.work_permit_number) fieldErrors.work_permit_number = "Work permit number is required for foreign employees.";
+  if (!input.work_permit_expiry_date) fieldErrors.work_permit_expiry_date = "Work permit expiry date is required for foreign employees.";
+
+  if (Object.keys(fieldErrors).length > 0) {
+    throw new ValidationError("Please complete the required foreign employee identity fields.", fieldErrors);
+  }
+};
+
+const duplicateIdentityError = (
+  field: "employee_code" | "id_card_number" | "passport_number" | "work_permit_number",
+) => {
+  const details = {
+    employee_code: {
+      code: "DUPLICATE_EMPLOYEE_CODE",
+      title: "Duplicate employee ID",
+      message: "This employee ID is already used by another employee.",
+      field: "employee_code",
+    },
+    id_card_number: {
+      code: "DUPLICATE_NATIONAL_ID",
+      title: "Duplicate National ID",
+      message: "This National ID is already used by another employee.",
+      field: "id_card_number",
+    },
+    passport_number: {
+      code: "DUPLICATE_PASSPORT_NUMBER",
+      title: "Duplicate passport number",
+      message: "This passport number is already used by another employee.",
+      field: "passport_number",
+    },
+    work_permit_number: {
+      code: "DUPLICATE_WORK_PERMIT_NUMBER",
+      title: "Duplicate work permit number",
+      message: "This work permit number is already used by another employee.",
+      field: "work_permit_number",
+    },
+  }[field];
+
+  return new AppError({
+    code: details.code,
+    title: details.title,
+    message: details.message,
+    statusCode: 409,
+    retryable: false,
+    fieldErrors: { [details.field]: details.message },
+  });
+};
+
+const ensureUniqueIdentity = async (
+  env: Env,
+  companyId: string,
+  input: Pick<EmployeePersistInput, "employee_code" | "id_card_number" | "passport_number" | "work_permit_number">,
+  currentEmployeeId?: string,
+) => {
+  const duplicateCode = await employeesRepository.findEmployeeByCode(
+    env,
+    companyId,
+    input.employee_code,
+  );
+
+  if (duplicateCode && duplicateCode.id !== currentEmployeeId) {
+    throw duplicateIdentityError("employee_code");
+  }
+
+  for (const field of ["id_card_number", "passport_number", "work_permit_number"] as const) {
+    const value = input[field];
+
+    if (!value) {
+      continue;
+    }
+
+    const duplicate = await employeesRepository.findEmployeeByIdentityField(
+      env,
+      companyId,
+      field,
+      value,
+    );
+
+    if (duplicate && duplicate.id !== currentEmployeeId) {
+      throw duplicateIdentityError(field);
+    }
+  }
+};
+
+const formatEmployeeCode = (prefix: string, number: number, padding: number) =>
+  `${prefix}-${String(number).padStart(padding, "0")}`;
+
+const ensureEmployeeCodeSequence = async (env: Env, companyId: string) => {
+  let sequence = await employeesRepository.getEmployeeCodeSequence(env, companyId);
+
+  if (sequence) {
+    return sequence;
+  }
+
+  const nextNumber = await employeesRepository.getNextEmployeeCodeNumberFromExisting(env, companyId);
+  await employeesRepository.createEmployeeCodeSequence(env, companyId, nextNumber);
+  sequence = await employeesRepository.getEmployeeCodeSequence(env, companyId);
+
+  return sequence ?? {
+    company_id: companyId,
+    prefix: "EMP",
+    next_number: nextNumber,
+    padding: 6,
+  };
+};
+
+const generateEmployeeCode = async (env: Env, companyId: string): Promise<string> => {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const sequence = await ensureEmployeeCodeSequence(env, companyId);
+    const code = formatEmployeeCode(sequence.prefix, sequence.next_number, sequence.padding);
+    const existing = await employeesRepository.findEmployeeByCode(env, companyId, code);
+
+    await employeesRepository.advanceEmployeeCodeSequence(env, companyId, sequence.next_number);
+
+    if (!existing) {
+      return code;
+    }
+  }
+
+  throw new AppError(
+    "Employee ID could not be generated. Please try again.",
+    "EMPLOYEE_CODE_GENERATION_FAILED",
+    500,
+  );
+};
 
 const sanitizeEmployeeDocument = (
   document: Record<string, unknown>,
@@ -287,12 +478,12 @@ const ensureReferenceData = async (
 const mergeEmployee = (
   existing: EmployeeListRow,
   input: EmployeeInternalUpdateInput,
-): EmployeeWriteInput & {
+): EmployeePersistInput & {
   resigned_at?: string | null;
   terminated_at?: string | null;
   deleted_at?: string | null;
 } => ({
-  employee_code: input.employee_code ?? existing.employee_code,
+  employee_code: existing.employee_code,
   full_name: input.full_name ?? existing.full_name,
   employee_type: input.employee_type ?? existing.employee_type,
   primary_outlet_id: input.primary_outlet_id ?? existing.primary_outlet_id ?? "",
@@ -309,6 +500,18 @@ const mergeEmployee = (
     input.passport_number !== undefined
       ? input.passport_number
       : existing.passport_number,
+  passport_expiry_date:
+    input.passport_expiry_date !== undefined
+      ? input.passport_expiry_date
+      : existing.passport_expiry_date,
+  work_permit_number:
+    input.work_permit_number !== undefined
+      ? input.work_permit_number
+      : existing.work_permit_number,
+  work_permit_expiry_date:
+    input.work_permit_expiry_date !== undefined
+      ? input.work_permit_expiry_date
+      : existing.work_permit_expiry_date,
   phone: input.phone !== undefined ? input.phone : existing.phone,
   emergency_contact_name:
     input.emergency_contact_name !== undefined
@@ -378,17 +581,14 @@ export const createEmployee = async (
   context: AuthActor,
   input: EmployeeWriteInput,
 ) => {
-  await ensureReferenceData(env, context, input);
+  const generatedInput = normalizeEmployeeForPersist({
+    ...input,
+    employee_code: await generateEmployeeCode(env, context.companyId),
+  });
 
-  const existing = await employeesRepository.findEmployeeByCode(
-    env,
-    context.companyId,
-    input.employee_code,
-  );
-
-  if (existing) {
-    throw new ConflictError("This employee code is already in use.");
-  }
+  ensureIdentityRequirements(generatedInput);
+  await ensureReferenceData(env, context, generatedInput);
+  await ensureUniqueIdentity(env, context.companyId, generatedInput);
 
   const employeeId = createEntityId("emp");
 
@@ -396,18 +596,18 @@ export const createEmployee = async (
     env,
     employeeId,
     context.companyId,
-    input,
+    generatedInput,
     context.actorUserId,
   );
   await employeesRepository.createJobHistory(env, {
     id: createPrefixedId("job_hist"),
     companyId: context.companyId,
     employeeId,
-    outletId: input.primary_outlet_id,
-    departmentId: input.department_id,
-    positionId: input.position_id,
+    outletId: generatedInput.primary_outlet_id,
+    departmentId: generatedInput.department_id,
+    positionId: generatedInput.position_id,
     changeType: "initial_assignment",
-    effectiveFrom: input.joined_at ?? nowIso().slice(0, 10),
+    effectiveFrom: generatedInput.joined_at ?? nowIso().slice(0, 10),
     reason: "Employee created",
     createdBy: context.actorUserId,
   });
@@ -415,7 +615,7 @@ export const createEmployee = async (
     id: createPrefixedId("status_hist"),
     companyId: context.companyId,
     employeeId,
-    newStatus: input.employment_status,
+    newStatus: generatedInput.employment_status,
     reason: "Employee created",
     changedBy: context.actorUserId,
   });
@@ -424,17 +624,17 @@ export const createEmployee = async (
     entityType: "employee",
     entityId: employeeId,
     employeeId,
-    outletId: input.primary_outlet_id,
-    newValue: input,
+    outletId: generatedInput.primary_outlet_id,
+    newValue: generatedInput,
   });
   await trackEmployeeSyncChange(env, context, {
     employeeId,
-    outletId: input.primary_outlet_id,
+    outletId: generatedInput.primary_outlet_id,
     actionType: "created",
     payload: {
-      employee_code: input.employee_code,
-      full_name: input.full_name,
-      employment_status: input.employment_status,
+      employee_code: generatedInput.employee_code,
+      full_name: generatedInput.full_name,
+      employment_status: generatedInput.employment_status,
     },
   });
   await broadcast(env, context, "employees.created", { employee_id: employeeId });
@@ -460,24 +660,17 @@ export const updateEmployee = async (
     throw new ValidationError("Please restore this employee before making changes.");
   }
 
-  const merged = mergeEmployee(existing, input);
+  const merged = normalizeEmployeeForPersist(mergeEmployee(existing, normalizeEmployeeInput(input)));
+  ensureIdentityRequirements(merged);
   await ensureReferenceData(env, context, merged);
-
-  if (merged.employee_code !== existing.employee_code) {
-    const duplicate = await employeesRepository.findEmployeeByCode(
-      env,
-      context.companyId,
-      merged.employee_code,
-    );
-
-    if (duplicate && duplicate.id !== employeeId) {
-      throw new ConflictError("This employee code is already in use.");
-    }
-  }
+  await ensureUniqueIdentity(env, context.companyId, merged, employeeId);
 
   const sensitiveFieldsChanged =
     input.id_card_number !== undefined ||
     input.passport_number !== undefined ||
+    input.passport_expiry_date !== undefined ||
+    input.work_permit_number !== undefined ||
+    input.work_permit_expiry_date !== undefined ||
     input.bank_name !== undefined ||
     input.bank_account_masked !== undefined;
 

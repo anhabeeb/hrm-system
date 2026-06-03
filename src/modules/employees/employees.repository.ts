@@ -3,9 +3,9 @@ import type {
   DocumentMetadataInput,
   EmployeeListFilters,
   EmployeeListRow,
+  EmployeePersistInput,
   EmployeeNoteInput,
   EmployeeRecord,
-  EmployeeWriteInput,
   JobChangeInput,
   OutletAssignmentInput,
   SalaryHistoryInput,
@@ -182,6 +182,72 @@ export const findEmployeeByCode = (
     [companyId, employeeCode],
   );
 
+export const findEmployeeByIdentityField = (
+  env: Env,
+  companyId: string,
+  field: "id_card_number" | "passport_number" | "work_permit_number",
+  value: string,
+): Promise<EmployeeRecord | null> =>
+  queryOne<EmployeeRecord>(
+    env,
+    `SELECT * FROM employees WHERE company_id = ? AND ${field} = ? AND deleted_at IS NULL LIMIT 1`,
+    [companyId, value],
+  );
+
+export const getEmployeeCodeSequence = (
+  env: Env,
+  companyId: string,
+): Promise<{ company_id: string; prefix: string; next_number: number; padding: number } | null> =>
+  queryOne(
+    env,
+    "SELECT company_id, prefix, next_number, padding FROM employee_code_sequences WHERE company_id = ? LIMIT 1",
+    [companyId],
+  );
+
+export const createEmployeeCodeSequence = (
+  env: Env,
+  companyId: string,
+  nextNumber: number,
+) =>
+  execute(
+    env,
+    `INSERT OR IGNORE INTO employee_code_sequences (
+      company_id, prefix, next_number, padding, created_at, updated_at
+    ) VALUES (?, 'EMP', ?, 6, ?, ?)`,
+    [companyId, nextNumber, new Date().toISOString(), new Date().toISOString()],
+  );
+
+export const getNextEmployeeCodeNumberFromExisting = async (
+  env: Env,
+  companyId: string,
+): Promise<number> => {
+  const row = await queryOne<{ next_number: number }>(
+    env,
+    `SELECT COALESCE(MAX(CASE
+      WHEN employee_code GLOB 'EMP-[0-9]*' THEN CAST(substr(employee_code, 5) AS INTEGER)
+      ELSE 0
+    END), 0) + 1 AS next_number
+     FROM employees
+     WHERE company_id = ?`,
+    [companyId],
+  );
+
+  return row?.next_number ?? 1;
+};
+
+export const advanceEmployeeCodeSequence = (
+  env: Env,
+  companyId: string,
+  fromNumber: number,
+) =>
+  execute(
+    env,
+    `UPDATE employee_code_sequences
+     SET next_number = ?, updated_at = ?
+     WHERE company_id = ? AND next_number = ?`,
+    [fromNumber + 1, new Date().toISOString(), companyId, fromNumber],
+  );
+
 export const findActiveOutlet = (
   env: Env,
   companyId: string,
@@ -219,18 +285,19 @@ export const createEmployee = (
   env: Env,
   id: string,
   companyId: string,
-  input: EmployeeWriteInput,
+  input: EmployeePersistInput,
   actorUserId: string,
 ) =>
   execute(
     env,
     `INSERT INTO employees (
       id, company_id, employee_code, full_name, employee_type, nationality,
-      id_card_number, passport_number, phone, emergency_contact_name,
+      id_card_number, passport_number, passport_expiry_date,
+      work_permit_number, work_permit_expiry_date, phone, emergency_contact_name,
       emergency_contact_phone, primary_outlet_id, department_id, position_id,
       contract_type, employment_status, joined_at, bank_name, bank_account_masked,
       notes, created_by, updated_by, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       companyId,
@@ -240,6 +307,9 @@ export const createEmployee = (
       input.nationality ?? null,
       input.id_card_number ?? null,
       input.passport_number ?? null,
+      input.passport_expiry_date ?? null,
+      input.work_permit_number ?? null,
+      input.work_permit_expiry_date ?? null,
       input.phone ?? null,
       input.emergency_contact_name ?? null,
       input.emergency_contact_phone ?? null,
@@ -263,7 +333,7 @@ export const updateEmployee = (
   env: Env,
   companyId: string,
   id: string,
-  input: EmployeeWriteInput & {
+  input: EmployeePersistInput & {
     resigned_at?: string | null;
     terminated_at?: string | null;
     deleted_at?: string | null;
@@ -274,7 +344,8 @@ export const updateEmployee = (
     env,
     `UPDATE employees SET
       employee_code = ?, full_name = ?, employee_type = ?, nationality = ?,
-      id_card_number = ?, passport_number = ?, phone = ?, emergency_contact_name = ?,
+      id_card_number = ?, passport_number = ?, passport_expiry_date = ?,
+      work_permit_number = ?, work_permit_expiry_date = ?, phone = ?, emergency_contact_name = ?,
       emergency_contact_phone = ?, primary_outlet_id = ?, department_id = ?,
       position_id = ?, contract_type = ?, employment_status = ?, joined_at = ?,
       resigned_at = ?, terminated_at = ?, bank_name = ?, bank_account_masked = ?,
@@ -287,6 +358,9 @@ export const updateEmployee = (
       input.nationality ?? null,
       input.id_card_number ?? null,
       input.passport_number ?? null,
+      input.passport_expiry_date ?? null,
+      input.work_permit_number ?? null,
+      input.work_permit_expiry_date ?? null,
       input.phone ?? null,
       input.emergency_contact_name ?? null,
       input.emergency_contact_phone ?? null,
