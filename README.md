@@ -257,6 +257,13 @@ Access control layers:
 - Reason middleware requires a clear reason for sensitive actions
 - Device auth middleware authenticates devices separately from users
 
+Users & Access APIs:
+
+- `/api/v1/users`, `/api/v1/roles`, and `/api/v1/permissions` are authenticated, permission-checked, and company-scoped.
+- User responses return only safe profile/access fields and never expose password hashes, reset tokens, session token hashes, TOTP secrets, backup code hashes, or internal auth secrets.
+- User management supports list/detail/create/update, enable/disable, password-reset-required, and role assignment with safeguards for the last active Super Admin.
+- Roles and permissions endpoints expose role metadata, role permissions, user counts, and seeded permissions for the Users & Access UI permission matrix.
+
 Approval notes:
 
 - Approval workflows can be disabled by Super Admin later
@@ -703,9 +710,7 @@ Prompt 17 adds a separate `frontend/` React + TypeScript + Vite application for 
 - My Profile is read-only for official fields; users request profile/KYC updates instead of directly editing official employee data.
 - 2FA management lives under `/profile/security`; setup secrets and backup codes are not persisted in browser storage.
 - Employees UI is implemented with backend-aligned `/employees` API calls, backend pagination, URL filters, table-first list/detail layouts, create/edit dialogs, and permission-aware salary/document/note panels.
-- Users & Access UI foundation is implemented with Users, Roles, and Permission Matrix tabs. The current backend does not register `/users`, `/roles`, or `/permissions` routes yet, so the page does not call those missing endpoints.
-- Users & Access mutating actions remain disabled until backend endpoints exist, and no fake user/role success messages are shown.
-- Roles/Permissions UI foundation shows a “Seeded permission reference” grouped by module and includes only actual backend seeded permissions.
+- Users & Access UI is connected to live `/users`, `/roles`, and `/permissions` APIs and uses backend data for user lists, role lists, and the permission matrix.
 - Outlets, Departments, and Positions UI are implemented with backend-aligned APIs, compact tables, filters, detail drawers, and create/edit dialogs.
 - Settings UI foundation is implemented with Company, Features, Attendance, Leave, Payroll, Approvals, Documents, and Backup sections. Feature settings use real backend feature endpoints and require a shadcn dialog reason for changes; `window.prompt` is not used.
 - Prompt 19 module pages use shadcn/ui, Tailwind CSS, TanStack Query, table-first Enterprise HRM Admin Dashboard patterns, permission-aware actions, and feature-aware routes.
