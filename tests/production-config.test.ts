@@ -86,9 +86,19 @@ describe("production config placeholders", () => {
 
     expect(pkg.scripts?.["build:api"]).toBe("tsc --noEmit");
     expect(pkg.scripts?.["build:frontend"]).toContain("npm --prefix frontend run build");
+    expect(pkg.scripts?.["verify:frontend-assets"]).toBe("node scripts/verify-frontend-assets.mjs");
     expect(pkg.scripts?.["build:all"]).toContain("build:api");
     expect(pkg.scripts?.["build:all"]).toContain("build:frontend");
-    expect(pkg.scripts?.deploy).toBe("npm run build:all && wrangler deploy");
+    expect(pkg.scripts?.deploy).toBe("npm run build:all && npm run verify:frontend-assets && wrangler deploy");
+  });
+
+  it("frontend asset deploy guard checks index and assets directory", () => {
+    const script = readText("scripts/verify-frontend-assets.mjs");
+
+    expect(script).toContain("frontend");
+    expect(script).toContain("dist");
+    expect(script).toContain("index.html");
+    expect(script).toContain("assets");
   });
 
   it.todo("fresh D1 migrations and seeds apply in order without inserting real users or passwords");

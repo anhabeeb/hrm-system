@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import app from "../src/app";
+import worker from "../src/index";
 
 const envWithEmptyBootstrapDb = {
   ENVIRONMENT: "test",
@@ -11,6 +12,24 @@ const envWithEmptyBootstrapDb = {
         first: async () => ({ total: 0 }),
       }),
     }),
+  },
+} as unknown as Env;
+
+const executionContext = {
+  waitUntil: () => undefined,
+  passThroughOnException: () => undefined,
+} as unknown as ExecutionContext;
+
+const envWithAssets = {
+  ENVIRONMENT: "test",
+  ASSETS: {
+    fetch: async () =>
+      new Response("<!doctype html><html><body><div id=\"root\"></div></body></html>", {
+        status: 200,
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+        },
+      }),
   },
 } as unknown as Env;
 
@@ -205,6 +224,43 @@ describe("route consistency", () => {
 
     expect(response.headers.get("Access-Control-Allow-Origin")).not.toBe("*");
   });
+});
+
+describe("Worker API/static asset routing", () => {
+  const fetchWorker = (path: string, env: Env = envWithAssets) =>
+    worker.fetch!(new Request(`https://hrm.example.test${path}`), env, executionContext);
+
+  it("GET /api/v1/health returns JSON 200 through the Worker entrypoint", async () => {
+    const response = await fetchWorker("/api/v1/health", { ENVIRONMENT: "test" } as Env);
+    const text = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    expect(text).toContain('"service":"hrm-api"');
+    expect(text).not.toContain("<!doctype html");
+  });
+
+  it("GET /api/not-real returns JSON API_ROUTE_NOT_FOUND through the Worker entrypoint", async () => {
+    const response = await fetchWorker("/api/not-real", { ENVIRONMENT: "test" } as Env);
+    const text = await response.text();
+
+    expect(response.status).toBe(404);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    expect(text).toContain("API_ROUTE_NOT_FOUND");
+    expect(text).not.toContain("<!doctype html");
+  });
+
+  for (const route of ["/", "/dashboard", "/employees", "/settings"]) {
+    it(`GET ${route} returns the React app shell`, async () => {
+      const response = await fetchWorker(route);
+      const text = await response.text();
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-type")).toContain("text/html");
+      expect(text).toContain("<!doctype html");
+      expect(text).not.toContain("ENDPOINT_NOT_FOUND");
+    });
+  }
 });
 
 describe("route consistency placeholders", () => {

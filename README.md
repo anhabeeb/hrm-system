@@ -12,7 +12,7 @@ This prompt sets up:
 - Cloudflare D1, R2, and Durable Object bindings
 - A versioned API base at `/api/v1`
 - A health check route at `GET /api/v1/health`
-- Standard response helpers and user-friendly err or handling
+- Standard response helpers and user-friendly error handling
 - Request ID middleware for traceability
 - Placeholder services for database, audit, notifications, and realtime events
 
@@ -102,7 +102,7 @@ npm run test
 
 ## D1 migrations
 
-D1 migrations are ordered SQL files that create and update the database schema over time. They should be reviewed before being applied, especially when they touch production data.
+D1 migrations are ordered SQL files that create and update the database schema over time. The `migrations/` directory is the canonical source of truth for database schema in this project. Migrations should be reviewed before being applied, especially when they touch production data.
 
 Apply local migrations:
 
@@ -148,6 +148,8 @@ Production deployment can start with no company profile and no users. The bootst
 - `GET /api/v1/bootstrap/status` tells a future setup screen whether first-time setup is required.
 - `POST /api/v1/bootstrap/initialize` creates the first company and Super Admin.
 - `POST /api/v1/bootstrap/super-admin` is an alias for the same initialize flow.
+- The `system_bootstrap` table tracks whether setup has completed and stores the initialized company/user IDs.
+- If an existing remote D1 database is missing `system_bootstrap`, apply the latest migrations rather than wiping or re-seeding production data.
 - The initialize endpoint requires `Authorization: Bearer <BOOTSTRAP_ADMIN_TOKEN>`.
 - `BOOTSTRAP_ADMIN_TOKEN` must be configured as a Cloudflare secret, not committed to the repo or stored in `wrangler.jsonc`.
 - Seed files must be run before bootstrap so the Super Admin role and default templates exist.
@@ -208,6 +210,9 @@ Password rules:
 
 - Passwords must be stored only as strong one-way hashes
 - The current implementation uses PBKDF2-HMAC-SHA256 with a unique salt and `PASSWORD_PEPPER`
+- Cloudflare Workers currently reject PBKDF2 iteration counts above 100,000, so `PASSWORD_HASH_ITERATIONS` is clamped to the Worker-safe maximum of `100000`.
+- New password hashes include metadata in the encoded value: algorithm, version, iteration count, salt, and derived hash. Verification reads the stored iteration count so older hashes can still be checked and upgraded safely after login.
+- If password hashing configuration fails, the API returns `PASSWORD_HASH_CONFIGURATION_ERROR` with a request ID and suggested action instead of a generic unknown error.
 - Password hashes are never returned by API responses
 - Real users, passwords, and password hashes must never be seeded
 
@@ -410,7 +415,15 @@ Future UI should show biometric devices, mappings, logs, and unmatched users in 
 npm run deploy
 ```
 
-Before deploying, make sure you have replaced placeholder resource IDs and bucket names in `wrangler.jsonc`, and added all required secrets in Cloudflare.
+The root deploy script builds both the API and `frontend/dist`, then runs `wrangler deploy`. Production is configured for the preferred single-Worker hosting model:
+
+- Workers Static Assets serves `./frontend/dist`.
+- React routes such as `/dashboard`, `/employees`, and `/settings` return the SPA.
+- `run_worker_first: ["/api/*"]` ensures `/api/*` always reaches the Worker API before static asset fallback.
+- Unknown `/api/*` routes return structured JSON `API_ROUTE_NOT_FOUND`, never `index.html`.
+- Leave `VITE_API_BASE_URL` empty for this same-origin deployment so the frontend calls `/api/v1/...`.
+
+Before deploying, make sure you have replaced placeholder resource IDs and bucket names in `wrangler.jsonc`, added all required secrets in Cloudflare, and configured `CORS_ALLOWED_ORIGINS` for every separate frontend origin that may call the API.
 
 ## Cloudflare bindings
 
@@ -500,6 +513,19 @@ Use `npx wrangler secret put <SECRET_NAME> --name hrm-system` and never put secr
 - Do not calculate payroll money with floating point values
 - Backend permission checks must be enforced later even if the frontend hides actions
 - Error messages should stay user-friendly and avoid technical jargon in normal API responses
+- API errors use a structured diagnostics shape with `code`, `title`, `message`, `requestId`, `route`, `method`, `step`, `status`, `retryable`, optional sanitized `technicalMessage`, optional `fieldErrors`, and an optional `suggestedAction`.
+- The global Worker error middleware classifies validation, auth, permission, D1/database, Cloudflare binding/secret, storage, realtime, conflict, timeout, and unknown runtime failures before returning JSON.
+- Production responses must never expose stack traces, secrets, passwords, API tokens, cookies, JWTs, private keys, or raw environment dumps. Server logs keep full stack/cause details behind the request ID.
+- If `system_error_logs` exists, error logging is best-effort. If that write fails, the app logs to console and does not create a recursive crash.
+- Non-critical side effects such as audit/activity/realtime/notification writes should be best-effort when the core action has already succeeded, unless the specific workflow marks the side effect as business-critical.
+- The frontend API client normalizes structured backend errors, network failures, timeouts, and non-JSON responses into a single `ApiError` object. Forms and setup screens should show the diagnostic panel instead of replacing every failure with “Something went wrong.”
+- Frontend production builds should prefer same-origin API requests with an empty `VITE_API_BASE_URL`, which resolves calls to `/api/v1/...`. Set `VITE_API_BASE_URL` only when the frontend and API are intentionally deployed on different origins.
+- Network diagnostics distinguish `NETWORK_UNREACHABLE`, `API_TIMEOUT`, `CORS_BLOCKED`, `MIXED_CONTENT_BLOCKED`, `API_HTML_RESPONSE`, `INVALID_API_RESPONSE`, `API_BASE_URL_INVALID`, and structured `API_ROUTE_NOT_FOUND` responses.
+- Copy Diagnostics for network failures includes request URL, API base URL/source, method, browser online state, fetch error name/message, timeout flag, CORS/mixed-content suspicion, current page URL, build version, request timestamps, and elapsed time.
+- `/api/v1/health` is public, fast, D1-free, and returns JSON directly for deployment checks. `/api/v1/health/deep` can be used for basic binding/D1 diagnostics.
+- Unknown `/api/*` paths return structured JSON with `API_ROUTE_NOT_FOUND` and must never fall through to the React `index.html` app shell.
+- First-time setup should show actionable schema errors such as `DATABASE_MISSING_TABLE` with `technicalMessage: no such table: system_bootstrap`, failed step, request ID, and the suggested action to apply D1 migrations.
+- Copy Diagnostics buttons should include request ID, code, route, step, status, retryability, title, message, safe technical detail, and suggested action so support can correlate UI reports with Worker logs.
 
 ## UI and UX direction for future prompts
 
@@ -829,7 +855,14 @@ npx wrangler secret put BOOTSTRAP_ADMIN_TOKEN --name hrm-system
 2. Confirm `wrangler.jsonc` points to the intended production Worker, D1 database, R2 buckets, and Durable Object binding.
 3. Optionally apply migrations locally first with `npx wrangler d1 migrations apply hrm-system --local`.
 4. Apply migrations remotely with `npx wrangler d1 migrations apply hrm-system --remote`.
-5. Run seed SQL remotely in this order:
+5. Verify the setup-state table exists after migrations:
+
+```bash
+npx wrangler d1 execute hrm-system --remote --command "SELECT name FROM sqlite_master WHERE type='table' AND name='system_bootstrap';"
+npx wrangler d1 execute hrm-system --remote --command "SELECT * FROM system_bootstrap;"
+```
+
+6. Run seed SQL remotely in this order:
 
 ```bash
 npx wrangler d1 execute hrm-system --remote --file seeds/permissions.seed.sql
@@ -841,11 +874,11 @@ npx wrangler d1 execute hrm-system --remote --file seeds/approval-workflows.seed
 npx wrangler d1 execute hrm-system --remote --file seeds/approval-thresholds.seed.sql
 ```
 
-6. Verify the Super Admin role exists.
-7. Verify core frontend/backend permissions exist.
-8. Verify feature defaults exist for `employee_management`, `user_management`, `settings`, `attendance`, `offline_sync`, `kiosk_attendance`, `biometric_attendance`, `leave_management`, `long_leave`, `payroll`, `payslips`, `assets_uniforms`, `documents`, `approvals`, `reports`, `import_export`, `backup_recovery`, and `audit_logs`.
-9. Verify document categories, leave types, approval workflows, and settings defaults exist.
-10. Do not seed real users, passwords, password hashes, private company data, or secrets. Create the first Super Admin through bootstrap only.
+7. Verify the Super Admin role exists.
+8. Verify core frontend/backend permissions exist.
+9. Verify feature defaults exist for `employee_management`, `user_management`, `settings`, `attendance`, `offline_sync`, `kiosk_attendance`, `biometric_attendance`, `leave_management`, `long_leave`, `payroll`, `payslips`, `assets_uniforms`, `documents`, `approvals`, `reports`, `import_export`, `backup_recovery`, and `audit_logs`.
+10. Verify document categories, leave types, approval workflows, and settings defaults exist.
+11. Do not seed real users, passwords, password hashes, private company data, or secrets. Create the first Super Admin through bootstrap only.
 
 ### Bootstrap First-Time Setup Runbook
 
@@ -867,9 +900,10 @@ Bootstrap works only once, the bootstrap token must not be shared, and the front
 
 ### Frontend Production Configuration
 
-- `frontend/.env.example` documents `VITE_API_BASE_URL=https://your-worker-url.workers.dev`.
+- `frontend/.env.example` leaves `VITE_API_BASE_URL` empty for same-origin `/api/v1` calls.
 - If the frontend is hosted separately from the Worker, set `VITE_API_BASE_URL` to the Worker origin.
 - If frontend and backend are served from the same origin, `VITE_API_BASE_URL` can be empty and the app will use same-origin `/api/v1`.
+- Do not hardcode localhost, workers.dev previews, Pages previews, or old deployment URLs into production bundles.
 - Do not put secrets in frontend env files.
 - Build and preview:
 
@@ -885,13 +919,38 @@ npm run preview
 Backend smoke tests:
 
 - `GET /api/v1/health` returns production status.
-- Unknown API endpoint returns `ENDPOINT_NOT_FOUND`.
+- `GET /api/v1/health/deep` returns binding diagnostics.
+- Unknown `/api/*` endpoint returns JSON `API_ROUTE_NOT_FOUND`, not the React app shell.
 - Login fails safely with wrong credentials.
 - Protected endpoints reject missing credentials.
 - `GET /api/v1/bootstrap/status` returns the expected setup state.
 - `POST /api/v1/bootstrap/initialize` is blocked after setup is complete.
 - `GET /api/v1/auth/me` works after login.
 - Logout clears the session.
+
+Deployment verification commands:
+
+```bash
+curl.exe -i https://YOUR_FRONTEND_DOMAIN/api/v1/health
+curl.exe -i https://YOUR_FRONTEND_DOMAIN/api/v1/bootstrap/status
+curl.exe -i https://YOUR_FRONTEND_DOMAIN/api/not-real
+```
+
+Expected:
+
+- `/api/v1/health` returns JSON success.
+- `/api/v1/bootstrap/status` returns JSON.
+- `/api/not-real` returns structured JSON 404 with `API_ROUTE_NOT_FOUND`.
+- None of these return `index.html`.
+- None of these fail with CORS when called from the actual frontend origin.
+
+If frontend and API are separate deployments, also verify:
+
+```bash
+curl.exe -i https://YOUR_API_DOMAIN/api/v1/health
+```
+
+In Chrome DevTools, confirm the bootstrap/status request URL is the intended API URL and does not point to localhost, a stale preview URL, or the wrong domain.
 
 Frontend smoke tests:
 
@@ -947,12 +1006,13 @@ R2 and data movement smoke tests:
 ```json
 {
   "success": true,
-  "data": {
-    "status": "ok",
-    "service": "hrm-api",
-    "environment": "local"
-  },
-  "message": "HRM API is running"
+  "status": "ok",
+  "service": "hrm-api",
+  "environment": "local",
+  "timestamp": "2026-06-03T00:00:00.000Z",
+  "version": "0.1.0",
+  "requestId": "req_xxx",
+  "request_id": "req_xxx"
 }
 ```
 

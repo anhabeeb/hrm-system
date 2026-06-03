@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "wrangler dev",
     "build": "tsc --noEmit",
-    "deploy": "wrangler deploy",
+    "build:api": "tsc --noEmit",
+    "build:frontend": "npm --prefix frontend install && npm --prefix frontend run build",
+    "build:all": "npm run build:api && npm run build:frontend",
+    "verify:frontend-assets": "node scripts/verify-frontend-assets.mjs",
+    "deploy": "npm run build:all && npm run verify:frontend-assets && wrangler deploy",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "db:migrate:local": "wrangler d1 migrations apply DB --local",

@@ -9,7 +9,15 @@
   // Keep secrets such as SESSION_SECRET, PASSWORD_PEPPER, and TOTP_ENCRYPTION_KEY
   // in Cloudflare secrets using `wrangler secret put`, not in this file.
   "vars": {
-    "ENVIRONMENT": "production"
+    "ENVIRONMENT": "production",
+    "CORS_ALLOWED_ORIGINS": "https://hrm.cafeasiana.com.mv,https://www.hrm.cafeasiana.com.mv"
+  },
+
+  "assets": {
+    "directory": "./frontend/dist",
+    "not_found_handling": "single-page-application",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
   },
 
   "d1_databases": [
