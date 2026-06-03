@@ -1,6 +1,7 @@
 declare global {
   interface Env {
     DB: D1Database;
+    ASSETS?: Fetcher;
     DOCUMENTS_BUCKET: R2Bucket;
     BACKUP_BUCKET: R2Bucket;
     REALTIME_ROOM: DurableObjectNamespace;
