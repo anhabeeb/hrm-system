@@ -1,7 +1,6 @@
 import type { Permission } from "@/features/roles/roles.types";
 
-// TODO: Enable live Users & Access API calls when backend /users, /roles, and /permissions routes are implemented.
-export const USER_ACCESS_API_CONNECTED = false;
+export const USER_ACCESS_API_CONNECTED = true;
 
 export const SEEDED_PERMISSION_FOUNDATION: Permission[] = [
   { permission_key: "employees.view", module: "employees", action: "view" },

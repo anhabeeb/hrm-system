@@ -6,11 +6,32 @@ import { roleList, userDisplayName } from "./user-format";
 import type { AdminUser } from "./users.types";
 import type { Pagination } from "@/types/api";
 
-export const UsersTable = ({ rows, loading, pagination, onView, onPageChange, onPageSizeChange }: {
+export const UsersTable = ({
+  rows,
+  loading,
+  pagination,
+  onView,
+  onAssignRoles,
+  onResetPassword,
+  onEnable,
+  onDisable,
+  canAssignRoles,
+  canResetPassword,
+  canEditStatus,
+  onPageChange,
+  onPageSizeChange,
+}: {
   rows: AdminUser[];
   loading?: boolean;
   pagination?: Pagination;
   onView: (user: AdminUser) => void;
+  onAssignRoles?: (user: AdminUser) => void;
+  onResetPassword?: (user: AdminUser) => void;
+  onEnable?: (user: AdminUser) => void;
+  onDisable?: (user: AdminUser) => void;
+  canAssignRoles?: boolean;
+  canResetPassword?: boolean;
+  canEditStatus?: boolean;
   onPageChange?: (page: number) => void;
   onPageSizeChange?: (pageSize: number) => void;
 }) => (
@@ -32,6 +53,20 @@ export const UsersTable = ({ rows, loading, pagination, onView, onPageChange, on
       { key: "two_factor_enabled", header: "2FA Status", cell: (row) => row.two_factor_enabled ? "Enabled" : "Not enabled" },
       { key: "last_login_at", header: "Last Login", cell: (row) => formatDate(row.last_login_at) },
     ]}
-    rowActions={(row) => <RowActions actions={[{ key: "view", onSelect: () => onView(row) }, { key: "assign-role", disabled: true }, { key: "reset-password", disabled: true }, { key: "disable", disabled: true }]} />}
+    rowActions={(row) => {
+      const isDisabled = row.status === "disabled" || row.status === "inactive";
+      return (
+        <RowActions
+          actions={[
+            { key: "view", onSelect: () => onView(row) },
+            { key: "assign-role", onSelect: () => onAssignRoles?.(row), disabled: !canAssignRoles },
+            { key: "reset-password", onSelect: () => onResetPassword?.(row), disabled: !canResetPassword },
+            isDisabled
+              ? { key: "enable", onSelect: () => onEnable?.(row), disabled: !canEditStatus }
+              : { key: "disable", onSelect: () => onDisable?.(row), disabled: !canEditStatus },
+          ]}
+        />
+      );
+    }}
   />
 );

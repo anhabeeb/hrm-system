@@ -1,27 +1,34 @@
 import { FilterBar } from "@/components/data/FilterBar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { Role } from "@/features/roles/roles.types";
 
-export const UserFilters = ({ search, status, role, onChange, onClear }: {
+export const UserFilters = ({ search, status, roleId, roles = [], onChange, onClear }: {
   search?: string;
   status?: string;
-  role?: string;
-  onChange: (filters: { search?: string; status?: string; role?: string }) => void;
+  roleId?: string;
+  roles?: Role[];
+  onChange: (filters: { search?: string; status?: string; role_id?: string }) => void;
   onClear: () => void;
 }) => (
   <FilterBar
     search={search}
     searchPlaceholder="Search users"
-    onSearchChange={(value) => onChange({ search: value || undefined, status, role })}
+    onSearchChange={(value) => onChange({ search: value || undefined, status, role_id: roleId })}
     onClear={onClear}
     onApply={() => undefined}
   >
-    <Select value={status ?? "all"} onValueChange={(value) => onChange({ search, role, status: value === "all" ? undefined : value })}>
+    <Select value={status ?? "all"} onValueChange={(value) => onChange({ search, role_id: roleId, status: value === "all" ? undefined : value })}>
       <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
       <SelectContent><SelectItem value="all">All statuses</SelectItem><SelectItem value="active">Active</SelectItem><SelectItem value="disabled">Disabled</SelectItem><SelectItem value="pending">Pending</SelectItem></SelectContent>
     </Select>
-    <Select value={role ?? "all"} onValueChange={(value) => onChange({ search, status, role: value === "all" ? undefined : value })}>
+    <Select value={roleId ?? "all"} onValueChange={(value) => onChange({ search, status, role_id: value === "all" ? undefined : value })}>
       <SelectTrigger><SelectValue placeholder="Role" /></SelectTrigger>
-      <SelectContent><SelectItem value="all">All roles</SelectItem><SelectItem value="super_admin">Super Admin</SelectItem><SelectItem value="admin">Admin</SelectItem><SelectItem value="hr_manager">HR Manager</SelectItem><SelectItem value="outlet_manager">Outlet Manager</SelectItem></SelectContent>
+      <SelectContent>
+        <SelectItem value="all">All roles</SelectItem>
+        {roles.map((role) => (
+          <SelectItem key={role.id} value={role.id}>{role.role_name}</SelectItem>
+        ))}
+      </SelectContent>
     </Select>
   </FilterBar>
 );

@@ -7,14 +7,17 @@ export interface AdminUser {
   email?: string | null;
   status?: string | null;
   roles?: string[];
+  role_ids?: string[];
   outlet_ids?: string[];
   two_factor_enabled?: boolean;
   last_login_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface UserFilters {
   search?: string;
-  role?: string;
+  role_id?: string;
   status?: string;
   outlet_id?: string;
   page?: number;
