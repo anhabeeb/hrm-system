@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { clearAuthToken, getAuthToken, setAuthToken } from "@/lib/auth-token";
 import { hasAllPermissions as userHasAllPermissions, hasAnyPermission as userHasAnyPermission, hasPermission as userHasPermission } from "@/lib/permissions";
 import { hasFeature as userHasFeature } from "@/lib/features";
+import { ApiError } from "@/lib/api-errors";
 import type { AuthStateSnapshot, CurrentUser } from "@/types/auth";
 
 import { authApi } from "./api";
@@ -43,7 +44,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [hasHydrated, setHasHydrated] = useState(false);
   const [requires2FA, setRequires2FA] = useState(false);
-  const [pendingTwoFactorLogin, setPendingTwoFactorLogin] = useState<LoginInput | null>(null);
+  const [pendingTwoFactorLogin, setPendingTwoFactorLogin] = useState<(LoginInput & { challenge_id?: string }) | null>(null);
 
   const applyUser = useCallback(
     (nextUser: CurrentUser | null, options: { roles?: string[]; permissions?: string[]; outletIds?: string[]; features?: string[] } = {}) => {
@@ -86,11 +87,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = useCallback(
     async (input: LoginInput) => {
-      const response = await authApi.login(input);
-      if (response.data.two_factor_required) {
-        setPendingTwoFactorLogin({ email: input.email, password: input.password });
-        setRequires2FA(true);
-        return { requires2FA: true };
+      let response;
+      try {
+        response = await authApi.login(input);
+        if (response.data.two_factor_required) {
+          setPendingTwoFactorLogin({ email: input.email, password: input.password, challenge_id: response.data.challenge_id });
+          setRequires2FA(true);
+          return { requires2FA: true };
+        }
+      } catch (error) {
+        if (error instanceof ApiError && error.code === "TWO_FACTOR_REQUIRED") {
+          const details = error.details as { challenge_id?: string } | undefined;
+          setPendingTwoFactorLogin({ email: input.email, password: input.password, challenge_id: details?.challenge_id });
+          setRequires2FA(true);
+          return { requires2FA: true };
+        }
+        throw error;
       }
 
       setPendingTwoFactorLogin(null);
@@ -116,10 +128,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         throw new Error("Please log in again to continue.");
       }
 
-      const response = await authApi.login({
-        ...pendingTwoFactorLogin,
-        totp_code: code,
-      });
+      const response = pendingTwoFactorLogin.challenge_id
+        ? await authApi.verifyLoginTwoFactor({ challenge_id: pendingTwoFactorLogin.challenge_id, code })
+        : await authApi.login({
+            ...pendingTwoFactorLogin,
+            totp_code: code,
+          });
 
       if (response.data.token) {
         setAuthToken(response.data.token);

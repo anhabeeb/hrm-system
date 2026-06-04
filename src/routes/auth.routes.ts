@@ -9,20 +9,23 @@ const authRoutes = new Hono<AppContext>();
 authRoutes.post("/auth/login", authController.login);
 authRoutes.post("/auth/forgot-password", authController.forgotPassword);
 authRoutes.post("/auth/reset-password", authController.resetPassword);
+authRoutes.post("/auth/2fa/verify", authController.verifyLoginTwoFactor);
 
 authRoutes.post("/auth/logout", authMiddleware, authController.logout);
 authRoutes.get("/auth/me", authMiddleware, authController.authMe);
 authRoutes.post("/auth/change-password", authMiddleware, authController.changePassword);
 authRoutes.post("/auth/2fa/setup", authMiddleware, authController.setupTwoFactor);
-authRoutes.post("/auth/2fa/verify", authMiddleware, authController.verifyTwoFactor);
+authRoutes.post("/auth/2fa/confirm", authMiddleware, authController.verifyTwoFactor);
 authRoutes.post("/auth/2fa/disable", authMiddleware, authController.disableTwoFactor);
 authRoutes.post("/auth/2fa/backup-code", authMiddleware, authController.useBackupCode);
 
 authRoutes.get("/me", authMiddleware, authController.myProfile);
 authRoutes.get("/me/security", authMiddleware, authController.mySecurity);
+authRoutes.get("/me/2fa/status", authMiddleware, authController.twoFactorStatus);
 authRoutes.post("/me/change-password", authMiddleware, authController.changePassword);
 authRoutes.post("/me/2fa/setup", authMiddleware, authController.setupTwoFactor);
 authRoutes.post("/me/2fa/verify", authMiddleware, authController.verifyTwoFactor);
+authRoutes.post("/me/2fa/confirm", authMiddleware, authController.verifyTwoFactor);
 authRoutes.post("/me/2fa/disable", authMiddleware, authController.disableTwoFactor);
 authRoutes.get("/me/kyc-requests", authMiddleware, authController.listKycRequests);
 authRoutes.post("/me/kyc-requests", authMiddleware, authController.createKycRequest);

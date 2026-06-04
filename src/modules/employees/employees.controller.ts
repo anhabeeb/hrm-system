@@ -1,8 +1,8 @@
 import type { Context } from "hono";
 
 import * as employeesService from "./employees.service";
+import * as documentsService from "../documents/documents.service";
 import {
-  validateDocumentMetadataInput,
   validateEmployeeCreateInput,
   validateEmployeeListFilters,
   validateEmployeeNoteInput,
@@ -12,6 +12,12 @@ import {
   validateOutletAssignmentInput,
   validateSalaryHistoryInput,
 } from "./employees.validators";
+import {
+  validateDocumentArchive,
+  validateDocumentReplace,
+  validateDocumentUpdate,
+  validateDocumentUpload,
+} from "../documents/documents.validators";
 import type { AppContext, AuthActor } from "../../types/api.types";
 import { AuthError, ValidationError } from "../../utils/errors";
 import { created, ok, paginated } from "../../utils/response";
@@ -34,6 +40,16 @@ const requiredId = (c: Context<AppContext>): string => {
 
   if (!id) {
     throw new ValidationError("Employee is required.");
+  }
+
+  return id;
+};
+
+const requiredDocumentId = (c: Context<AppContext>): string => {
+  const id = c.req.param("documentId");
+
+  if (!id) {
+    throw new ValidationError("Document is required.");
   }
 
   return id;
@@ -219,28 +235,42 @@ export const addSalaryHistory = async (c: Context<AppContext>) =>
 
 export const listDocuments = async (c: Context<AppContext>) =>
   ok(
-    {
-      documents: await employeesService.listDocuments(
-        c.env,
-        actor(c),
-        requiredId(c),
-      ),
-    },
+    await documentsService.listEmployeeDocumentsWithCompliance(c.env, actor(c), requiredId(c)),
     "Employee documents loaded successfully.",
     { requestId: c.get("requestId") },
   );
 
 export const addDocument = async (c: Context<AppContext>) =>
   created(
-    await employeesService.addDocument(
-      c.env,
-      actor(c),
-      requiredId(c),
-      validateDocumentMetadataInput(await readJson(c)),
-    ),
-    "Document metadata saved successfully.",
+    await documentsService.uploadDocument(c.env, actor(c), {
+      ...validateDocumentUpload({ ...(await readJson(c) as Record<string, unknown>), employee_id: requiredId(c) }),
+      employee_id: requiredId(c),
+    }),
+    "Document uploaded successfully.",
     { requestId: c.get("requestId") },
   );
+
+export const getDocument = async (c: Context<AppContext>) =>
+  ok(await documentsService.getDocument(c.env, actor(c), requiredDocumentId(c), requiredId(c)), "Document loaded successfully.", { requestId: c.get("requestId") });
+
+export const updateDocument = async (c: Context<AppContext>) =>
+  ok(await documentsService.updateDocument(c.env, actor(c), requiredDocumentId(c), validateDocumentUpdate(await readJson(c)), requiredId(c)), "Document updated successfully.", { requestId: c.get("requestId") });
+
+export const replaceDocument = async (c: Context<AppContext>) =>
+  created(
+    await documentsService.replaceDocument(c.env, actor(c), requiredDocumentId(c), {
+      ...validateDocumentReplace({ ...(await readJson(c) as Record<string, unknown>), employee_id: requiredId(c) }),
+      employee_id: requiredId(c),
+    }, requiredId(c)),
+    "Document replaced successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const archiveDocument = async (c: Context<AppContext>) =>
+  ok(await documentsService.archiveDocument(c.env, actor(c), requiredDocumentId(c), validateDocumentArchive(await readJson(c)), requiredId(c)), "Document archived successfully.", { requestId: c.get("requestId") });
+
+export const documentHistory = async (c: Context<AppContext>) =>
+  ok(await documentsService.getDocumentHistory(c.env, actor(c), requiredDocumentId(c), requiredId(c)), "Document history loaded successfully.", { requestId: c.get("requestId") });
 
 export const listNotes = async (c: Context<AppContext>) =>
   ok(

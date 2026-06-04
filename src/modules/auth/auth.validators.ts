@@ -12,6 +12,7 @@ import type {
   LoginInput,
   ResetPasswordInput,
   TwoFactorDisableInput,
+  TwoFactorChallengeVerifyInput,
   TwoFactorVerifyInput,
 } from "./auth.types";
 import { ValidationError } from "../../utils/errors";
@@ -125,6 +126,27 @@ export const validateTwoFactorVerifyInput = (
     z.object({
       code: totpCodeSchema,
     }),
+    payload,
+  );
+
+export const validateTwoFactorChallengeVerifyInput = (
+  payload: unknown,
+): TwoFactorChallengeVerifyInput =>
+  parse(
+    z
+      .object({
+        challenge_id: z.string().trim().min(1, "Two-factor verification has expired. Please log in again."),
+        code: z.string().trim().optional(),
+        backup_code: z.string().trim().optional(),
+      })
+      .refine((value) => value.code || value.backup_code, {
+        message: "Please enter your authenticator code.",
+        path: ["code"],
+      })
+      .refine((value) => !value.code || /^\d{6}$/.test(value.code), {
+        message: "Please enter the 6-digit Google Authenticator code.",
+        path: ["code"],
+      }),
     payload,
   );
 

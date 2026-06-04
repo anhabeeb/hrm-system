@@ -22,6 +22,9 @@ documentsRoutes.post("/categories", requirePermission("documents_settings.manage
 documentsRoutes.patch("/categories/:id", requirePermission("documents_settings.manage"), controller.updateCategory);
 documentsRoutes.get("/:id", requirePermission("documents.view"), controller.getDocument);
 documentsRoutes.patch("/:id", requirePermission("documents.edit"), controller.updateDocument);
+documentsRoutes.post("/:id/replace", requirePermission("documents.upload"), controller.replaceDocument);
+documentsRoutes.post("/:id/archive", requirePermission("documents.edit"), requireReason(), controller.archiveDocument);
+documentsRoutes.get("/:id/history", requirePermission("documents.view"), controller.documentHistory);
 documentsRoutes.delete("/:id", requirePermission("documents.delete"), requireReason(), controller.deleteDocument);
 documentsRoutes.get("/:id/download", requirePermission("documents.download"), controller.downloadDocument);
 

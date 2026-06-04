@@ -26,4 +26,11 @@ export const createDocumentAccessLog = (env: Env, context: AuthActor, document: 
     action,
     ipAddress: context.ipAddress,
     userAgent: context.userAgent,
+  }).catch((error) => {
+    console.warn("Document access log could not be recorded", {
+      action,
+      documentId: document.id,
+      requestId: context.requestId,
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
   });

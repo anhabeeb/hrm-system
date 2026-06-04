@@ -90,6 +90,7 @@ export const errorResponse = (
   const payload: ApiErrorResponse = {
     success: false,
     message,
+    data: options.data,
     error: {
       code,
       title: options.title ?? titleFromCode(code),

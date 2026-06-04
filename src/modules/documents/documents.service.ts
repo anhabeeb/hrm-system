@@ -1,4 +1,9 @@
-import { DOCUMENT_AUDIT_ACTIONS } from "./documents.constants";
+import {
+  DOCUMENT_AUDIT_ACTIONS,
+  DOCUMENT_EXPIRING_SOON_DAYS,
+  FOREIGN_EMPLOYEE_DOCUMENT_TYPES,
+  LOCAL_EMPLOYEE_DOCUMENT_TYPES,
+} from "./documents.constants";
 import * as accessService from "./document-access.service";
 import * as expiryService from "./document-expiry.service";
 import * as storageService from "./document-storage.service";
@@ -6,9 +11,11 @@ import * as repository from "./documents.repository";
 import type {
   DocumentCategoryFilters,
   DocumentCategoryInput,
+  DocumentArchiveInput,
   DocumentDeleteInput,
   DocumentFilters,
   DocumentListResult,
+  DocumentReplaceInput,
   DocumentUpdateInput,
   DocumentUploadInput,
 } from "./documents.types";
@@ -22,10 +29,47 @@ import { createPrefixedId } from "../../utils/ids";
 const pagination = (page: number, pageSize: number, total: number): PaginationMeta => ({ page, page_size: pageSize, total, total_pages: total === 0 ? 0 : Math.ceil(total / pageSize) });
 const scope = (context: AuthActor) => ({ isSuperAdmin: permissionService.isSuperAdmin(context), outletIds: context.outletIds });
 const includeSensitive = (context: AuthActor) => permissionService.hasPermission(context, "documents.view_sensitive");
-const sanitize = (document: any) => {
+export const calculateDocumentValidityStatus = (document: { status?: string | null; expiry_date?: string | null }) => {
+  if (document.status === "replaced" || document.status === "archived" || document.status === "pending_review" || document.status === "rejected") {
+    return document.status;
+  }
+  if (!document.expiry_date) return "no_expiry";
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const expiry = new Date(`${document.expiry_date}T00:00:00Z`);
+  const days = Math.ceil((expiry.getTime() - today.getTime()) / 86_400_000);
+  if (days < 0) return "expired";
+  if (days <= DOCUMENT_EXPIRING_SOON_DAYS) return "expiring_soon";
+  return "active";
+};
+const daysUntilExpiry = (expiryDate?: string | null) => {
+  if (!expiryDate) return null;
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const expiry = new Date(`${expiryDate}T00:00:00Z`);
+  return Math.ceil((expiry.getTime() - today.getTime()) / 86_400_000);
+};
+const sensitiveDocumentResponseKeys = new Set([
+  "file_key",
+  "r2_key",
+  "storage_key",
+  "internal_storage_path",
+  "private_object_key",
+  "bucket_path",
+  "signed_url",
+  "raw_signed_url",
+]);
+
+export const sanitizeDocumentForResponse = (document: any) => {
   if (!document) return document;
-  const { file_key: _fileKey, ...safe } = document;
-  return safe;
+  const safe = Object.fromEntries(
+    Object.entries(document).filter(([key]) => !sensitiveDocumentResponseKeys.has(key.toLowerCase())),
+  ) as Record<string, any>;
+  return {
+    ...safe,
+    validity_status: calculateDocumentValidityStatus(safe),
+    days_until_expiry: daysUntilExpiry(safe.expiry_date),
+  };
 };
 const audit = async (
   env: Env,
@@ -62,22 +106,62 @@ const ensureDocument = async (env: Env, context: AuthActor, id: string, action: 
   accessService.assertDocumentAccess(context, document, action);
   return document;
 };
+const assertEmployeeScopedDocument = (document: any, employeeId?: string) => {
+  if (employeeId && document.employee_id !== employeeId) {
+    throw new NotFoundError("Document not found.");
+  }
+};
 
 export const listDocuments = async (env: Env, context: AuthActor, filters: DocumentFilters): Promise<DocumentListResult<any>> => {
   const total = await repository.countDocuments(env, context.companyId, filters, scope(context));
   return {
-    rows: (await repository.listDocuments(env, context.companyId, filters, scope(context), includeSensitive(context))).map(sanitize),
+    rows: (await repository.listDocuments(env, context.companyId, filters, scope(context), includeSensitive(context))).map(sanitizeDocumentForResponse),
     pagination: pagination(filters.page, filters.page_size, total),
   };
 };
 
-export const getDocument = async (env: Env, context: AuthActor, id: string) => {
+export const buildEmployeeDocumentComplianceSummary = (employee: any, documents: any[]) => {
+  const expected = employee.employee_type === "foreign" ? [...FOREIGN_EMPLOYEE_DOCUMENT_TYPES] : [...LOCAL_EMPLOYEE_DOCUMENT_TYPES];
+  const latestByType = new Map<string, any>();
+  for (const document of documents) {
+    if (!latestByType.has(document.document_type)) latestByType.set(document.document_type, document);
+  }
+  const missing = expected.filter((type) => !latestByType.has(type));
+  const expired = documents.filter((document) => calculateDocumentValidityStatus(document) === "expired").map((document) => document.document_type);
+  const expiringSoon = documents.filter((document) => calculateDocumentValidityStatus(document) === "expiring_soon").map((document) => document.document_type);
+  const needsReview = documents.filter((document) => document.status === "pending_review" || document.status === "rejected").map((document) => document.document_type);
+  const highPriority = employee.employee_type === "foreign" ? expired.filter((type) => type === "work_permit" || type === "work_visa") : [];
+
+  let status = "complete";
+  if (needsReview.length > 0) status = "needs_review";
+  else if (expired.length > 0) status = "expired_documents";
+  else if (expiringSoon.length > 0) status = "expiring_soon";
+  else if (missing.length > 0) status = "missing_optional_documents";
+
+  return {
+    employee_type: employee.employee_type,
+    status,
+    expected_document_types: expected,
+    missing_document_types: missing,
+    expired_document_types: expired,
+    expiring_soon_document_types: expiringSoon,
+    needs_review_document_types: needsReview,
+    high_priority_document_types: highPriority,
+    warning:
+      employee.employee_type === "foreign" && missing.length > 0
+        ? "Missing foreign employee documents are warnings only and do not block employee records."
+        : undefined,
+  };
+};
+
+export const getDocument = async (env: Env, context: AuthActor, id: string, employeeId?: string) => {
   const document = await ensureDocument(env, context, id, "view");
+  assertEmployeeScopedDocument(document, employeeId);
   await accessService.createDocumentAccessLog(env, context, document, "view");
   if (document.is_sensitive === 1) {
     await audit(env, context, { action: DOCUMENT_AUDIT_ACTIONS.viewed, entityType: "employee_document", entityId: id, employeeId: document.employee_id, outletId: document.outlet_id });
   }
-  return { document: sanitize(document) };
+  return { document: sanitizeDocumentForResponse(document) };
 };
 
 export const uploadDocument = async (env: Env, context: AuthActor, input: DocumentUploadInput) => {
@@ -100,22 +184,29 @@ export const uploadDocument = async (env: Env, context: AuthActor, input: Docume
     companyId: context.companyId,
     employeeId: input.employee_id,
     documentType: input.document_type,
+    documentNumber: input.document_number,
+    issueDate: input.issue_date,
+    startDate: input.start_date,
     fileKey,
     fileName: input.file_name,
     mimeType: input.mime_type,
     expiryDate: input.expiry_date,
+    drivingLicenseCategory: input.driving_license_category,
+    drivingLicenseCategoryOther: input.driving_license_category_other,
+    notes: input.notes,
     isSensitive: input.is_sensitive !== false,
     uploadedBy: context.actorUserId,
   });
   const document = await repository.findDocumentById(env, context.companyId, id);
   await accessService.createDocumentAccessLog(env, context, document, "upload");
-  await audit(env, context, { action: DOCUMENT_AUDIT_ACTIONS.uploaded, entityType: "employee_document", entityId: id, employeeId: input.employee_id, outletId: employee.primary_outlet_id, newValue: sanitize(document) });
+  await audit(env, context, { action: DOCUMENT_AUDIT_ACTIONS.uploaded, entityType: "employee_document", entityId: id, employeeId: input.employee_id, outletId: employee.primary_outlet_id, newValue: sanitizeDocumentForResponse(document) });
   await broadcastEvent(env, { roomName: `company:${context.companyId}`, type: "documents.uploaded", payload: { document_id: id, employee_id: input.employee_id }, triggeredBy: context.actorUserId }).catch(() => undefined);
-  return { document: sanitize(document) };
+  return { document: sanitizeDocumentForResponse(document) };
 };
 
-export const updateDocument = async (env: Env, context: AuthActor, id: string, input: DocumentUpdateInput) => {
+export const updateDocument = async (env: Env, context: AuthActor, id: string, input: DocumentUpdateInput, employeeId?: string) => {
   const existing = await ensureDocument(env, context, id, "edit");
+  assertEmployeeScopedDocument(existing, employeeId);
   const sensitiveChange =
     (input.document_type !== undefined && input.document_type !== existing.document_type) ||
     (input.expiry_date !== undefined && input.expiry_date !== existing.expiry_date) ||
@@ -124,19 +215,88 @@ export const updateDocument = async (env: Env, context: AuthActor, id: string, i
   if (sensitiveChange && (!input.reason || input.reason.length < 3)) {
     throw new AppError("A reason is required for this action.", "REASON_REQUIRED", 400);
   }
-  await repository.updateDocument(env, context.companyId, id, input);
+  await repository.updateDocument(env, context.companyId, id, input, context.actorUserId);
   const updated = await repository.findDocumentById(env, context.companyId, id);
   await accessService.createDocumentAccessLog(env, context, existing, "update");
-  await audit(env, context, { action: DOCUMENT_AUDIT_ACTIONS.updated, entityType: "employee_document", entityId: id, employeeId: existing.employee_id, outletId: existing.outlet_id, oldValue: sanitize(existing), newValue: sanitize(updated), reason: input.reason });
+  await audit(env, context, { action: DOCUMENT_AUDIT_ACTIONS.updated, entityType: "employee_document", entityId: id, employeeId: existing.employee_id, outletId: existing.outlet_id, oldValue: sanitizeDocumentForResponse(existing), newValue: sanitizeDocumentForResponse(updated), reason: input.reason });
   await broadcastEvent(env, { roomName: `company:${context.companyId}`, type: "documents.updated", payload: { document_id: id }, triggeredBy: context.actorUserId }).catch(() => undefined);
-  return { document: sanitize(updated) };
+  return { document: sanitizeDocumentForResponse(updated) };
+};
+
+export const replaceDocument = async (env: Env, context: AuthActor, id: string, input: DocumentReplaceInput, employeeId?: string) => {
+  const existing = await ensureDocument(env, context, id, "edit");
+  assertEmployeeScopedDocument(existing, employeeId);
+  const employee = await ensureEmployeeAccess(env, context, existing.employee_id);
+  const newId = createPrefixedId("doc");
+  let fileKey: string;
+  try {
+    fileKey = await storageService.storeDocument(env, context.companyId, input);
+  } catch (error) {
+    if (error instanceof Error && error.message === "invalid_base64") {
+      throw new AppError("The uploaded document content is invalid.", "DOCUMENT_CONTENT_INVALID", 400);
+    }
+    if (error instanceof Error && error.message === "empty_file") {
+      throw new AppError("The uploaded document is empty.", "DOCUMENT_EMPTY", 400);
+    }
+    throw error;
+  }
+  await repository.createDocument(env, {
+    id: newId,
+    companyId: context.companyId,
+    employeeId: existing.employee_id,
+    documentType: input.document_type || existing.document_type,
+    documentNumber: input.document_number,
+    issueDate: input.issue_date,
+    startDate: input.start_date,
+    fileKey,
+    fileName: input.file_name,
+    mimeType: input.mime_type,
+    expiryDate: input.expiry_date,
+    drivingLicenseCategory: input.driving_license_category,
+    drivingLicenseCategoryOther: input.driving_license_category_other,
+    notes: input.notes,
+    isSensitive: input.is_sensitive !== false,
+    uploadedBy: context.actorUserId,
+    versionNumber: Number(existing.version_number ?? 1) + 1,
+    previousDocumentId: existing.id,
+  });
+  await repository.updateDocumentStatus(env, context.companyId, existing.id, { status: "replaced", replacedByDocumentId: newId, updatedBy: context.actorUserId });
+  const replacement = await repository.findDocumentById(env, context.companyId, newId);
+  await accessService.createDocumentAccessLog(env, context, replacement, "replace");
+  await audit(env, context, { action: DOCUMENT_AUDIT_ACTIONS.replaced, entityType: "employee_document", entityId: newId, employeeId: existing.employee_id, outletId: employee.primary_outlet_id, oldValue: sanitizeDocumentForResponse(existing), newValue: sanitizeDocumentForResponse(replacement), reason: input.reason });
+  await broadcastEvent(env, { roomName: `company:${context.companyId}`, type: "documents.replaced", payload: { document_id: newId, previous_document_id: existing.id, employee_id: existing.employee_id }, triggeredBy: context.actorUserId }).catch(() => undefined);
+  return { document: sanitizeDocumentForResponse(replacement), previous_document_id: existing.id };
+};
+
+export const archiveDocument = async (env: Env, context: AuthActor, id: string, input: DocumentArchiveInput, employeeId?: string) => {
+  const existing = await ensureDocument(env, context, id, "edit");
+  assertEmployeeScopedDocument(existing, employeeId);
+  await repository.updateDocumentStatus(env, context.companyId, id, { status: "archived", updatedBy: context.actorUserId });
+  const archived = await repository.findDocumentById(env, context.companyId, id);
+  await accessService.createDocumentAccessLog(env, context, existing, "archive");
+  await audit(env, context, { action: DOCUMENT_AUDIT_ACTIONS.archived, entityType: "employee_document", entityId: id, employeeId: existing.employee_id, outletId: existing.outlet_id, oldValue: sanitizeDocumentForResponse(existing), newValue: sanitizeDocumentForResponse(archived), reason: input.reason });
+  await broadcastEvent(env, { roomName: `company:${context.companyId}`, type: "documents.archived", payload: { document_id: id, employee_id: existing.employee_id }, triggeredBy: context.actorUserId }).catch(() => undefined);
+  return { document: sanitizeDocumentForResponse(archived) };
+};
+
+export const getDocumentHistory = async (env: Env, context: AuthActor, id: string, employeeId?: string) => {
+  const document = await ensureDocument(env, context, id, "view");
+  assertEmployeeScopedDocument(document, employeeId);
+  const rows = await repository.listDocumentHistory(env, context.companyId, document.employee_id, document.document_type, includeSensitive(context));
+  return { history: rows.map(sanitizeDocumentForResponse) };
+};
+
+export const listEmployeeDocumentsWithCompliance = async (env: Env, context: AuthActor, employeeId: string) => {
+  const employee = await ensureEmployeeAccess(env, context, employeeId);
+  const documents = (await repository.listLatestEmployeeDocuments(env, context.companyId, employeeId, includeSensitive(context))).map(sanitizeDocumentForResponse);
+  return { documents, compliance: buildEmployeeDocumentComplianceSummary(employee, documents) };
 };
 
 export const deleteDocument = async (env: Env, context: AuthActor, id: string, input: DocumentDeleteInput) => {
   const existing = await ensureDocument(env, context, id, "delete");
   await repository.softDeleteDocument(env, context.companyId, id);
   await accessService.createDocumentAccessLog(env, context, existing, "delete");
-  await audit(env, context, { action: DOCUMENT_AUDIT_ACTIONS.deleted, entityType: "employee_document", entityId: id, employeeId: existing.employee_id, outletId: existing.outlet_id, oldValue: sanitize(existing), reason: input.reason });
+  await audit(env, context, { action: DOCUMENT_AUDIT_ACTIONS.deleted, entityType: "employee_document", entityId: id, employeeId: existing.employee_id, outletId: existing.outlet_id, oldValue: sanitizeDocumentForResponse(existing), reason: input.reason });
   await broadcastEvent(env, { roomName: `company:${context.companyId}`, type: "documents.deleted", payload: { document_id: id }, triggeredBy: context.actorUserId }).catch(() => undefined);
   return { deleted: true };
 };
@@ -157,7 +317,7 @@ export const downloadDocument = async (env: Env, context: AuthActor, id: string)
 export const expiringDocuments = async (env: Env, context: AuthActor, filters: DocumentFilters): Promise<DocumentListResult<any>> => {
   const total = await expiryService.countExpiringDocuments(env, context.companyId, filters, scope(context));
   return {
-    rows: (await expiryService.listExpiringDocuments(env, context.companyId, filters, scope(context), includeSensitive(context))).map(sanitize),
+    rows: (await expiryService.listExpiringDocuments(env, context.companyId, filters, scope(context), includeSensitive(context))).map(sanitizeDocumentForResponse),
     pagination: pagination(filters.page, filters.page_size, total),
   };
 };

@@ -103,6 +103,12 @@ export interface TwoFactorVerifyInput {
   code: string;
 }
 
+export interface TwoFactorChallengeVerifyInput {
+  challenge_id: string;
+  code?: string;
+  backup_code?: string;
+}
+
 export interface TwoFactorDisableInput {
   password?: string;
   code?: string;

@@ -8,12 +8,13 @@ import {
   validateKycUpdateRequestInput,
   validateLoginInput,
   validateResetPasswordInput,
+  validateTwoFactorChallengeVerifyInput,
   validateTwoFactorDisableInput,
   validateTwoFactorVerifyInput,
 } from "./auth.validators";
 import type { AppContext } from "../../types/api.types";
 import { AuthError } from "../../utils/errors";
-import { ok } from "../../utils/response";
+import { errorResponse, ok } from "../../utils/response";
 
 const readJson = async (c: Context<AppContext>): Promise<unknown> =>
   c.req.json().catch(() => ({}));
@@ -59,6 +60,23 @@ const respondWithCookie = (
 export const login = async (c: Context<AppContext>) => {
   const input = validateLoginInput(await readJson(c));
   const result = await authService.login(c.env, input, requestContext(c));
+
+  if ((result.response as { two_factor_required?: boolean }).two_factor_required) {
+    return errorResponse(202, "TWO_FACTOR_REQUIRED", "Enter the 6-digit code from your authenticator app.", {
+      requestId: c.get("requestId"),
+      title: "Two-factor authentication required",
+        retryable: true,
+        details: result.response,
+        data: result.response,
+      });
+    }
+
+  return respondWithCookie(c, result);
+};
+
+export const verifyLoginTwoFactor = async (c: Context<AppContext>) => {
+  const input = validateTwoFactorChallengeVerifyInput(await readJson(c));
+  const result = await authService.verifyLoginTwoFactorChallenge(c.env, input, requestContext(c));
 
   return respondWithCookie(c, result);
 };
@@ -129,6 +147,16 @@ export const setupTwoFactor = async (c: Context<AppContext>) => {
   return ok(result.response, result.message, {
     requestId: c.get("requestId"),
   });
+};
+
+export const twoFactorStatus = async (c: Context<AppContext>) => {
+  const actor = requireActor(c);
+
+  return ok(
+    await authService.getSecuritySummary(c.env, actor.actorUserId),
+    "Two-factor authentication status loaded.",
+    { requestId: c.get("requestId") },
+  );
 };
 
 export const verifyTwoFactor = async (c: Context<AppContext>) => {

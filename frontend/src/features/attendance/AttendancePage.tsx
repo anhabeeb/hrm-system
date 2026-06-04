@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 
 import { DataTable } from "@/components/data/DataTable";
@@ -13,18 +13,27 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/features/auth/auth.store";
-import { friendlyOperationalError, sanitizeForDisplay } from "@/lib/safe-display";
 import { searchParamNumber } from "@/lib/query-string";
+import { friendlyOperationalError, sanitizeForDisplay } from "@/lib/safe-display";
 import type { TableColumn } from "@/types/common";
 import { attendanceApi } from "./attendance.api";
-import { formatDate, formatDateTime, humanize } from "./attendance-format";
+import { formatDateTime, humanize } from "./attendance-format";
 import { AttendanceConflictPanel } from "./AttendanceConflictPanel";
 import { AttendanceDetailDrawer } from "./AttendanceDetailDrawer";
 import { AttendanceFilters } from "./AttendanceFilters";
 import { AttendanceSummaryTable } from "./AttendanceSummaryTable";
 import { CorrectionRequestDialog } from "./CorrectionRequestDialog";
 import { ManualAttendanceBatchDialog } from "./ManualAttendanceBatchDialog";
-import type { AttendanceConflict, AttendanceCorrection, AttendanceEvent, AttendanceFilters as AttendanceFilterValues, AttendanceSummary, CorrectionRequestPayload, ManualAttendanceBatchPayload, ManualAttendanceBatchResult, ReasonPayload } from "./attendance.types";
+import type {
+  AttendanceConflict,
+  AttendanceEvent,
+  AttendanceFilters as AttendanceFilterValues,
+  AttendanceSummary,
+  CorrectionRequestPayload,
+  ManualAttendanceBatchPayload,
+  ManualAttendanceBatchResult,
+  ReasonPayload,
+} from "./attendance.types";
 
 const today = new Date();
 const startOfWeek = new Date(today);
@@ -34,21 +43,11 @@ const isoDate = (date: Date) => date.toISOString().slice(0, 10);
 const eventColumns: TableColumn<AttendanceEvent>[] = [
   { key: "event_time", header: "Timestamp", cell: (row) => formatDateTime(row.event_time) },
   { key: "employee_name", header: "Employee", cell: (row) => row.employee_name ?? row.full_name ?? row.employee_id ?? "Unknown employee" },
-  { key: "outlet_name", header: "Outlet", cell: (row) => row.outlet_name ?? row.outlet_id ?? "—" },
+  { key: "outlet_name", header: "Outlet", cell: (row) => row.outlet_name ?? row.outlet_id ?? "-" },
   { key: "event_type", header: "Event Type", cell: (row) => humanize(row.event_type) },
   { key: "source", header: "Source", cell: (row) => humanize(row.source) },
-  { key: "device_id", header: "Device", cell: (row) => row.device_id ?? "—" },
+  { key: "device_id", header: "Device", cell: (row) => row.device_id ?? "-" },
   { key: "sync_status", header: "Sync Status", cell: (row) => <StatusBadge status={row.sync_status ?? "neutral"} /> },
-];
-
-const correctionColumns: TableColumn<AttendanceCorrection>[] = [
-  { key: "created_at", header: "Request Date", cell: (row) => formatDate(row.created_at) },
-  { key: "employee_name", header: "Employee", cell: (row) => row.employee_name ?? row.employee_id ?? "Unknown employee" },
-  { key: "attendance_date", header: "Attendance Date", cell: (row) => formatDate(row.attendance_date) },
-  { key: "correction_type", header: "Correction Type", cell: (row) => humanize(row.correction_type) },
-  { key: "requested_by", header: "Requested By", cell: (row) => row.requested_by_name ?? row.requested_by ?? "—" },
-  { key: "status", header: "Status", cell: (row) => <StatusBadge status={row.status} /> },
-  { key: "reason", header: "Reason", cell: (row) => row.reason ?? "—" },
 ];
 
 export const AttendancePage = () => {
@@ -59,11 +58,10 @@ export const AttendancePage = () => {
   const [selectedSummary, setSelectedSummary] = useState<AttendanceSummary | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<AttendanceEvent | null>(null);
   const [selectedConflict, setSelectedConflict] = useState<AttendanceConflict | null>(null);
-  const [selectedCorrection, setSelectedCorrection] = useState<AttendanceCorrection | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [correctionOpen, setCorrectionOpen] = useState(false);
-  const [reasonDialog, setReasonDialog] = useState<"approve" | "reject" | "resolve" | null>(null);
+  const [reasonDialog, setReasonDialog] = useState<"resolve" | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [manualBatchResult, setManualBatchResult] = useState<ManualAttendanceBatchResult | undefined>();
 
@@ -104,7 +102,6 @@ export const AttendancePage = () => {
 
   const summaryQuery = useQuery({ queryKey: ["attendance", "summary", filters], queryFn: () => attendanceApi.listSummary(filters) });
   const eventsQuery = useQuery({ queryKey: ["attendance", "events", filters], queryFn: () => attendanceApi.listEvents(filters) });
-  const correctionsQuery = useQuery({ queryKey: ["attendance", "corrections", filters], queryFn: () => attendanceApi.listCorrections(filters) });
   const conflictsQuery = useQuery({ queryKey: ["attendance", "conflicts", filters], queryFn: () => attendanceApi.listConflicts(filters) });
 
   const invalidateAttendance = async () => queryClient.invalidateQueries({ queryKey: ["attendance"] });
@@ -129,24 +126,6 @@ export const AttendancePage = () => {
     },
   });
 
-  const approveMutation = useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: ReasonPayload }) => attendanceApi.approveCorrection(id, payload),
-    onSuccess: async () => {
-      setSuccessMessage("Attendance correction approved.");
-      setReasonDialog(null);
-      await invalidateAttendance();
-    },
-  });
-
-  const rejectMutation = useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: ReasonPayload }) => attendanceApi.rejectCorrection(id, payload),
-    onSuccess: async () => {
-      setSuccessMessage("Attendance correction rejected.");
-      setReasonDialog(null);
-      await invalidateAttendance();
-    },
-  });
-
   const resolveMutation = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: ReasonPayload }) => attendanceApi.resolveConflict(id, payload),
     onSuccess: async () => {
@@ -158,42 +137,46 @@ export const AttendancePage = () => {
 
   const canManualEntry = auth.hasAnyPermission(["attendance.manual_entry", "attendance.edit"]);
   const canRequestCorrection = auth.hasAnyPermission(["attendance.manual_entry", "attendance.edit"]);
-  const canApproveCorrection = auth.hasPermission("attendance.approve_correction");
-  const canRejectCorrection = auth.hasPermission("attendance.reject_correction");
   const canResolveConflict = auth.hasPermission("attendance.resolve_conflicts");
 
   const selectedEvents = selectedSummary
     ? (eventsQuery.data?.data ?? []).filter((event) => event.employee_id === selectedSummary.employee_id || !selectedSummary.employee_id)
     : [];
 
-  const actionError = approveMutation.error ?? rejectMutation.error ?? resolveMutation.error;
+  const actionError = resolveMutation.error;
 
   return (
     <div>
-      <PageHeader title="Attendance" description="Review daily attendance, missing punches, conflicts, and corrections." />
+      <PageHeader title="Attendance" description="Review daily attendance, raw events, and conflicts. Time corrections now have a dedicated workspace." />
       <div className="space-y-4 p-4 md:p-6">
         {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
-        {(summaryQuery.isError || eventsQuery.isError || correctionsQuery.isError || conflictsQuery.isError) ? (
+        {(summaryQuery.isError || eventsQuery.isError || conflictsQuery.isError) ? (
           <InlineAlert title="Attendance records could not be loaded." variant="error">Please adjust filters or try again.</InlineAlert>
         ) : null}
         <div className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-base font-semibold">Attendance operations</h2>
-            <p className="text-sm text-muted-foreground">Daily summaries are payroll-facing; raw events are for audit and review.</p>
+            <p className="text-sm text-muted-foreground">
+              Daily summaries are payroll-facing; correction review is handled in Time Corrections.
+            </p>
           </div>
-          {canManualEntry ? (
-            <Button onClick={() => { setSelectedSummary(null); setManualOpen(true); }}>
-              <Plus className="h-4 w-4" />
-              Manual attendance
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" asChild>
+              <Link to="/attendance/corrections">Open Time Corrections</Link>
             </Button>
-          ) : null}
+            {canManualEntry ? (
+              <Button onClick={() => { setSelectedSummary(null); setManualOpen(true); }}>
+                <Plus className="h-4 w-4" />
+                Manual attendance
+              </Button>
+            ) : null}
+          </div>
         </div>
         <AttendanceFilters filters={filters} onChange={updateFilters} onClear={() => setSearchParams(new URLSearchParams({ page: "1", page_size: String(filters.page_size), tab }))} />
         <Tabs value={tab} onValueChange={setActiveTab}>
           <TabsList>
             <TabsTrigger value="summary">Daily Summary</TabsTrigger>
             <TabsTrigger value="events">Events</TabsTrigger>
-            <TabsTrigger value="corrections">Corrections</TabsTrigger>
             <TabsTrigger value="conflicts">Conflicts</TabsTrigger>
           </TabsList>
           <TabsContent value="summary">
@@ -231,28 +214,6 @@ export const AttendancePage = () => {
               onPageSizeChange={(page_size) => updateFilters({ page: 1, page_size })}
               emptyTitle="No attendance events found"
               rowActions={(row) => <RowActions actions={[{ key: "view", onSelect: () => setSelectedEvent(row) }]} />}
-            />
-          </TabsContent>
-          <TabsContent value="corrections">
-            <DataTable
-              columns={correctionColumns}
-              rows={correctionsQuery.data?.data ?? []}
-              getRowId={(row) => row.id}
-              loading={correctionsQuery.isLoading}
-              compact
-              pagination={correctionsQuery.data?.pagination}
-              onPageChange={(page) => updateFilters({ page })}
-              onPageSizeChange={(page_size) => updateFilters({ page: 1, page_size })}
-              emptyTitle="No attendance corrections found"
-              rowActions={(row) => (
-                <RowActions
-                  actions={[
-                    { key: "view", onSelect: () => setSelectedCorrection(row) },
-                    ...(canApproveCorrection ? [{ key: "approve" as const, onSelect: () => { setSelectedCorrection(row); setReasonDialog("approve"); } }] : []),
-                    ...(canRejectCorrection ? [{ key: "reject" as const, onSelect: () => { setSelectedCorrection(row); setReasonDialog("reject"); } }] : []),
-                  ]}
-                />
-              )}
             />
           </TabsContent>
           <TabsContent value="conflicts">
@@ -305,16 +266,14 @@ export const AttendancePage = () => {
       <CorrectionRequestDialog
         open={Boolean(reasonDialog)}
         mode="reason"
-        title={reasonDialog === "approve" ? "Approve correction" : reasonDialog === "reject" ? "Reject correction" : "Resolve attendance conflict"}
+        title="Resolve attendance conflict"
         description="A reason is required for this action."
-        loading={approveMutation.isPending || rejectMutation.isPending || resolveMutation.isPending}
+        loading={resolveMutation.isPending}
         error={actionError}
         onOpenChange={(open) => !open && setReasonDialog(null)}
         onSubmit={(payload) => {
           const reasonPayload = payload as ReasonPayload;
-          if (reasonDialog === "approve" && selectedCorrection) approveMutation.mutate({ id: selectedCorrection.id, payload: reasonPayload });
-          if (reasonDialog === "reject" && selectedCorrection) rejectMutation.mutate({ id: selectedCorrection.id, payload: reasonPayload });
-          if (reasonDialog === "resolve" && selectedConflict) resolveMutation.mutate({ id: selectedConflict.id, payload: { ...reasonPayload, resolution: "accept" } });
+          if (selectedConflict) resolveMutation.mutate({ id: selectedConflict.id, payload: { ...reasonPayload, resolution: "accept" } });
         }}
       />
     </div>

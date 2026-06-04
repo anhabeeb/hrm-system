@@ -23,6 +23,7 @@ import type {
   ResetPasswordInput,
   SafeUserProfile,
   TwoFactorDisableInput,
+  TwoFactorChallengeVerifyInput,
   TwoFactorRecord,
   TwoFactorVerifyInput,
   UserRecord,
@@ -34,7 +35,7 @@ import {
   buildSessionCookie,
   createSessionToken,
 } from "../../services/session.service";
-import { AuthError, LockedRecordError, NotFoundError, ValidationError } from "../../utils/errors";
+import { AppError, AuthError, LockedRecordError, NotFoundError, ValidationError } from "../../utils/errors";
 import { createEntityId } from "../../utils/ids";
 import {
   base64ToBytes,
@@ -48,6 +49,7 @@ import {
 } from "../../utils/crypto";
 
 const base32Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+const TWO_FACTOR_CHALLENGE_TTL_SECONDS = 5 * 60;
 
 const normalizeEmail = (email: string): string => email.trim().toLowerCase();
 
@@ -112,6 +114,65 @@ const encodeBase32 = (bytes: Uint8Array): string => {
   }
 
   return output;
+};
+
+const base64UrlEncode = (value: string): string =>
+  btoa(value).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+
+const base64UrlDecode = (value: string): string => {
+  const padded = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
+  return atob(padded);
+};
+
+const signChallengePayload = async (payload: string, secret: string): Promise<string> => {
+  const key = await crypto.subtle.importKey("raw", encodeUtf8(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const signature = new Uint8Array(await crypto.subtle.sign("HMAC", key, encodeUtf8(payload)));
+  return bytesToBase64(signature).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+};
+
+const createTwoFactorChallenge = async (env: Env, user: UserRecord): Promise<string> => {
+  const payload = base64UrlEncode(JSON.stringify({
+    user_id: user.id,
+    company_id: user.company_id,
+    exp: Math.floor(Date.now() / 1000) + TWO_FACTOR_CHALLENGE_TTL_SECONDS,
+    nonce: bytesToBase64(randomBytes(12)),
+  }));
+  const signature = await signChallengePayload(payload, env.SESSION_SECRET);
+  return `${payload}.${signature}`;
+};
+
+const verifyTwoFactorChallenge = async (env: Env, challengeId: string): Promise<{ user_id: string; company_id: string }> => {
+  const [payload, signature] = challengeId.split(".");
+  if (!payload || !signature) {
+    throw new AppError({
+      code: "TWO_FACTOR_SETUP_EXPIRED",
+      title: "Two-factor verification expired",
+      message: "Two-factor verification has expired. Please log in again.",
+      statusCode: 401,
+      retryable: false,
+    });
+  }
+  const expectedSignature = await signChallengePayload(payload, env.SESSION_SECRET);
+  if (!constantTimeEqual(signature, expectedSignature)) {
+    throw new AppError({
+      code: "TWO_FACTOR_SETUP_EXPIRED",
+      title: "Two-factor verification expired",
+      message: "Two-factor verification has expired. Please log in again.",
+      statusCode: 401,
+      retryable: false,
+    });
+  }
+  const parsed = JSON.parse(base64UrlDecode(payload)) as { user_id?: string; company_id?: string; exp?: number };
+  if (!parsed.user_id || !parsed.company_id || !parsed.exp || parsed.exp <= Math.floor(Date.now() / 1000)) {
+    throw new AppError({
+      code: "TWO_FACTOR_SETUP_EXPIRED",
+      title: "Two-factor verification expired",
+      message: "Two-factor verification has expired. Please log in again.",
+      statusCode: 401,
+      retryable: false,
+    });
+  }
+  return { user_id: parsed.user_id, company_id: parsed.company_id };
 };
 
 const decodeBase32 = (value: string): Uint8Array => {
@@ -223,6 +284,11 @@ const verifyTotpCode = async (secret: string, code: string): Promise<boolean> =>
   }
 
   return false;
+};
+
+export const generateTotpCodeForSecret = async (secret: string, timestamp = Date.now()): Promise<string> => {
+  const counter = Math.floor(timestamp / 1000 / TOTP_PERIOD_SECONDS);
+  return hotp(decodeBase32(secret), counter);
 };
 
 const createBackupCodes = async (
@@ -354,12 +420,14 @@ export const login = async (
     }
 
     if (!input.totp_code && !input.backup_code) {
+      const challengeId = await createTwoFactorChallenge(env, user);
       return {
         response: {
           two_factor_required: true,
           method: "totp",
+          challenge_id: challengeId,
         },
-        message: "Please enter your Google Authenticator code.",
+        message: "Enter the 6-digit code from your authenticator app.",
       };
     }
 
@@ -376,7 +444,13 @@ export const login = async (
 
     if (!totpValid && !backupValid) {
       await audit(env, { action: "two_factor_failed", user, request });
-      throw new AuthError("The Google Authenticator code is incorrect.");
+      throw new AppError({
+        code: "INVALID_TWO_FACTOR_CODE",
+        title: "Invalid two-factor code",
+        message: "The verification code is invalid or has expired.",
+        statusCode: 401,
+        retryable: false,
+      });
     }
 
     if (backupValid) {
@@ -398,6 +472,82 @@ export const login = async (
     expiresAt: sessionToken.expiresAt,
   });
   await audit(env, { action: "login_success", user, request });
+
+  return {
+    response: {
+      user: toSafeUser({
+        ...user,
+        failed_login_attempts: 0,
+        locked_until: null,
+        last_login_at: nowIso(),
+      }),
+    },
+    cookie: buildSessionCookie(sessionToken.token, sessionToken.expiresAt),
+    message: "You are now logged in.",
+  };
+};
+
+export const verifyLoginTwoFactorChallenge = async (
+  env: Env,
+  input: TwoFactorChallengeVerifyInput,
+  request: AuthenticatedRequestContext,
+) => {
+  const challenge = await verifyTwoFactorChallenge(env, input.challenge_id);
+  const user = await ensureAuthenticated(env, challenge.user_id);
+  if (user.company_id !== challenge.company_id || user.two_factor_enabled !== 1) {
+    throw new AppError({
+      code: "TWO_FACTOR_NOT_ENABLED",
+      title: "Two-factor authentication not enabled",
+      message: "Two-factor authentication is not enabled for this account.",
+      statusCode: 400,
+      retryable: false,
+    });
+  }
+
+  const twoFactor = await authRepository.getTwoFactorByUserId(env, user.id);
+  if (!twoFactor?.secret_encrypted || twoFactor.disabled_at) {
+    throw new AppError({
+      code: "TWO_FACTOR_NOT_ENABLED",
+      title: "Two-factor authentication not enabled",
+      message: "Two-factor authentication is not enabled for this account.",
+      statusCode: 400,
+      retryable: false,
+    });
+  }
+
+  const totpValid = input.code
+    ? await verifyTotpCode(
+        await decryptTotpSecret(twoFactor.secret_encrypted, env.TOTP_ENCRYPTION_KEY),
+        input.code,
+      )
+    : false;
+  const backupValid = !totpValid && input.backup_code ? await consumeBackupCode(env, twoFactor, input.backup_code) : false;
+
+  if (!totpValid && !backupValid) {
+    await audit(env, { action: "two_factor_failed", user, request });
+    throw new AppError({
+      code: "INVALID_TWO_FACTOR_CODE",
+      title: "Invalid two-factor code",
+      message: "The verification code is invalid or has expired.",
+      statusCode: 401,
+      retryable: false,
+    });
+  }
+
+  await authRepository.resetFailedLogin(env, user.id);
+  const sessionToken = await createSessionToken(env.SESSION_SECRET);
+
+  await authRepository.createSession(env, {
+    id: sessionToken.id,
+    companyId: user.company_id,
+    userId: user.id,
+    tokenHash: sessionToken.tokenHash,
+    ipAddress: request.ipAddress,
+    userAgent: request.userAgent,
+    deviceId: request.deviceId,
+    expiresAt: sessionToken.expiresAt,
+  });
+  await audit(env, { action: backupValid ? "backup_code_used" : "login_success", user, request });
 
   return {
     response: {
@@ -449,11 +599,18 @@ export const getMe = async (env: Env, userId: string) => {
 
 export const getSecuritySummary = async (env: Env, userId: string) => {
   const user = await ensureAuthenticated(env, userId);
-  const activeSessionsCount = await authRepository.countActiveSessions(env, user.id);
+  const [activeSessionsCount, twoFactor] = await Promise.all([
+    authRepository.countActiveSessions(env, user.id),
+    authRepository.getTwoFactorByUserId(env, user.id),
+  ]);
+  const backupCodes = twoFactor ? parseBackupCodes(twoFactor) : [];
 
   return {
     password_updated_at: user.password_updated_at,
     two_factor_enabled: user.two_factor_enabled === 1,
+    enabled: user.two_factor_enabled === 1,
+    verified_at: twoFactor?.enabled_at ?? null,
+    backup_codes_remaining: backupCodes.filter((code) => !code.used_at).length,
     active_sessions_count: activeSessionsCount,
     last_login_at: user.last_login_at,
   };
@@ -572,9 +729,18 @@ export const setupTwoFactor = async (
   request: AuthenticatedRequestContext,
 ) => {
   const user = await ensureAuthenticated(env, userId);
+  const existing = await authRepository.getTwoFactorByUserId(env, user.id);
+  if (user.two_factor_enabled === 1 && existing?.enabled_at && !existing.disabled_at) {
+    throw new AppError({
+      code: "TWO_FACTOR_ALREADY_ENABLED",
+      title: "Two-factor authentication already enabled",
+      message: "Two-factor authentication is already enabled.",
+      statusCode: 409,
+      retryable: false,
+    });
+  }
   const secret = encodeBase32(randomBytes(20));
   const encryptedSecret = await encryptTotpSecret(secret, env.TOTP_ENCRYPTION_KEY);
-  const existing = await authRepository.getTwoFactorByUserId(env, user.id);
   const id = existing?.id ?? createEntityId("user").replace("user_", "2fa_");
 
   await authRepository.createOrUpdateTwoFactor(env, {
@@ -592,7 +758,8 @@ export const setupTwoFactor = async (
 
   return {
     response: {
-      otpauth_url: `otpauth://totp/${issuer}:${label}?secret=${secret}&issuer=${issuer}&period=${TOTP_PERIOD_SECONDS}&digits=${TOTP_DIGITS}`,
+      otpauth_url: `otpauth://totp/${issuer}:${label}?secret=${secret}&issuer=${issuer}&algorithm=SHA1&period=${TOTP_PERIOD_SECONDS}&digits=${TOTP_DIGITS}`,
+      manual_key: secret.replace(/(.{4})/g, "$1 ").trim(),
       manual_setup_key: secret,
     },
     message:
@@ -610,7 +777,13 @@ export const verifyTwoFactor = async (
   const twoFactor = await authRepository.getTwoFactorByUserId(env, user.id);
 
   if (!twoFactor?.secret_encrypted) {
-    throw new AuthError("Two-factor authentication setup has not been started.");
+    throw new AppError({
+      code: "TWO_FACTOR_SETUP_NOT_STARTED",
+      title: "Two-factor setup not started",
+      message: "Two-factor authentication setup has not been started.",
+      statusCode: 400,
+      retryable: false,
+    });
   }
 
   const secret = await decryptTotpSecret(
@@ -621,7 +794,13 @@ export const verifyTwoFactor = async (
 
   if (!isValid) {
     await audit(env, { action: "two_factor_failed", user, request });
-    throw new AuthError("The Google Authenticator code is incorrect.");
+    throw new AppError({
+      code: "INVALID_TWO_FACTOR_CODE",
+      title: "Invalid two-factor code",
+      message: "The verification code is invalid or has expired.",
+      statusCode: 401,
+      retryable: false,
+    });
   }
 
   let backupCodes: string[] | undefined;
@@ -643,8 +822,8 @@ export const verifyTwoFactor = async (
   }
 
   return {
-    response: backupCodes ? { backup_codes: backupCodes } : {},
-    message: "Two-factor authentication is enabled.",
+    response: backupCodes ? { enabled: true, backup_codes: backupCodes } : { enabled: true },
+    message: "Two-factor authentication has been enabled.",
   };
 };
 
@@ -658,6 +837,16 @@ export const disableTwoFactor = async (
   const twoFactor = await authRepository.getTwoFactorByUserId(env, user.id);
   let confirmed = false;
 
+  if (user.two_factor_enabled !== 1 || !twoFactor || twoFactor.disabled_at) {
+    throw new AppError({
+      code: "TWO_FACTOR_NOT_ENABLED",
+      title: "Two-factor authentication not enabled",
+      message: "Two-factor authentication is not enabled.",
+      statusCode: 400,
+      retryable: false,
+    });
+  }
+
   if (input.password) {
     confirmed = await verifyPassword(input.password, user.password_hash, env.PASSWORD_PEPPER);
   }
@@ -670,7 +859,13 @@ export const disableTwoFactor = async (
   }
 
   if (!confirmed) {
-    throw new AuthError("We could not confirm your identity. Please try again.");
+    throw new AppError({
+      code: "INVALID_TWO_FACTOR_CODE",
+      title: "Invalid two-factor code",
+      message: "We could not confirm your identity. Please try again.",
+      statusCode: 401,
+      retryable: false,
+    });
   }
 
   await authRepository.disableTwoFactor(env, user.id);

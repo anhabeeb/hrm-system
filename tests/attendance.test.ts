@@ -47,6 +47,42 @@ describe("attendance validators", () => {
     ).toThrow(ValidationError);
   });
 
+  it("manual batch maps row note into notes for row-level processing", () => {
+    const input = validateManualBatchInput({
+      outlet_id: "outlet_1",
+      attendance_date: "2026-06-04",
+      reason: "Manager submitted daily attendance.",
+      entries: [{ employee_id: "emp_1", clock_in_time: "09:00", note: "Arrived after briefing." }],
+    });
+
+    expect(input.entries[0]?.notes).toBe("Arrived after briefing.");
+  });
+
+  it("manual batch enforces the maximum safe batch size", () => {
+    expect(() =>
+      validateManualBatchInput({
+        outlet_id: "outlet_1",
+        attendance_date: "2026-06-04",
+        reason: "Manager submitted daily attendance.",
+        entries: Array.from({ length: 101 }, (_, index) => ({
+          employee_id: `emp_${index}`,
+          clock_in_time: "09:00",
+        })),
+      }),
+    ).toThrow(ValidationError);
+  });
+
+  it("manual batch supports status-only attendance rows", () => {
+    const input = validateManualBatchInput({
+      outlet_id: "outlet_1",
+      attendance_date: "2026-06-04",
+      reason: "Manager submitted daily attendance.",
+      entries: [{ employee_id: "emp_1", status: "absent" }],
+    });
+
+    expect(input.entries[0]?.status).toBe("absent");
+  });
+
   it("review actions accept notes as a user-friendly reason", () => {
     const input = validateReviewInput({ notes: "Approved after checking roster." });
     expect(input.reason).toBe("Approved after checking roster.");

@@ -10,6 +10,10 @@ export interface DocumentFilters {
   outlet_id?: string;
   document_type?: string;
   status?: string;
+  expiry_from?: string;
+  expiry_to?: string;
+  expiring_within_days?: number;
+  employee_type?: string;
   is_sensitive?: boolean;
   expiring_before?: string;
   page: number;
@@ -19,21 +23,41 @@ export interface DocumentFilters {
 export interface DocumentUploadInput {
   employee_id: string;
   document_type: string;
+  document_number?: string;
+  issue_date?: string;
+  start_date?: string;
   file_name: string;
   mime_type: string;
   content_base64?: string;
   expiry_date?: string;
+  driving_license_category?: string;
+  driving_license_category_other?: string;
+  notes?: string;
   is_sensitive?: boolean;
 }
 
 export interface DocumentUpdateInput {
   document_type?: string;
+  document_number?: string | null;
+  issue_date?: string | null;
+  start_date?: string | null;
   file_name?: string;
   mime_type?: string;
   expiry_date?: string | null;
   status?: string;
+  driving_license_category?: string | null;
+  driving_license_category_other?: string | null;
+  notes?: string | null;
   is_sensitive?: boolean;
   reason?: string;
+}
+
+export interface DocumentReplaceInput extends DocumentUploadInput {
+  reason: string;
+}
+
+export interface DocumentArchiveInput {
+  reason: string;
 }
 
 export interface DocumentDeleteInput {

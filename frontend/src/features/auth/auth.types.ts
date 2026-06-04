@@ -10,6 +10,7 @@ export interface LoginInput {
 export interface LoginResult {
   user?: CurrentUser;
   two_factor_required?: boolean;
+  challenge_id?: string;
   method?: "totp" | string;
   token?: string;
 }

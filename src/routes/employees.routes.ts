@@ -79,6 +79,37 @@ employeesRoutes.post(
   requirePermission("documents.upload"),
   employeesController.addDocument,
 );
+employeesRoutes.get(
+  "/:id/documents/:documentId",
+  requireFeature("documents"),
+  requirePermission("documents.view"),
+  employeesController.getDocument,
+);
+employeesRoutes.patch(
+  "/:id/documents/:documentId",
+  requireFeature("documents"),
+  requirePermission("documents.edit"),
+  employeesController.updateDocument,
+);
+employeesRoutes.post(
+  "/:id/documents/:documentId/replace",
+  requireFeature("documents"),
+  requirePermission("documents.upload"),
+  employeesController.replaceDocument,
+);
+employeesRoutes.post(
+  "/:id/documents/:documentId/archive",
+  requireFeature("documents"),
+  requirePermission("documents.edit"),
+  requireReason(),
+  employeesController.archiveDocument,
+);
+employeesRoutes.get(
+  "/:id/documents/:documentId/history",
+  requireFeature("documents"),
+  requirePermission("documents.view"),
+  employeesController.documentHistory,
+);
 employeesRoutes.get("/:id/notes", requirePermission("employees.view"), employeesController.listNotes);
 employeesRoutes.post("/:id/notes", requirePermission("employees.edit"), employeesController.addNote);
 employeesRoutes.get(

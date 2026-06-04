@@ -1,5 +1,23 @@
-import { ALLOWED_MIME_TYPES, DANGEROUS_MIME_TYPES, DEFAULT_PAGE_SIZE, MAX_DOCUMENT_BYTES, MAX_PAGE_SIZE } from "./documents.constants";
-import type { DocumentCategoryFilters, DocumentCategoryInput, DocumentDeleteInput, DocumentFilters, DocumentUpdateInput, DocumentUploadInput } from "./documents.types";
+import {
+  ALLOWED_MIME_TYPES,
+  DANGEROUS_MIME_TYPES,
+  DEFAULT_PAGE_SIZE,
+  DOCUMENT_STATUSES,
+  DOCUMENT_TYPES,
+  DRIVING_LICENSE_CATEGORIES,
+  MAX_DOCUMENT_BYTES,
+  MAX_PAGE_SIZE,
+} from "./documents.constants";
+import type {
+  DocumentArchiveInput,
+  DocumentCategoryFilters,
+  DocumentCategoryInput,
+  DocumentDeleteInput,
+  DocumentFilters,
+  DocumentReplaceInput,
+  DocumentUpdateInput,
+  DocumentUploadInput,
+} from "./documents.types";
 import { AppError, ValidationError } from "../../utils/errors";
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
@@ -20,7 +38,7 @@ const requireString = (value: unknown, message: string) => {
 const date = (value: unknown) => {
   const parsed = asString(value);
   if (!parsed) return undefined;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(parsed) || Number.isNaN(new Date(`${parsed}T00:00:00Z`).getTime())) throw new ValidationError("Please select a valid expiry date.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(parsed) || Number.isNaN(new Date(`${parsed}T00:00:00Z`).getTime())) throw new ValidationError("Please select a valid document date.");
   return parsed;
 };
 const reason = (value: unknown) => {
@@ -54,12 +72,57 @@ const validateBase64Size = (value: unknown) => {
   if (estimatedBytes > MAX_DOCUMENT_BYTES) throw new ValidationError("This document is too large.");
   return content;
 };
+const documentType = (value: unknown) => {
+  const parsed = requireString(value, "Document type is required.");
+  if (!(DOCUMENT_TYPES as readonly string[]).includes(parsed)) {
+    throw new ValidationError("Please select a valid document type.", { document_type: "Please select a valid document type." });
+  }
+  return parsed;
+};
+const documentStatus = (value: unknown) => {
+  const parsed = asString(value);
+  if (!parsed) return undefined;
+  if (!(DOCUMENT_STATUSES as readonly string[]).includes(parsed)) {
+    throw new ValidationError("Please select a valid document status.", { status: "Please select a valid document status." });
+  }
+  return parsed;
+};
+const drivingCategory = (value: unknown) => {
+  const parsed = asString(value);
+  if (!parsed) return undefined;
+  if (!(DRIVING_LICENSE_CATEGORIES as readonly string[]).includes(parsed)) {
+    throw new ValidationError("Please select a valid driving license category.", { driving_license_category: "Please select a valid driving license category." });
+  }
+  return parsed;
+};
+const validateDrivingLicenseCategory = <T extends { document_type?: string; driving_license_category?: string | null; driving_license_category_other?: string | null }>(input: T): T => {
+  if (input.document_type === "driving_license" && !input.driving_license_category) {
+    throw new ValidationError("Driving license category is required for driving license documents.", {
+      driving_license_category: "Driving license category is required.",
+    });
+  }
+  if (input.document_type && input.document_type !== "driving_license" && (input.driving_license_category || input.driving_license_category_other)) {
+    throw new ValidationError("Driving license category can only be used for driving license documents.", {
+      driving_license_category: "Driving license category can only be used for driving license documents.",
+    });
+  }
+  if (input.driving_license_category === "other" && !input.driving_license_category_other) {
+    throw new ValidationError("Please describe the driving license category.", {
+      driving_license_category_other: "Please describe the driving license category.",
+    });
+  }
+  return input;
+};
 
 export const validateDocumentFilters = (query: Record<string, unknown>): DocumentFilters => ({
   employee_id: asString(query.employee_id),
   outlet_id: asString(query.outlet_id),
   document_type: asString(query.document_type),
   status: asString(query.status),
+  expiry_from: date(query.expiry_from),
+  expiry_to: date(query.expiry_to),
+  expiring_within_days: asNumber(query.expiring_within_days),
+  employee_type: asString(query.employee_type),
   is_sensitive: query.is_sensitive === undefined ? undefined : query.is_sensitive === "true" || query.is_sensitive === true,
   expiring_before: date(query.expiring_before),
   page: page(query.page),
@@ -68,30 +131,53 @@ export const validateDocumentFilters = (query: Record<string, unknown>): Documen
 
 export const validateDocumentUpload = (payload: unknown): DocumentUploadInput => {
   if (!isObject(payload)) throw new ValidationError();
-  return {
+  return validateDrivingLicenseCategory({
     employee_id: requireString(payload.employee_id, "Employee is required."),
-    document_type: requireString(payload.document_type, "Document type is required."),
+    document_type: documentType(payload.document_type),
+    document_number: asString(payload.document_number),
+    issue_date: date(payload.issue_date),
+    start_date: date(payload.start_date),
     file_name: safeFileName(payload.file_name),
     mime_type: validateMime(payload.mime_type),
     content_base64: validateBase64Size(payload.content_base64),
     expiry_date: date(payload.expiry_date),
+    driving_license_category: drivingCategory(payload.driving_license_category),
+    driving_license_category_other: asString(payload.driving_license_category_other),
+    notes: asString(payload.notes),
     is_sensitive: asBool(payload.is_sensitive) ?? true,
-  };
+  });
 };
 
 export const validateDocumentUpdate = (payload: unknown): DocumentUpdateInput => {
   if (!isObject(payload)) throw new ValidationError();
   if (payload.file_key !== undefined) throw new AppError("Document file changes must be made through the replace document action.", "DOCUMENT_FILE_CHANGE_REQUIRES_REPLACE", 400);
   if (payload.content_base64 !== undefined) throw new AppError("Document file changes must be made through the replace document action.", "DOCUMENT_FILE_CHANGE_REQUIRES_REPLACE", 400);
-  return {
-    document_type: asString(payload.document_type),
+  return validateDrivingLicenseCategory({
+    document_type: payload.document_type === undefined ? undefined : documentType(payload.document_type),
+    document_number: payload.document_number === null ? null : asString(payload.document_number),
+    issue_date: payload.issue_date === null ? null : date(payload.issue_date),
+    start_date: payload.start_date === null ? null : date(payload.start_date),
     file_name: payload.file_name === undefined ? undefined : safeFileName(payload.file_name),
     mime_type: payload.mime_type === undefined ? undefined : validateMime(payload.mime_type),
     expiry_date: payload.expiry_date === null ? null : date(payload.expiry_date),
-    status: asString(payload.status),
+    status: documentStatus(payload.status),
+    driving_license_category: payload.driving_license_category === null ? null : drivingCategory(payload.driving_license_category),
+    driving_license_category_other: payload.driving_license_category_other === null ? null : asString(payload.driving_license_category_other),
+    notes: payload.notes === null ? null : asString(payload.notes),
     is_sensitive: asBool(payload.is_sensitive),
     reason: asString(payload.reason),
-  };
+  });
+};
+
+export const validateDocumentReplace = (payload: unknown): DocumentReplaceInput => {
+  if (!isObject(payload)) throw new ValidationError();
+  const input = validateDocumentUpload(payload);
+  return { ...input, reason: reason(payload.reason) };
+};
+
+export const validateDocumentArchive = (payload: unknown): DocumentArchiveInput => {
+  if (!isObject(payload)) throw new ValidationError();
+  return { reason: reason(payload.reason) };
 };
 
 export const validateDocumentDelete = (payload: unknown): DocumentDeleteInput => {

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+import fs from "node:fs";
 
 import { verifyCriticalRoutes } from "../scripts/verify-critical-routes.mjs";
 import { classifySmokeResponse, smokeChecks } from "../scripts/smoke-production.mjs";
+import { requiredEmployeeDocumentColumns } from "../scripts/document-schema-columns.mjs";
 
 const response = (status, contentType, body) => ({ status, contentType, body });
 const check = (path) => smokeChecks.find((item) => item.path === path);
@@ -55,5 +57,24 @@ describe("deployment safeguards", () => {
 
     expect(result.ok).toBe(false);
     expect(result.reason).toContain("Expected frontend 200");
+  });
+
+  it("foreign employee document history migration declares every required compliance column", () => {
+    const migration = fs.readFileSync("migrations/0017_foreign_employee_document_history.sql", "utf8");
+
+    for (const column of requiredEmployeeDocumentColumns.filter((column) => column !== "updated_at")) {
+      expect(migration).toContain(`ADD COLUMN ${column}`);
+    }
+  });
+
+  it("deployment checklist documents safe handling for partial document migration reruns", () => {
+    const checklist = fs.readFileSync("docs/deployment-checklist.md", "utf8");
+
+    expect(checklist).toContain('npx wrangler d1 execute hrm-system --remote --command "PRAGMA table_info(employee_documents);"');
+    expect(checklist).toContain("do not re-run this migration blindly");
+    expect(checklist).toContain("npm run verify:document-schema");
+    for (const column of requiredEmployeeDocumentColumns) {
+      expect(checklist).toContain(column);
+    }
   });
 });

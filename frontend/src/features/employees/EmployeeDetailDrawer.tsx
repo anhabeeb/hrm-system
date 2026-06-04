@@ -29,6 +29,8 @@ interface EmployeeDetailDrawerProps {
   canViewSalary: boolean;
   canViewDocuments: boolean;
   canViewSensitiveDocuments: boolean;
+  canUploadDocuments: boolean;
+  canEditDocuments: boolean;
   canViewNotes: boolean;
 }
 
@@ -41,6 +43,8 @@ export const EmployeeDetailDrawer = ({
   canViewSalary,
   canViewDocuments,
   canViewSensitiveDocuments,
+  canUploadDocuments,
+  canEditDocuments,
   canViewNotes,
 }: EmployeeDetailDrawerProps) => {
   if (!employee) return null;
@@ -100,8 +104,14 @@ export const EmployeeDetailDrawer = ({
         <EmployeeSalaryHistoryPanel employeeId={employee.id} canViewSalary={canViewSalary} />
       </section>
       <section className="space-y-3">
-        <h3 className="text-sm font-semibold">Documents Summary</h3>
-        <EmployeeDocumentsPanel employeeId={employee.id} canViewDocuments={canViewDocuments} canViewSensitiveDocuments={canViewSensitiveDocuments} />
+        <h3 className="text-sm font-semibold">Documents & Compliance</h3>
+        <EmployeeDocumentsPanel
+          employeeId={employee.id}
+          canViewDocuments={canViewDocuments}
+          canViewSensitiveDocuments={canViewSensitiveDocuments}
+          canUploadDocuments={canUploadDocuments}
+          canEditDocuments={canEditDocuments}
+        />
       </section>
       <section className="space-y-3">
         <h3 className="text-sm font-semibold">Notes</h3>

@@ -115,6 +115,8 @@ export const EmployeesPage = () => {
   const canViewSalary = auth.hasAnyPermission(["salary.view", "payroll.view"]);
   const canViewDocuments = auth.hasPermission("documents.view") && auth.hasFeature("documents");
   const canViewSensitiveDocuments = auth.hasPermission("documents.view_sensitive");
+  const canUploadDocuments = auth.hasPermission("documents.upload") && auth.hasFeature("documents");
+  const canEditDocuments = auth.hasPermission("documents.edit") && auth.hasFeature("documents");
   const canViewNotes = auth.hasPermission("employees.view");
 
   return (
@@ -165,6 +167,8 @@ export const EmployeesPage = () => {
           canViewSalary={canViewSalary}
           canViewDocuments={canViewDocuments}
           canViewSensitiveDocuments={canViewSensitiveDocuments}
+          canUploadDocuments={canUploadDocuments}
+          canEditDocuments={canEditDocuments}
           canViewNotes={canViewNotes}
         />
         <EmployeeForm

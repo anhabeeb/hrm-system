@@ -3,16 +3,22 @@ import type { CurrentUser } from "@/types/auth";
 export interface SecuritySummary {
   password_updated_at?: string | null;
   two_factor_enabled?: boolean;
+  enabled?: boolean;
+  verified_at?: string | null;
+  backup_codes_remaining?: number;
   active_sessions_count?: number;
   last_login_at?: string | null;
 }
 
 export interface TwoFactorSetupResponse {
   otpauth_url: string;
+  manual_key: string;
   manual_setup_key: string;
+  qr_code_data_url?: string | null;
 }
 
 export interface TwoFactorVerifyResponse {
+  enabled?: boolean;
   backup_codes?: string[];
 }
 

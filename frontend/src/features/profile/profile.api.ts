@@ -11,10 +11,11 @@ import type {
 export const profileApi = {
   me: () => api.get<ProfileResponse>("/me"),
   security: () => api.get<SecuritySummary>("/me/security"),
+  twoFactorStatus: () => api.get<SecuritySummary>("/me/2fa/status"),
   changePassword: (input: { current_password: string; new_password: string; confirm_password: string }) =>
     api.post<Record<string, never>>("/me/change-password", input),
   setupTwoFactor: () => api.post<TwoFactorSetupResponse>("/me/2fa/setup"),
-  verifyTwoFactor: (code: string) => api.post<TwoFactorVerifyResponse>("/me/2fa/verify", { code }),
+  verifyTwoFactor: (code: string) => api.post<TwoFactorVerifyResponse>("/me/2fa/confirm", { code }),
   disableTwoFactor: (input: { password?: string; code?: string }) =>
     api.post<Record<string, never>>("/me/2fa/disable", input),
   listKycRequests: () => api.get<KycRequestRecord[]>("/me/kyc-requests"),

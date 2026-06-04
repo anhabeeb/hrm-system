@@ -645,6 +645,16 @@ The Assets, Uniforms, and Documents backend is available under `/api/v1/assets`,
 - Documents are stored in Cloudflare R2, while metadata is stored in D1. File content is never stored in D1.
 - `/documents/upload` requires actual file content until multipart upload is implemented. The system must not create zero-byte `valid` R2 files.
 - `/documents/:id/download` returns the actual file response when available, with private no-store headers.
+- Employee-scoped document routes are available under `/employees/:id/documents` for list, upload, detail, metadata update, replace, archive, and history.
+- Foreign employee document tracking supports Passport, Work Visa, Work Permit, Medical Certificate, Insurance, and Driving License without making them mandatory for employee creation.
+- Local employee document tracking focuses on National ID, Driving License, Insurance, and Other documents.
+- Driving License documents require a license category such as Motorcycle, Light Vehicle, Heavy Vehicle, Boat, or Other.
+- Employee document metadata tracks document/reference number, issue date, start date, expiry date, notes, status, uploader/updater, version number, previous document, and replacement links.
+- Replacing a document preserves the old record as `replaced`, creates a new higher version, and exposes previous versions through document history.
+- Archiving a document does not delete historical records; file deletion remains a separate future action and should require explicit permission.
+- Employee detail includes a Documents & Compliance section with latest documents, expiry status, expected document types, warnings, and document history.
+- Expiry status uses a 60-day warning window: active, expiring soon, expired, or no expiry.
+- Missing foreign employee documents are compliance warnings only; they do not block employee creation or profile updates.
 - Document API responses do not expose private R2 `file_key` values.
 - `file_key` is never exposed in public document API responses.
 - Sensitive documents require `documents.view_sensitive` for view and download access.

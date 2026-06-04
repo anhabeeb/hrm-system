@@ -7,6 +7,8 @@ import {
   validateCategoryUpdate,
   validateDocumentDelete,
   validateDocumentFilters,
+  validateDocumentArchive,
+  validateDocumentReplace,
   validateDocumentUpdate,
   validateDocumentUpload,
 } from "./documents.validators";
@@ -30,6 +32,10 @@ const query = (c: Context<AppContext>) => ({
   outlet_id: c.req.query("outlet_id"),
   document_type: c.req.query("document_type"),
   status: c.req.query("status"),
+  expiry_from: c.req.query("expiry_from"),
+  expiry_to: c.req.query("expiry_to"),
+  expiring_within_days: c.req.query("expiring_within_days"),
+  employee_type: c.req.query("employee_type"),
   is_sensitive: c.req.query("is_sensitive"),
   expiring_before: c.req.query("expiring_before"),
   applies_to_foreign_employee: c.req.query("applies_to_foreign_employee"),
@@ -48,6 +54,12 @@ export const uploadDocument = async (c: Context<AppContext>) =>
   created(await service.uploadDocument(c.env, actor(c), validateDocumentUpload(await body(c))), "Document uploaded successfully.", { requestId: c.get("requestId") });
 export const updateDocument = async (c: Context<AppContext>) =>
   ok(await service.updateDocument(c.env, actor(c), id(c), validateDocumentUpdate(await body(c))), "Document updated successfully.", { requestId: c.get("requestId") });
+export const replaceDocument = async (c: Context<AppContext>) =>
+  created(await service.replaceDocument(c.env, actor(c), id(c), validateDocumentReplace(await body(c))), "Document replaced successfully.", { requestId: c.get("requestId") });
+export const archiveDocument = async (c: Context<AppContext>) =>
+  ok(await service.archiveDocument(c.env, actor(c), id(c), validateDocumentArchive(await body(c))), "Document archived successfully.", { requestId: c.get("requestId") });
+export const documentHistory = async (c: Context<AppContext>) =>
+  ok(await service.getDocumentHistory(c.env, actor(c), id(c)), "Document history loaded successfully.", { requestId: c.get("requestId") });
 export const deleteDocument = async (c: Context<AppContext>) =>
   ok(await service.deleteDocument(c.env, actor(c), id(c), validateDocumentDelete(await body(c))), "Document deleted successfully.", { requestId: c.get("requestId") });
 export const downloadDocument = async (c: Context<AppContext>) =>

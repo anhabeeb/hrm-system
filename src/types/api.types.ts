@@ -35,6 +35,7 @@ export interface ApiErrorDetails {
 export interface ApiErrorResponse {
   success: false;
   error: ApiErrorDetails;
+  data?: unknown;
   request_id?: string;
   requestId?: string;
   message?: string;
@@ -66,6 +67,7 @@ export interface ResponseOptions {
   suggestedAction?: string;
   fieldErrors?: Record<string, string>;
   details?: unknown;
+  data?: unknown;
 }
 
 export interface AuthActor {

@@ -1,0 +1,15 @@
+export const requiredEmployeeDocumentColumns = [
+  "document_number",
+  "issue_date",
+  "start_date",
+  "document_category",
+  "driving_license_category",
+  "driving_license_category_other",
+  "version_number",
+  "replaced_by_document_id",
+  "previous_document_id",
+  "notes",
+  "created_by",
+  "updated_by",
+  "updated_at",
+];

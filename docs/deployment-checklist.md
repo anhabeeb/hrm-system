@@ -65,6 +65,24 @@ Correct unauthenticated production behavior:
 
 If those routes return `404 API_ROUTE_NOT_FOUND`, production is not running the latest source-of-truth Worker script.
 
+## Document Compliance Migration Guardrails
+
+Phase 3 foreign employee document tracking extends `employee_documents` through `migrations/0017_foreign_employee_document_history.sql`.
+
+- Apply migration `0017_foreign_employee_document_history.sql` once before using document compliance fields.
+- The migration is forward-only and must not wipe, recreate, or backfill-destructively modify `employee_documents`.
+- SQLite/D1 `ALTER TABLE ... ADD COLUMN` is not reliably idempotent across all contexts, so do not re-run this migration blindly after a partial failure.
+- If a partial migration failure occurs, inspect the existing table first:
+
+```bash
+npx wrangler d1 execute hrm-system --remote --command "PRAGMA table_info(employee_documents);"
+```
+
+- Confirm these columns exist before retrying or manually applying missing columns: `document_number`, `issue_date`, `start_date`, `document_category`, `driving_license_category`, `driving_license_category_other`, `version_number`, `replaced_by_document_id`, `previous_document_id`, `notes`, `created_by`, `updated_by`, and `updated_at`.
+- Run `npm run verify:document-schema` locally before deployment to confirm source migration/checklist coverage for the required document history columns.
+- Do not drop existing employee document records. Replacements must preserve old rows and link versions through `previous_document_id` and `replaced_by_document_id`.
+- Document API list/detail responses must never expose `file_key`, R2 object keys, storage paths, tokens, or raw secrets.
+
 ## Postdeploy Smoke Test
 
 Run:

@@ -84,14 +84,37 @@ export interface EmployeeSalaryRow {
 export interface EmployeeDocumentRow {
   id: string;
   document_type?: string | null;
+  document_number?: string | null;
   document_name?: string | null;
   file_name?: string | null;
+  issue_date?: string | null;
+  start_date?: string | null;
   expiry_date?: string | null;
   status?: string | null;
+  validity_status?: string | null;
+  days_until_expiry?: number | null;
+  driving_license_category?: string | null;
+  driving_license_category_other?: string | null;
+  version_number?: number | null;
+  previous_document_id?: string | null;
+  replaced_by_document_id?: string | null;
+  notes?: string | null;
   is_sensitive?: number | boolean | null;
   uploaded_by?: string | null;
   uploaded_at?: string | null;
   created_at?: string;
+}
+
+export interface EmployeeDocumentCompliance {
+  employee_type?: EmployeeType;
+  status: "complete" | "missing_optional_documents" | "expiring_soon" | "expired_documents" | "needs_review" | string;
+  expected_document_types: string[];
+  missing_document_types: string[];
+  expired_document_types: string[];
+  expiring_soon_document_types: string[];
+  needs_review_document_types: string[];
+  high_priority_document_types?: string[];
+  warning?: string;
 }
 
 export interface EmployeeNoteRow {
