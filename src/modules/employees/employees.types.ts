@@ -93,6 +93,18 @@ export interface EmployeeWriteInput {
   notes?: string | null;
 }
 
+export interface EmployeeStartingSalaryInput {
+  monthly_salary_amount: number;
+  salary_type: "monthly";
+  currency: string;
+  effective_from: string;
+  reason: string;
+}
+
+export type EmployeeCreateInput = EmployeeWriteInput & {
+  starting_salary: EmployeeStartingSalaryInput;
+};
+
 export type EmployeeUpdateInput = Partial<
   Omit<EmployeeWriteInput, "primary_outlet_id" | "employment_status">
 >;

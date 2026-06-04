@@ -11,11 +11,12 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { DepartmentCombobox, OutletCombobox, PositionCombobox } from "@/components/selectors";
 import type { Department } from "@/features/departments/departments.types";
 import type { Outlet } from "@/features/outlets/outlets.types";
 import type { Position } from "@/features/positions/positions.types";
 import type { ApiError } from "@/lib/api-errors";
-import { employeeSchema, type EmployeeFormValues } from "./employees.schema";
+import { employeeCreateSchema, employeeUpdateSchema, type EmployeeFormValues } from "./employees.schema";
 import type { Employee } from "./employees.types";
 
 const defaults: EmployeeFormValues = {
@@ -36,6 +37,13 @@ const defaults: EmployeeFormValues = {
   phone: null,
   contract_type: null,
   notes: null,
+  starting_salary: {
+    amount: 0,
+    salary_type: "monthly",
+    currency: "MVR",
+    effective_from: new Date().toISOString().slice(0, 10),
+    reason: "Starting salary",
+  },
 };
 
 export const EmployeeForm = ({
@@ -61,9 +69,16 @@ export const EmployeeForm = ({
   onOpenChange: (open: boolean) => void;
   onSubmit: (values: EmployeeFormValues) => void;
 }) => {
-  const form = useForm<EmployeeFormValues>({ resolver: zodResolver(employeeSchema), defaultValues: defaults });
   const isEdit = mode === "edit";
+  const form = useForm<EmployeeFormValues>({
+    resolver: zodResolver(isEdit ? employeeUpdateSchema : employeeCreateSchema),
+    defaultValues: defaults,
+  });
   const employeeType = form.watch("employee_type");
+  const joinedAt = form.watch("joined_at");
+  const departmentId = form.watch("department_id");
+  const positionId = form.watch("position_id");
+  const startingSalaryAmount = form.watch("starting_salary.amount");
 
   useEffect(() => {
     if (!open) return;
@@ -85,8 +100,25 @@ export const EmployeeForm = ({
       phone: employee.phone ?? null,
       contract_type: employee.contract_type ?? null,
       notes: null,
+      starting_salary: defaults.starting_salary,
     } : defaults);
   }, [employee, form, open]);
+
+  useEffect(() => {
+    if (!open || isEdit || !joinedAt) return;
+    const currentEffectiveFrom = form.getValues("starting_salary.effective_from");
+    if (!currentEffectiveFrom || currentEffectiveFrom === defaults.starting_salary.effective_from) {
+      form.setValue("starting_salary.effective_from", joinedAt);
+    }
+  }, [form, isEdit, joinedAt, open]);
+
+  useEffect(() => {
+    if (!open || isEdit || !positionId || startingSalaryAmount > 0) return;
+    const selectedPosition = positions.find((position) => position.id === positionId);
+    if (selectedPosition?.default_salary_amount) {
+      form.setValue("starting_salary.amount", selectedPosition.default_salary_amount);
+    }
+  }, [form, isEdit, open, positionId, positions, startingSalaryAmount]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -122,13 +154,25 @@ export const EmployeeForm = ({
                 <FormItem><FormLabel><RequiredLabel>Status</RequiredLabel></FormLabel><Select value={field.value} onValueChange={field.onChange} disabled={isEdit}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{["active", "on_leave", "long_leave", "suspended", "resigned", "terminated", "archived"].map((status) => <SelectItem key={status} value={status}>{status.replace(/_/g, " ")}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
               )} />
               <FormField control={form.control} name="primary_outlet_id" render={({ field }) => (
-                <FormItem><FormLabel><RequiredLabel>Primary outlet</RequiredLabel></FormLabel><Select value={field.value} onValueChange={field.onChange} disabled={isEdit}><FormControl><SelectTrigger><SelectValue placeholder="Choose outlet" /></SelectTrigger></FormControl><SelectContent>{outlets.map((outlet) => <SelectItem key={outlet.id} value={outlet.id}>{outlet.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                <FormItem>
+                  <FormLabel><RequiredLabel>Primary outlet</RequiredLabel></FormLabel>
+                  <OutletCombobox value={field.value} onChange={(value) => field.onChange(value ?? "")} disabled={isEdit} />
+                  <FormMessage />
+                </FormItem>
               )} />
               <FormField control={form.control} name="department_id" render={({ field }) => (
-                <FormItem><FormLabel>Department</FormLabel><Select value={field.value ?? "none"} onValueChange={(value) => field.onChange(value === "none" ? null : value)}><FormControl><SelectTrigger><SelectValue placeholder="Choose department" /></SelectTrigger></FormControl><SelectContent><SelectItem value="none">No department</SelectItem>{departments.map((department) => <SelectItem key={department.id} value={department.id}>{department.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                <FormItem>
+                  <FormLabel>Department</FormLabel>
+                  <DepartmentCombobox value={field.value} onChange={(value) => field.onChange(value ?? null)} placeholder="No department" />
+                  <FormMessage />
+                </FormItem>
               )} />
               <FormField control={form.control} name="position_id" render={({ field }) => (
-                <FormItem><FormLabel>Position</FormLabel><Select value={field.value ?? "none"} onValueChange={(value) => field.onChange(value === "none" ? null : value)}><FormControl><SelectTrigger><SelectValue placeholder="Choose position" /></SelectTrigger></FormControl><SelectContent><SelectItem value="none">No position</SelectItem>{positions.map((position) => <SelectItem key={position.id} value={position.id}>{position.title}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                <FormItem>
+                  <FormLabel>Position</FormLabel>
+                  <PositionCombobox value={field.value} onChange={(value) => field.onChange(value ?? null)} departmentId={departmentId} placeholder="No position" />
+                  <FormMessage />
+                </FormItem>
               )} />
               <FormField control={form.control} name="joined_at" render={({ field }) => (
                 <FormItem><FormLabel>Joined date</FormLabel><FormControl><Input type="date" value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value || null)} /></FormControl><FormMessage /></FormItem>
@@ -166,6 +210,43 @@ export const EmployeeForm = ({
             <FormField control={form.control} name="notes" render={({ field }) => (
               <FormItem><FormLabel>Notes</FormLabel><FormControl><Textarea value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value || null)} /></FormControl><FormMessage /></FormItem>
             )} />
+            {!isEdit ? (
+              <section className="space-y-3 rounded-lg border bg-muted/20 p-4">
+                <div>
+                  <h3 className="text-sm font-semibold">Salary Details</h3>
+                  <p className="text-xs text-muted-foreground">Starting salary is saved to employee salary history for payroll. Position salary is only used as a suggestion.</p>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <FormField control={form.control} name="starting_salary.amount" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel><RequiredLabel>Basic salary amount</RequiredLabel></FormLabel>
+                      <FormControl><Input type="number" min="1" step="1" value={field.value || ""} onChange={(event) => field.onChange(event.target.value === "" ? 0 : Number(event.target.value))} /></FormControl>
+                      <p className="text-xs text-muted-foreground">Enter integer minor units, for example 750000 for MVR 7,500.00.</p>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="starting_salary.salary_type" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel><RequiredLabel>Salary type</RequiredLabel></FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                        <SelectContent><SelectItem value="monthly">Monthly</SelectItem></SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="starting_salary.currency" render={({ field }) => (
+                    <FormItem><FormLabel><RequiredLabel>Currency</RequiredLabel></FormLabel><FormControl><Input value={field.value ?? "MVR"} onChange={(event) => field.onChange(event.target.value || "MVR")} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="starting_salary.effective_from" render={({ field }) => (
+                    <FormItem><FormLabel><RequiredLabel>Effective from</RequiredLabel></FormLabel><FormControl><Input type="date" value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value)} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                </div>
+                <FormField control={form.control} name="starting_salary.reason" render={({ field }) => (
+                  <FormItem><FormLabel>Reason / notes</FormLabel><FormControl><Textarea value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value || null)} /></FormControl><FormMessage /></FormItem>
+                )} />
+              </section>
+            ) : null}
             {isEdit ? <p className="text-xs text-muted-foreground">Status and outlet changes use dedicated reason-required actions and are not changed through this edit form.</p> : null}
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>

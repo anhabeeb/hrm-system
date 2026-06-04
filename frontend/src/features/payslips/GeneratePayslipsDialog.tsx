@@ -2,9 +2,9 @@ import { useState } from "react";
 
 import { FormError } from "@/components/feedback/FormError";
 import { LoadingButton } from "@/components/forms/LoadingButton";
+import { OutletCombobox, PayrollPeriodCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -30,8 +30,8 @@ export const GeneratePayslipsDialog = ({
           <DialogDescription>Creates payslip metadata only. PDF generation remains a later backend step.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
-          <Label className="space-y-1 text-sm">Payroll run ID<Input value={payload.payroll_run_id} onChange={(event) => setPayload((current) => ({ ...current, payroll_run_id: event.target.value }))} /></Label>
-          <Label className="space-y-1 text-sm">Outlet ID optional<Input value={payload.outlet_id} onChange={(event) => setPayload((current) => ({ ...current, outlet_id: event.target.value }))} /></Label>
+          <Label className="space-y-1 text-sm">Payroll period<PayrollPeriodCombobox value={payload.payroll_run_id} onChange={(value) => setPayload((current) => ({ ...current, payroll_run_id: value ?? "" }))} /></Label>
+          <Label className="space-y-1 text-sm">Outlet optional<OutletCombobox value={payload.outlet_id} onChange={(value) => setPayload((current) => ({ ...current, outlet_id: value ?? "" }))} placeholder="All accessible outlets" /></Label>
           <Label className="space-y-1 text-sm">Reason<Textarea value={payload.reason} onChange={(event) => setPayload((current) => ({ ...current, reason: event.target.value }))} /></Label>
           <FormError message={error ?? undefined} />
         </div>

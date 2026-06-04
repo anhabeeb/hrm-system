@@ -23,8 +23,8 @@ import { AttendanceDetailDrawer } from "./AttendanceDetailDrawer";
 import { AttendanceFilters } from "./AttendanceFilters";
 import { AttendanceSummaryTable } from "./AttendanceSummaryTable";
 import { CorrectionRequestDialog } from "./CorrectionRequestDialog";
-import { ManualAttendanceDialog } from "./ManualAttendanceDialog";
-import type { AttendanceConflict, AttendanceCorrection, AttendanceEvent, AttendanceFilters as AttendanceFilterValues, AttendanceSummary, CorrectionRequestPayload, ManualAttendancePayload, ReasonPayload } from "./attendance.types";
+import { ManualAttendanceBatchDialog } from "./ManualAttendanceBatchDialog";
+import type { AttendanceConflict, AttendanceCorrection, AttendanceEvent, AttendanceFilters as AttendanceFilterValues, AttendanceSummary, CorrectionRequestPayload, ManualAttendanceBatchPayload, ManualAttendanceBatchResult, ReasonPayload } from "./attendance.types";
 
 const today = new Date();
 const startOfWeek = new Date(today);
@@ -65,6 +65,7 @@ export const AttendancePage = () => {
   const [correctionOpen, setCorrectionOpen] = useState(false);
   const [reasonDialog, setReasonDialog] = useState<"approve" | "reject" | "resolve" | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [manualBatchResult, setManualBatchResult] = useState<ManualAttendanceBatchResult | undefined>();
 
   const filters = useMemo<AttendanceFilterValues>(() => ({
     date_from: searchParams.get("date_from") || isoDate(startOfWeek),
@@ -109,11 +110,13 @@ export const AttendancePage = () => {
   const invalidateAttendance = async () => queryClient.invalidateQueries({ queryKey: ["attendance"] });
 
   const manualMutation = useMutation({
-    mutationFn: attendanceApi.manualEntry,
-    onSuccess: async () => {
-      setSuccessMessage("Manual attendance entry submitted successfully.");
-      setManualOpen(false);
-      await invalidateAttendance();
+    mutationFn: attendanceApi.manualBatch,
+    onSuccess: async (response) => {
+      setManualBatchResult(response.data);
+      const rowErrors = response.data.row_errors?.length ?? 0;
+      setSuccessMessage(rowErrors > 0 ? "Some manual attendance rows need review." : "Manual attendance batch submitted successfully.");
+      if (rowErrors === 0) setManualOpen(false);
+      if (response.data.accepted.length > 0) await invalidateAttendance();
     },
   });
 
@@ -179,9 +182,9 @@ export const AttendancePage = () => {
             <p className="text-sm text-muted-foreground">Daily summaries are payroll-facing; raw events are for audit and review.</p>
           </div>
           {canManualEntry ? (
-            <Button onClick={() => setManualOpen(true)}>
+            <Button onClick={() => { setSelectedSummary(null); setManualOpen(true); }}>
               <Plus className="h-4 w-4" />
-              Manual entry
+              Manual attendance
             </Button>
           ) : null}
         </div>
@@ -279,17 +282,21 @@ export const AttendancePage = () => {
           />
         ) : null}
       </DetailDrawer>
-      <ManualAttendanceDialog
+      <ManualAttendanceBatchDialog
         open={manualOpen}
-        initial={{ employee_id: selectedSummary?.employee_id, attendance_date: selectedSummary?.attendance_date ?? selectedSummary?.date }}
+        initial={{ outlet_id: selectedSummary?.outlet_id, employee_id: selectedSummary?.employee_id, attendance_date: selectedSummary?.attendance_date ?? selectedSummary?.date }}
         loading={manualMutation.isPending}
         error={manualMutation.error}
-        onOpenChange={setManualOpen}
-        onSubmit={(payload: ManualAttendancePayload) => manualMutation.mutate(payload)}
+        result={manualBatchResult}
+        onOpenChange={(open) => {
+          setManualOpen(open);
+          if (!open) setManualBatchResult(undefined);
+        }}
+        onSubmit={(payload: ManualAttendanceBatchPayload) => manualMutation.mutate(payload)}
       />
       <CorrectionRequestDialog
         open={correctionOpen}
-        initial={{ employee_id: selectedSummary?.employee_id, attendance_date: selectedSummary?.attendance_date ?? selectedSummary?.date }}
+        initial={{ outlet_id: selectedSummary?.outlet_id, employee_id: selectedSummary?.employee_id, attendance_date: selectedSummary?.attendance_date ?? selectedSummary?.date }}
         loading={correctionMutation.isPending}
         error={correctionMutation.error}
         onOpenChange={setCorrectionOpen}

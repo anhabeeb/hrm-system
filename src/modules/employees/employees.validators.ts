@@ -7,6 +7,7 @@ import {
 } from "./employees.constants";
 import type {
   DocumentMetadataInput,
+  EmployeeCreateInput,
   EmployeeListFilters,
   EmployeeNoteInput,
   EmployeeStatusInput,
@@ -62,6 +63,13 @@ const employeeBase = z.object({
   bank_account_masked: optionalTrimmed,
   notes: optionalTrimmed,
 });
+
+const asRecord = (payload: unknown): Record<string, unknown> =>
+  typeof payload === "object" && payload !== null
+    ? (payload as Record<string, unknown>)
+    : {};
+
+const salaryTypes = ["monthly"] as const;
 
 const blankToNull = <T extends Record<string, unknown>>(input: T): T => {
   const normalized = { ...input };
@@ -136,10 +144,86 @@ export const validateEmployeeListFilters = (
   return parsed;
 };
 
-export const validateEmployeeCreateInput = (payload: unknown): EmployeeWriteInput => {
+export const validateEmployeeCreateInput = (payload: unknown): EmployeeCreateInput => {
+  const rawPayload = asRecord(payload);
   const input = blankToNull(parse(employeeBase, payload));
   ensureEmployeeIdentityDetails(input);
-  return input;
+
+  const rawSalary = asRecord(rawPayload.starting_salary);
+  if (!rawPayload.starting_salary || Object.keys(rawSalary).length === 0) {
+    throw new AppError({
+      code: "STARTING_SALARY_REQUIRED",
+      title: "Starting salary required",
+      message: "Starting salary is required.",
+      statusCode: 400,
+      retryable: false,
+      fieldErrors: {
+        "starting_salary.amount": "Starting salary is required.",
+      },
+    });
+  }
+
+  const salaryType = String(rawSalary.salary_type ?? "monthly").trim();
+  if (!salaryTypes.includes(salaryType as (typeof salaryTypes)[number])) {
+    throw new AppError({
+      code: "INVALID_SALARY_TYPE",
+      title: "Invalid salary type",
+      message: "Select a valid salary type.",
+      statusCode: 400,
+      retryable: false,
+      fieldErrors: {
+        "starting_salary.salary_type": "Select a valid salary type.",
+      },
+    });
+  }
+
+  const amountValue = rawSalary.monthly_salary_amount ?? rawSalary.amount;
+  const amount = typeof amountValue === "number"
+    ? amountValue
+    : typeof amountValue === "string" && amountValue.trim() !== ""
+      ? Number(amountValue)
+      : NaN;
+
+  if (!Number.isInteger(amount) || amount <= 0) {
+    throw new AppError({
+      code: "INVALID_SALARY_AMOUNT",
+      title: "Invalid salary amount",
+      message: "Starting salary must be a positive amount in integer minor units.",
+      statusCode: 400,
+      retryable: false,
+      fieldErrors: {
+        "starting_salary.amount": "Starting salary must be a positive amount in integer minor units.",
+      },
+    });
+  }
+
+  const effectiveFrom =
+    typeof rawSalary.effective_from === "string" && rawSalary.effective_from.trim()
+      ? rawSalary.effective_from.trim()
+      : input.joined_at ?? new Date().toISOString().slice(0, 10);
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveFrom)) {
+    throw new ValidationError("Please enter a valid salary effective date.", {
+      "starting_salary.effective_from": "Please enter a valid salary effective date.",
+    });
+  }
+
+  return {
+    ...input,
+    starting_salary: {
+      monthly_salary_amount: amount,
+      salary_type: "monthly",
+      currency:
+        typeof rawSalary.currency === "string" && rawSalary.currency.trim()
+          ? rawSalary.currency.trim().toUpperCase()
+          : "MVR",
+      effective_from: effectiveFrom,
+      reason:
+        typeof rawSalary.reason === "string" && rawSalary.reason.trim()
+          ? rawSalary.reason.trim()
+          : "Starting salary",
+    },
+  } satisfies EmployeeCreateInput;
 };
 
 export const validateEmployeeUpdateInput = (payload: unknown): EmployeeUpdateInput => {

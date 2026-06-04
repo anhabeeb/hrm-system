@@ -1,4 +1,5 @@
 import { FilterBar } from "@/components/data/FilterBar";
+import { EmployeeCombobox, OutletCombobox } from "@/components/selectors";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -25,12 +26,12 @@ export const AttendanceFilters = ({
       <Input id="date-to" type="date" value={filters.date_to ?? ""} onChange={(event) => onChange({ date_to: event.target.value })} />
     </div>
     <div className="space-y-1.5">
-      <Label htmlFor="employee-id">Employee ID</Label>
-      <Input id="employee-id" value={filters.employee_id ?? ""} placeholder="Employee ID" onChange={(event) => onChange({ employee_id: event.target.value })} />
+      <Label>Outlet</Label>
+      <OutletCombobox value={filters.outlet_id} onChange={(value) => onChange({ outlet_id: value, employee_id: undefined })} placeholder="All outlets" />
     </div>
     <div className="space-y-1.5">
-      <Label htmlFor="outlet-id">Outlet ID</Label>
-      <Input id="outlet-id" value={filters.outlet_id ?? ""} placeholder="Outlet ID" onChange={(event) => onChange({ outlet_id: event.target.value })} />
+      <Label>Employee</Label>
+      <EmployeeCombobox value={filters.employee_id} outletId={filters.outlet_id} onChange={(value) => onChange({ employee_id: value })} placeholder="All employees" />
     </div>
     <div className="space-y-1.5">
       <Label>Status</Label>

@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { FormError } from "@/components/feedback/FormError";
 import { LoadingButton } from "@/components/forms/LoadingButton";
+import { EmployeeCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -43,7 +44,7 @@ export const BiometricMappingDialog = ({ mapping, unmatchedLog, open, loading, e
           <DialogDescription>Map the biometric device user ID to the correct employee profile.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-3">
-          <Label>Employee ID<Input value={values.employee_id} onChange={(event) => setValues((current) => ({ ...current, employee_id: event.target.value }))} /></Label>
+          <Label>Employee<EmployeeCombobox value={values.employee_id} onChange={(value) => setValues((current) => ({ ...current, employee_id: value ?? "" }))} /></Label>
           {!unmatchedLog ? (
             <>
               <Label>Device ID<Input value={values.device_id} onChange={(event) => setValues((current) => ({ ...current, device_id: event.target.value }))} /></Label>

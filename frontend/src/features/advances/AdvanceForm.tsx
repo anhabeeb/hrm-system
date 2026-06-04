@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { FormError } from "@/components/feedback/FormError";
 import { LoadingButton } from "@/components/forms/LoadingButton";
+import { EmployeeCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -31,7 +32,7 @@ export const AdvanceForm = ({
           <DialogDescription>Amounts are submitted as integer minor units to match payroll storage.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
-          <Label className="space-y-1 text-sm">Employee ID<Input value={payload.employee_id} onChange={(event) => setPayload((current) => ({ ...current, employee_id: event.target.value }))} /></Label>
+          <Label className="space-y-1 text-sm">Employee<EmployeeCombobox value={payload.employee_id} onChange={(value) => setPayload((current) => ({ ...current, employee_id: value ?? "" }))} /></Label>
           <Label className="space-y-1 text-sm">Amount minor units<Input type="number" min="1" step="1" value={payload.amount} onChange={(event) => setPayload((current) => ({ ...current, amount: event.target.value }))} /></Label>
           <div className="grid gap-3 sm:grid-cols-2">
             <Label className="space-y-1 text-sm">Paid date<Input type="date" value={payload.paid_date} onChange={(event) => setPayload((current) => ({ ...current, paid_date: event.target.value }))} /></Label>

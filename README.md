@@ -321,6 +321,9 @@ Important rules:
 - Duplicate National ID, passport number, work permit number, and employee code values are blocked per company
 - The main employee record stores searchable identity numbers; `employee_documents` remains the document/upload and expiry evidence layer
 - The employee create/edit UI keeps generated Employee ID read-only, switches identity fields by employee type, and keeps the light table-first admin style
+- Employee creation captures a required starting salary and saves it to `employee_salary_history`
+- Position default salary, when available, is only a create-form suggestion; employee salary history remains the payroll source of truth
+- General employee profile edits do not silently overwrite salary history; salary changes should create a new salary history row with an effective date and reason
 - HR/Admin manages employee data; users submit My Profile/KYC update requests instead of directly editing HR-controlled fields
 - General employee edit cannot change employment status, resignation, termination, archive state, or primary outlet
 - Employee status changes must use the status action, archive action, or restore action
@@ -331,7 +334,7 @@ Important rules:
 - HR/Admin/Super Admin can approve, reject, or return profile update requests for more information
 - Some KYC/profile update request types may require manual HR follow-up when the target field is not directly supported yet
 - Sensitive employee data is permission-controlled and masked when the user lacks sensitive access
-- Salary history stores money as integer minor units only; payroll calculation comes later
+- Salary history stores money as integer minor units only, currently using `monthly_salary_amount`, and payroll reads salary from `employee_salary_history`
 - Employee, salary, document metadata, notes, status, outlet, job, and KYC review changes require audit logs where sensitive
 
 The employee list API is designed for professional HR tables with search, filters, status badges, joined outlet/department/position names, and future row action icons such as view, edit, archive, restore, documents, salary, and more actions. Future UI should use compact data tables, structured detail panels, clean filters, and avoid bubble-heavy layouts.
@@ -700,6 +703,9 @@ Prompt 17 adds a separate `frontend/` React + TypeScript + Vite application for 
 - Navigation uses backend seeded feature keys exactly: Kiosk Devices and Sync Status use `offline_sync`, Assets and Uniforms use `assets_uniforms`, and the future dedicated kiosk punch screen can use `kiosk_attendance`.
 - Import / Export navigation uses the seeded `export.view` or `import.view` permissions rather than frontend-only job keys.
 - Reusable UI foundations include data tables, toolbars, filters, pagination, row action icons, detail sections, drawers, confirmation dialogs, inline alerts, status badges, loading states, and empty states.
+- Reusable searchable selector foundations are available for employees, outlets, departments, positions, leave types, and payroll periods. New forms should prefer these selectors over manual ID text inputs for user-facing employee/outlet/department/position/leave/payroll references.
+- Lookup endpoints are registered under `/api/v1/lookups/*`, require authentication, return compact safe labels only, and must not expose salary, document, bank, token, password, permission, or security fields.
+- The desktop sidebar is sticky within the viewport, and collapsed navigation uses centered square icon targets for a cleaner admin shell.
 - API calls use `VITE_API_BASE_URL` when configured and otherwise default to same-origin `/api/v1`.
 - The API client parses the backend standard response shape, preserves `request_id`, and throws typed user-friendly errors without stack traces or internal debug payloads.
 - Auth state is ready for `/auth/login`, `/auth/logout`, `/auth/me`, 2FA verification, and password reset endpoints.
@@ -723,6 +729,8 @@ Prompt 17 adds a separate `frontend/` React + TypeScript + Vite application for 
 - The frontend remains a light theme only. There is no dark mode, no theme switching, and no dark mode setting.
 - Prompt 20 implements the Attendance UI, Kiosk Devices UI, Sync Status UI, and Biometric UI using the same shadcn/ui, Tailwind CSS, light-only Enterprise HRM Admin Dashboard style.
 - Attendance now has table-first tabs for daily summaries, raw events, corrections, and conflicts, with URL-backed filters, backend pagination, detail drawers, reason dialogs, and locked-payroll error handling.
+- Manual attendance now supports outlet-first batch entry: HR/Admin selects an outlet, loads assigned employees, toggles rows, enters clock/status values, and submits multiple entries to `/api/v1/attendance/manual-batch` while backend payroll locks and employee/outlet scope remain enforced.
+- Time Corrections are also available as a dedicated `/attendance/corrections` page with outlet/employee/status/date filters, correction request creation, and approve/reject actions when permitted.
 - The Attendance Summary endpoint now uses the standard paginated API shape with top-level `data` and `pagination`; it no longer returns nested `data.rows`.
 - The Attendance Events tab uses `GET /api/v1/attendance/events` for raw attendance events, which is separate from daily summaries returned by `/attendance` and `/attendance/summary`.
 - Kiosk Devices now has a table-first fleet view, device registration, enable/disable, rotate-token dialogs, health summary integration, and permission-aware row actions.

@@ -1,4 +1,5 @@
 import { FilterBar } from "@/components/data/FilterBar";
+import { OutletCombobox } from "@/components/selectors";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -7,8 +8,8 @@ import type { DeviceFilters as DeviceFilterValues } from "./devices.types";
 export const DeviceFilters = ({ filters, onChange, onClear }: { filters: DeviceFilterValues; onChange: (next: Partial<DeviceFilterValues>) => void; onClear: () => void }) => (
   <FilterBar search={filters.search} searchPlaceholder="Search devices" onSearchChange={(search) => onChange({ search })} onClear={onClear} onApply={() => onChange({})}>
     <div className="space-y-1.5">
-      <Label htmlFor="device-outlet">Outlet ID</Label>
-      <Input id="device-outlet" value={filters.outlet_id ?? ""} onChange={(event) => onChange({ outlet_id: event.target.value })} />
+      <Label htmlFor="device-outlet">Outlet</Label>
+      <OutletCombobox value={filters.outlet_id} onChange={(value) => onChange({ outlet_id: value })} placeholder="All accessible outlets" />
     </div>
     <div className="space-y-1.5">
       <Label htmlFor="device-type">Device type</Label>

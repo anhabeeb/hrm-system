@@ -5,6 +5,7 @@ import { RefreshCw } from "lucide-react";
 
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { OutletCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -112,7 +113,7 @@ export const SyncStatusPage = () => {
         <SyncSummaryPanel summary={statusQuery.data?.data} />
         {reportStatusQuery.data?.data ? <pre className="max-h-32 overflow-auto rounded border bg-muted p-3 text-xs">{JSON.stringify(sanitizeForDisplay(reportStatusQuery.data.data), null, 2)}</pre> : null}
         <div className="grid gap-3 rounded-lg border bg-card p-4 shadow-sm md:grid-cols-4">
-          <Input placeholder="Outlet ID" value={filters.outlet_id ?? ""} onChange={(event) => updateFilters({ outlet_id: event.target.value })} />
+          <OutletCombobox value={filters.outlet_id} onChange={(value) => updateFilters({ outlet_id: value })} placeholder="All accessible outlets" />
           <Input placeholder="Device ID" value={filters.device_id ?? ""} onChange={(event) => updateFilters({ device_id: event.target.value })} />
           <Input placeholder="Status" value={filters.status ?? ""} onChange={(event) => updateFilters({ status: event.target.value })} />
           <Input placeholder="Conflict type" value={filters.conflict_type ?? ""} onChange={(event) => updateFilters({ conflict_type: event.target.value })} />

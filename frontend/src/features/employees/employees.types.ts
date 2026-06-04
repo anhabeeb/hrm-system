@@ -58,9 +58,16 @@ export interface EmployeePayload {
   phone?: string | null;
   contract_type?: string | null;
   notes?: string | null;
+  starting_salary: {
+    amount: number;
+    salary_type: "monthly";
+    currency?: string;
+    effective_from?: string;
+    reason?: string | null;
+  };
 }
 
-export type EmployeeUpdatePayload = Partial<Omit<EmployeePayload, "primary_outlet_id" | "employment_status">>;
+export type EmployeeUpdatePayload = Partial<Omit<EmployeePayload, "primary_outlet_id" | "employment_status" | "starting_salary">>;
 
 export interface EmployeeDetailResponse {
   employee: Employee;

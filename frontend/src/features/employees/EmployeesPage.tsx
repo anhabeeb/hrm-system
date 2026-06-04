@@ -102,7 +102,7 @@ export const EmployeesPage = () => {
 
   const submitForm = (values: EmployeeFormValues) => {
     if (formMode === "edit" && selectedEmployee) {
-      const { employee_code: _employeeCode, primary_outlet_id: _primaryOutletId, employment_status: _employmentStatus, ...payload } = values;
+      const { employee_code: _employeeCode, primary_outlet_id: _primaryOutletId, employment_status: _employmentStatus, starting_salary: _startingSalary, ...payload } = values;
       updateMutation.mutate({ id: selectedEmployee.id, payload });
       return;
     }

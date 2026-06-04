@@ -20,7 +20,7 @@ const employeeBaseSchema = z.object({
   notes: z.string().trim().nullable().optional(),
 });
 
-export const employeeSchema = employeeBaseSchema.superRefine((value, context) => {
+const identityRules = (value: z.infer<typeof employeeBaseSchema>, context: z.RefinementCtx) => {
   if (value.employee_type === "local" && !value.id_card_number) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["id_card_number"], message: "National ID number is required for local employees." });
   }
@@ -41,8 +41,24 @@ export const employeeSchema = employeeBaseSchema.superRefine((value, context) =>
       context.addIssue({ code: z.ZodIssueCode.custom, path: ["work_permit_expiry_date"], message: "Work permit expiry date is required for foreign employees." });
     }
   }
+};
+
+const startingSalarySchema = z.object({
+  amount: z.coerce.number().int("Starting salary must be an integer amount in minor units.").positive("Starting salary is required."),
+  salary_type: z.literal("monthly", { errorMap: () => ({ message: "Select a valid salary type." }) }).default("monthly"),
+  currency: z.string().trim().default("MVR"),
+  effective_from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Please enter a valid effective date."),
+  reason: z.string().trim().nullable().optional(),
 });
 
-export const employeeUpdateSchema = employeeBaseSchema.omit({ employee_code: true, primary_outlet_id: true, employment_status: true }).partial();
+export const employeeCreateSchema = employeeBaseSchema.extend({
+  starting_salary: startingSalarySchema,
+}).superRefine((value, context) => identityRules(value, context));
 
-export type EmployeeFormValues = z.infer<typeof employeeSchema>;
+export const employeeSchema = employeeCreateSchema;
+
+export const employeeUpdateSchema = employeeBaseSchema
+  .omit({ employee_code: true, primary_outlet_id: true, employment_status: true })
+  .partial();
+
+export type EmployeeFormValues = z.infer<typeof employeeCreateSchema>;

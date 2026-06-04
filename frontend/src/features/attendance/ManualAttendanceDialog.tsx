@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { FormError } from "@/components/feedback/FormError";
 import { LoadingButton } from "@/components/forms/LoadingButton";
+import { EmployeeCombobox, OutletCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -29,6 +30,7 @@ export const ManualAttendanceDialog = ({
 }) => {
   const [values, setValues] = useState<ManualAttendancePayload>({
     employee_id: initial?.employee_id ?? "",
+    outlet_id: initial?.outlet_id ?? "",
     attendance_date: initial?.attendance_date ?? "",
     clock_in_time: initial?.clock_in_time ?? "",
     clock_out_time: initial?.clock_out_time ?? "",
@@ -45,8 +47,8 @@ export const ManualAttendanceDialog = ({
       setLocalError("Reason is required.");
       return;
     }
-    if (!values.employee_id || !values.attendance_date || (!values.clock_in_time && !values.clock_out_time && !values.status)) {
-      setLocalError("Select an employee, date, and at least one clock time or status.");
+    if (!values.outlet_id || !values.employee_id || !values.attendance_date || (!values.clock_in_time && !values.clock_out_time && !values.status)) {
+      setLocalError("Select an outlet, employee, date, and at least one clock time or status.");
       return;
     }
     setLocalError(null);
@@ -65,8 +67,12 @@ export const ManualAttendanceDialog = ({
         ) : (
           <div className="grid gap-3">
             <div className="grid gap-1.5">
-              <Label htmlFor="manual-employee">Employee ID</Label>
-              <Input id="manual-employee" value={values.employee_id} onChange={(event) => update("employee_id", event.target.value)} />
+              <Label>Outlet</Label>
+              <OutletCombobox value={values.outlet_id} onChange={(value) => setValues((current) => ({ ...current, outlet_id: value ?? "", employee_id: "" }))} />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>Employee</Label>
+              <EmployeeCombobox value={values.employee_id} outletId={values.outlet_id} onChange={(value) => update("employee_id", value ?? "")} />
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="manual-date">Attendance date</Label>

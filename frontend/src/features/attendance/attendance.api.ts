@@ -7,6 +7,8 @@ import type {
   AttendanceFilters,
   AttendanceSummary,
   CorrectionRequestPayload,
+  ManualAttendanceBatchPayload,
+  ManualAttendanceBatchResult,
   ManualAttendancePayload,
   ReasonPayload,
 } from "./attendance.types";
@@ -16,6 +18,7 @@ export const attendanceApi = {
   listEvents: (filters: AttendanceFilters = {}) => api.get<AttendanceEvent[]>(`/attendance/events${buildQueryString(filters)}`),
   getEvent: (id: string) => api.get<{ event: AttendanceEvent } | AttendanceEvent>(`/attendance/events/${id}`),
   manualEntry: (payload: ManualAttendancePayload) => api.post<{ saved: boolean }>("/attendance/manual-entry", payload),
+  manualBatch: (payload: ManualAttendanceBatchPayload) => api.post<ManualAttendanceBatchResult>("/attendance/manual-batch", payload),
   requestCorrection: (payload: CorrectionRequestPayload) => api.post<{ correction_id?: string }>("/attendance/correction-request", payload),
   listCorrections: (filters: AttendanceFilters = {}) => api.get<AttendanceCorrection[]>(`/attendance/corrections${buildQueryString(filters)}`),
   approveCorrection: (id: string, payload: ReasonPayload) => api.post<{ approved: boolean }>(`/attendance/corrections/${id}/approve`, payload),

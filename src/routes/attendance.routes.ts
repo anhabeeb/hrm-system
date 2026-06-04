@@ -20,6 +20,7 @@ attendanceRoutes.get("/events", requirePermission("attendance.view"), controller
 attendanceRoutes.get("/events/:id", requirePermission("attendance.view"), controller.getEvent);
 attendanceRoutes.post("/clock-in", requireAnyPermission(["attendance.create", "attendance.manual_entry"]), controller.clockIn);
 attendanceRoutes.post("/clock-out", requireAnyPermission(["attendance.create", "attendance.manual_entry"]), controller.clockOut);
+attendanceRoutes.post("/manual-batch", requirePermission("attendance.manual_entry"), requireReason(), controller.manualBatch);
 attendanceRoutes.post("/manual-entry", requirePermission("attendance.manual_entry"), requireReason(), controller.manualEntry);
 attendanceRoutes.post("/correction-request", requireAnyPermission(["attendance.manual_entry", "attendance.edit"]), requireReason(), controller.correctionRequest);
 attendanceRoutes.post("/corrections/:id/approve", requirePermission("attendance.approve_correction"), requireReason({ fields: ["reason", "notes"] }), controller.approveCorrection);

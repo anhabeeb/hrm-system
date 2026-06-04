@@ -1,5 +1,6 @@
 import type {
   DocumentMetadataInput,
+  EmployeeCreateInput,
   EmployeeListFilters,
   EmployeeListRow,
   EmployeePersistInput,
@@ -579,10 +580,11 @@ export const getEmployee = async (
 export const createEmployee = async (
   env: Env,
   context: AuthActor,
-  input: EmployeeWriteInput,
+  input: EmployeeCreateInput,
 ) => {
+  const { starting_salary: startingSalary, ...employeeInput } = input;
   const generatedInput = normalizeEmployeeForPersist({
-    ...input,
+    ...employeeInput,
     employee_code: await generateEmployeeCode(env, context.companyId),
   });
 
@@ -591,34 +593,30 @@ export const createEmployee = async (
   await ensureUniqueIdentity(env, context.companyId, generatedInput);
 
   const employeeId = createEntityId("emp");
+  const salaryHistoryId = createPrefixedId("salary_hist");
 
-  await employeesRepository.createEmployee(
-    env,
-    employeeId,
-    context.companyId,
-    generatedInput,
-    context.actorUserId,
-  );
-  await employeesRepository.createJobHistory(env, {
-    id: createPrefixedId("job_hist"),
-    companyId: context.companyId,
-    employeeId,
-    outletId: generatedInput.primary_outlet_id,
-    departmentId: generatedInput.department_id,
-    positionId: generatedInput.position_id,
-    changeType: "initial_assignment",
-    effectiveFrom: generatedInput.joined_at ?? nowIso().slice(0, 10),
-    reason: "Employee created",
-    createdBy: context.actorUserId,
-  });
-  await employeesRepository.createStatusHistory(env, {
-    id: createPrefixedId("status_hist"),
-    companyId: context.companyId,
-    employeeId,
-    newStatus: generatedInput.employment_status,
-    reason: "Employee created",
-    changedBy: context.actorUserId,
-  });
+  try {
+    await employeesRepository.createEmployeeOnboardingRecords(env, {
+      employeeId,
+      salaryHistoryId,
+      jobHistoryId: createPrefixedId("job_hist"),
+      statusHistoryId: createPrefixedId("status_hist"),
+      companyId: context.companyId,
+      employee: generatedInput,
+      startingSalary,
+      actorUserId: context.actorUserId,
+      jobEffectiveFrom: generatedInput.joined_at ?? nowIso().slice(0, 10),
+    });
+  } catch (error) {
+    throw new AppError({
+      code: "EMPLOYEE_SALARY_HISTORY_CREATE_FAILED",
+      title: "Employee salary could not be saved",
+      message: "Employee could not be created because the starting salary could not be saved.",
+      statusCode: 500,
+      retryable: true,
+      cause: error,
+    });
+  }
   await ensureAudit(env, context, {
     action: "employee_created",
     entityType: "employee",
@@ -626,6 +624,20 @@ export const createEmployee = async (
     employeeId,
     outletId: generatedInput.primary_outlet_id,
     newValue: generatedInput,
+  });
+  await ensureAudit(env, context, {
+    action: "employee_salary_added",
+    entityType: "employee_salary_history",
+    entityId: salaryHistoryId,
+    employeeId,
+    outletId: generatedInput.primary_outlet_id,
+    newValue: {
+      monthly_salary_amount: startingSalary.monthly_salary_amount,
+      currency: startingSalary.currency,
+      effective_from: startingSalary.effective_from,
+      reason: startingSalary.reason,
+    },
+    reason: startingSalary.reason,
   });
   await trackEmployeeSyncChange(env, context, {
     employeeId,

@@ -1,4 +1,5 @@
 import { FilterBar } from "@/components/data/FilterBar";
+import { OutletCombobox } from "@/components/selectors";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -32,8 +33,8 @@ export const PayrollFilters = ({
       </Select>
     </Label>
     <Label className="space-y-1 text-xs font-medium text-muted-foreground">
-      Outlet ID
-      <Input value={filters.outlet_id ?? ""} onChange={(event) => onChange({ outlet_id: event.target.value })} placeholder="Accessible outlet" />
+      Outlet
+      <OutletCombobox value={filters.outlet_id} onChange={(value) => onChange({ outlet_id: value })} placeholder="All accessible outlets" />
     </Label>
   </FilterBar>
 );

@@ -126,6 +126,29 @@ export interface ManualEntryInput {
   notes?: string;
 }
 
+export interface ManualBatchEntryInput {
+  employee_id?: string;
+  clock_in_time?: string;
+  clock_out_time?: string;
+  status?: AttendanceSummaryStatus;
+  note?: string;
+  notes?: string;
+}
+
+export interface ManualBatchInput {
+  outlet_id: string;
+  attendance_date: string;
+  reason: string;
+  entries: ManualBatchEntryInput[];
+}
+
+export interface ManualBatchRowError {
+  index: number;
+  employee_id?: string;
+  code: string;
+  message: string;
+}
+
 export interface CorrectionRequestInput {
   employee_id: string;
   attendance_event_id?: string;

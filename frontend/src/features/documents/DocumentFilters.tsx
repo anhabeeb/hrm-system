@@ -1,4 +1,5 @@
 import { FilterBar } from "@/components/data/FilterBar";
+import { EmployeeCombobox, OutletCombobox } from "@/components/selectors";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -14,7 +15,7 @@ export const DocumentFilters = ({ filters, onChange, onClear }: { filters: Docum
         <SelectContent><SelectItem value="all">All statuses</SelectItem><SelectItem value="valid">Valid</SelectItem><SelectItem value="expired">Expired</SelectItem><SelectItem value="missing">Missing</SelectItem><SelectItem value="deleted">Deleted</SelectItem></SelectContent>
       </Select>
     </Label>
-    <Label className="space-y-1 text-xs font-medium text-muted-foreground">Employee ID<Input value={filters.employee_id ?? ""} onChange={(event) => onChange({ employee_id: event.target.value })} /></Label>
-    <Label className="space-y-1 text-xs font-medium text-muted-foreground">Outlet ID<Input value={filters.outlet_id ?? ""} onChange={(event) => onChange({ outlet_id: event.target.value })} /></Label>
+    <Label className="space-y-1 text-xs font-medium text-muted-foreground">Employee<EmployeeCombobox value={filters.employee_id} outletId={filters.outlet_id} onChange={(value) => onChange({ employee_id: value })} placeholder="All employees" /></Label>
+    <Label className="space-y-1 text-xs font-medium text-muted-foreground">Outlet<OutletCombobox value={filters.outlet_id} onChange={(value) => onChange({ outlet_id: value, employee_id: undefined })} placeholder="All accessible outlets" /></Label>
   </FilterBar>
 );

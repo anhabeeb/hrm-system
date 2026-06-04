@@ -12,6 +12,7 @@ import type {
   AttendanceListFilters,
   ConflictResolveInput,
   CorrectionRequestInput,
+  ManualBatchInput,
   ManualEntryInput,
   ReviewInput,
 } from "./attendance.types";
@@ -76,6 +77,27 @@ export const validateManualEntryInput = (payload: unknown): ManualEntryInput =>
       status: z.enum(ATTENDANCE_SUMMARY_STATUSES).optional(),
       reason,
       notes: z.string().trim().optional(),
+      note: z.string().trim().optional(),
+    }).transform((value) => ({ ...value, notes: value.notes ?? value.note })),
+    payload,
+  );
+
+export const validateManualBatchInput = (payload: unknown): ManualBatchInput =>
+  parse(
+    z.object({
+      outlet_id: z.string().trim().min(1, "Outlet is required."),
+      attendance_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Please enter a valid attendance date."),
+      reason,
+      entries: z.array(
+        z.object({
+          employee_id: z.string().trim().optional(),
+          clock_in_time: isoOrDate.optional(),
+          clock_out_time: isoOrDate.optional(),
+          status: z.enum(ATTENDANCE_SUMMARY_STATUSES).optional(),
+          note: z.string().trim().optional(),
+          notes: z.string().trim().optional(),
+        }).transform((value) => ({ ...value, notes: value.notes ?? value.note })),
+      ).min(1, "Please include at least one attendance entry.").max(100, "A batch can include up to 100 attendance entries."),
     }),
     payload,
   );

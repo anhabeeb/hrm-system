@@ -87,12 +87,42 @@ export interface AttendanceFilters {
 
 export interface ManualAttendancePayload {
   employee_id: string;
+  outlet_id?: string;
   attendance_date: string;
   clock_in_time?: string;
   clock_out_time?: string;
   status?: string;
   reason: string;
   note?: string;
+}
+
+export interface ManualAttendanceBatchEntry {
+  employee_id: string;
+  clock_in_time?: string;
+  clock_out_time?: string;
+  status?: string;
+  note?: string;
+}
+
+export interface ManualAttendanceBatchPayload {
+  outlet_id: string;
+  attendance_date: string;
+  reason: string;
+  entries: ManualAttendanceBatchEntry[];
+}
+
+export interface ManualAttendanceBatchRowError {
+  index: number;
+  employee_id?: string;
+  code: string;
+  message: string;
+}
+
+export interface ManualAttendanceBatchResult {
+  outlet_id: string;
+  attendance_date: string;
+  accepted: Array<{ index: number; employee_id: string; event_ids: string[] }>;
+  row_errors: ManualAttendanceBatchRowError[];
 }
 
 export interface CorrectionRequestPayload {

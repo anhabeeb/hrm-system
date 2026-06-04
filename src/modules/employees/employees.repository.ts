@@ -4,6 +4,7 @@ import type {
   EmployeeListFilters,
   EmployeeListRow,
   EmployeePersistInput,
+  EmployeeStartingSalaryInput,
   EmployeeNoteInput,
   EmployeeRecord,
   JobChangeInput,
@@ -328,6 +329,114 @@ export const createEmployee = (
       new Date().toISOString(),
     ],
   );
+
+export const createEmployeeOnboardingRecords = (
+  env: Env,
+  input: {
+    employeeId: string;
+    salaryHistoryId: string;
+    jobHistoryId: string;
+    statusHistoryId: string;
+    companyId: string;
+    employee: EmployeePersistInput;
+    startingSalary: EmployeeStartingSalaryInput;
+    actorUserId: string;
+    jobEffectiveFrom: string;
+  },
+) => {
+  const timestamp = new Date().toISOString();
+
+  return env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO employees (
+        id, company_id, employee_code, full_name, employee_type, nationality,
+        id_card_number, passport_number, passport_expiry_date,
+        work_permit_number, work_permit_expiry_date, phone, emergency_contact_name,
+        emergency_contact_phone, primary_outlet_id, department_id, position_id,
+        contract_type, employment_status, joined_at, bank_name, bank_account_masked,
+        notes, created_by, updated_by, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      input.employeeId,
+      input.companyId,
+      input.employee.employee_code,
+      input.employee.full_name,
+      input.employee.employee_type,
+      input.employee.nationality ?? null,
+      input.employee.id_card_number ?? null,
+      input.employee.passport_number ?? null,
+      input.employee.passport_expiry_date ?? null,
+      input.employee.work_permit_number ?? null,
+      input.employee.work_permit_expiry_date ?? null,
+      input.employee.phone ?? null,
+      input.employee.emergency_contact_name ?? null,
+      input.employee.emergency_contact_phone ?? null,
+      input.employee.primary_outlet_id,
+      input.employee.department_id ?? null,
+      input.employee.position_id ?? null,
+      input.employee.contract_type ?? null,
+      input.employee.employment_status,
+      input.employee.joined_at ?? null,
+      input.employee.bank_name ?? null,
+      input.employee.bank_account_masked ?? null,
+      input.employee.notes ?? null,
+      input.actorUserId,
+      input.actorUserId,
+      timestamp,
+      timestamp,
+    ),
+    env.DB.prepare(
+      `INSERT INTO employee_salary_history (
+        id, company_id, employee_id, monthly_salary_amount, currency,
+        effective_from, reason, created_by, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      input.salaryHistoryId,
+      input.companyId,
+      input.employeeId,
+      input.startingSalary.monthly_salary_amount,
+      input.startingSalary.currency,
+      input.startingSalary.effective_from,
+      input.startingSalary.reason,
+      input.actorUserId,
+      timestamp,
+    ),
+    env.DB.prepare(
+      `INSERT INTO employee_job_history (
+        id, company_id, employee_id, outlet_id, department_id, position_id,
+        change_type, effective_from, reason, created_by, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      input.jobHistoryId,
+      input.companyId,
+      input.employeeId,
+      input.employee.primary_outlet_id,
+      input.employee.department_id ?? null,
+      input.employee.position_id ?? null,
+      "initial_assignment",
+      input.jobEffectiveFrom,
+      "Employee created",
+      input.actorUserId,
+      timestamp,
+    ),
+    env.DB.prepare(
+      `INSERT INTO employee_status_history (
+        id, company_id, employee_id, old_status, new_status, reason,
+        changed_by, changed_at, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      input.statusHistoryId,
+      input.companyId,
+      input.employeeId,
+      null,
+      input.employee.employment_status,
+      "Employee created",
+      input.actorUserId,
+      timestamp,
+      timestamp,
+    ),
+  ]);
+};
 
 export const updateEmployee = (
   env: Env,

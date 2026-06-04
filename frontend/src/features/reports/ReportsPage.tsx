@@ -11,6 +11,7 @@ import { RowActions } from "@/components/data/RowActions";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { EmployeeCombobox, OutletCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -149,8 +150,8 @@ export const ReportsPage = () => {
         {generateMutation.isSuccess ? <InlineAlert title="Report generated successfully." variant="success" /> : null}
         {(activeError || generateMutation.error) ? <InlineAlert title={friendlyHrmError(activeError ?? generateMutation.error, "Report data could not be loaded.")} variant="error" /> : null}
         <div className="grid gap-3 rounded-lg border bg-card p-4 md:grid-cols-6">
-          <Input placeholder="Outlet ID" value={filters.outlet_id ?? ""} onChange={(event) => updateFilters({ outlet_id: event.target.value })} />
-          <Input placeholder="Employee ID" value={filters.employee_id ?? ""} onChange={(event) => updateFilters({ employee_id: event.target.value })} />
+          <OutletCombobox value={filters.outlet_id} onChange={(value) => updateFilters({ outlet_id: value, employee_id: undefined })} placeholder="All accessible outlets" />
+          <EmployeeCombobox value={filters.employee_id} outletId={filters.outlet_id} onChange={(value) => updateFilters({ employee_id: value })} placeholder="All employees" />
           <Input type="date" value={filters.date_from ?? ""} onChange={(event) => updateFilters({ date_from: event.target.value })} />
           <Input type="date" value={filters.date_to ?? ""} onChange={(event) => updateFilters({ date_to: event.target.value })} />
           <Input placeholder="Payroll month" value={filters.payroll_month ?? ""} onChange={(event) => updateFilters({ payroll_month: event.target.value })} />

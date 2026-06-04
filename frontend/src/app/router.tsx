@@ -15,6 +15,7 @@ import { DepartmentsPage } from "@/features/departments/DepartmentsPage";
 import { PositionsPage } from "@/features/positions/PositionsPage";
 import { EmployeesPage } from "@/features/employees/EmployeesPage";
 import { AttendancePage } from "@/features/attendance/AttendancePage";
+import { AttendanceCorrectionsPage } from "@/features/attendance/AttendanceCorrectionsPage";
 import { KioskDevicesPage } from "@/features/devices/KioskDevicesPage";
 import { SyncStatusPage } from "@/features/sync/SyncStatusPage";
 import { BiometricPage } from "@/features/biometric/BiometricPage";
@@ -75,6 +76,7 @@ export const AppRouter = () => (
         <Route path="/departments" element={guarded(<DepartmentsPage />, { permission: "departments.view", feature: "employee_management" })} />
         <Route path="/positions" element={guarded(<PositionsPage />, { permission: "positions.view", feature: "employee_management" })} />
         <Route path="/attendance" element={guarded(<AttendancePage />, { permission: "attendance.view", feature: "attendance" })} />
+        <Route path="/attendance/corrections" element={guarded(<AttendanceCorrectionsPage />, { permission: "attendance.view", feature: "attendance" })} />
         <Route path="/kiosk-devices" element={guarded(<KioskDevicesPage />, { permissionsAny: ["devices.view", "kiosk.view"], feature: "offline_sync" })} />
         <Route path="/sync-status" element={guarded(<SyncStatusPage />, { permission: "sync.view", feature: "offline_sync" })} />
         <Route path="/biometric" element={guarded(<BiometricPage />, { permissionsAny: ["biometric.view", "devices.view"], feature: "biometric_attendance" })} />

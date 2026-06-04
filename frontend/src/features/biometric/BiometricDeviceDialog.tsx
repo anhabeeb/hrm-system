@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { FormError } from "@/components/feedback/FormError";
 import { LoadingButton } from "@/components/forms/LoadingButton";
+import { OutletCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -36,7 +37,7 @@ export const BiometricDeviceDialog = ({ device, open, loading, error, onOpenChan
           <DialogDescription>Only punch-log metadata is managed here. Fingerprint or face templates are never stored.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-3">
-          <Label>Outlet ID<Input value={values.outlet_id} onChange={(event) => setValues((current) => ({ ...current, outlet_id: event.target.value }))} /></Label>
+          <Label>Outlet<OutletCombobox value={values.outlet_id} onChange={(value) => setValues((current) => ({ ...current, outlet_id: value ?? "" }))} /></Label>
           <Label>Device name<Input value={values.device_name} onChange={(event) => setValues((current) => ({ ...current, device_name: event.target.value }))} /></Label>
           <Label>Serial<Input value={values.device_serial} onChange={(event) => setValues((current) => ({ ...current, device_serial: event.target.value }))} /></Label>
           <Label>Device type<Input value={values.device_type} onChange={(event) => setValues((current) => ({ ...current, device_type: event.target.value }))} /></Label>

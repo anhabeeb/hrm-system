@@ -8,6 +8,7 @@ import {
   CalendarClock,
   ClipboardCheck,
   Clock3,
+  FileClock,
   DatabaseBackup,
   FileArchive,
   FileText,
@@ -51,6 +52,7 @@ export const navigationGroups: NavGroup[] = [
     label: "Time & Attendance",
     items: [
       { label: "Attendance", path: "/attendance", icon: Clock3, requiredFeature: "attendance", requiredPermission: "attendance.view" },
+      { label: "Time Corrections", path: "/attendance/corrections", icon: FileClock, requiredFeature: "attendance", requiredPermission: "attendance.view" },
       { label: "Kiosk Devices", path: "/kiosk-devices", icon: TabletSmartphone, requiredFeature: "offline_sync", requiredPermissionsAny: ["devices.view", "kiosk.view"] },
       { label: "Sync Status", path: "/sync-status", icon: Repeat, requiredFeature: "offline_sync", requiredPermission: "sync.view" },
       { label: "Biometric", path: "/biometric", icon: Fingerprint, requiredFeature: "biometric_attendance", requiredPermission: "biometric.view" },

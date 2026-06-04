@@ -1,4 +1,5 @@
 import { FilterBar } from "@/components/data/FilterBar";
+import { OutletCombobox } from "@/components/selectors";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,6 +22,6 @@ export const AssetFilters = ({ filters, onChange, onClear }: { filters: AssetFil
       </Select>
     </Label>
     <Label className="space-y-1 text-xs font-medium text-muted-foreground">Asset type<Input value={filters.asset_type ?? ""} onChange={(event) => onChange({ asset_type: event.target.value })} /></Label>
-    <Label className="space-y-1 text-xs font-medium text-muted-foreground">Outlet ID<Input value={filters.outlet_id ?? ""} onChange={(event) => onChange({ outlet_id: event.target.value })} /></Label>
+    <Label className="space-y-1 text-xs font-medium text-muted-foreground">Outlet<OutletCombobox value={filters.outlet_id} onChange={(value) => onChange({ outlet_id: value })} placeholder="All accessible outlets" /></Label>
   </FilterBar>
 );

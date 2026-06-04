@@ -6,6 +6,7 @@ import {
   validateClockInput,
   validateConflictResolveInput,
   validateCorrectionRequestInput,
+  validateManualBatchInput,
   validateManualEntryInput,
   validateReviewInput,
 } from "./attendance.validators";
@@ -105,6 +106,14 @@ export const clockOut = async (c: Context<AppContext>) => {
 
 export const manualEntry = async (c: Context<AppContext>) =>
   created(await service.manualEntry(c.env, actor(c), validateManualEntryInput(await body(c))), "Attendance record saved successfully.", { requestId: c.get("requestId") });
+
+export const manualBatch = async (c: Context<AppContext>) => {
+  const result = await service.manualBatch(c.env, actor(c), validateManualBatchInput(await body(c)));
+  const message = result.row_errors.length > 0
+    ? "Some attendance rows need review before they can be saved."
+    : "Manual attendance batch saved successfully.";
+  return created(result, message, { requestId: c.get("requestId") });
+};
 
 export const correctionRequest = async (c: Context<AppContext>) =>
   created(await service.createCorrectionRequest(c.env, actor(c), validateCorrectionRequestInput(await body(c))), "Attendance correction submitted successfully.", { requestId: c.get("requestId") });

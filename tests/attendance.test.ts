@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 
+import app from "../src/app";
 import {
   getAttendanceDateFromEventTime,
   getPayrollMonthFromAttendanceDate,
   normalizeAttendanceDateTime,
 } from "../src/modules/attendance/attendance.service";
 import {
+  validateManualBatchInput,
   validateManualEntryInput,
   validateReviewInput,
 } from "../src/modules/attendance/attendance.validators";
@@ -18,6 +20,29 @@ describe("attendance validators", () => {
         employee_id: "emp_1",
         outlet_id: "outlet_1",
         attendance_date: "2026-05-29",
+      }),
+    ).toThrow(ValidationError);
+  });
+
+  it("manual batch validates required batch envelope", () => {
+    const input = validateManualBatchInput({
+      outlet_id: "outlet_1",
+      attendance_date: "2026-06-04",
+      reason: "Manager submitted daily attendance.",
+      entries: [{ employee_id: "emp_1", clock_in_time: "09:00", status: "present" }],
+    });
+
+    expect(input.outlet_id).toBe("outlet_1");
+    expect(input.entries).toHaveLength(1);
+  });
+
+  it("manual batch rejects empty entries", () => {
+    expect(() =>
+      validateManualBatchInput({
+        outlet_id: "outlet_1",
+        attendance_date: "2026-06-04",
+        reason: "Manager submitted daily attendance.",
+        entries: [],
       }),
     ).toThrow(ValidationError);
   });
@@ -53,6 +78,20 @@ describe("attendance validators", () => {
 
   it("gets payroll month from attendance date", () => {
     expect(getPayrollMonthFromAttendanceDate("2026-07-01")).toBe("2026-07");
+  });
+});
+
+describe("attendance routes", () => {
+  it("manual batch route exists and requires authentication", async () => {
+    const response = await app.request(
+      "/api/v1/attendance/manual-batch",
+      { method: "POST", body: JSON.stringify({}), headers: { "content-type": "application/json" } },
+      { ENVIRONMENT: "local" } as Env,
+    );
+    const body = await response.json() as { error?: { code?: string } };
+
+    expect(response.status).toBe(401);
+    expect(body.error?.code).not.toBe("API_ROUTE_NOT_FOUND");
   });
 });
 

@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { FormError } from "@/components/feedback/FormError";
 import { LoadingButton } from "@/components/forms/LoadingButton";
+import { EmployeeCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -32,7 +33,7 @@ export const LongLeaveForm = ({
           <DialogDescription>Creates a long leave record and asks the backend to prepare salary-impact preview when possible.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">
-          <Label className="space-y-1 text-sm">Employee ID<Input value={payload.employee_id} onChange={(event) => update("employee_id", event.target.value)} /></Label>
+          <Label className="space-y-1 text-sm">Employee<EmployeeCombobox value={payload.employee_id} onChange={(value) => update("employee_id", value ?? "")} /></Label>
           <Label className="space-y-1 text-sm">Leave request ID<Input value={payload.leave_request_id} onChange={(event) => update("leave_request_id", event.target.value)} /></Label>
           <div className="grid gap-3 sm:grid-cols-2">
             <Label className="space-y-1 text-sm">Start date<Input type="date" value={payload.start_date} onChange={(event) => update("start_date", event.target.value)} /></Label>

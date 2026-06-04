@@ -95,7 +95,7 @@ export const calculateEmployeePayroll = async (
     exceptions.push({
       exception_type: "missing_salary",
       severity: "critical",
-      message: "Salary history is missing for this employee.",
+      message: "This employee does not have an active salary record for the selected payroll period. Add a salary record for the employee, then retry payroll.",
       employee_id: input.employee.id,
       outlet_id: input.employee.primary_outlet_id,
     });

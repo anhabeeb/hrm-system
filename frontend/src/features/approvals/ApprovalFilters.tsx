@@ -1,4 +1,5 @@
 import { FilterBar } from "@/components/data/FilterBar";
+import { OutletCombobox } from "@/components/selectors";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -15,6 +16,6 @@ export const ApprovalFilters = ({ filters, onChange, onClear }: { filters: Appro
     </Label>
     <Label className="space-y-1 text-xs font-medium text-muted-foreground">Module<Input value={filters.module ?? ""} onChange={(event) => onChange({ module: event.target.value })} /></Label>
     <Label className="space-y-1 text-xs font-medium text-muted-foreground">Workflow key<Input value={filters.workflow_key ?? ""} onChange={(event) => onChange({ workflow_key: event.target.value })} /></Label>
-    <Label className="space-y-1 text-xs font-medium text-muted-foreground">Outlet ID<Input value={filters.outlet_id ?? ""} onChange={(event) => onChange({ outlet_id: event.target.value })} /></Label>
+    <Label className="space-y-1 text-xs font-medium text-muted-foreground">Outlet<OutletCombobox value={filters.outlet_id} onChange={(value) => onChange({ outlet_id: value })} placeholder="All accessible outlets" /></Label>
   </FilterBar>
 );

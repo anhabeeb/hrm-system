@@ -13,8 +13,8 @@ export const Sidebar = ({ collapsed, onCollapsedChange }: { collapsed: boolean; 
   const groups = getVisibleNavigation(user);
 
   return (
-    <aside className={cn("hidden h-screen shrink-0 border-r bg-card transition-[width] duration-200 lg:flex lg:flex-col", collapsed ? "w-16" : "w-64")}>
-      <div className="flex h-14 items-center gap-3 border-b px-3">
+    <aside className={cn("sticky top-0 hidden h-screen shrink-0 self-start border-r bg-card transition-[width] duration-200 lg:flex lg:flex-col", collapsed ? "w-16" : "w-64")}>
+      <div className={cn("flex h-14 items-center gap-3 border-b px-3", collapsed && "justify-center px-2")}>
         <div className="flex h-9 w-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
           <Factory className="h-5 w-5" />
         </div>
@@ -44,7 +44,7 @@ export const Sidebar = ({ collapsed, onCollapsedChange }: { collapsed: boolean; 
         )}
       </ScrollArea>
       <div className="border-t p-2">
-        <Button variant="ghost" size={collapsed ? "icon" : "sm"} className={cn("w-full", !collapsed && "justify-start")} onClick={() => onCollapsedChange(!collapsed)} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
+        <Button variant="ghost" size={collapsed ? "icon" : "sm"} className={cn(collapsed ? "mx-auto flex h-10 w-10 justify-center px-0" : "w-full justify-start")} onClick={() => onCollapsedChange(!collapsed)} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
           {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           {!collapsed ? "Collapse" : null}
         </Button>

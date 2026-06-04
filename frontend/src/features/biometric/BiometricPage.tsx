@@ -7,6 +7,7 @@ import { DetailDrawer } from "@/components/data/DetailDrawer";
 import { DetailSection } from "@/components/data/DetailSection";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { EmployeeCombobox, OutletCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -171,9 +172,9 @@ export const BiometricPage = () => {
           ) : null}
         </div>
         <div className="grid gap-3 rounded-lg border bg-card p-4 shadow-sm md:grid-cols-4">
-          <Input placeholder="Outlet ID" value={filters.outlet_id ?? ""} onChange={(event) => updateFilters({ outlet_id: event.target.value })} />
+          <OutletCombobox value={filters.outlet_id} onChange={(value) => updateFilters({ outlet_id: value, employee_id: undefined })} placeholder="All accessible outlets" />
           <Input placeholder="Device ID" value={filters.device_id ?? ""} onChange={(event) => updateFilters({ device_id: event.target.value })} />
-          <Input placeholder="Employee ID" value={filters.employee_id ?? ""} onChange={(event) => updateFilters({ employee_id: event.target.value })} />
+          <EmployeeCombobox value={filters.employee_id} outletId={filters.outlet_id} onChange={(value) => updateFilters({ employee_id: value })} placeholder="All employees" />
           <Input placeholder="Biometric User ID" value={filters.biometric_user_id ?? ""} onChange={(event) => updateFilters({ biometric_user_id: event.target.value })} />
         </div>
         <Tabs value={tab} onValueChange={setActiveTab}>

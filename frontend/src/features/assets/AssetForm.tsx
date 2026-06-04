@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { FormError } from "@/components/feedback/FormError";
 import { LoadingButton } from "@/components/forms/LoadingButton";
+import { OutletCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -27,7 +28,7 @@ export const AssetForm = ({ asset, open, loading, error, onOpenChange, onSubmit 
           <Label className="space-y-1 text-sm">Asset code<Input value={payload.asset_code} onChange={(event) => setPayload((p) => ({ ...p, asset_code: event.target.value }))} /></Label>
           <Label className="space-y-1 text-sm">Asset name<Input value={payload.asset_name} onChange={(event) => setPayload((p) => ({ ...p, asset_name: event.target.value }))} /></Label>
           <Label className="space-y-1 text-sm">Asset type<Input value={payload.asset_type} onChange={(event) => setPayload((p) => ({ ...p, asset_type: event.target.value }))} /></Label>
-          <Label className="space-y-1 text-sm">Outlet ID<Input value={payload.outlet_id} onChange={(event) => setPayload((p) => ({ ...p, outlet_id: event.target.value }))} /></Label>
+          <Label className="space-y-1 text-sm">Outlet<OutletCombobox value={payload.outlet_id} onChange={(value) => setPayload((p) => ({ ...p, outlet_id: value ?? "" }))} /></Label>
           <Label className="space-y-1 text-sm">Value minor units<Input type="number" min="1" step="1" value={payload.purchase_value_amount} onChange={(event) => setPayload((p) => ({ ...p, purchase_value_amount: event.target.value }))} /></Label>
           <Label className="space-y-1 text-sm">Condition<Input value={payload.current_condition} onChange={(event) => setPayload((p) => ({ ...p, current_condition: event.target.value }))} /></Label>
         </div>

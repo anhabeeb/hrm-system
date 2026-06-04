@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { FormError } from "@/components/feedback/FormError";
 import { LoadingButton } from "@/components/forms/LoadingButton";
+import { EmployeeCombobox, OutletCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -26,7 +27,7 @@ export const CorrectionRequestDialog = ({
   mode?: "request" | "reason";
   title?: string;
   description?: string;
-  initial?: Partial<CorrectionRequestPayload>;
+  initial?: Partial<CorrectionRequestPayload> & { outlet_id?: string };
   loading?: boolean;
   error?: unknown;
   onOpenChange: (open: boolean) => void;
@@ -40,6 +41,7 @@ export const CorrectionRequestDialog = ({
     requested_clock_out: "",
     reason: "",
   });
+  const [outletId, setOutletId] = useState(initial?.outlet_id ?? "");
   const [localError, setLocalError] = useState<string | null>(null);
 
   const submit = () => {
@@ -66,8 +68,12 @@ export const CorrectionRequestDialog = ({
           {mode === "request" ? (
             <>
               <div className="grid gap-1.5">
-                <Label htmlFor="correction-employee">Employee ID</Label>
-                <Input id="correction-employee" value={values.employee_id} onChange={(event) => setValues((current) => ({ ...current, employee_id: event.target.value }))} />
+                <Label>Outlet</Label>
+                <OutletCombobox value={outletId} onChange={(value) => { setOutletId(value ?? ""); setValues((current) => ({ ...current, employee_id: "" })); }} placeholder="Select outlet first" />
+              </div>
+              <div className="grid gap-1.5">
+                <Label>Employee</Label>
+                <EmployeeCombobox value={values.employee_id} outletId={outletId} onChange={(value) => setValues((current) => ({ ...current, employee_id: value ?? "" }))} />
               </div>
               <div className="grid gap-1.5">
                 <Label htmlFor="correction-date">Attendance date</Label>

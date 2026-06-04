@@ -16,6 +16,8 @@ import type {
   ConflictResolveInput,
   CorrectionRequestInput,
   KioskClockInput,
+  ManualBatchInput,
+  ManualBatchRowError,
   ManualEntryInput,
   ReviewInput,
 } from "./attendance.types";
@@ -540,9 +542,13 @@ export const manualEntry = async (
   env: Env,
   context: AuthActor,
   input: ManualEntryInput,
+  options: { auditRequired?: boolean } = {},
 ) => {
   assertOutletAccess(context, input.outlet_id);
-  await ensureEmployee(env, context.companyId, input.employee_id);
+  const employee = await ensureEmployee(env, context.companyId, input.employee_id);
+  if (employee.primary_outlet_id !== input.outlet_id) {
+    throw new OutletAccessError("This employee is not assigned to the selected outlet.");
+  }
   await assertPayrollUnlocked(env, context.companyId, input.attendance_date);
   const eventIds: string[] = [];
   if (input.clock_in_time) {
@@ -611,9 +617,102 @@ export const manualEntry = async (
     requestId: context.requestId,
     ipAddress: context.ipAddress,
     userAgent: context.userAgent,
-    required: true,
+    required: options.auditRequired ?? true,
   });
   return { event_ids: eventIds, summary };
+};
+
+export const manualBatch = async (
+  env: Env,
+  context: AuthActor,
+  input: ManualBatchInput,
+) => {
+  assertOutletAccess(context, input.outlet_id);
+  await assertPayrollUnlocked(env, context.companyId, input.attendance_date);
+
+  const accepted: Array<{ index: number; employee_id: string; event_ids: string[] }> = [];
+  const rowErrors: ManualBatchRowError[] = [];
+
+  for (const [index, entry] of input.entries.entries()) {
+    const employeeId = entry.employee_id?.trim();
+    if (!employeeId) {
+      rowErrors.push({
+        index,
+        code: "EMPLOYEE_REQUIRED",
+        message: "Employee is required for this row.",
+      });
+      continue;
+    }
+    if (!entry.clock_in_time && !entry.clock_out_time && !entry.status) {
+      rowErrors.push({
+        index,
+        employee_id: employeeId,
+        code: "ATTENDANCE_VALUE_REQUIRED",
+        message: "Add a clock time or attendance status for this row.",
+      });
+      continue;
+    }
+
+    try {
+      const result = await manualEntry(
+        env,
+        context,
+        {
+          employee_id: employeeId,
+          outlet_id: input.outlet_id,
+          attendance_date: input.attendance_date,
+          clock_in_time: entry.clock_in_time,
+          clock_out_time: entry.clock_out_time,
+          status: entry.status,
+          reason: input.reason,
+          notes: entry.notes ?? entry.note,
+        },
+        { auditRequired: false },
+      );
+      accepted.push({ index, employee_id: employeeId, event_ids: result.event_ids });
+    } catch (error) {
+      const message = error instanceof Error
+        ? error.message
+        : "This attendance row could not be saved.";
+      const code = error instanceof AppError ? error.code : "ROW_NOT_SAVED";
+      rowErrors.push({ index, employee_id: employeeId, code, message });
+    }
+  }
+
+  await audit(env, {
+    companyId: context.companyId,
+    outletId: input.outlet_id,
+    module: "attendance",
+    action: "attendance_manual_batch",
+    entityType: "attendance_daily_summary",
+    entityId: input.outlet_id,
+    actorUserId: context.actorUserId,
+    reason: input.reason,
+    details: {
+      attendance_date: input.attendance_date,
+      accepted_count: accepted.length,
+      row_error_count: rowErrors.length,
+    },
+    requestId: context.requestId,
+    ipAddress: context.ipAddress,
+    userAgent: context.userAgent,
+    required: false,
+  });
+
+  await realtime(
+    env,
+    context.companyId,
+    "attendance.manual_batch",
+    { outlet_id: input.outlet_id, attendance_date: input.attendance_date, accepted_count: accepted.length },
+    context.actorUserId,
+  );
+
+  return {
+    outlet_id: input.outlet_id,
+    attendance_date: input.attendance_date,
+    accepted,
+    row_errors: rowErrors,
+  };
 };
 
 export const createCorrectionRequest = async (
