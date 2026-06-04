@@ -180,14 +180,13 @@ export const validateKycUpdateRequestInput = (
   const input = parse(
     z.object({
       request_type: z.string().trim().min(1, "Request type is required."),
-      requested_value_json: z.custom<unknown>(
-        (value) => value !== undefined,
-        "Requested update details are required.",
-      ),
+      requested_value_json: z.custom<unknown>().optional(),
+      requested_changes: z.custom<unknown>().optional(),
       reason: z.string().trim().max(1000).optional(),
     }),
     payload,
   );
+  const requestedValue = input.requested_value_json ?? input.requested_changes;
 
   if (DISALLOWED_KYC_REQUEST_TYPES.has(input.request_type)) {
     throw new ValidationError(
@@ -199,9 +198,13 @@ export const validateKycUpdateRequestInput = (
     throw new ValidationError("Please choose a supported profile update type.");
   }
 
+  if (requestedValue === undefined) {
+    throw new ValidationError("Requested update details are required.");
+  }
+
   return {
     request_type: input.request_type,
-    requested_value_json: input.requested_value_json,
+    requested_value_json: requestedValue,
     reason: input.reason,
   };
 };

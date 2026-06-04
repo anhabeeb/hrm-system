@@ -72,6 +72,57 @@ const toSafeUser = (user: UserRecord): SafeUserProfile => ({
 const isActiveUser = (user: UserRecord): boolean =>
   user.status === "active" && !user.deleted_at;
 
+const validateEmailFormat = (email: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+const normalizeEmailUpdatePayload = (payload: unknown): { email: string } => {
+  const value = payload && typeof payload === "object"
+    ? (payload as Record<string, unknown>).email
+    : undefined;
+  const email = typeof value === "string" ? normalizeEmail(value) : "";
+
+  if (!email || !validateEmailFormat(email)) {
+    throw new AppError({
+      code: "INVALID_EMAIL",
+      title: "Invalid email",
+      message: "Please enter a valid email address.",
+      statusCode: 400,
+      retryable: false,
+      fieldErrors: { email: "Please enter a valid email address." },
+    });
+  }
+
+  return { email };
+};
+
+const assertEmailCanBeRequested = async (
+  env: Env,
+  user: UserRecord,
+  email: string,
+) => {
+  if (normalizeEmail(user.email ?? "") === email) {
+    throw new AppError({
+      code: "EMAIL_UNCHANGED",
+      title: "Email unchanged",
+      message: "The new email must be different from your current email.",
+      statusCode: 400,
+      retryable: false,
+      fieldErrors: { email: "The new email must be different from your current email." },
+    });
+  }
+
+  const existing = await authRepository.findUserByEmailInCompany(env, user.company_id, email);
+  if (existing && existing.id !== user.id) {
+    throw new AppError({
+      code: "DUPLICATE_USER_EMAIL",
+      title: "Duplicate email",
+      message: "A user with this email already exists.",
+      statusCode: 409,
+      retryable: false,
+      fieldErrors: { email: "A user with this email already exists." },
+    });
+  }
+};
+
 const audit = async (
   env: Env,
   input: {
@@ -912,6 +963,26 @@ export const createKycRequest = async (
   request: AuthenticatedRequestContext,
 ) => {
   const user = await ensureAuthenticated(env, userId);
+  let requestedValueJson = input.requested_value_json;
+  let oldValueJson: string | null = null;
+
+  if (input.request_type === "email_update") {
+    const emailUpdate = normalizeEmailUpdatePayload(input.requested_value_json);
+    if (!input.reason?.trim()) {
+      throw new AppError({
+        code: "EMAIL_UPDATE_REASON_REQUIRED",
+        title: "Reason required",
+        message: "Please provide a reason for changing your login email.",
+        statusCode: 400,
+        retryable: false,
+        fieldErrors: { reason: "Please provide a reason for changing your login email." },
+      });
+    }
+    await assertEmailCanBeRequested(env, user, emailUpdate.email);
+    requestedValueJson = emailUpdate;
+    oldValueJson = JSON.stringify({ email: user.email ?? null });
+  }
+
   const requestId = createEntityId("user").replace("user_", "kyc_");
 
   await authRepository.createKycRequest(env, {
@@ -920,7 +991,8 @@ export const createKycRequest = async (
     userId: user.id,
     employeeId: user.employee_id,
     requestType: input.request_type,
-    requestedValueJson: JSON.stringify(input.requested_value_json),
+    requestedValueJson: JSON.stringify(requestedValueJson),
+    oldValueJson,
     reason: input.reason ?? null,
   });
   await audit(env, {

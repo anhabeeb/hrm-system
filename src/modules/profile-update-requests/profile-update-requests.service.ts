@@ -20,6 +20,55 @@ const parseJson = (value: string): Record<string, unknown> => {
   }
 };
 
+const normalizeEmail = (email: string): string => email.trim().toLowerCase();
+const isEmail = (email: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+const readEmailUpdate = (value: Record<string, unknown>): string => {
+  const email = typeof value.email === "string" ? normalizeEmail(value.email) : "";
+  if (!email || !isEmail(email)) {
+    throw new AppError({
+      code: "INVALID_EMAIL",
+      title: "Invalid email",
+      message: "Please enter a valid email address.",
+      statusCode: 400,
+      retryable: false,
+      fieldErrors: { email: "Please enter a valid email address." },
+    });
+  }
+  return email;
+};
+
+const assertEmailAvailableForApproval = async (
+  env: Env,
+  context: AuthActor,
+  userId: string,
+  currentEmail: string | null | undefined,
+  nextEmail: string,
+) => {
+  if (normalizeEmail(currentEmail ?? "") === nextEmail) {
+    throw new AppError({
+      code: "EMAIL_UNCHANGED",
+      title: "Email unchanged",
+      message: "The requested email is already the user's current email.",
+      statusCode: 400,
+      retryable: false,
+      fieldErrors: { email: "The requested email is already the user's current email." },
+    });
+  }
+
+  const existing = await repository.findUserByEmail(env, context.companyId, nextEmail);
+  if (existing && existing.id !== userId) {
+    throw new AppError({
+      code: "DUPLICATE_USER_EMAIL",
+      title: "Duplicate email",
+      message: "A user with this email already exists.",
+      statusCode: 409,
+      retryable: false,
+      fieldErrors: { email: "A user with this email already exists." },
+    });
+  }
+};
+
 const audit = async (
   env: Env,
   context: AuthActor,
@@ -102,9 +151,14 @@ const applyApprovedChange = async (
       }
       break;
     case "email_update":
-      await repository.updateUserFields(env, context.companyId, request.user_id, {
-        email: String(value.email ?? ""),
-      });
+      {
+        const email = readEmailUpdate(value);
+        await assertEmailAvailableForApproval(env, context, request.user_id, user?.email, email);
+        await repository.updateUserFields(env, context.companyId, request.user_id, {
+          email,
+        });
+        await repository.revokeUserSessions(env, context.companyId, request.user_id);
+      }
       break;
     case "emergency_contact_update":
       if (request.employee_id) {

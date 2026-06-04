@@ -17,16 +17,34 @@ export const kycUpdateSchema = z
   .object({
     full_name: z.string().trim().optional(),
     phone: z.string().trim().optional(),
+    new_email: z.string().trim().optional(),
+    confirm_new_email: z.string().trim().optional(),
     address: z.string().trim().optional(),
     emergency_contact: z.string().trim().optional(),
     document_note: z.string().trim().optional(),
     reason: z.string().trim().min(1, "Reason is required."),
+  })
+  .superRefine((value, ctx) => {
+    if (value.new_email?.trim() || value.confirm_new_email?.trim()) {
+      if (!value.new_email?.trim()) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "New email is required.", path: ["new_email"] });
+      } else if (!z.string().email().safeParse(value.new_email).success) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Please enter a valid email address.", path: ["new_email"] });
+      }
+      if (!value.confirm_new_email?.trim()) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Please confirm the new email.", path: ["confirm_new_email"] });
+      }
+      if (value.new_email?.trim() && value.confirm_new_email?.trim() && value.new_email.trim().toLowerCase() !== value.confirm_new_email.trim().toLowerCase()) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Email addresses must match.", path: ["confirm_new_email"] });
+      }
+    }
   })
   .refine(
     (value) =>
       Boolean(
         value.full_name?.trim() ||
           value.phone?.trim() ||
+          value.new_email?.trim() ||
           value.address?.trim() ||
           value.emergency_contact?.trim() ||
           value.document_note?.trim(),

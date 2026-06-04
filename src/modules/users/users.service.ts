@@ -196,6 +196,7 @@ export const createUser = async (env: Env, context: AuthActor, input: UserCreate
 export const updateUser = async (env: Env, context: AuthActor, id: string, input: UserUpdateInput) => {
   const existing = await ensureUser(env, context, id);
   const nextEmail = input.email ?? existing.email;
+  const emailChanged = input.email !== undefined && input.email !== existing.email;
   if (nextEmail) await ensureUniqueEmail(env, context.companyId, nextEmail, id);
   if (input.status && disablingStatuses.has(input.status) && id === context.actorUserId) {
     throw new ConflictError("You cannot disable your own account.");
@@ -217,6 +218,10 @@ export const updateUser = async (env: Env, context: AuthActor, id: string, input
   }
   if (input.status && disablingStatuses.has(input.status)) {
     await usersRepository.revokeUserSessions(env, context.companyId, id);
+  }
+  if (emailChanged) {
+    await usersRepository.revokeUserSessions(env, context.companyId, id);
+    await audit(env, context, "user_email_updated", id, { email: existing.email }, { email: nextEmail });
   }
   const user = await getUser(env, context, id);
   await audit(env, context, "user_updated", id, existing, user);

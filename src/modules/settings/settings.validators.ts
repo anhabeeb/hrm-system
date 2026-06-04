@@ -69,6 +69,101 @@ const requireEffectiveDateForPayrollImpact = (
   }
 };
 
+const ALLOWED_SETTING_KEYS_BY_GROUP: Partial<Record<SettingsGroup, Set<string>>> = {
+  company: new Set(["company.basic", "company.profile"]),
+  attendance: new Set(["attendance.default_rules"]),
+  leave: new Set(["leave.default_rules", "long_leave.default_rules", "holiday.default_rules"]),
+  payroll: new Set(["payroll.default_rules", "payroll.earnings_toggles"]),
+  documents: new Set(["documents.default_rules", "documents.categories", "documents.foreign_employee_expected"]),
+  backup_recovery: new Set(["backup.default_rules"]),
+  notifications: new Set(["notifications.default_rules"]),
+  reports: new Set(["reports.default_rules"]),
+  import_export: new Set(["import_export.default_rules"]),
+  offline_sync: new Set(["sync.default_rules", "devices.default_rules", "biometric.default_rules", "realtime.default_rules"]),
+  audit_security: new Set(["security.default_rules"]),
+};
+
+const validateKnownSettingKeys = (
+  group: SettingsGroup,
+  settings: Record<string, Record<string, unknown>>,
+) => {
+  const allowed = ALLOWED_SETTING_KEYS_BY_GROUP[group];
+  if (!allowed) return;
+
+  const unknown = Object.keys(settings).find((key) => !allowed.has(key));
+  if (unknown) {
+    throw new ValidationError("Please choose a valid setting for this section.");
+  }
+};
+
+const assertNumberRange = (
+  value: unknown,
+  label: string,
+  min = 0,
+  max = 100_000,
+) => {
+  if (value === undefined || value === null || value === "") return;
+  if (typeof value !== "number" || !Number.isFinite(value) || value < min || value > max) {
+    throw new ValidationError(`${label} must be a valid number.`);
+  }
+};
+
+const assertBoolean = (value: unknown, label: string) => {
+  if (value === undefined || value === null) return;
+  if (typeof value !== "boolean") {
+    throw new ValidationError(`${label} must be enabled or disabled.`);
+  }
+};
+
+const validateTypedSettingValues = (
+  settings: Record<string, Record<string, unknown>>,
+) => {
+  const companyProfile = settings["company.profile"];
+  if (companyProfile?.company_email !== undefined && companyProfile.company_email !== "") {
+    const email = String(companyProfile.company_email).trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      throw new ValidationError("Please enter a valid company email.");
+    }
+    companyProfile.company_email = email;
+  }
+  const companyBasic = settings["company.basic"];
+  if (companyBasic?.currency !== undefined && !/^[A-Z]{3}$/.test(String(companyBasic.currency))) {
+    throw new ValidationError("Please enter a valid currency code.");
+  }
+  if (companyBasic?.timezone !== undefined) {
+    try {
+      Intl.DateTimeFormat(undefined, { timeZone: String(companyBasic.timezone) });
+    } catch {
+      throw new ValidationError("Please enter a valid timezone.");
+    }
+  }
+
+  for (const [settingKey, value] of Object.entries(settings)) {
+    for (const [fieldKey, fieldValue] of Object.entries(value)) {
+      if (fieldKey.endsWith("_enabled") || fieldKey.startsWith("allow_") || fieldKey.startsWith("require_") || fieldKey.startsWith("show_") || fieldKey.startsWith("deduct_")) {
+        assertBoolean(fieldValue, fieldKey.replaceAll("_", " "));
+      }
+      if (
+        fieldKey.endsWith("_minutes") ||
+        fieldKey.endsWith("_days") ||
+        fieldKey.endsWith("_count") ||
+        fieldKey.endsWith("_attempts") ||
+        fieldKey.endsWith("_size") ||
+        fieldKey.endsWith("_rows") ||
+        fieldKey.endsWith("_percentage") ||
+        fieldKey === "default_payroll_day" ||
+        fieldKey === "custom_salary_days"
+      ) {
+        assertNumberRange(fieldValue, fieldKey.replaceAll("_", " "));
+      }
+    }
+
+    if (settingKey === "payroll.default_rules" && value.salary_calculation_basis !== undefined && !["calendar_days", "fixed_30_days", "working_days", "custom_days"].includes(String(value.salary_calculation_basis))) {
+      throw new ValidationError("Please choose a valid salary calculation method.");
+    }
+  }
+};
+
 export const validateUpdateSettingsGroupInput = (
   group: SettingsGroup,
   payload: unknown,
@@ -92,6 +187,8 @@ export const validateUpdateSettingsGroupInput = (
   };
 
   requireEffectiveDateForPayrollImpact(group, input.effective_date);
+  validateKnownSettingKeys(group, input.settings);
+  validateTypedSettingValues(input.settings);
   validateUiPreferences(input.settings);
 
   return input;

@@ -79,6 +79,13 @@ export const findUser = (env: Env, companyId: string, userId: string) =>
     "SELECT id, full_name, email, phone, employee_id FROM users WHERE company_id = ? AND id = ? LIMIT 1",
     [companyId, userId],
   );
+
+export const findUserByEmail = (env: Env, companyId: string, email: string) =>
+  one<{ id: string; email: string | null }>(
+    env,
+    "SELECT id, email FROM users WHERE company_id = ? AND lower(email) = lower(?) AND deleted_at IS NULL LIMIT 1",
+    [companyId, email],
+  );
 export const findEmployee = (env: Env, companyId: string, employeeId: string) =>
   one<Record<string, unknown>>(
     env,
@@ -95,6 +102,13 @@ export const updateUserFields = (env: Env, companyId: string, userId: string, va
       updated_at = ?
      WHERE company_id = ? AND id = ?`,
     [values.full_name ?? null, values.email ?? null, values.phone ?? null, new Date().toISOString(), companyId, userId],
+  );
+
+export const revokeUserSessions = (env: Env, companyId: string, userId: string) =>
+  run(
+    env,
+    "UPDATE sessions SET revoked_at = ? WHERE company_id = ? AND user_id = ? AND revoked_at IS NULL",
+    [new Date().toISOString(), companyId, userId],
   );
 export const updateEmployeeFields = (env: Env, companyId: string, employeeId: string, values: Record<string, unknown>) =>
   run(

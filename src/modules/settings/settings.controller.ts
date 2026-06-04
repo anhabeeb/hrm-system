@@ -70,6 +70,32 @@ export const updateSettingsGroup = async (c: Context<AppContext>) => {
   );
 };
 
+export const getAliasedSettingsGroup =
+  (group: string) => async (c: Context<AppContext>) => {
+    const validatedGroup = validateSettingsGroup(group);
+    const data = await settingsService.getSettingsGroup(c.env, actor(c), validatedGroup);
+
+    return ok(
+      data,
+      data.settings.length === 0
+        ? "No settings found for this group yet."
+        : "Settings loaded successfully.",
+      { requestId: c.get("requestId") },
+    );
+  };
+
+export const updateAliasedSettingsGroup =
+  (group: string) => async (c: Context<AppContext>) => {
+    const validatedGroup = validateSettingsGroup(group);
+    const input = validateUpdateSettingsGroupInput(validatedGroup, await readJson(c));
+
+    return ok(
+      await settingsService.updateSettingsGroup(c.env, actor(c), validatedGroup, input),
+      "Settings updated successfully.",
+      { requestId: c.get("requestId") },
+    );
+  };
+
 export const listFeatures = async (c: Context<AppContext>) =>
   ok(await settingsService.listFeatures(c.env, actor(c)), "Features loaded successfully.", {
     requestId: c.get("requestId"),

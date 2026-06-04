@@ -9,9 +9,21 @@ import { KycUpdateForm } from "./KycUpdateForm";
 import { profileApi } from "./profile.api";
 import type { KycRequestRecord } from "./profile.types";
 
+const requestTypeLabels: Record<string, string> = {
+  name_update: "Name Update",
+  phone_update: "Phone Update",
+  email_update: "Email Update",
+  address_update: "Address Update",
+  emergency_contact_update: "Emergency Contact Update",
+  document_update: "Document Update",
+};
+
 const summarizeRequest = (request: KycRequestRecord) => {
   try {
     const parsed = JSON.parse(request.requested_value_json) as Record<string, unknown>;
+    if (request.request_type === "email_update" && typeof parsed.email === "string") {
+      return `Email: ${parsed.email}`;
+    }
     return Object.keys(parsed).filter((key) => parsed[key] !== undefined && parsed[key] !== "").join(", ") || "Profile update";
   } catch {
     return "Profile update";
@@ -38,7 +50,7 @@ export const KycUpdatePage = () => {
           <DataTable
             columns={[
               { key: "created_at", header: "Date", cell: (row) => formatDate(row.created_at) },
-              { key: "request_type", header: "Type" },
+              { key: "request_type", header: "Type", cell: (row) => requestTypeLabels[row.request_type] ?? row.request_type },
               { key: "requested_value_json", header: "Requested changes", cell: summarizeRequest },
               { key: "status", header: "Status", cell: (row) => <StatusBadge status={row.status} /> },
             ]}

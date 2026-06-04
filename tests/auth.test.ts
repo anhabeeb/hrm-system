@@ -11,6 +11,16 @@ const authRepoMock = vi.hoisted(() => {
     users: new Map<string, UserRecord>(),
     twoFactors: new Map<string, TwoFactorRecord>(),
     sessions: [] as unknown[],
+    kycRequests: [] as Array<{
+      id: string;
+      companyId: string;
+      userId: string;
+      employeeId: string | null;
+      requestType: string;
+      requestedValueJson: string;
+      oldValueJson?: string | null;
+      reason: string | null;
+    }>,
   };
 
   return {
@@ -18,6 +28,10 @@ const authRepoMock = vi.hoisted(() => {
     findUserByEmail: vi.fn(async (_env: Env, email: string) => {
       const normalized = email.toLowerCase();
       return [...state.users.values()].find((user) => user.email?.toLowerCase() === normalized) ?? null;
+    }),
+    findUserByEmailInCompany: vi.fn(async (_env: Env, companyId: string, email: string) => {
+      const normalized = email.toLowerCase();
+      return [...state.users.values()].find((user) => user.company_id === companyId && user.email?.toLowerCase() === normalized && !user.deleted_at) ?? null;
     }),
     findUserById: vi.fn(async (_env: Env, id: string) => state.users.get(id) ?? null),
     getUserRoles: vi.fn(async () => []),
@@ -103,7 +117,18 @@ const authRepoMock = vi.hoisted(() => {
     findSessionByTokenHash: vi.fn(),
     touchSession: vi.fn(),
     revokeSession: vi.fn(),
-    createKycRequest: vi.fn(),
+    createKycRequest: vi.fn(async (_env: Env, input: {
+      id: string;
+      companyId: string;
+      userId: string;
+      employeeId: string | null;
+      requestType: string;
+      requestedValueJson: string;
+      oldValueJson?: string | null;
+      reason: string | null;
+    }) => {
+      state.kycRequests.push(input);
+    }),
     listOwnKycRequests: vi.fn(),
     findOwnKycRequest: vi.fn(),
   };
@@ -155,6 +180,7 @@ beforeEach(async () => {
   authRepoMock.state.users.clear();
   authRepoMock.state.twoFactors.clear();
   authRepoMock.state.sessions.length = 0;
+  authRepoMock.state.kycRequests.length = 0;
   const user = await createTestUser();
   authRepoMock.state.users.set(user.id, user);
 });
@@ -233,6 +259,57 @@ describe("my profile KYC validation", () => {
         },
       }),
     ).toThrow(ValidationError);
+  });
+});
+
+describe("my profile email update requests", () => {
+  it("normalizes and stores email_update as a pending request without changing the login email", async () => {
+    const authService = await import("../src/modules/auth/auth.service");
+
+    const result = await authService.createKycRequest(
+      testEnv,
+      "user_2fa",
+      {
+        request_type: "email_update",
+        requested_value_json: { email: "NEW.EMAIL@Example.COM" },
+        reason: "Changing login email",
+      },
+      testRequest,
+    );
+
+    expect(result.response.status).toBe("pending");
+    expect(authRepoMock.state.users.get("user_2fa")?.email).toBe("twofactor@example.com");
+    expect(authRepoMock.state.kycRequests).toHaveLength(1);
+    expect(JSON.parse(authRepoMock.state.kycRequests[0]?.requestedValueJson ?? "{}")).toEqual({ email: "new.email@example.com" });
+    expect(JSON.parse(authRepoMock.state.kycRequests[0]?.oldValueJson ?? "{}")).toEqual({ email: "twofactor@example.com" });
+  });
+
+  it("rejects invalid, unchanged, and duplicate email_update requests", async () => {
+    const authService = await import("../src/modules/auth/auth.service");
+    const duplicateUser = await createTestUser();
+    authRepoMock.state.users.set("user_duplicate", {
+      ...duplicateUser,
+      id: "user_duplicate",
+      email: "taken@example.com",
+    });
+
+    await expect(authService.createKycRequest(testEnv, "user_2fa", {
+      request_type: "email_update",
+      requested_value_json: { email: "not-an-email" },
+      reason: "Testing",
+    }, testRequest)).rejects.toMatchObject({ code: "INVALID_EMAIL" });
+
+    await expect(authService.createKycRequest(testEnv, "user_2fa", {
+      request_type: "email_update",
+      requested_value_json: { email: "twofactor@example.com" },
+      reason: "Testing",
+    }, testRequest)).rejects.toMatchObject({ code: "EMAIL_UNCHANGED" });
+
+    await expect(authService.createKycRequest(testEnv, "user_2fa", {
+      request_type: "email_update",
+      requested_value_json: { email: "taken@example.com" },
+      reason: "Testing",
+    }, testRequest)).rejects.toMatchObject({ code: "DUPLICATE_USER_EMAIL" });
   });
 });
 

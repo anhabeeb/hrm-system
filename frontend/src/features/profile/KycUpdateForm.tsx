@@ -10,6 +10,7 @@ import { LoadingButton } from "@/components/forms/LoadingButton";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/features/auth/auth.store";
 import { ApiError } from "@/lib/api-errors";
 
 import { profileApi } from "./profile.api";
@@ -20,6 +21,8 @@ type KycValues = z.infer<typeof kycUpdateSchema>;
 const defaults: KycValues = {
   full_name: "",
   phone: "",
+  new_email: "",
+  confirm_new_email: "",
   address: "",
   emergency_contact: "",
   document_note: "",
@@ -27,6 +30,7 @@ const defaults: KycValues = {
 };
 
 const resolveRequestType = (values: KycValues) => {
+  if (values.new_email?.trim()) return "email_update";
   if (values.full_name?.trim()) return "name_update";
   if (values.phone?.trim()) return "phone_update";
   if (values.address?.trim()) return "address_update";
@@ -35,6 +39,7 @@ const resolveRequestType = (values: KycValues) => {
 };
 
 export const KycUpdateForm = () => {
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<{ message: string; requestId?: string } | null>(null);
@@ -44,9 +49,16 @@ export const KycUpdateForm = () => {
     setSuccess(false);
     setError(null);
     try {
+      const nextEmail = values.new_email?.trim().toLowerCase();
+      if (nextEmail && nextEmail === user?.email?.trim().toLowerCase()) {
+        setError({ message: "The new email must be different from your current email." });
+        return;
+      }
+      const requestType = resolveRequestType(values);
       await profileApi.createKycRequest({
-        request_type: resolveRequestType(values),
+        request_type: requestType,
         requested_value_json: {
+          email: requestType === "email_update" ? nextEmail : undefined,
           full_name: values.full_name || undefined,
           phone: values.phone || undefined,
           address: values.address || undefined,
@@ -72,6 +84,33 @@ export const KycUpdateForm = () => {
         <InlineAlert title="Official fields are read-only" variant="info">
           Profile changes are reviewed through KYC/update requests. Role, permission, outlet, salary, payroll, and attendance changes cannot be requested here.
         </InlineAlert>
+        <div className="rounded-lg border bg-muted/20 p-4">
+          <h3 className="text-sm font-semibold">Email Update</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Request a reviewed change to your login email.</p>
+          <InlineAlert title="Login email change" variant="warning">
+            If approved, this will change the user's login email.
+          </InlineAlert>
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
+            <div className="space-y-1 text-sm">
+              <span className="font-medium">Current email</span>
+              <Input value={user?.email ?? "Not available"} readOnly aria-readonly />
+            </div>
+            <FormField control={form.control} name="new_email" render={({ field }) => (
+              <FormItem>
+                <FormLabel>New email</FormLabel>
+                <FormControl><Input type="email" autoComplete="email" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="confirm_new_email" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Confirm new email</FormLabel>
+                <FormControl><Input type="email" autoComplete="email" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+          </div>
+        </div>
         <div className="grid gap-4 md:grid-cols-2">
           <FormField control={form.control} name="full_name" render={({ field }) => (
             <FormItem>

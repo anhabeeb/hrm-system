@@ -78,6 +78,46 @@ settingsRoutes.patch(
   settingsController.updateApprovalThreshold,
 );
 
+const aliasGroupRoutes = (
+  path: string,
+  group:
+    | "company"
+    | "audit_security"
+    | "attendance"
+    | "leave"
+    | "payroll"
+    | "documents"
+    | "backup_recovery"
+    | "notifications"
+    | "reports"
+    | "import_export"
+    | "offline_sync",
+) => {
+  settingsRoutes.get(
+    path,
+    requireSettingsAccess({ mode: "view", group }),
+    settingsController.getAliasedSettingsGroup(group),
+  );
+  settingsRoutes.patch(
+    path,
+    requireSettingsAccess({ mode: "manage", group }),
+    requireReason(),
+    settingsController.updateAliasedSettingsGroup(group),
+  );
+};
+
+aliasGroupRoutes("/company", "company");
+aliasGroupRoutes("/security", "audit_security");
+aliasGroupRoutes("/attendance", "attendance");
+aliasGroupRoutes("/leave", "leave");
+aliasGroupRoutes("/payroll", "payroll");
+aliasGroupRoutes("/documents", "documents");
+aliasGroupRoutes("/backup", "backup_recovery");
+aliasGroupRoutes("/notifications", "notifications");
+aliasGroupRoutes("/reports", "reports");
+aliasGroupRoutes("/import-export", "import_export");
+aliasGroupRoutes("/devices-sync", "offline_sync");
+
 settingsRoutes.get(
   "/change-log",
   requireSettingsAccess({

@@ -37,6 +37,13 @@ export const findUserByEmail = (env: Env, email: string): Promise<UserRecord | n
     [email],
   );
 
+export const findUserByEmailInCompany = (env: Env, companyId: string, email: string): Promise<UserRecord | null> =>
+  queryOne<UserRecord>(
+    env,
+    "SELECT * FROM users WHERE company_id = ? AND lower(email) = lower(?) AND deleted_at IS NULL LIMIT 1",
+    [companyId, email],
+  );
+
 export const findUserById = (env: Env, id: string): Promise<UserRecord | null> =>
   queryOne<UserRecord>(env, "SELECT * FROM users WHERE id = ? LIMIT 1", [id]);
 
@@ -335,6 +342,7 @@ export const createKycRequest = (
     employeeId: string | null;
     requestType: string;
     requestedValueJson: string;
+    oldValueJson?: string | null;
     reason: string | null;
   },
 ) =>
@@ -344,13 +352,14 @@ export const createKycRequest = (
       id, company_id, user_id, employee_id, request_type, old_value_json,
       requested_value_json, reason, status, reviewed_by, reviewed_at,
       review_notes, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, NULL, ?, ?, 'pending', NULL, NULL, NULL, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', NULL, NULL, NULL, ?, ?)`,
     [
       input.id,
       input.companyId,
       input.userId,
       input.employeeId,
       input.requestType,
+      input.oldValueJson ?? null,
       input.requestedValueJson,
       input.reason,
       new Date().toISOString(),

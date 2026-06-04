@@ -1,50 +1,56 @@
-import { SlidersHorizontal } from "lucide-react";
+import { Link } from "react-router-dom";
+import {
+  Bell,
+  Building2,
+  CalendarClock,
+  Clock3,
+  DatabaseBackup,
+  FileText,
+  Landmark,
+  ShieldCheck,
+  TabletSmartphone,
+  UploadCloud,
+  BarChart3,
+} from "lucide-react";
 
 import { PageHeader } from "@/components/layout/PageHeader";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ApprovalSettingsPanel } from "./ApprovalSettingsPanel";
-import { AttendanceSettingsPanel } from "./AttendanceSettingsPanel";
-import { BackupSettingsPanel } from "./BackupSettingsPanel";
-import { CompanySettingsPanel } from "./CompanySettingsPanel";
-import { DocumentSettingsPanel } from "./DocumentSettingsPanel";
-import { FeatureSettingsPanel } from "./FeatureSettingsPanel";
-import { LeaveSettingsPanel } from "./LeaveSettingsPanel";
-import { PayrollSettingsPanel } from "./PayrollSettingsPanel";
-import { SettingSection } from "./SettingSection";
+import { Button } from "@/components/ui/button";
+
+const settingsLinks = [
+  { title: "Company Information", description: "Company identity, contact, address, timezone, currency, and logo URL.", path: "/settings/company", icon: Building2 },
+  { title: "Security", description: "Password, 2FA, session, login protection, and reset policies.", path: "/settings/security", icon: ShieldCheck },
+  { title: "Attendance", description: "Manual attendance, corrections, kiosk, biometric, overtime, and lock controls.", path: "/settings/attendance", icon: Clock3 },
+  { title: "Leave", description: "Leave policies, leave types, statutory templates, and long leave rules.", path: "/settings/leave", icon: CalendarClock },
+  { title: "Payroll", description: "Payroll cycle, salary calculation, loans, approval, lock, and payslip settings.", path: "/settings/payroll", icon: Landmark },
+  { title: "Documents", description: "Document module, expiry warnings, categories, and foreign employee expected documents.", path: "/settings/documents", icon: FileText },
+  { title: "Backup & Recovery", description: "Backup frequency, retention, restore approval, and health status.", path: "/settings/backup", icon: DatabaseBackup },
+  { title: "Notifications", description: "System notifications and planned email notification controls.", path: "/settings/notifications", icon: Bell },
+  { title: "Reports", description: "Export formats, masking, date range defaults, and report access controls.", path: "/settings/reports", icon: BarChart3 },
+  { title: "Import / Export", description: "Import/export enablement, approval requirements, row limits, and duplicate behavior.", path: "/settings/import-export", icon: UploadCloud },
+  { title: "Devices & Sync", description: "Kiosk, biometric, local bridge, offline sync, batch, retry, and realtime controls.", path: "/settings/devices-sync", icon: TabletSmartphone },
+];
 
 export const SettingsPage = () => (
   <div>
-    <PageHeader title="Settings" description="Company configuration and module settings foundation" />
-    <div className="space-y-4 p-4 md:p-6">
-      <div className="rounded-lg border bg-card p-4 shadow-sm">
-        <div className="flex items-start gap-3">
-          <SlidersHorizontal className="mt-1 h-5 w-5 text-primary" />
-          <div>
-            <h2 className="text-base font-semibold">Settings Foundation</h2>
-            <p className="text-sm text-muted-foreground">Light-only, sectioned settings UI. No dark mode or theme switching settings are exposed.</p>
+    <PageHeader title="Settings" description="Structured company administration settings. Use each section to update validated settings with a reason and audit history." />
+    <div className="grid gap-4 p-4 md:grid-cols-2 md:p-6 xl:grid-cols-3">
+      {settingsLinks.map((item) => {
+        const Icon = item.icon;
+        return (
+          <div key={item.path} className="rounded-lg border bg-card p-4 shadow-sm">
+            <div className="flex items-start gap-3">
+              <Icon className="mt-1 h-5 w-5 text-primary" />
+              <div>
+                <h2 className="text-base font-semibold">{item.title}</h2>
+                <p className="mt-1 text-sm text-muted-foreground">{item.description}</p>
+                <Button asChild variant="outline" size="sm" className="mt-4">
+                  <Link to={item.path}>Open settings</Link>
+                </Button>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-      <Tabs defaultValue="company" className="space-y-4">
-        <TabsList className="flex h-auto flex-wrap justify-start">
-          <TabsTrigger value="company">Company</TabsTrigger>
-          <TabsTrigger value="features">Features</TabsTrigger>
-          <TabsTrigger value="attendance">Attendance</TabsTrigger>
-          <TabsTrigger value="leave">Leave</TabsTrigger>
-          <TabsTrigger value="payroll">Payroll</TabsTrigger>
-          <TabsTrigger value="approvals">Approvals</TabsTrigger>
-          <TabsTrigger value="documents">Documents</TabsTrigger>
-          <TabsTrigger value="backup">Backup</TabsTrigger>
-        </TabsList>
-        <TabsContent value="company"><SettingSection title="Company Settings" description="Company-level settings returned by the backend."><CompanySettingsPanel /></SettingSection></TabsContent>
-        <TabsContent value="features"><SettingSection title="Feature Settings" description="Feature flags are managed through the real settings feature endpoints."><FeatureSettingsPanel /></SettingSection></TabsContent>
-        <TabsContent value="attendance"><SettingSection title="Attendance Settings"><AttendanceSettingsPanel /></SettingSection></TabsContent>
-        <TabsContent value="leave"><SettingSection title="Leave Settings"><LeaveSettingsPanel /></SettingSection></TabsContent>
-        <TabsContent value="payroll"><SettingSection title="Payroll Settings"><PayrollSettingsPanel /></SettingSection></TabsContent>
-        <TabsContent value="approvals"><SettingSection title="Approval Settings"><ApprovalSettingsPanel /></SettingSection></TabsContent>
-        <TabsContent value="documents"><SettingSection title="Document Settings"><DocumentSettingsPanel /></SettingSection></TabsContent>
-        <TabsContent value="backup"><SettingSection title="Backup Settings"><BackupSettingsPanel /></SettingSection></TabsContent>
-      </Tabs>
+        );
+      })}
     </div>
   </div>
 );

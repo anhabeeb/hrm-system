@@ -332,6 +332,15 @@ describe("Users & Access API routes", () => {
     });
   });
 
+  it("Super Admin can view protected user routes even when specific permission seeds are missing", async () => {
+    const response = await request("/api/v1/users", { headers: authHeaders }, createEnv({ authUserId: "user_super_only" }));
+    const body = await response.json() as { success: boolean; data: Array<Record<string, unknown>> };
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.data.length).toBeGreaterThan(0);
+  });
+
   it("GET /api/v1/users never returns password_hash or auth secrets", async () => {
     const response = await request("/api/v1/users", { headers: authHeaders });
     const text = await response.text();
