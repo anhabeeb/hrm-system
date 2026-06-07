@@ -8,7 +8,7 @@ It is intentionally structured for long-term growth so future prompts can add HR
 
 This prompt sets up:
 
-- A Cloudflare Worker API in TypeScript
+- A Cloudflare Worker API in TypeScript 
 - Cloudflare D1, R2, and Durable Object bindings
 - A versioned API base at `/api/v1`
 - A health check route at `GET /api/v1/health`
