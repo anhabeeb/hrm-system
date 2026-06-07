@@ -1,7 +1,19 @@
 import type { Pagination } from "@/types/api";
 
 export type EmployeeType = "local" | "foreign";
-export type EmploymentStatus = "active" | "on_leave" | "long_leave" | "suspended" | "resigned" | "terminated" | "archived";
+export type EmploymentStatus =
+  | "active"
+  | "probation"
+  | "confirmed"
+  | "on_leave"
+  | "long_leave"
+  | "suspended"
+  | "resigned"
+  | "terminated"
+  | "retired"
+  | "inactive"
+  | "rehired"
+  | "archived";
 
 export interface Employee {
   id: string;
@@ -69,17 +81,238 @@ export interface EmployeePayload {
 
 export type EmployeeUpdatePayload = Partial<Omit<EmployeePayload, "primary_outlet_id" | "employment_status" | "starting_salary">>;
 
+export interface EmployeeStatusHistoryRow {
+  id: string;
+  employee_id?: string;
+  old_status?: EmploymentStatus | string | null;
+  new_status: EmploymentStatus | string;
+  effective_from?: string | null;
+  effective_to?: string | null;
+  reason?: string | null;
+  notes?: string | null;
+  approval_request_id?: string | null;
+  approved_by?: string | null;
+  created_by?: string | null;
+  created_by_name?: string | null;
+  changed_by?: string | null;
+  changed_by_name?: string | null;
+  changed_at?: string | null;
+  created_at?: string;
+}
+
+export interface EmployeeStatusChangePayload {
+  new_status: EmploymentStatus;
+  effective_from: string;
+  reason: string;
+  notes?: string | null;
+  disable_user_access?: boolean;
+  revoke_active_sessions?: boolean;
+  override_invalid_transition?: boolean;
+  override_reason?: string | null;
+  target_active_status?: "active" | "probation" | "confirmed";
+}
+
 export interface EmployeeDetailResponse {
   employee: Employee;
 }
 
 export interface EmployeeSalaryRow {
   id: string;
+  employee_id?: string;
   monthly_salary_amount: number;
   currency?: string | null;
   effective_from?: string | null;
+  effective_to?: string | null;
+  change_type?: "starting_salary" | "increment" | "promotion" | "correction" | "contract_change" | "other" | string | null;
+  reason?: string | null;
+  created_by?: string | null;
+  created_by_name?: string | null;
+  created_at?: string;
+  updated_at?: string | null;
+}
+
+export interface EmployeeSalaryChangePayload {
+  monthly_salary_amount: number;
+  currency: string;
+  effective_from: string;
+  change_type: "starting_salary" | "increment" | "promotion" | "correction" | "contract_change" | "other";
+  reason: string;
+}
+
+export interface EmployeeApprovalRequestSummary {
+  id: string | null;
+  type: string;
+  status: string;
+  employee_id: string;
+  effective_from: string;
+}
+
+export interface EmployeeApprovalResponse {
+  approval_required: true;
+  approval_request_id: string | null;
+  approval_request: EmployeeApprovalRequestSummary;
+  existing_approval_request?: boolean;
+}
+
+export type EmployeeJobChangeType =
+  | "promotion"
+  | "transfer"
+  | "department_change"
+  | "position_change"
+  | "outlet_change"
+  | "correction"
+  | "other";
+
+export interface EmployeeJobHistoryRow {
+  id: string;
+  employee_id?: string;
+  change_type: EmployeeJobChangeType | string;
+  effective_from: string;
+  effective_to?: string | null;
+  old_outlet_id?: string | null;
+  new_outlet_id?: string | null;
+  old_outlet_name?: string | null;
+  new_outlet_name?: string | null;
+  old_department_id?: string | null;
+  new_department_id?: string | null;
+  old_department_name?: string | null;
+  new_department_name?: string | null;
+  old_position_id?: string | null;
+  new_position_id?: string | null;
+  old_position_title?: string | null;
+  new_position_title?: string | null;
+  reason?: string | null;
+  created_by?: string | null;
+  created_by_name?: string | null;
   created_at?: string;
 }
+
+export interface EmployeeJobChangePayload {
+  change_type: EmployeeJobChangeType;
+  effective_from: string;
+  new_outlet_id?: string | null;
+  new_department_id?: string | null;
+  new_position_id?: string | null;
+  reason: string;
+  salary_change?: {
+    enabled: boolean;
+    monthly_salary_amount?: number;
+    currency?: string;
+    change_type?: EmployeeSalaryChangePayload["change_type"];
+    reason?: string;
+  };
+}
+
+export type EmployeeJobChangeResponse =
+  | { employee: Employee; job_change: EmployeeJobHistoryRow; salary_change: EmployeeSalaryRow | null }
+  | EmployeeApprovalResponse;
+
+export type EmployeeSalaryChangeResponse =
+  | { salary_record_id: string; closed_previous_salary_id?: string | null; salary?: EmployeeSalaryRow }
+  | EmployeeApprovalResponse;
+
+export type CompensationComponentType = "allowance" | "benefit" | "deduction";
+export type CompensationCalculationType = "fixed_amount" | "percentage_of_basic_salary" | "non_cash_benefit";
+export type CompensationComponentStatus = "active" | "scheduled" | "ended" | "cancelled" | "pending_approval";
+
+export interface EmployeeCompensationComponent {
+  id: string;
+  employee_id: string;
+  component_definition_id?: string | null;
+  component_type: CompensationComponentType;
+  component_code?: string | null;
+  component_name: string;
+  category?: string | null;
+  amount: number;
+  currency?: string | null;
+  calculation_type: CompensationCalculationType;
+  affects_gross_pay?: number | boolean | null;
+  affects_net_pay?: number | boolean | null;
+  effective_from: string;
+  effective_to?: string | null;
+  status: CompensationComponentStatus | string;
+  effective_status?: CompensationComponentStatus | string;
+  reason?: string | null;
+  notes?: string | null;
+  created_by?: string | null;
+  created_by_name?: string | null;
+  created_at?: string;
+  calculated_amount?: number;
+  cash_payroll_component?: boolean;
+}
+
+export interface CompensationComponentDefinition {
+  id: string;
+  component_type: CompensationComponentType;
+  component_code: string;
+  component_name: string;
+  category?: string | null;
+  default_amount?: number | null;
+  currency?: string | null;
+  calculation_type: CompensationCalculationType;
+  affects_gross_pay?: number | boolean | null;
+  affects_net_pay?: number | boolean | null;
+  status: "active" | "inactive" | string;
+  description?: string | null;
+}
+
+export interface CompensationComponentDefinitionPayload {
+  component_type: CompensationComponentType;
+  component_code: string;
+  component_name: string;
+  category?: string | null;
+  default_amount: number;
+  amount: number;
+  currency: string;
+  calculation_type: CompensationCalculationType;
+  affects_gross_pay: boolean;
+  affects_net_pay: boolean;
+  description?: string | null;
+  reason: string;
+}
+
+export interface EmployeeCompensationSummary {
+  employee_id: string;
+  currency: string;
+  basic_salary: number;
+  recurring_gross_additions: number;
+  recurring_gross_deductions: number;
+  recurring_net_additions: number;
+  recurring_net_deductions: number;
+  recurring_cash_allowances: number;
+  recurring_cash_benefits: number;
+  recurring_cash_deductions: number;
+  non_cash_benefits: number;
+  estimated_recurring_gross_pay: number;
+  estimated_recurring_net_before_variable_items: number;
+  components: EmployeeCompensationComponent[];
+  note?: string;
+}
+
+export interface EmployeeCompensationComponentPayload {
+  component_definition_id?: string | null;
+  component_type: CompensationComponentType;
+  component_code?: string | null;
+  component_name: string;
+  category?: string | null;
+  amount: number;
+  currency: string;
+  calculation_type: CompensationCalculationType;
+  affects_gross_pay: boolean;
+  affects_net_pay: boolean;
+  effective_from: string;
+  reason: string;
+  notes?: string | null;
+}
+
+export interface EmployeeCompensationComponentEndPayload {
+  effective_to: string;
+  reason: string;
+}
+
+export type EmployeeCompensationComponentMutationResponse =
+  | { component: EmployeeCompensationComponent; closed_previous_component_id?: string | null }
+  | EmployeeApprovalResponse;
 
 export interface EmployeeDocumentRow {
   id: string;

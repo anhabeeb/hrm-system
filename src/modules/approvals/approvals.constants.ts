@@ -1,8 +1,20 @@
 export const DEFAULT_PAGE_SIZE = 25;
 export const MAX_PAGE_SIZE = 100;
 
-export const APPROVAL_STATUSES = ["pending", "in_progress", "approved", "rejected", "returned", "returned_for_more_info", "cancelled"] as const;
-export const TERMINAL_APPROVAL_STATUSES = ["approved", "rejected", "returned", "returned_for_more_info", "cancelled"] as const;
+export const APPROVAL_STATUSES = [
+  "pending",
+  "in_progress",
+  "applying",
+  "applied",
+  "approved",
+  "rejected",
+  "returned",
+  "returned_for_more_info",
+  "cancelled",
+  "failed",
+  "expired",
+] as const;
+export const TERMINAL_APPROVAL_STATUSES = ["applied", "approved", "rejected", "cancelled", "expired"] as const;
 export const APPROVAL_ACTIONS = ["approve", "reject", "return", "override"] as const;
 export const APPROVAL_MODES = ["disabled", "manual", "auto_admin_superadmin", "full_workflow"] as const;
 

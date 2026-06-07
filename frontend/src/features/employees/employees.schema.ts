@@ -7,7 +7,7 @@ const employeeBaseSchema = z.object({
   primary_outlet_id: z.string().trim().min(1, "Primary outlet is required."),
   department_id: z.string().trim().nullable().optional(),
   position_id: z.string().trim().nullable().optional(),
-  employment_status: z.enum(["active", "on_leave", "long_leave", "suspended", "resigned", "terminated", "archived"]),
+  employment_status: z.enum(["active", "probation", "confirmed", "on_leave", "long_leave", "suspended", "resigned", "terminated", "retired", "inactive", "rehired", "archived"]),
   joined_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Please enter a valid joined date.").nullable().optional(),
   nationality: z.string().trim().nullable().optional(),
   id_card_number: z.string().trim().nullable().optional(),

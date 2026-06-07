@@ -1,14 +1,32 @@
 import { api } from "@/lib/api-client";
 import { buildQueryString } from "@/lib/query-string";
 import type { DocumentUpdatePayload, DocumentUploadPayload } from "@/features/documents/documents.types";
-import type { Employee, EmployeeDetailResponse, EmployeeDocumentCompliance, EmployeeDocumentRow, EmployeeFilters, EmployeeNoteRow, EmployeePayload, EmployeeSalaryRow, EmployeeUpdatePayload } from "./employees.types";
+import type { CompensationComponentDefinition, CompensationComponentDefinitionPayload, Employee, EmployeeCompensationComponent, EmployeeCompensationComponentEndPayload, EmployeeCompensationComponentMutationResponse, EmployeeCompensationComponentPayload, EmployeeCompensationSummary, EmployeeDetailResponse, EmployeeDocumentCompliance, EmployeeDocumentRow, EmployeeFilters, EmployeeJobChangePayload, EmployeeJobChangeResponse, EmployeeJobHistoryRow, EmployeeNoteRow, EmployeePayload, EmployeeSalaryChangePayload, EmployeeSalaryChangeResponse, EmployeeSalaryRow, EmployeeStatusChangePayload, EmployeeStatusHistoryRow, EmployeeUpdatePayload } from "./employees.types";
 
 export const employeesApi = {
   list: (filters: EmployeeFilters) => api.get<Employee[]>(`/employees${buildQueryString(filters)}`),
   get: (id: string) => api.get<EmployeeDetailResponse>(`/employees/${id}`),
   create: (payload: EmployeePayload) => api.post<{ employee: Employee } | { id: string }>("/employees", payload),
   update: (id: string, payload: EmployeeUpdatePayload) => api.patch<{ employee: Employee } | { updated: boolean }>(`/employees/${id}`, payload),
+  statusHistory: (id: string) => api.get<{ history: EmployeeStatusHistoryRow[] }>(`/employees/${id}/status-history`),
+  changeStatus: (id: string, payload: EmployeeStatusChangePayload) =>
+    api.post<{ employee: Employee; status_history: EmployeeStatusHistoryRow | null; updated: boolean; scheduled?: boolean }>(`/employees/${id}/status-change`, payload),
+  jobHistory: (id: string) => api.get<{ history: EmployeeJobHistoryRow[] }>(`/employees/${id}/job-history`),
+  createJobChange: (id: string, payload: EmployeeJobChangePayload) =>
+    api.post<EmployeeJobChangeResponse>(`/employees/${id}/job-change`, payload),
   salaryHistory: (id: string) => api.get<{ history: EmployeeSalaryRow[] }>(`/employees/${id}/salary-history`),
+  addSalaryHistory: (id: string, payload: EmployeeSalaryChangePayload) =>
+    api.post<EmployeeSalaryChangeResponse>(`/employees/${id}/salary-history`, payload),
+  compensationSummary: (id: string) =>
+    api.get<{ summary: EmployeeCompensationSummary }>(`/employees/${id}/compensation-summary`),
+  compensationComponents: (id: string) =>
+    api.get<{ components: EmployeeCompensationComponent[] }>(`/employees/${id}/compensation-components`),
+  addCompensationComponent: (id: string, payload: EmployeeCompensationComponentPayload) =>
+    api.post<EmployeeCompensationComponentMutationResponse>(`/employees/${id}/compensation-components`, payload),
+  changeCompensationComponent: (id: string, componentId: string, payload: EmployeeCompensationComponentPayload) =>
+    api.patch<EmployeeCompensationComponentMutationResponse>(`/employees/${id}/compensation-components/${componentId}`, payload),
+  endCompensationComponent: (id: string, componentId: string, payload: EmployeeCompensationComponentEndPayload) =>
+    api.post<EmployeeCompensationComponentMutationResponse>(`/employees/${id}/compensation-components/${componentId}/end`, payload),
   documents: (id: string) => api.get<{ documents: EmployeeDocumentRow[]; compliance?: EmployeeDocumentCompliance }>(`/employees/${id}/documents`),
   document: (employeeId: string, documentId: string) => api.get<{ document: EmployeeDocumentRow }>(`/employees/${employeeId}/documents/${documentId}`),
   uploadDocument: (employeeId: string, payload: Omit<DocumentUploadPayload, "employee_id">) => api.post<{ document: EmployeeDocumentRow }>(`/employees/${employeeId}/documents`, payload),
@@ -17,4 +35,17 @@ export const employeesApi = {
   archiveDocument: (employeeId: string, documentId: string, reason: string) => api.post<{ document: EmployeeDocumentRow }>(`/employees/${employeeId}/documents/${documentId}/archive`, { reason }),
   documentHistory: (employeeId: string, documentId: string) => api.get<{ history: EmployeeDocumentRow[] }>(`/employees/${employeeId}/documents/${documentId}/history`),
   notes: (id: string) => api.get<{ notes: EmployeeNoteRow[] }>(`/employees/${id}/notes`),
+};
+
+export const compensationDefinitionsApi = {
+  list: (filters: { search?: string; component_type?: string; status?: string; page?: number; page_size?: number } = {}) =>
+    api.get<CompensationComponentDefinition[]>(`/compensation-component-definitions${buildQueryString(filters)}`),
+  create: (payload: CompensationComponentDefinitionPayload) =>
+    api.post<{ definition: CompensationComponentDefinition }>("/compensation-component-definitions", payload),
+  update: (id: string, payload: CompensationComponentDefinitionPayload) =>
+    api.patch<{ definition: CompensationComponentDefinition }>(`/compensation-component-definitions/${id}`, payload),
+  enable: (id: string, reason: string) =>
+    api.post<{ definition: CompensationComponentDefinition }>(`/compensation-component-definitions/${id}/enable`, { reason }),
+  disable: (id: string, reason: string) =>
+    api.post<{ definition: CompensationComponentDefinition }>(`/compensation-component-definitions/${id}/disable`, { reason }),
 };

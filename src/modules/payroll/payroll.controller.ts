@@ -61,6 +61,9 @@ export const calculate = async (c: Context<AppContext>) =>
 export const recalculate = async (c: Context<AppContext>) =>
   ok(await service.recalculatePayroll(c.env, actor(c), id(c), validatePayrollAction(await body(c))), "Payroll recalculated successfully.", { requestId: c.get("requestId") });
 
+export const previewCalculation = async (c: Context<AppContext>) =>
+  ok(await service.previewPayrollCalculation(c.env, actor(c), id(c)), "Payroll calculation preview loaded successfully.", { requestId: c.get("requestId") });
+
 export const listItems = async (c: Context<AppContext>) => {
   const result = await service.listItems(c.env, actor(c), id(c), validateItemFilters(query(c)));
   return paginated(result.rows, result.pagination, "Payroll items loaded successfully.", { requestId: c.get("requestId") });
@@ -88,6 +91,9 @@ export const reject = async (c: Context<AppContext>) =>
 
 export const lock = async (c: Context<AppContext>) =>
   ok(await service.lockPayroll(c.env, actor(c), id(c), validatePayrollAction(await body(c))), "Payroll locked successfully.", { requestId: c.get("requestId") });
+
+export const finalize = async (c: Context<AppContext>) =>
+  ok(await service.finalizePayroll(c.env, actor(c), id(c), validatePayrollAction(await body(c))), "Payroll finalized successfully.", { requestId: c.get("requestId") });
 
 export const requestReopen = async (c: Context<AppContext>) =>
   ok(await service.requestReopen(c.env, actor(c), id(c), validatePayrollAction(await body(c))), "Payroll reopen requested.", { requestId: c.get("requestId") });

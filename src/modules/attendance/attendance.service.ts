@@ -98,9 +98,9 @@ const assertPayrollUnlocked = async (
     companyId,
     attendanceDate.slice(0, 7),
   );
-  if (run?.status === "locked" || run?.status === "paid") {
+  if (["finalizing", "finalized", "locked", "paid"].includes(run?.status ?? "")) {
     throw new LockedRecordError(
-      "This attendance period is locked because payroll is locked.",
+      "This attendance period is locked because payroll has been finalized.",
     );
   }
 };
@@ -112,9 +112,9 @@ export const assertPayrollMonthsUnlocked = async (
 ) => {
   for (const month of new Set([...months].filter(Boolean) as string[])) {
     const run = await repository.findPayrollRunForMonth(env, companyId, month);
-    if (run?.status === "locked" || run?.status === "paid") {
+    if (["finalizing", "finalized", "locked", "paid"].includes(run?.status ?? "")) {
       throw new LockedRecordError(
-        "This attendance period is locked because payroll is locked.",
+        "This attendance period is locked because payroll has been finalized.",
       );
     }
   }
@@ -125,7 +125,7 @@ const ensureEmployee = async (env: Env, companyId: string, employeeId: string) =
   if (!employee || employee.deleted_at) {
     throw new NotFoundError("The requested employee could not be found.");
   }
-  if (["archived", "resigned", "terminated"].includes(employee.employment_status)) {
+  if (["archived", "resigned", "terminated", "retired", "inactive"].includes(employee.employment_status)) {
     throw new ValidationError("This employee is not active for attendance.");
   }
   return employee;
@@ -260,10 +260,9 @@ const directSummaryUpdate = async (
     break_minutes: 0,
     overtime_minutes: 0,
     status: input.status,
-    payroll_status:
-      payrollRun?.status === "locked" || payrollRun?.status === "paid"
-        ? "locked"
-        : "pending",
+    payroll_status: ["finalizing", "finalized", "locked", "paid"].includes(payrollRun?.status ?? "")
+      ? "locked"
+      : "pending",
   });
 };
 

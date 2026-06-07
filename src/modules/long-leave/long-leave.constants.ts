@@ -18,6 +18,6 @@ export const LONG_LEAVE_AUDIT_ACTIONS = {
 
 export const DEFAULT_LONG_LEAVE_TRIGGER_DAYS = 30;
 export const DEFAULT_SALARY_CALCULATION_DAYS = 30;
-export const LOCKED_PAYROLL_STATUSES = ["locked", "paid"] as const;
+export const LOCKED_PAYROLL_STATUSES = ["finalizing", "finalized", "locked", "paid"] as const;
 export const DEFAULT_PAGE_SIZE = 25;
 export const MAX_PAGE_SIZE = 100;

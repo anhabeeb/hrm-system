@@ -7,7 +7,7 @@ import { AppError, NotFoundError, OutletAccessError, PermissionError, ReasonRequ
 
 import { assertApprovalIsActionable, assertNotSelfApproval } from "./approval-action.service";
 import { getApprovalDirectDecision } from "./approval-direct.service";
-import { applyApprovedTargetChange, applyRejectedTargetChange } from "./approval-integration.service";
+import { applyApprovedTargetChange, applyRejectedTargetChange, findAppliedTargetChange } from "./approval-integration.service";
 import { canActorApproveStep, findNextRequiredStep } from "./approval-step.service";
 import * as thresholdService from "./approval-threshold.service";
 import * as workflowService from "./approval-workflow.service";
@@ -25,6 +25,7 @@ import type {
   WorkflowInput,
   WorkflowUpdateInput,
 } from "./approvals.types";
+import { TERMINAL_APPROVAL_STATUSES } from "./approvals.constants";
 
 const buildScope = (context: AuthActor): ApprovalOutletScope => ({
   isSuperAdmin: permissionService.isSuperAdmin(context),
@@ -86,8 +87,24 @@ const thresholdList = (value: unknown): string[] => {
 const requestToResponse = async (env: Env, context: AuthActor, request: any) => {
   const step = await repository.findStep(env, context.companyId, request.workflow_id, Number(request.current_step ?? 1));
   const threshold = thresholdFromPayload(request.payload_json);
-  const actionable = !["approved", "rejected", "returned", "returned_for_more_info", "cancelled"].includes(request.status);
+  const salarySettings = await settingsService.getSalaryApprovalSettings(env, context.companyId);
+  const terminal = (TERMINAL_APPROVAL_STATUSES as readonly string[]).includes(request.status);
+  const normalActionable = !terminal && !["applying", "failed"].includes(request.status);
   const assigned = canActorApproveStep(context, step, threshold);
+  const isRequester = request.requested_by === context.actorUserId;
+  const selfApprovalAllowed = !isRequester || salarySettings.allow_requester_self_approval;
+  const applyingRetryReady = await isApplyingRecoveryReady(env, context.companyId, request);
+  const retryAuthorized = assigned || permissionService.isSuperAdmin(context);
+  const canApprove = normalActionable && assigned && selfApprovalAllowed;
+  const disabledReason = isRequester && !salarySettings.allow_requester_self_approval
+    ? "Self-approval is disabled for this company."
+    : request.status === "applying" && !applyingRetryReady
+      ? "This approval request is currently applying. Please wait before retrying."
+      : request.status === "applying"
+        ? "This approval request appears stuck and can be retried."
+        : request.status === "failed" && request.failure_message
+          ? request.failure_message
+          : null;
   return {
     id: request.id,
     workflow_id: request.workflow_id,
@@ -116,11 +133,20 @@ const requestToResponse = async (env: Env, context: AuthActor, request: any) => 
     payload_summary: sanitizePayload(parseJson(request.payload_json, null)),
     created_at: request.created_at,
     updated_at: request.updated_at,
+    applied_at: request.applied_at,
+    applying_started_at: request.applying_started_at,
+    failure_code: request.failure_code,
+    failure_message: request.failure_message,
     actions_available: {
-      can_approve: actionable && assigned && request.requested_by !== context.actorUserId,
-      can_reject: actionable && assigned && request.requested_by !== context.actorUserId,
-      can_return: actionable && assigned && request.requested_by !== context.actorUserId,
-      can_override: actionable && permissionService.isSuperAdmin(context),
+      can_approve: canApprove,
+      can_reject: normalActionable && assigned && !isRequester,
+      can_return: normalActionable && assigned && !isRequester,
+      can_cancel: ["pending", "in_progress"].includes(request.status) && (request.requested_by === context.actorUserId || assigned || permissionService.isSuperAdmin(context)),
+      can_retry: request.status === "failed"
+        ? retryAuthorized
+        : request.status === "applying" && applyingRetryReady && retryAuthorized,
+      can_override: !terminal && request.status !== "applying" && permissionService.isSuperAdmin(context) && salarySettings.allow_super_admin_override,
+      disabled_reason: disabledReason,
     },
   };
 };
@@ -165,6 +191,282 @@ const auditOrFail = async (
   }
 };
 
+const auditBestEffort = async (
+  env: Env,
+  context: AuthActor,
+  input: Omit<auditService.AuditLogInput, "companyId" | "actorId" | "ipAddress" | "userAgent" | "requestId">,
+): Promise<void> => {
+  try {
+    await auditOrFail(env, context, input);
+  } catch (error) {
+    console.error("Approval audit log could not be recorded after state transition", {
+      approvalRequestId: input.approvalRequestId,
+      action: input.action,
+      requestId: context.requestId,
+      error,
+    });
+  }
+};
+
+const getSafeError = (error: unknown) => ({
+  code: error instanceof AppError ? error.code : "APPROVAL_TARGET_APPLY_FAILED",
+  message: error instanceof Error ? error.message : "The approved change could not be applied. Please review and try again.",
+});
+
+const assertSelfApprovalAllowed = async (env: Env, context: AuthActor, request: any) => {
+  const settings = await settingsService.getSalaryApprovalSettings(env, context.companyId);
+  if (settings.allow_requester_self_approval) return;
+  if (request.requested_by && request.requested_by === context.actorUserId) {
+    throw new AppError("You cannot approve your own request.", "APPROVAL_SELF_APPROVAL_NOT_ALLOWED", 403);
+  }
+};
+
+const assertReasonPolicy = async (
+  env: Env,
+  companyId: string,
+  action: "approve" | "reject",
+  input: ApprovalActionInput,
+) => {
+  const settings = await settingsService.getSalaryApprovalSettings(env, companyId);
+  if (action === "approve" && settings.require_reason_for_approval && !input.reason?.trim()) {
+    throw new AppError("A reason is required to approve this request.", "APPROVAL_REASON_REQUIRED", 400);
+  }
+  if (action === "reject" && settings.require_reason_for_rejection && !input.reason?.trim()) {
+    throw new AppError("A reason is required to reject this request.", "REJECTION_REASON_REQUIRED", 400);
+  }
+};
+
+const actionComment = (input: ApprovalActionInput, fallback: string) =>
+  input.comment?.trim() || input.reason?.trim() || fallback;
+
+const batchChanges = (results: unknown[], index: number) => {
+  const result = results[index] as { meta?: { changes?: number } } | undefined;
+  return Number(result?.meta?.changes ?? 0);
+};
+
+const statusTransitionError = (status?: string): AppError => {
+  if (status === "applying") {
+    return new AppError("This approval request is currently applying. Please wait before retrying.", "APPROVAL_ALREADY_PROCESSING", 409);
+  }
+  if (status === "applied" || status === "approved") {
+    return new AppError("This approval request has already been applied.", "APPROVAL_ALREADY_APPLIED", 409);
+  }
+  if (status === "rejected") {
+    return new AppError("This approval request has already been rejected.", "APPROVAL_REQUEST_REJECTED", 409);
+  }
+  if (status === "cancelled") {
+    return new AppError("This approval request has already been cancelled.", "APPROVAL_REQUEST_CANCELLED", 409);
+  }
+  if (status === "expired") {
+    return new AppError("This approval request has expired.", "APPROVAL_REQUEST_EXPIRED", 409);
+  }
+  return new AppError("This approval request is not pending.", "APPROVAL_REQUEST_NOT_PENDING", 409);
+};
+
+const applyingStartedAt = (request: any): number | null => {
+  const started = request.applying_started_at ?? request.updated_at;
+  if (!started) return null;
+  const timestamp = new Date(started).getTime();
+  return Number.isFinite(timestamp) ? timestamp : null;
+};
+
+const getApplyingRecoveryWindow = async (env: Env, companyId: string) => {
+  const settings = await settingsService.getSalaryApprovalSettings(env, companyId);
+  return settings.approval_applying_recovery_minutes * 60 * 1000;
+};
+
+const isApplyingRecoveryReady = async (env: Env, companyId: string, request: any) => {
+  if (request.status !== "applying") return false;
+  const startedAt = applyingStartedAt(request);
+  if (!startedAt) return false;
+  const recoveryWindow = await getApplyingRecoveryWindow(env, companyId);
+  return Date.now() - startedAt >= recoveryWindow;
+};
+
+const applyingRecoveryCutoffIso = async (env: Env, companyId: string) => {
+  const recoveryWindow = await getApplyingRecoveryWindow(env, companyId);
+  return new Date(Date.now() - recoveryWindow).toISOString();
+};
+
+const transitionOrThrow = async (
+  env: Env,
+  context: AuthActor,
+  request: any,
+  input: {
+    actionId: string;
+    stepOrder: number;
+    action: string;
+    comment?: string | null;
+    oldStatus: string;
+    newStatus: string;
+    allowedStatuses: string[];
+    currentStep?: number;
+  },
+) => {
+  const results = await repository.transitionRequestWithAction(env, {
+    companyId: context.companyId,
+    requestId: request.id,
+    actedBy: context.actorUserId,
+    ...input,
+  });
+  if (batchChanges(results, 0) === 1) return;
+  const latest = await repository.findRequestById(env, context.companyId, request.id);
+  throw statusTransitionError(latest?.status);
+};
+
+const finalizeAppliedOrRecover = async (
+  env: Env,
+  context: AuthActor,
+  request: any,
+  input: ApprovalActionInput,
+  integration: { target_result?: unknown; target_update_applied: boolean; target_update_note: string },
+  oldStatus: string,
+) => {
+  const results = await repository.finalizeAppliedRequest(env, {
+    actionId: crypto.randomUUID(),
+    companyId: context.companyId,
+    requestId: request.id,
+    stepOrder: Number(request.current_step ?? 1),
+    actedBy: context.actorUserId,
+    comment: actionComment(input, "Approved"),
+    oldStatus,
+    targetResult: integration.target_result,
+  });
+  const updated = batchChanges(results, 0);
+  if (updated === 1) {
+    return;
+  }
+
+  const latest = await repository.findRequestById(env, context.companyId, request.id);
+  const appliedAction = await repository.findAppliedAction(env, context.companyId, request.id);
+  if (latest?.status === "applied" && appliedAction) {
+    return;
+  }
+
+  if (latest?.status && latest.status !== "applying") {
+    throw statusTransitionError(latest.status);
+  }
+  throw new AppError("Approval finalization could not be completed safely. Please refresh and try again.", "APPROVAL_FINALIZATION_FAILED", 409);
+};
+
+const assertNotExpired = async (env: Env, context: AuthActor, request: any) => {
+  const settings = await settingsService.getSalaryApprovalSettings(env, context.companyId);
+  if (!settings.approval_request_expiry_days || !request.created_at) return;
+  const createdAt = new Date(request.created_at).getTime();
+  if (!Number.isFinite(createdAt)) return;
+  const expiresAt = createdAt + settings.approval_request_expiry_days * 24 * 60 * 60 * 1000;
+  if (Date.now() <= expiresAt) return;
+  const result = await repository.expireRequestIfOpen(env, context.companyId, request.id);
+  if (Number(result.meta?.changes ?? 0) !== 1) {
+    const latest = await repository.findRequestById(env, context.companyId, request.id);
+    throw statusTransitionError(latest?.status);
+  }
+  throw new AppError("This approval request has expired.", "APPROVAL_REQUEST_EXPIRED", 409);
+};
+
+const expireRequestIfNeeded = async (env: Env, context: AuthActor, request: any) => {
+  if (!["pending", "in_progress"].includes(request.status)) return request;
+  const settings = await settingsService.getSalaryApprovalSettings(env, context.companyId);
+  if (!settings.approval_request_expiry_days || !request.created_at) return request;
+  const createdAt = new Date(request.created_at).getTime();
+  if (!Number.isFinite(createdAt)) return request;
+  const expiresAt = createdAt + settings.approval_request_expiry_days * 24 * 60 * 60 * 1000;
+  if (Date.now() <= expiresAt) return request;
+  const result = await repository.expireRequestIfOpen(env, context.companyId, request.id);
+  if (Number(result.meta?.changes ?? 0) !== 1) {
+    return repository.findRequestById(env, context.companyId, request.id) ?? request;
+  }
+  return { ...request, status: "expired", updated_at: new Date().toISOString() };
+};
+
+const finalApproveRequest = async (
+  env: Env,
+  context: AuthActor,
+  request: any,
+  input: ApprovalActionInput,
+  options: { override?: boolean } = {},
+) => {
+  const claim = await repository.claimRequestForApplication(env, context.companyId, request.id, context.actorUserId);
+  let claimedRequest = request;
+  if (!claim.claimed) {
+    const latest = await repository.findRequestById(env, context.companyId, request.id);
+    if (!latest) throw new NotFoundError("Approval request not found.");
+    if (latest.status === "applied" || latest.status === "approved") {
+      return {
+        approval_request_id: request.id,
+        status: latest.status,
+        target_update_applied: true,
+        target_update_note: "This approval request has already been applied.",
+        message: "Approval request already completed.",
+      };
+    }
+    if (latest.status === "applying") {
+      const recovered = await findAppliedTargetChange(env, context, latest);
+      if (!recovered) {
+        throw new AppError("This approval request is already being applied. Please try again shortly.", "APPROVAL_ALREADY_PROCESSING", 409);
+      }
+      claimedRequest = latest;
+      await finalizeAppliedOrRecover(env, context, latest, input, recovered, "applying");
+      await auditBestEffort(env, context, {
+        outletId: latest.outlet_id ?? undefined,
+        module: "approvals",
+        action: "APPROVAL_FINALIZATION_RECOVERED",
+        severity: "info",
+        entityType: "approval_request",
+        entityId: latest.id,
+        employeeId: latest.employee_id ?? undefined,
+        newValueJson: JSON.stringify({ status: "applied", recovered: true }),
+        reason: input.reason ?? undefined,
+        approvalRequestId: latest.id,
+      });
+      return { approval_request_id: latest.id, status: "applied", current_step: latest.current_step, ...recovered, message: "Approval request approved." };
+    }
+    throw new AppError("This approval request is not pending.", "APPROVAL_REQUEST_NOT_PENDING", 409);
+  }
+
+  claimedRequest = { ...request, status: "applying" };
+  let integration;
+  try {
+    integration = await applyApprovedTargetChange(env, context, claimedRequest);
+  } catch (error) {
+    const safeError = getSafeError(error);
+    await repository.markRequestFailed(env, context.companyId, request.id, safeError);
+    await auditBestEffort(env, context, {
+      outletId: request.outlet_id ?? undefined,
+      module: "approvals",
+      action: "approval_request_apply_failed",
+      severity: "error",
+      entityType: "approval_request",
+      entityId: request.id,
+      employeeId: request.employee_id ?? undefined,
+      oldValueJson: JSON.stringify({ status: "applying" }),
+      newValueJson: JSON.stringify({ status: "failed", error: safeError }),
+      reason: input.reason ?? undefined,
+      approvalRequestId: request.id,
+    });
+    throw error;
+  }
+
+  await finalizeAppliedOrRecover(env, context, request, input, integration, request.status);
+
+  await auditBestEffort(env, context, {
+    outletId: request.outlet_id ?? undefined,
+    module: "approvals",
+    action: options.override ? "approval_request_override_applied" : "approval_request_applied",
+    severity: options.override ? "high" : "info",
+    entityType: "approval_request",
+    entityId: request.id,
+    employeeId: request.employee_id ?? undefined,
+    oldValueJson: JSON.stringify({ status: request.status, current_step: request.current_step }),
+    newValueJson: JSON.stringify({ status: "applied", ...integration }),
+    reason: input.reason ?? undefined,
+    approvalRequestId: request.id,
+  });
+  await broadcastSafe(env, context.companyId, options.override ? "approval.override" : "approval.approve", { approval_request_id: request.id, status: "applied" }, context.actorUserId);
+
+  return { approval_request_id: request.id, status: "applied", current_step: request.current_step, ...integration, message: "Approval request approved." };
+};
+
 const broadcastSafe = async (env: Env, companyId: string, type: string, payload: Record<string, unknown>, actorId: string) => {
   try {
     await realtimeService.broadcastEvent(env, {
@@ -182,10 +484,11 @@ export const listApprovalRequests = async (env: Env, context: AuthActor, filters
   const candidates = await repository.listRequestCandidates(env, context.companyId, filters);
   const accessible: any[] = [];
   for (const row of candidates) {
-    const step = await repository.findStep(env, context.companyId, row.workflow_id, Number(row.current_step ?? 1));
-    if (canUserAccessApproval(context, row, step, "view")) {
-      if (!filters.assigned_to_me || canActorApproveStep(context, step, thresholdFromPayload(row.payload_json))) {
-        accessible.push(row);
+    const effectiveRow = await expireRequestIfNeeded(env, context, row);
+    const step = await repository.findStep(env, context.companyId, effectiveRow.workflow_id, Number(effectiveRow.current_step ?? 1));
+    if (canUserAccessApproval(context, effectiveRow, step, "view")) {
+      if (!filters.assigned_to_me || canActorApproveStep(context, step, thresholdFromPayload(effectiveRow.payload_json))) {
+        accessible.push(effectiveRow);
       }
     }
   }
@@ -200,9 +503,10 @@ export const listApprovalRequests = async (env: Env, context: AuthActor, filters
 export const getApprovalRequest = async (env: Env, context: AuthActor, id: string) => {
   const request = await repository.findRequestById(env, context.companyId, id);
   if (!request) throw new NotFoundError("Approval request not found.");
-  const step = await repository.findStep(env, context.companyId, request.workflow_id, Number(request.current_step ?? 1));
-  assertAccess(context, request, step, "view");
-  return requestToResponse(env, context, request);
+  const effectiveRequest = await expireRequestIfNeeded(env, context, request);
+  const step = await repository.findStep(env, context.companyId, effectiveRequest.workflow_id, Number(effectiveRequest.current_step ?? 1));
+  assertAccess(context, effectiveRequest, step, "view");
+  return requestToResponse(env, context, effectiveRequest);
 };
 
 export const getApprovalHistory = async (env: Env, context: AuthActor, id: string) => {
@@ -226,7 +530,15 @@ const actOnApproval = async (
   const currentStep = steps.find((step) => Number(step.step_order) === Number(request.current_step ?? 1));
   assertAccess(context, request, currentStep, "act");
   assertApprovalIsActionable(request.status);
-  assertNotSelfApproval(request.requested_by, context.actorUserId);
+  await assertNotExpired(env, context, request);
+  if (action === "approve" || action === "reject") {
+    await assertReasonPolicy(env, context.companyId, action, input);
+  }
+  if (action === "approve") {
+    await assertSelfApprovalAllowed(env, context, request);
+  } else {
+    assertNotSelfApproval(request.requested_by, context.actorUserId);
+  }
   assertCurrentStepAccess(context, currentStep, request);
 
   const oldStatus = request.status;
@@ -243,14 +555,24 @@ const actOnApproval = async (
       newStatus = "in_progress";
       nextStep = followingStep.step_order;
     } else {
-      integration = await applyApprovedTargetChange(env, request);
+      return finalApproveRequest(env, context, request, input);
     }
   } else if (action === "reject") {
     integration = await applyRejectedTargetChange(env, request);
   }
 
   const auditAction = action === "approve" && nextStep ? "approval_step_approved" : `approval_request_${action === "return" ? "returned" : `${action}d`}`;
-  await auditOrFail(env, context, {
+  await transitionOrThrow(env, context, request, {
+    actionId: crypto.randomUUID(),
+    stepOrder: Number(request.current_step ?? 1),
+    action,
+    comment: actionComment(input, action),
+    oldStatus,
+    newStatus,
+    allowedStatuses: ["pending", "in_progress"],
+    currentStep: nextStep,
+  });
+  await auditBestEffort(env, context, {
     outletId: request.outlet_id ?? undefined,
     module: "approvals",
     action: auditAction,
@@ -260,20 +582,8 @@ const actOnApproval = async (
     employeeId: request.employee_id ?? undefined,
     oldValueJson: JSON.stringify({ status: oldStatus, current_step: request.current_step }),
     newValueJson: JSON.stringify({ status: newStatus, current_step: nextStep ?? request.current_step, ...integration }),
-    reason: input.reason,
+    reason: input.reason ?? undefined,
     approvalRequestId: id,
-  });
-  await repository.runApprovalActionStatements(env, {
-    actionId: crypto.randomUUID(),
-    companyId: context.companyId,
-    requestId: id,
-    stepOrder: Number(request.current_step ?? 1),
-    action,
-    actedBy: context.actorUserId,
-    comment: input.comment ?? input.reason,
-    oldStatus,
-    newStatus,
-    currentStep: nextStep,
   });
   await broadcastSafe(env, context.companyId, `approval.${action}`, { approval_request_id: id, status: newStatus }, context.actorUserId);
 
@@ -294,6 +604,147 @@ export const rejectApprovalRequest = (env: Env, context: AuthActor, id: string, 
 
 export const returnApprovalRequest = (env: Env, context: AuthActor, id: string, input: ApprovalActionInput) =>
   actOnApproval(env, context, id, "return", input);
+
+export const cancelApprovalRequest = async (env: Env, context: AuthActor, id: string, input: ApprovalActionInput) => {
+  const request = await repository.findRequestById(env, context.companyId, id);
+  if (!request) throw new NotFoundError("Approval request not found.");
+  const step = await repository.findStep(env, context.companyId, request.workflow_id, Number(request.current_step ?? 1));
+  const canCancel =
+    permissionService.isSuperAdmin(context) ||
+    request.requested_by === context.actorUserId ||
+    canActorApproveStep(context, step, thresholdFromPayload(request.payload_json));
+  if (!canCancel) {
+    throw new PermissionError("You do not have permission to cancel this approval request.");
+  }
+  if (!["pending", "in_progress"].includes(request.status)) {
+    throw new AppError("Only pending approval requests can be cancelled.", "APPROVAL_REQUEST_NOT_PENDING", 409);
+  }
+  await assertNotExpired(env, context, request);
+
+  await transitionOrThrow(env, context, request, {
+    actionId: crypto.randomUUID(),
+    stepOrder: Number(request.current_step ?? 1),
+    action: "cancel",
+    comment: actionComment(input, "Cancelled"),
+    oldStatus: request.status,
+    newStatus: "cancelled",
+    allowedStatuses: ["pending", "in_progress"],
+  });
+  await auditBestEffort(env, context, {
+    outletId: request.outlet_id ?? undefined,
+    module: "approvals",
+    action: "approval_request_cancelled",
+    severity: "warning",
+    entityType: "approval_request",
+    entityId: id,
+    employeeId: request.employee_id ?? undefined,
+    oldValueJson: JSON.stringify({ status: request.status, current_step: request.current_step }),
+    newValueJson: JSON.stringify({ status: "cancelled", current_step: request.current_step }),
+    reason: input.reason ?? undefined,
+    approvalRequestId: id,
+  });
+  await broadcastSafe(env, context.companyId, "approval.cancelled", { approval_request_id: id, status: "cancelled" }, context.actorUserId);
+  return { approval_request_id: id, status: "cancelled", target_update_applied: false, message: "Approval request cancelled." };
+};
+
+export const retryApprovalRequest = async (env: Env, context: AuthActor, id: string, input: ApprovalActionInput) => {
+  const request = await repository.findRequestById(env, context.companyId, id);
+  if (!request) throw new NotFoundError("Approval request not found.");
+  const step = await repository.findStep(env, context.companyId, request.workflow_id, Number(request.current_step ?? 1));
+  assertAccess(context, request, step, "act");
+  assertCurrentStepAccess(context, step, request);
+  await assertSelfApprovalAllowed(env, context, request);
+  await assertNotExpired(env, context, request);
+
+  if (!["failed", "applying"].includes(request.status)) {
+    throw statusTransitionError(request.status);
+  }
+
+  if (request.status === "applying" && !(await isApplyingRecoveryReady(env, context.companyId, request))) {
+    throw new AppError("This approval request is currently applying. Please wait before retrying.", "APPROVAL_ALREADY_PROCESSING", 409);
+  }
+
+  await auditOrFail(env, context, {
+    outletId: request.outlet_id ?? undefined,
+    module: "approvals",
+    action: "approval_retry_requested",
+    severity: "warning",
+    entityType: "approval_request",
+    entityId: id,
+    employeeId: request.employee_id ?? undefined,
+    oldValueJson: JSON.stringify({ status: request.status, retry_count: request.retry_count ?? 0 }),
+    newValueJson: JSON.stringify({ retry_requested: true }),
+    reason: input.reason ?? undefined,
+    approvalRequestId: id,
+  });
+  await repository.recordRetryAttempt(env, context.companyId, id);
+
+  if (request.status === "applying") {
+    const recovered = await findAppliedTargetChange(env, context, request);
+    if (recovered) {
+      await finalizeAppliedOrRecover(env, context, request, input, recovered, "applying");
+      await auditBestEffort(env, context, {
+        outletId: request.outlet_id ?? undefined,
+        module: "approvals",
+        action: "approval_retry_applied",
+        severity: "info",
+        entityType: "approval_request",
+        entityId: id,
+        employeeId: request.employee_id ?? undefined,
+        newValueJson: JSON.stringify({ status: "applied", recovered: true }),
+        reason: input.reason ?? undefined,
+        approvalRequestId: id,
+      });
+      await broadcastSafe(env, context.companyId, "approval.retry_applied", { approval_request_id: id, status: "applied" }, context.actorUserId);
+      return { approval_request_id: id, status: "applied", current_step: request.current_step, ...recovered, message: "Approval request approved." };
+    }
+    const failure = {
+      code: "APPROVAL_ALREADY_PROCESSING",
+      message: "This approval request was stuck while applying and is being retried.",
+    };
+    const result = await repository.markStaleApplyingRequestFailed(
+      env,
+      context.companyId,
+      id,
+      failure,
+      await applyingRecoveryCutoffIso(env, context.companyId),
+    );
+    if (Number(result.meta?.changes ?? 0) !== 1) {
+      const latest = await repository.findRequestById(env, context.companyId, id);
+      throw statusTransitionError(latest?.status);
+    }
+    const failedRequest = { ...request, status: "failed", failure_code: failure.code, failure_message: failure.message, applying_started_at: null };
+    const retryResult = await finalApproveRequest(env, context, failedRequest, input);
+    await auditBestEffort(env, context, {
+      outletId: request.outlet_id ?? undefined,
+      module: "approvals",
+      action: "approval_retry_applied",
+      severity: "info",
+      entityType: "approval_request",
+      entityId: id,
+      employeeId: request.employee_id ?? undefined,
+      newValueJson: JSON.stringify({ status: retryResult.status, stale_applying_retried: true, target_update_applied: retryResult.target_update_applied }),
+      reason: input.reason ?? undefined,
+      approvalRequestId: id,
+    });
+    return retryResult;
+  }
+
+  const result = await finalApproveRequest(env, context, request, input);
+  await auditBestEffort(env, context, {
+    outletId: request.outlet_id ?? undefined,
+    module: "approvals",
+    action: "approval_retry_applied",
+    severity: "info",
+    entityType: "approval_request",
+    entityId: id,
+    employeeId: request.employee_id ?? undefined,
+    newValueJson: JSON.stringify({ status: result.status, target_update_applied: result.target_update_applied }),
+    reason: input.reason ?? undefined,
+    approvalRequestId: id,
+  });
+  return result;
+};
 
 const findMatchingThreshold = async (
   env: Env,
@@ -319,20 +770,143 @@ const findMatchingThreshold = async (
   })[0] ?? null;
 };
 
+const ensureDefaultSalaryApprovalWorkflow = async (env: Env, companyId: string) => {
+  let workflow = await repository.findWorkflowByKey(env, companyId, "salary_increment");
+  if (!workflow) {
+    await repository.createWorkflow(env, `workflow_salary_increment_${companyId}`, companyId, {
+      workflow_key: "salary_increment",
+      workflow_name: "Salary & Promotion Changes",
+      module: "salary",
+      approval_mode: "auto_admin_superadmin",
+    });
+    workflow = await repository.findWorkflowByKey(env, companyId, "salary_increment");
+  }
+  if (!workflow) return null;
+
+  const steps = await repository.listSteps(env, companyId, workflow.id);
+  if (steps.length === 0) {
+    await repository.createStep(env, `step_salary_increment_${companyId}`, companyId, workflow.id, {
+      step_order: 1,
+      step_name: "Salary approval",
+      required_permission_key: "approvals.approve",
+      is_required: true,
+      approval_type: "single",
+    });
+  }
+
+  await env.DB.prepare(
+    `INSERT OR IGNORE INTO company_settings (
+      id, company_id, setting_key, setting_group, setting_value_json,
+      effective_from, created_by, updated_by, created_at, updated_at
+    ) VALUES (?, ?, 'approvals.salary_rules', 'payroll', ?, NULL, NULL, NULL, ?, ?)`,
+  ).bind(
+    `setting_salary_approval_${companyId}`,
+    companyId,
+    JSON.stringify({
+      salary_change_approval_enabled: true,
+      promotion_salary_change_approval_enabled: true,
+      salary_correction_approval_enabled: true,
+      allow_requester_self_approval: false,
+      allow_super_admin_override: true,
+      auto_apply_when_no_eligible_approver: true,
+      approval_request_expiry_days: 30,
+      approval_applying_recovery_minutes: 5,
+      require_reason_for_approval: true,
+      require_reason_for_rejection: true,
+    }),
+    new Date().toISOString(),
+    new Date().toISOString(),
+  ).run();
+
+  return workflow;
+};
+
+const resolveEligibleApproverRequirement = async (
+  env: Env,
+  context: AuthActor,
+  input: ApprovalRequestCreateInput,
+  workflow: any,
+  threshold: any,
+) => {
+  if (input.workflowKey !== "salary_increment") return { canCreateRequest: true };
+
+  const settings = await settingsService.getSalaryApprovalSettings(env, context.companyId);
+  const steps = await repository.listSteps(env, context.companyId, workflow.id);
+  const firstRequiredStep = steps.find((step) => Number(step.is_required ?? 1) === 1) ?? steps[0] ?? null;
+  const thresholdPermissions = thresholdList(threshold?.required_permissions_json);
+  const thresholdRoles = thresholdList(threshold?.required_roles_json);
+  const permissionKeys = thresholdPermissions.length > 0
+    ? thresholdPermissions
+    : firstRequiredStep?.required_permission_key ? [firstRequiredStep.required_permission_key] : [];
+  const roleKeys = thresholdRoles.length > 0
+    ? thresholdRoles
+    : firstRequiredStep?.required_role_key ? [firstRequiredStep.required_role_key] : [];
+  const employeeOutlet = input.employeeId
+    ? await repository.findEmployeeOutlet(env, context.companyId, input.employeeId)
+    : null;
+
+  const eligibleApprovers = await repository.countEligibleApprovers(env, {
+    companyId: context.companyId,
+    requesterId: context.actorUserId,
+    permissionKeys,
+    roleKeys,
+    outletId: employeeOutlet?.primary_outlet_id ?? null,
+    allowRequesterSelfApproval: settings.allow_requester_self_approval,
+  });
+  if (eligibleApprovers > 0) return { canCreateRequest: true };
+
+  if (!settings.auto_apply_when_no_eligible_approver) {
+    throw new AppError({
+      message: "No eligible approver is available for this request. Please update the approval workflow or assign an approver.",
+      code: "NO_ELIGIBLE_APPROVER",
+      statusCode: 409,
+      retryable: false,
+      suggestedAction: "Assign an eligible approver or enable auto-apply when no approver is available.",
+    });
+  }
+
+  return {
+    canCreateRequest: false,
+    decision: {
+      approval_required: false,
+      direct_action_allowed: true,
+      approval_request_id: null,
+      auto_applied_no_eligible_approver: true,
+      message: "No eligible approver was available, so this change can be applied directly based on company settings.",
+    },
+  };
+};
+
 export const overrideApprovalRequest = async (env: Env, context: AuthActor, id: string, input: ApprovalOverrideInput) => {
   if (!permissionService.isSuperAdmin(context)) {
     throw new PermissionError("Only Super Admin can override approval requests.");
   }
+  const salaryApprovalSettings = await settingsService.getSalaryApprovalSettings(env, context.companyId);
+  if (!salaryApprovalSettings.allow_super_admin_override) {
+    throw new PermissionError("Super Admin override is currently disabled.");
+  }
   const request = await repository.findRequestById(env, context.companyId, id);
   if (!request) throw new NotFoundError("Approval request not found.");
   assertApprovalIsActionable(request.status);
+  await assertNotExpired(env, context, request);
 
   const newStatus = input.decision === "approve" ? "approved" : "rejected";
-  const integration = input.decision === "approve"
-    ? await applyApprovedTargetChange(env, request)
-    : await applyRejectedTargetChange(env, request);
+  if (input.decision === "approve") {
+    return finalApproveRequest(env, context, request, input, { override: true });
+  }
 
-  await auditOrFail(env, context, {
+  const integration = await applyRejectedTargetChange(env, request);
+
+  await transitionOrThrow(env, context, request, {
+    actionId: crypto.randomUUID(),
+    stepOrder: Number(request.current_step ?? 1),
+    action: `override_${input.decision}`,
+    comment: actionComment(input, `Override ${input.decision}`),
+    oldStatus: request.status,
+    newStatus,
+    allowedStatuses: ["pending", "in_progress"],
+  });
+  await auditBestEffort(env, context, {
     outletId: request.outlet_id ?? undefined,
     module: "approvals",
     action: "approval_request_overridden",
@@ -342,19 +916,8 @@ export const overrideApprovalRequest = async (env: Env, context: AuthActor, id: 
     employeeId: request.employee_id ?? undefined,
     oldValueJson: JSON.stringify({ status: request.status }),
     newValueJson: JSON.stringify({ status: newStatus, decision: input.decision, ...integration }),
-    reason: input.reason,
+    reason: input.reason ?? undefined,
     approvalRequestId: id,
-  });
-  await repository.runApprovalActionStatements(env, {
-    actionId: crypto.randomUUID(),
-    companyId: context.companyId,
-    requestId: id,
-    stepOrder: Number(request.current_step ?? 1),
-    action: `override_${input.decision}`,
-    actedBy: context.actorUserId,
-    comment: input.comment ?? input.reason,
-    oldStatus: request.status,
-    newStatus,
   });
   await broadcastSafe(env, context.companyId, "approval.override", { approval_request_id: id, status: newStatus }, context.actorUserId);
   return { approval_request_id: id, status: newStatus, ...integration };
@@ -365,7 +928,9 @@ export const createApprovalRequestForWorkflow = async (
   context: AuthActor,
   input: ApprovalRequestCreateInput,
 ) => {
-  const workflow = await workflowService.getWorkflowByKey(env, context.companyId, input.workflowKey);
+  const workflow = input.workflowKey === "salary_increment"
+    ? await ensureDefaultSalaryApprovalWorkflow(env, context.companyId)
+    : await workflowService.getWorkflowByKey(env, context.companyId, input.workflowKey);
   if (!workflow || workflow.is_enabled !== 1) {
     return { approval_required: false, direct_action_allowed: true, approval_request_id: null, message: "Approval workflow is not enabled for this action." };
   }
@@ -382,6 +947,10 @@ export const createApprovalRequestForWorkflow = async (
 
   const id = crypto.randomUUID();
   const threshold = await findMatchingThreshold(env, context.companyId, input.workflowKey, input.amount, input.currency);
+  const eligibleApproverDecision = await resolveEligibleApproverRequirement(env, context, input, workflow, threshold);
+  if (!eligibleApproverDecision.canCreateRequest) {
+    return eligibleApproverDecision.decision;
+  }
   const payload = {
     ...(input.payload ?? {}),
     ...(threshold ? {
@@ -603,15 +1172,24 @@ export const getThresholdHistory = async (env: Env, context: AuthActor, id: stri
 };
 
 export const getSettingsSummary = async (env: Env, context: AuthActor) => {
-  const [approvalMode, workflowsEnabled] = await Promise.all([
+  const [approvalMode, workflowsEnabled, salaryApprovalSettings] = await Promise.all([
     settingsService.getApprovalMode(env, context.companyId),
     settingsService.areApprovalWorkflowsEnabled(env, context.companyId),
+    settingsService.getSalaryApprovalSettings(env, context.companyId),
   ]);
   return {
     approval_mode: approvalMode,
     approval_workflows_enabled: workflowsEnabled,
     direct_admin_approval_enabled: approvalMode === "auto_admin_superadmin",
     disabled: approvalMode === "disabled" || !workflowsEnabled,
+    salary_approval_settings: {
+      require_reason_for_approval: salaryApprovalSettings.require_reason_for_approval,
+      require_reason_for_rejection: salaryApprovalSettings.require_reason_for_rejection,
+      allow_requester_self_approval: salaryApprovalSettings.allow_requester_self_approval,
+      allow_super_admin_override: salaryApprovalSettings.allow_super_admin_override,
+      auto_apply_when_no_eligible_approver: salaryApprovalSettings.auto_apply_when_no_eligible_approver,
+      approval_applying_recovery_minutes: salaryApprovalSettings.approval_applying_recovery_minutes,
+    },
   };
 };
 

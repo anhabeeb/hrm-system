@@ -51,6 +51,16 @@ export const returnApproval = async (c: Context<AppContext>) => {
   return ok(result, result.message, requestId(c));
 };
 
+export const cancelApproval = async (c: Context<AppContext>) => {
+  const result = await service.cancelApprovalRequest(c.env, auth(c), param(c, "id"), validateApprovalAction(await json(c)));
+  return ok(result, result.message, requestId(c));
+};
+
+export const retryApproval = async (c: Context<AppContext>) => {
+  const result = await service.retryApprovalRequest(c.env, auth(c), param(c, "id"), validateApprovalAction(await json(c)));
+  return ok(result, result.message, requestId(c));
+};
+
 export const overrideApproval = async (c: Context<AppContext>) =>
   ok(await service.overrideApprovalRequest(c.env, auth(c), param(c, "id"), validateOverrideAction(await json(c))), "Approval request overridden.", requestId(c));
 

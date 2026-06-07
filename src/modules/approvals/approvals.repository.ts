@@ -158,6 +158,75 @@ export const updateRequestStatus = (env: Env, companyId: string, id: string, sta
     [status, currentStep ?? null, new Date().toISOString(), companyId, id],
   );
 
+export const expireRequestIfOpen = (env: Env, companyId: string, id: string) =>
+  run(
+    env,
+    `UPDATE approval_requests
+     SET status = 'expired', applying_started_at = NULL, updated_at = ?
+     WHERE company_id = ? AND id = ? AND status IN ('pending', 'in_progress')`,
+    [new Date().toISOString(), companyId, id],
+  );
+
+export const claimRequestForApplication = (
+  env: Env,
+  companyId: string,
+  id: string,
+  actorUserId: string,
+) =>
+  run(
+    env,
+    `UPDATE approval_requests
+     SET status = 'applying', applying_started_at = ?, updated_at = ?
+     WHERE company_id = ? AND id = ? AND status IN ('pending', 'in_progress', 'failed')`,
+    [new Date().toISOString(), new Date().toISOString(), companyId, id],
+  ).then((result) => ({
+    claimed: Number(result.meta?.changes ?? 0) === 1,
+    actorUserId,
+  }));
+
+export const markRequestFailed = (
+  env: Env,
+  companyId: string,
+  id: string,
+  failure: { code: string; message: string },
+) =>
+  run(
+    env,
+    `UPDATE approval_requests
+     SET status = 'failed',
+         failure_code = ?,
+         failure_message = ?,
+         payload_json = json_set(COALESCE(payload_json, '{}'), '$.application_failure', json(?)),
+         applying_started_at = NULL,
+         updated_at = ?
+     WHERE company_id = ? AND id = ? AND status = 'applying'`,
+    [failure.code, failure.message, JSON.stringify(failure), new Date().toISOString(), companyId, id],
+  );
+
+export const markStaleApplyingRequestFailed = (
+  env: Env,
+  companyId: string,
+  id: string,
+  failure: { code: string; message: string },
+  recoveryCutoffIso: string,
+) =>
+  run(
+    env,
+    `UPDATE approval_requests
+     SET status = 'failed',
+         failure_code = ?,
+         failure_message = ?,
+         payload_json = json_set(COALESCE(payload_json, '{}'), '$.application_failure', json(?)),
+         applying_started_at = NULL,
+         updated_at = ?
+     WHERE company_id = ?
+       AND id = ?
+       AND status = 'applying'
+       AND applying_started_at IS NOT NULL
+       AND applying_started_at <= ?`,
+    [failure.code, failure.message, JSON.stringify(failure), new Date().toISOString(), companyId, id, recoveryCutoffIso],
+  );
+
 export const runApprovalActionStatements = (
   env: Env,
   input: { actionId: string; companyId: string; requestId: string; stepOrder: number; action: string; actedBy: string; comment: string; oldStatus: string; newStatus: string; currentStep?: number },
@@ -174,6 +243,200 @@ export const runApprovalActionStatements = (
        WHERE company_id = ? AND id = ?`,
     ).bind(input.newStatus, input.currentStep ?? null, new Date().toISOString(), input.companyId, input.requestId),
   ]);
+
+export const finalizeAppliedRequest = (
+  env: Env,
+  input: {
+    actionId: string;
+    companyId: string;
+    requestId: string;
+    stepOrder: number;
+    actedBy: string;
+    comment: string;
+    oldStatus: string;
+    targetResult?: unknown;
+  },
+) => {
+  const timestamp = new Date().toISOString();
+  const targetResultJson = input.targetResult === undefined ? null : JSON.stringify(input.targetResult);
+  return env.DB.batch([
+    env.DB.prepare(
+      `UPDATE approval_requests
+       SET status = 'applied',
+           applied_at = COALESCE(applied_at, ?),
+           failure_code = NULL,
+           failure_message = NULL,
+           applying_started_at = NULL,
+           payload_json = CASE
+             WHEN ? IS NULL THEN payload_json
+             ELSE json_set(COALESCE(payload_json, '{}'), '$.target_result', json(?))
+           END,
+           updated_at = ?
+       WHERE company_id = ? AND id = ? AND status = 'applying'`,
+    ).bind(timestamp, targetResultJson, targetResultJson, timestamp, input.companyId, input.requestId),
+    env.DB.prepare(
+      `INSERT OR IGNORE INTO approval_actions (
+        id, company_id, approval_request_id, step_order, action, acted_by,
+        comment, old_status, new_status, created_at
+      )
+      SELECT ?, ?, ?, ?, 'applied', ?, ?, ?, 'applied', ?
+      WHERE EXISTS (
+        SELECT 1 FROM approval_requests
+        WHERE company_id = ? AND id = ? AND status = 'applied' AND applied_at = ?
+      )`,
+    ).bind(
+      input.actionId,
+      input.companyId,
+      input.requestId,
+      input.stepOrder,
+      input.actedBy,
+      input.comment,
+      input.oldStatus,
+      timestamp,
+      input.companyId,
+      input.requestId,
+      timestamp,
+    ),
+  ]);
+};
+
+export const transitionRequestWithAction = (
+  env: Env,
+  input: {
+    actionId: string;
+    companyId: string;
+    requestId: string;
+    stepOrder: number;
+    action: string;
+    actedBy: string;
+    comment?: string | null;
+    oldStatus: string;
+    newStatus: string;
+    allowedStatuses: string[];
+    currentStep?: number;
+  },
+) => {
+  const timestamp = new Date().toISOString();
+  const placeholders = input.allowedStatuses.map(() => "?").join(", ");
+  return env.DB.batch([
+    env.DB.prepare(
+      `UPDATE approval_requests
+       SET status = ?, current_step = COALESCE(?, current_step), applying_started_at = NULL, updated_at = ?
+       WHERE company_id = ? AND id = ? AND status IN (${placeholders})`,
+    ).bind(input.newStatus, input.currentStep ?? null, timestamp, input.companyId, input.requestId, ...input.allowedStatuses),
+    env.DB.prepare(
+      `INSERT INTO approval_actions (
+        id, company_id, approval_request_id, step_order, action, acted_by,
+        comment, old_status, new_status, created_at
+      )
+      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      WHERE EXISTS (
+        SELECT 1 FROM approval_requests
+        WHERE company_id = ? AND id = ? AND status = ? AND updated_at = ?
+      )`,
+    ).bind(
+      input.actionId,
+      input.companyId,
+      input.requestId,
+      input.stepOrder,
+      input.action,
+      input.actedBy,
+      input.comment ?? null,
+      input.oldStatus,
+      input.newStatus,
+      timestamp,
+      input.companyId,
+      input.requestId,
+      input.newStatus,
+      timestamp,
+    ),
+  ]);
+};
+
+export const findAppliedAction = (env: Env, companyId: string, requestId: string) =>
+  one<any>(
+    env,
+    "SELECT * FROM approval_actions WHERE company_id = ? AND approval_request_id = ? AND action = 'applied' LIMIT 1",
+    [companyId, requestId],
+  );
+
+export const recordRetryAttempt = (env: Env, companyId: string, requestId: string) =>
+  run(
+    env,
+    `UPDATE approval_requests
+     SET retry_count = COALESCE(retry_count, 0) + 1, last_retry_at = ?, updated_at = ?
+     WHERE company_id = ? AND id = ? AND status IN ('failed', 'applying')`,
+    [new Date().toISOString(), new Date().toISOString(), companyId, requestId],
+  );
+
+export const countEligibleApprovers = async (
+  env: Env,
+  input: {
+    companyId: string;
+    requesterId: string;
+    permissionKeys: string[];
+    roleKeys: string[];
+    outletId?: string | null;
+    allowRequesterSelfApproval: boolean;
+  },
+) => {
+  const clauses = ["u.company_id = ?", "u.status = 'active'", "u.deleted_at IS NULL"];
+  const values: unknown[] = [input.companyId];
+  if (!input.allowRequesterSelfApproval) {
+    clauses.push("u.id <> ?");
+    values.push(input.requesterId);
+  }
+  if (input.outletId) {
+    clauses.push(`(
+      EXISTS (
+        SELECT 1 FROM user_outlets uo
+        WHERE uo.company_id = u.company_id AND uo.user_id = u.id AND uo.outlet_id = ?
+      )
+      OR EXISTS (
+        SELECT 1 FROM user_roles ur_scope
+        JOIN roles r_scope ON r_scope.company_id = ur_scope.company_id AND r_scope.id = ur_scope.role_id
+        WHERE ur_scope.company_id = u.company_id AND ur_scope.user_id = u.id AND r_scope.role_key = 'super_admin'
+      )
+    )`);
+    values.push(input.outletId);
+  }
+
+  const permissionClauses: string[] = [
+    `EXISTS (
+      SELECT 1 FROM user_roles ur_super
+      JOIN roles r_super ON r_super.company_id = ur_super.company_id AND r_super.id = ur_super.role_id
+      WHERE ur_super.company_id = u.company_id AND ur_super.user_id = u.id
+        AND r_super.role_key = 'super_admin' AND r_super.is_active = 1
+    )`,
+  ];
+  if (input.permissionKeys.length > 0) {
+    permissionClauses.push(`EXISTS (
+      SELECT 1 FROM user_roles ur_perm
+      JOIN roles r_perm ON r_perm.company_id = ur_perm.company_id AND r_perm.id = ur_perm.role_id AND r_perm.is_active = 1
+      JOIN role_permissions rp ON rp.company_id = r_perm.company_id AND rp.role_id = r_perm.id
+      WHERE ur_perm.company_id = u.company_id AND ur_perm.user_id = u.id
+        AND rp.permission_key IN (${input.permissionKeys.map(() => "?").join(", ")})
+    )`);
+    values.push(...input.permissionKeys);
+  }
+  if (input.roleKeys.length > 0) {
+    permissionClauses.push(`EXISTS (
+      SELECT 1 FROM user_roles ur_role
+      JOIN roles r_role ON r_role.company_id = ur_role.company_id AND r_role.id = ur_role.role_id
+      WHERE ur_role.company_id = u.company_id AND ur_role.user_id = u.id
+        AND r_role.is_active = 1 AND r_role.role_key IN (${input.roleKeys.map(() => "?").join(", ")})
+    )`);
+    values.push(...input.roleKeys);
+  }
+  clauses.push(`(${permissionClauses.join(" OR ")})`);
+
+  const row = await one<{ total: number }>(
+    env,
+    `SELECT COUNT(DISTINCT u.id) AS total FROM users u WHERE ${clauses.join(" AND ")}`,
+    values,
+  );
+  return row?.total ?? 0;
+};
 
 export const createAction = (env: Env, input: { id: string; companyId: string; requestId: string; stepOrder: number; action: string; actedBy: string; comment: string; oldStatus: string; newStatus: string }) =>
   run(

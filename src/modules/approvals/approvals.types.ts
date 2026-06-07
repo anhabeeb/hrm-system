@@ -29,7 +29,7 @@ export interface ApprovalListFilters {
 }
 
 export interface ApprovalActionInput {
-  reason: string;
+  reason?: string | null;
   comment?: string;
 }
 

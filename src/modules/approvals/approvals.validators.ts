@@ -70,7 +70,7 @@ export const validateApprovalFilters = (query: Record<string, unknown>): Approva
 
 export const validateApprovalAction = (payload: unknown): ApprovalActionInput => {
   if (!isObject(payload)) throw new ValidationError();
-  return { reason: reason(payload), comment: asString(payload.comment) };
+  return { reason: asString(payload.reason) ?? asString(payload.comment) ?? null, comment: asString(payload.comment) };
 };
 
 export const validateOverrideAction = (payload: unknown): ApprovalOverrideInput => {

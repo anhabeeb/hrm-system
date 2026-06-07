@@ -14,6 +14,8 @@ import { OutletsPage } from "@/features/outlets/OutletsPage";
 import { DepartmentsPage } from "@/features/departments/DepartmentsPage";
 import { PositionsPage } from "@/features/positions/PositionsPage";
 import { EmployeesPage } from "@/features/employees/EmployeesPage";
+import { ContractsPage } from "@/features/contracts/ContractsPage";
+import { OffboardingPage } from "@/features/offboarding/OffboardingPage";
 import { AttendancePage } from "@/features/attendance/AttendancePage";
 import { AttendanceCorrectionsPage } from "@/features/attendance/AttendanceCorrectionsPage";
 import { KioskDevicesPage } from "@/features/devices/KioskDevicesPage";
@@ -83,6 +85,8 @@ export const AppRouter = () => (
         <Route path="/profile/security" element={<SecurityPage />} />
         <Route path="/profile/kyc-update" element={<KycUpdatePage />} />
         <Route path="/employees" element={guarded(<EmployeesPage />, { permission: "employees.view", feature: "employee_management" })} />
+        <Route path="/contracts" element={guarded(<ContractsPage />, { permissionsAny: ["contracts.view", "employees.contracts.view", "employees.view"], feature: "employee_management" })} />
+        <Route path="/offboarding" element={guarded(<OffboardingPage />, { permissionsAny: ["employees.offboarding.view", "employees.view"], feature: "employee_management" })} />
         <Route path="/users-access" element={guarded(<UsersAccessPage />, { permission: "users.view", feature: "user_management" })} />
         <Route path="/outlets" element={guarded(<OutletsPage />, { permission: "outlets.view", feature: "employee_management" })} />
         <Route path="/departments" element={guarded(<DepartmentsPage />, { permission: "departments.view", feature: "employee_management" })} />

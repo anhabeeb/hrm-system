@@ -14,6 +14,7 @@ export const payrollApi = {
   submitApproval: (id: string, reason: string) => api.post<{ submitted: boolean }>(`/payroll/${id}/submit-approval`, { reason }),
   approve: (id: string, reason: string) => api.post<{ approved: boolean }>(`/payroll/${id}/approve`, { reason }),
   reject: (id: string, reason: string) => api.post<{ rejected: boolean }>(`/payroll/${id}/reject`, { reason }),
+  finalize: (id: string, reason: string) => api.post<{ finalized: boolean; already_finalized?: boolean }>(`/payroll/${id}/finalize`, { reason }),
   lock: (id: string, reason: string) => api.post<{ locked: boolean }>(`/payroll/${id}/lock`, { reason }),
   requestReopen: (id: string, reason: string) => api.post<{ requested: boolean }>(`/payroll/${id}/request-reopen`, { reason }),
   reopen: (id: string, reason: string) => api.post<{ reopened: boolean }>(`/payroll/${id}/reopen`, { reason }),

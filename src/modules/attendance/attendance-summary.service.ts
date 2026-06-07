@@ -49,10 +49,9 @@ export const rebuildDailySummary = async (
     companyId,
     attendanceDate.slice(0, 7),
   );
-  const payrollStatus =
-    payrollRun?.status === "locked" || payrollRun?.status === "paid"
-      ? "locked"
-      : "pending";
+  const payrollStatus = ["finalizing", "finalized", "locked", "paid"].includes(payrollRun?.status ?? "")
+    ? "locked"
+    : "pending";
 
   await repository.upsertDailySummary(env, {
     id: createPrefixedId("att_sum"),

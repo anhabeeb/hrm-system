@@ -324,17 +324,61 @@ Important rules:
 - Employee creation captures a required starting salary and saves it to `employee_salary_history`
 - Position default salary, when available, is only a create-form suggestion; employee salary history remains the payroll source of truth
 - General employee profile edits do not silently overwrite salary history; salary changes should create a new salary history row with an effective date and reason
+- Salary changes can require approval through the existing approvals workflow before they update `employee_salary_history`.
+- Pending salary approvals do not close the previous salary row, do not create a new salary row, and do not affect payroll.
+- Promotions/job changes that include a salary change are submitted as one approval request when salary approval is required; employee job fields, job history, and salary history remain unchanged until approval.
+- Approved salary and promotion-with-salary requests are claimed as `applying`, revalidated for stale job state, stale salary timeline, overlap, and locked payroll periods, then finalized as `applied` only after the target change succeeds.
+- Salary and promotion approval application is idempotent using `approval_request_id` on salary/job history rows, so retries cannot apply the same approved request twice.
+- Approval finalization records `applied_at`, `applying_started_at`, structured failure details, retry metadata, and a unique final `applied` action so concurrent retries cannot duplicate approval history.
+- Approval retry is explicit and auditable; failed approvals can be retried, while recently applying approvals stay protected by the configured recovery window before retry is exposed.
+- Rejected, cancelled, expired, or returned salary approval requests preserve the existing employee, job history, salary history, and payroll state.
+- Salary approval defaults create/ensure the `salary_increment` workflow and a usable approval step so admins do not need to guess the exact workflow key before salary approvals work.
+- Salary approval settings are available in Payroll settings for salary change approvals, promotion salary approvals, correction approvals, self-approval, Super Admin override, auto-apply fallback, expiry days, applying recovery minutes, and reason requirements.
+- If approval is required but no eligible approver exists, company settings decide whether the salary/promotion change can auto-apply directly or is blocked with a clear “no eligible approver” message. Auto-apply success is audited only after the target salary/job change succeeds.
+- Approval and rejection reasons follow the current salary approval settings dynamically instead of being hardcoded at the route layer.
+- Requester self-approval is controlled by salary approval settings and reflected through backend action flags used by the approval UI.
 - HR/Admin manages employee data; users submit My Profile/KYC update requests instead of directly editing HR-controlled fields
 - General employee edit cannot change employment status, resignation, termination, archive state, or primary outlet
-- Employee status changes must use the status action, archive action, or restore action
+- Employee status changes must use the status action/status-change endpoint, archive action, or restore action
+- Employee lifecycle statuses include active, probation, confirmed, suspended, resigned, terminated, retired, inactive, and rehired, while existing on-leave/long-leave/archive states remain supported.
+- Status changes are effective-dated, require a reason, preserve `employee_status_history`, and close prior open lifecycle ranges instead of overwriting old history.
+- Invalid status transitions are blocked unless a Super Admin provides an explicit override reason, and tenant/company scope is still enforced.
+- Future-dated status changes are rejected until scheduled activation exists, returning “Future-dated employee status changes require scheduled activation and are not available yet.”
+- High-risk lifecycle approvals for termination, resignation, suspension, and rehire are reserved for the approval framework; approval settings default off for now, so authorized changes remain immediate, reason-required, and audited.
+- Status changes affecting a finalized payroll month are blocked so later lifecycle edits cannot mutate finalized payroll periods.
 - Employee outlet changes must use the outlet assignment action
 - Employee list totals and rows are filtered by outlet access before pagination for privacy
-- Archived, resigned, and terminated employees disable linked user logins and revoke active sessions
+- Archived, suspended, resigned, terminated, retired, and inactive employees can disable linked user logins and revoke active sessions when requested/defaulted, but the last active Super Admin cannot be disabled through an employee status change.
+- Rehire creates a new lifecycle history record and clears exit dates without creating a duplicate employee; payroll eligibility resumes from the rehire effective date.
+- Employee Profile includes a Lifecycle / Status History section with current status, effective dates, reasons, creator, and action buttons for confirm, suspend, resign, terminate, retire, rehire, or return to active where permitted.
+- Employee Offboarding is available from employee profiles and `/offboarding` to preserve exit history, generate clearance checklists, and prepare final settlement inputs without deleting employees.
+- Offboarding cases track resignation, termination, retirement, contract end, and other exits with statuses for in-progress clearance, final settlement readiness, completion, or cancellation.
+- Default offboarding tasks are generated from linked users, pending asset assignments, outstanding uniforms, attendance review, leave requests/balances, salary advances, salary loans, document handover, final payroll review, and optional exit interview.
+- Offboarding task generation is idempotent and uses source references so running checklist generation again does not duplicate tasks.
+- Final settlement drafts are preparation only: they summarize salary due, allowances, unpaid leave/attendance deductions, outstanding advances, loans, asset deductions, and estimated net settlement, but do not mark advances or loans paid and do not finalize payroll.
+- Offboarding exit dates and final settlement preparation are blocked when they would affect finalized, locked, or paid payroll periods.
+- Offboarding user-access tasks disable linked user login and revoke sessions only when explicitly completed, never delete users, and cannot disable the last active Super Admin.
+- Employee Contract Management tracks employee-scoped contract records for local and foreign employees without overwriting old contract history.
+- Contracts support permanent, fixed-term, probation, temporary, part-time, casual, foreign-worker, and other types, with end dates required for time-bound contract types.
+- Contract renewals create a new version linked to the old contract and mark the previous contract as renewed instead of modifying it in place.
+- Contract expiry status is date-derived for active, expiring-soon, and expired views; expiry warnings are visible in employee profiles and the global `/contracts` page.
+- Contract files link through existing employee document metadata and never expose raw R2/file keys in API or UI responses.
+- Contract tracking settings live under Documents settings with controls for warning days, document requirements, foreign/all-employee requirements, multiple active contracts, and future renewal approval.
+- Contract expiry does not automatically terminate employees in this phase; lifecycle/offboarding actions remain explicit, audited workflows.
 - Restoring an employee does not automatically re-enable the linked user login
 - HR/Admin/Super Admin can approve, reject, or return profile update requests for more information
 - Some KYC/profile update request types may require manual HR follow-up when the target field is not directly supported yet
 - Sensitive employee data is permission-controlled and masked when the user lacks sensitive access
 - Salary history stores money as integer minor units only, currently using `monthly_salary_amount`, and payroll reads salary from `employee_salary_history`
+- Recurring compensation components are stored separately in `employee_compensation_components` so basic salary, recurring allowances, benefits, and recurring deductions remain clearly separated.
+- Compensation components are effective-dated and history-preserving: changes close the previous row with `effective_to` and insert a new row instead of overwriting old amounts.
+- Recurring allowances usually affect gross and net pay; recurring deductions reduce net pay; non-cash benefits are labelled clearly and do not increase payable cash compensation.
+- Advances, salary loans, attendance deductions, unpaid leave deductions, one-time bonuses, one-time deductions, and payroll adjustments remain separate payroll items and must not be duplicated as recurring compensation components.
+- Employee Profile -> Salary & Compensation now shows a current compensation summary, basic salary history, active compensation components, and compensation history.
+- Compensation summary uses wording such as estimated recurring compensation before variable payroll items; it is not final payroll net.
+- Compensation component changes are blocked when their effective period would affect a locked or paid payroll month.
+- Payroll hardening later can reuse `getActiveEmployeeCompensationComponents` to fetch active components for the payroll period while continuing to read basic salary from `employee_salary_history`.
+- Employee detail shows pending salary and promotion approval requests separately from applied salary/job history so proposed values do not appear as current records.
 - Employee, salary, document metadata, notes, status, outlet, job, and KYC review changes require audit logs where sensitive
 
 The employee list API is designed for professional HR tables with search, filters, status badges, joined outlet/department/position names, and future row action icons such as view, edit, archive, restore, documents, salary, and more actions. Future UI should use compact data tables, structured detail panels, clean filters, and avoid bubble-heavy layouts.
@@ -586,22 +630,41 @@ The Payroll Engine backend is available under `/api/v1/payroll`, with supporting
 
 - Payroll calculates as a draft first and can be recalculated only while the run is editable.
 - Payroll runs are company-wide by company and payroll month.
-- Payroll calculation, recalculation, approval, lock, and reopen lifecycle actions require full payroll access. Outlet-filtered or outlet-limited payroll lifecycle actions are blocked until a dedicated safe partial payroll design exists.
+- Payroll calculation, recalculation, approval, finalization, lock, and reopen lifecycle actions require full payroll access. Outlet-filtered or outlet-limited payroll lifecycle actions are blocked until a dedicated safe partial payroll design exists.
 - Outlet-limited users see only totals for accessible outlets; full-access users can see company totals.
 - Payroll uses `attendance_daily_summary`, not raw attendance events, as the attendance source for payroll decisions.
+- Explicit `absent` attendance summary rows create absent-day deductions when the policy is enabled. Missing expected workdays are blocked when completion is required, or counted as absence only when `missing_attendance_counts_as_absent` is enabled.
+- Approved paid leave overrides absence; approved unpaid leave creates an unpaid-leave deduction and is not double-counted as absence. Approved attendance corrections override original summary status, while pending/rejected corrections do not affect payroll.
 - Payroll uses confirmed `long_leave_salary_impacts`; unconfirmed or missing long leave impact creates blocking payroll exceptions.
-- Payroll lock checks attendance sync blockers, unresolved sync conflicts, attendance conflicts, pending corrections, missing punches, missing attendance summaries, long leave confirmation, missing salary history, and critical payroll exceptions.
+- Payroll finalization/lock checks attendance sync blockers, unresolved sync conflicts, attendance conflicts, pending corrections, missing punches, missing attendance summaries, long leave confirmation, missing salary history, and critical payroll exceptions.
 - Salary basis settings are supported for `fixed_30_days`, `calendar_days`, `working_days`, and `custom_days`.
 - Payroll items include salary history, attendance deductions, approved leave and unpaid leave, confirmed long leave impact, approved advances, salary loan installments, asset deductions, and configurable placeholder behavior for future earnings.
+- Recurring compensation components apply gross and net effects independently. Gross-only allowances/benefits do not become deductions, net-only additions affect payable salary without changing gross pay, and non-cash benefits stay informational.
+- Payroll preview is read-only: it does not create/update runs, write payroll items, or mark advances/loans repaid.
+- Recalculation rebuilds generated payroll rows only and preserves approved manual payroll adjustments by default; pending/rejected manual rows are preserved but excluded from totals.
+- Hardened calculation claims a run, calculates employees in memory first, and publishes generated rows only after the generated result set is ready.
+- Salary advances and salary loan installments are deducted during preview/draft calculation but are marked repaid only during payroll finalization.
+- Payroll finalization is atomic and idempotent: it claims the run as `finalizing`, writes immutable `payroll_repayment_applications` ledger rows, applies repayment state, creates finalized payslip snapshots, locks attendance summaries, and then marks the run `finalized`.
+- Retrying finalized payroll is safe; existing repayment applications are reused/skipped so salary advances and salary loan installments are not double-applied.
+- The legacy lock route is deprecated and cannot bypass payroll finalization side effects.
+- Payroll reopen/reversal is intentionally disabled until a dedicated safe reversal workflow can reverse repayment ledger rows, advance/loan balances, payslip snapshots, and attendance locks together.
+- Finalized payroll is immutable. Attendance, leave, long leave, asset deductions, salary changes, compensation changes, advance edits, loan schedule changes, and recalculation treat `finalizing`/`finalized` like locked payroll.
+- Payroll approval requests include a calculation snapshot with run ID, month, item count, totals, calculation version, and reason; stale approval snapshots are rejected if payroll changes before finalization.
 - Money is stored as INTEGER minor units.
-- Locked payroll cannot be recalculated or changed unless reopened through the reopen workflow.
+- Finalized or locked payroll cannot be recalculated or changed unless a future controlled reversal/reopen workflow is implemented.
 - Lock fields are changed only by lock/reopen actions; approve and reject do not mutate `locked_by` or `locked_at`.
 - Approval workflows can be disabled; Admin/Super Admin direct approval is allowed only when settings and permissions allow it.
-- Payslip PDF generation is a later step; this module creates payslip metadata and a friendly download placeholder.
+- Payslips are generated from finalized payroll snapshots, not live employee records, so later profile/job/salary edits do not rewrite historical payslips.
+- Final payslips can only be generated after payroll is finalized; approved-but-not-finalized payroll can be reviewed but must not produce finalized payslips.
+- Finalized payslip snapshots include company, employee, payroll period, earnings, deductions, non-cash benefits, totals, and calculation traceability.
+- Payslip PDF generation is a later step; `/api/v1/payslips/:id/print` provides a print-friendly HTML view so authorized users can use browser Print / Save as PDF without fake PDF generation.
+- Payslip download/print/detail APIs never expose `file_key`, object storage keys, tokens, secrets, or raw private storage locations.
+- Payslip generation is idempotent and protected by unique payroll item and company/run/employee indexes so retrying finalization or generation does not create duplicate payslips.
 - Payslip batch generation respects outlet access; limited users generate only accessible outlet payslips.
+- Payroll-run scoped payslip endpoints are available under `/api/v1/payroll/runs/:id/payslips`, and employee history is available under `/api/v1/employees/:id/payslips` for authorized HR/Admin users.
 - Payroll export is currently a metadata/JSON foundation, not a real Excel/PDF export file, and export scope is outlet-filtered for limited users.
 - Outlet-limited users can view/export/generate payslips only for accessible outlet items, but cannot submit, approve, reject, lock, reopen, or approve reopen for company-wide payroll.
-- Salary loan schedule changes are blocked if they affect locked or paid payroll months.
+- Salary loan schedule changes are blocked if they affect finalized, locked, or paid payroll months.
 - Salary loan approval is idempotent and cannot create duplicate installment schedules.
 - Salary loan list APIs support `start_month` filtering, and advance list APIs support `date_from` / `date_to` filters against paid date; filtered rows and counts keep outlet-access protection.
 - Future payroll UI should use professional tables, filters, status badges, compact summaries, row action icons, and payroll flow steps rather than bubble-heavy screens.
@@ -616,17 +679,21 @@ The Approval Workflow Engine is available under `/api/v1/approvals`.
 - Approval lists, details, pending counts, and histories are paginated or table-friendly and apply outlet access protection.
 - No-outlet and company-level approval requests can be viewed or acted on by eligible current-step approvers, the requester for view-only access, or Super Admin. They are not exposed to unrelated users with generic view permission.
 - Static approval routes such as settings, workflows, and thresholds are registered before approval request `/:id` routes.
-- Requesters cannot approve, reject, or return their own approval requests.
+- Requester self-approval is configurable; the default blocks requesters from approving their own requests unless the company explicitly enables it and the requester has approval permission.
+- Pending or in-progress approval requests can be cancelled with a reason by the requester or authorized approvers/Super Admin, and cancelled requests never apply target changes.
+- Pending requests can expire based on approval settings; expired requests cannot be approved and do not apply target changes.
 - Terminal approval requests cannot be acted on again.
 - Workflow steps enforce required role and permission keys; users receive a friendly message when a request is waiting for a different approval step.
 - Sensitive workflow changes such as workflow key, module, approval mode, or enabled status require a reason.
 - Workflow steps cannot share a duplicate `step_order`, and workflow keys cannot be renamed while open approval requests exist.
 - Approval thresholds are applied during approval request creation when amount/currency metadata matches an active threshold. Threshold role/permission metadata further restricts who can approve that step.
-- Super Admin override is supported for approve/reject decisions, requires a reason, writes a high-severity audit log, and does not bypass hard business locks owned by target modules.
+- Super Admin override is supported for approve/reject decisions, requires a reason, follows the same safe claim/apply/finalize path for approved target changes, and does not bypass hard business locks owned by target modules.
 - Workflow configuration supports create, update, enable, disable, and step CRUD with audit logs.
 - Threshold configuration supports create, update, enable, disable, and history rows for policy review.
-- Approval action audit logging is recorded before approval status mutations, and action/status changes are batched together to avoid completed approvals without audit history.
-- Target-module integration is intentionally conservative: approvals record the decision and return a clear note when the target module must safely apply the approved change itself. The approval engine does not bypass payroll locks, salary-loan schedule protections, asset deduction locks, or document sensitivity/file-key rules.
+- Final approval application uses a safe `pending/in_progress/failed -> applying -> applied` state flow. If target application fails, the request is marked `failed` with a safe message; if finalization is retried after the target already applied, the idempotency reference is detected and the request is finalized without duplicating salary/job rows.
+- Applying requests do not expose normal approval actions. Retry is shown only after `approval_applying_recovery_minutes` has elapsed; before that, users see “This approval request is currently applying. Please wait before retrying.”
+- Approval success audits for step actions, rejection, return, cancellation, and override rejection are written only after the conditional status transition succeeds, avoiding misleading audit entries after concurrent updates.
+- Target-module integration remains conservative for unsupported modules: approvals record the decision and return a clear note when the target module must safely apply the approved change itself. The approval engine does not bypass payroll locks, salary-loan schedule protections, asset deduction locks, or document sensitivity/file-key rules.
 - Realtime placeholder events send only small status notifications and do not include sensitive approval payloads.
 - Future UI should use professional tables with filters, status badges, history drawers, and row action icons for approve, reject, return, override, view, and configuration actions.
 
@@ -732,6 +799,7 @@ Prompt 17 adds a separate `frontend/` React + TypeScript + Vite application for 
 - My Profile is read-only for official fields; users request profile/KYC updates instead of directly editing official employee data.
 - 2FA management lives under `/profile/security`; setup secrets and backup codes are not persisted in browser storage.
 - Employees UI is implemented with backend-aligned `/employees` API calls, backend pagination, URL filters, table-first list/detail layouts, create/edit dialogs, and permission-aware salary/document/note panels.
+- Employee profile Contracts and the global `/contracts` page are implemented with table-first history, current-contract summaries, expiry/missing-document warnings, create/edit/renew/archive dialogs, backend filters, and permission-aware actions.
 - Users & Access UI is connected to live `/users`, `/roles`, and `/permissions` APIs and uses backend data for user lists, role lists, and the permission matrix.
 - Outlets, Departments, and Positions UI are implemented with backend-aligned APIs, compact tables, filters, detail drawers, and create/edit dialogs.
 - Settings UI foundation is implemented with Company, Features, Attendance, Leave, Payroll, Approvals, Documents, and Backup sections. Feature settings use real backend feature endpoints and require a shadcn dialog reason for changes; `window.prompt` is not used.
@@ -756,8 +824,8 @@ Prompt 17 adds a separate `frontend/` React + TypeScript + Vite application for 
 - Long Leave UI supports record lists, salary-impact month rows, salary-impact confirmation, approve/reject actions, and return-to-work confirmation with locked-payroll friendly errors.
 - Payroll UI supports draft calculation, recalculation, run review, items, exceptions, lifecycle actions, payroll flow steps, and reason dialogs. Company-wide lifecycle actions remain backend-enforced for full payroll access.
 - Payroll row actions are permission-aware: users with only `payroll.view` cannot see or trigger recalculate, submit/review, approve, reject, lock, request reopen, or reopen actions.
-- Payslips UI supports outlet-scoped batch metadata generation and a safe PDF download placeholder; no real PDF file generation is implemented in the frontend.
-- Payslip download placeholder actions require `payslips.download`; users with only `payslips.view` can view payslip metadata but cannot trigger downloads.
+- Payslips UI supports outlet-scoped batch generation, finalized snapshot totals, earnings/deductions/non-cash detail, and a print-ready payslip view; no real PDF file generation is implemented in the frontend.
+- Payslip print/download actions require `payslips.print` / `payslips.download`; users with only `payslips.view` can view payslip snapshots but cannot trigger print/download actions.
 - Advances and Salary Loans UI submit money as integer minor units, expose approval/pause/settle workflows with required reasons, and surface locked-period errors in HR-friendly language.
 - Salary Loans support backend `start_month` filtering with the same outlet-filtered list/count behavior as other loan filters.
 - Advances support backend and frontend `date_from` / `date_to` filters against paid date, and request creation now shows “Advance payment requested successfully.”
@@ -794,7 +862,7 @@ npm run build
 npm run typecheck
 ```
 
-When preparing a ZIP or handoff bundle, exclude `.git/`, `.wrangler/`, `node_modules/`, `frontend/node_modules/`, `frontend/dist/`, `.env`, `.env.*`, `.dev.vars`, logs, and temporary text files.
+When preparing a ZIP or handoff bundle, create it from tracked source files only. Do not include `.git/`, `.wrangler/`, `.vite/`, `node_modules/`, `frontend/node_modules/`, `dist/`, `frontend/dist/`, `coverage/`, build caches, `.env`, `.env.*`, `.dev.vars`, logs, or temporary text files.
 
 ## Production Readiness Checklist
 
@@ -818,7 +886,7 @@ Use this checklist before frontend integration or production smoke testing.
 16. Verify `DOCUMENTS_BUCKET` upload/download access with a safe test document.
 17. Verify `BACKUP_BUCKET` access with a safe metadata backup/export test.
 18. Verify audit logs are created for sensitive actions.
-19. Verify `.git/`, `.wrangler/`, `.dev.vars`, `.env*`, `node_modules/`, logs, and secrets are not included in ZIP uploads or commits.
+19. Verify `.git/`, `.wrangler/`, `.vite/`, `.dev.vars`, `.env*`, `node_modules/`, `frontend/node_modules/`, `dist/`, `frontend/dist/`, `coverage/`, build caches, logs, and secrets are not included in ZIP uploads or commits.
 20. Start frontend integration only after backend smoke tests pass.
 
 Production safety reminders:
@@ -827,7 +895,7 @@ Production safety reminders:
 - Do not seed real passwords or real personal data.
 - The D1 `database_id` is not a password, but still treat production configuration carefully.
 - Employee document API responses never expose `file_key`; R2 object keys are internal only, and sensitive document names are masked unless the caller has `documents.view_sensitive`.
-- Uploaded ZIPs should exclude `.git`, `.wrangler`, `node_modules`, `frontend/node_modules`, `frontend/dist`, and temporary text files.
+- Uploaded ZIPs should be created from tracked source files only and exclude `.git`, `.wrangler`, `.vite`, dependency folders, build output, coverage, caches, and temporary text files.
 - Payroll locked or paid periods cannot be changed without the proper reopen flow.
 - Sensitive exports require a reason and the correct sensitive export permission or Super Admin access.
 - Bootstrap is one-time only and cannot run after setup is completed.
@@ -838,24 +906,23 @@ Use this checklist for the final production handoff.
 
 ### Repository Packaging
 
-- Remove temporary files such as `New Text Document.txt`, local logs, scratch files, and generated build output.
-- Do not commit `.env`, `.env.*`, `.dev.vars`, `.wrangler/`, `.mf/`, local SQLite/Miniflare state, `node_modules/`, or `frontend/dist/`.
+- Remove temporary files such as `New Text Document.txt`, local logs, scratch files, generated build output, and build caches.
+- Do not commit `.env`, `.env.*`, `.dev.vars`, `.wrangler/`, `.vite/`, `.mf/`, local SQLite/Miniflare state, `node_modules/`, `frontend/node_modules/`, `dist/`, `frontend/dist/`, `coverage/`, or build cache folders.
 - Do not commit secrets, Cloudflare API tokens, password hashes, TOTP secrets, device token hashes, R2 object keys, or real personal data.
-- Package ZIPs with exclusions similar to:
+- Preferred clean archive command after committing source changes:
 
 ```bash
-zip -r "HRM System.zip" . \
-  -x ".git/*" \
-  -x ".wrangler/*" \
-  -x "node_modules/*" \
-  -x "frontend/node_modules/*" \
-  -x "frontend/dist/*" \
-  -x ".dev.vars" \
-  -x ".env" \
-  -x ".env.*" \
-  -x "*.log" \
-  -x "New Text Document.txt"
+npm run archive:clean
 ```
+
+This runs:
+
+```bash
+git archive --format=zip --output HRM-System-clean.zip HEAD
+```
+
+- If a working-tree handoff is needed before commit, create the ZIP from `git ls-files` output only.
+- Do not run broad recursive archive commands over the workspace root. They are easy to misconfigure and can accidentally include `.git/`, dependency folders, build output, or local secrets.
 
 ### Cloudflare Configuration
 

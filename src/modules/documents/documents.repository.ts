@@ -299,7 +299,7 @@ export const updateCategory = (env: Env, companyId: string, id: string, input: P
 };
 
 export const listEmployeesForMissing = (env: Env, companyId: string, outletIds: string[], isSuperAdmin: boolean, outletId?: string) => {
-  const clauses = ["company_id = ?", "deleted_at IS NULL", "employment_status NOT IN ('archived', 'resigned', 'terminated')"];
+  const clauses = ["company_id = ?", "deleted_at IS NULL", "employment_status NOT IN ('archived', 'resigned', 'terminated', 'retired', 'inactive')"];
   const values: unknown[] = [companyId];
   if (!isSuperAdmin) {
     if (outletIds.length === 0) clauses.push("1 = 0");

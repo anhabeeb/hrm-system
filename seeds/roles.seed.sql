@@ -48,7 +48,7 @@ FROM permissions
 WHERE permission_key IN (
   'employees.view', 'employees.export', 'attendance.view', 'leave.view', 'long_leave.view',
   'long_leave.approve', 'long_leave.reject', 'long_leave.approve_salary_impact',
-  'payroll.view', 'payroll.review', 'payroll.approve', 'payroll.reject', 'payroll.lock',
+  'payroll.view', 'payroll.review', 'payroll.approve', 'payroll.reject', 'payroll.finalize', 'payroll.lock',
   'payroll.approve_reopen', 'payroll.export', 'salary.view', 'salary.history',
   'payslips.view', 'payslips.download', 'advances.view', 'advances.approve', 'advances.reject',
   'salary_loans.view', 'salary_loans.approve', 'holidays.view', 'roster.view',
@@ -74,6 +74,7 @@ AND permission_key NOT IN (
   'employees.view_sensitive',
   'documents.view_sensitive',
   'payroll.view',
+  'payroll.finalize',
   'payroll.lock',
   'salary.view',
   'salary.history',

@@ -11,6 +11,11 @@ import {
   validateJobChangeInput,
   validateOutletAssignmentInput,
   validateSalaryHistoryInput,
+  validateCompensationComponentChangeInput,
+  validateCompensationDefinitionFilters,
+  validateCompensationDefinitionInput,
+  validateCompensationComponentEndInput,
+  validateCompensationComponentInput,
 } from "./employees.validators";
 import {
   validateDocumentArchive,
@@ -45,11 +50,31 @@ const requiredId = (c: Context<AppContext>): string => {
   return id;
 };
 
+const requiredParam = (c: Context<AppContext>, name: string): string => {
+  const value = c.req.param(name);
+
+  if (!value) {
+    throw new ValidationError("Please choose a valid record.");
+  }
+
+  return value;
+};
+
 const requiredDocumentId = (c: Context<AppContext>): string => {
   const id = c.req.param("documentId");
 
   if (!id) {
     throw new ValidationError("Document is required.");
+  }
+
+  return id;
+};
+
+const requiredComponentId = (c: Context<AppContext>): string => {
+  const id = c.req.param("componentId");
+
+  if (!id) {
+    throw new ValidationError("Compensation component is required.");
   }
 
   return id;
@@ -176,17 +201,21 @@ export const assignOutlet = async (c: Context<AppContext>) =>
     { requestId: c.get("requestId") },
   );
 
-export const changeJob = async (c: Context<AppContext>) =>
-  ok(
-    await employeesService.changeJob(
-      c.env,
-      actor(c),
-      requiredId(c),
-      validateJobChangeInput(await readJson(c)),
-    ),
-    "Employee job details updated successfully.",
+export const changeJob = async (c: Context<AppContext>) => {
+  const result = await employeesService.changeJob(
+    c.env,
+    actor(c),
+    requiredId(c),
+    validateJobChangeInput(await readJson(c)),
+  );
+  return ok(
+    result,
+    (result as { approval_required?: boolean }).approval_required
+      ? "Promotion submitted for approval."
+      : "Job change recorded successfully.",
     { requestId: c.get("requestId") },
   );
+};
 
 export const listJobHistory = async (c: Context<AppContext>) =>
   ok(
@@ -221,17 +250,153 @@ export const listSalaryHistory = async (c: Context<AppContext>) =>
     { requestId: c.get("requestId") },
   );
 
-export const addSalaryHistory = async (c: Context<AppContext>) =>
+export const addSalaryHistory = async (c: Context<AppContext>) => {
+  const result = await employeesService.addSalaryHistory(
+    c.env,
+    actor(c),
+    requiredId(c),
+    validateSalaryHistoryInput(await readJson(c)),
+  );
+  return created(
+    result,
+    (result as { approval_required?: boolean }).approval_required
+      ? "Salary change submitted for approval."
+      : "Salary record added successfully.",
+    { requestId: c.get("requestId") },
+  );
+};
+
+export const getCompensationSummary = async (c: Context<AppContext>) =>
+  ok(
+    {
+      summary: await employeesService.getCompensationSummary(
+        c.env,
+        actor(c),
+        requiredId(c),
+      ),
+    },
+    "Compensation summary loaded successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const listCompensationComponents = async (c: Context<AppContext>) =>
+  ok(
+    {
+      components: await employeesService.listCompensationComponents(
+        c.env,
+        actor(c),
+        requiredId(c),
+      ),
+    },
+    "Compensation components loaded successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const createCompensationComponent = async (c: Context<AppContext>) =>
   created(
-    await employeesService.addSalaryHistory(
+    await employeesService.createCompensationComponent(
       c.env,
       actor(c),
       requiredId(c),
-      validateSalaryHistoryInput(await readJson(c)),
+      validateCompensationComponentInput(await readJson(c)),
     ),
-    "Salary record added successfully.",
+    "Compensation component added successfully.",
     { requestId: c.get("requestId") },
   );
+
+export const changeCompensationComponent = async (c: Context<AppContext>) =>
+  ok(
+    await employeesService.changeCompensationComponent(
+      c.env,
+      actor(c),
+      requiredId(c),
+      requiredComponentId(c),
+      validateCompensationComponentChangeInput(await readJson(c)),
+    ),
+    "Compensation component changed successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const endCompensationComponent = async (c: Context<AppContext>) =>
+  ok(
+    await employeesService.endCompensationComponent(
+      c.env,
+      actor(c),
+      requiredId(c),
+      requiredComponentId(c),
+      validateCompensationComponentEndInput(await readJson(c)),
+    ),
+    "Compensation component ended successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const listCompensationComponentDefinitions = async (c: Context<AppContext>) => {
+  const result = await employeesService.listCompensationComponentDefinitions(
+    c.env,
+    actor(c),
+    validateCompensationDefinitionFilters({
+      search: c.req.query("search"),
+      component_type: c.req.query("component_type"),
+      status: c.req.query("status"),
+      page: c.req.query("page"),
+      page_size: c.req.query("page_size"),
+    }),
+  );
+
+  return paginated(result.rows, result.pagination, "Compensation component definitions loaded successfully.", {
+    requestId: c.get("requestId"),
+  });
+};
+
+export const createCompensationComponentDefinition = async (c: Context<AppContext>) =>
+  created(
+    await employeesService.createCompensationComponentDefinition(
+      c.env,
+      actor(c),
+      validateCompensationDefinitionInput(await readJson(c)),
+    ),
+    "Compensation component definition created successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const updateCompensationComponentDefinition = async (c: Context<AppContext>) =>
+  ok(
+    await employeesService.updateCompensationComponentDefinition(
+      c.env,
+      actor(c),
+      requiredParam(c, "id"),
+      validateCompensationDefinitionInput(await readJson(c)),
+    ),
+    "Compensation component definition updated successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const enableCompensationComponentDefinition = async (c: Context<AppContext>) =>
+  ok(
+    await employeesService.setCompensationComponentDefinitionStatus(
+      c.env,
+      actor(c),
+      requiredParam(c, "id"),
+      "active",
+      await reasonFromBody(c),
+    ),
+    "Compensation component definition enabled successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const disableCompensationComponentDefinition = async (c: Context<AppContext>) =>
+  ok(
+    await employeesService.setCompensationComponentDefinitionStatus(
+      c.env,
+      actor(c),
+      requiredParam(c, "id"),
+      "inactive",
+      await reasonFromBody(c),
+    ),
+    "Compensation component definition disabled successfully.",
+    { requestId: c.get("requestId") },
+  );
+
 
 export const listDocuments = async (c: Context<AppContext>) =>
   ok(

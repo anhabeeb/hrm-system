@@ -151,7 +151,7 @@ export const EmployeeForm = ({
                 <FormItem><FormLabel><RequiredLabel>Employee type</RequiredLabel></FormLabel><Select value={field.value} onValueChange={field.onChange}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="local">Local</SelectItem><SelectItem value="foreign">Foreign</SelectItem></SelectContent></Select><FormMessage /></FormItem>
               )} />
               <FormField control={form.control} name="employment_status" render={({ field }) => (
-                <FormItem><FormLabel><RequiredLabel>Status</RequiredLabel></FormLabel><Select value={field.value} onValueChange={field.onChange} disabled={isEdit}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{["active", "on_leave", "long_leave", "suspended", "resigned", "terminated", "archived"].map((status) => <SelectItem key={status} value={status}>{status.replace(/_/g, " ")}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                <FormItem><FormLabel><RequiredLabel>Status</RequiredLabel></FormLabel><Select value={field.value} onValueChange={field.onChange} disabled={isEdit}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{["active", "probation", "confirmed", "on_leave", "long_leave", "suspended", "resigned", "terminated", "retired", "inactive", "rehired", "archived"].map((status) => <SelectItem key={status} value={status}>{status.replace(/_/g, " ")}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
               )} />
               <FormField control={form.control} name="primary_outlet_id" render={({ field }) => (
                 <FormItem>

@@ -49,14 +49,17 @@ export const PayslipsPage = () => {
     },
   });
   const downloadMutation = useMutation({
-    mutationFn: (id: string) => payslipsApi.downloadPlaceholder(id),
-    onSuccess: () => setSuccessMessage("Payslip PDF generation is not available yet."),
+    mutationFn: (id: string) => payslipsApi.download(id),
+    onSuccess: (response, id) => {
+      setSuccessMessage(String(response.data.message ?? "Payslip print view is ready."));
+      window.open(payslipsApi.printUrl(id), "_blank", "noopener,noreferrer");
+    },
   });
   const error = listQuery.error ?? generateMutation.error ?? downloadMutation.error;
   const canDownloadPayslip = auth.isSuperAdmin || auth.hasPermission("payslips.download");
   return (
     <div>
-      <PageHeader title="Payslips" description="Generate and view payslip metadata. PDF downloads are represented by a safe placeholder." actions={auth.hasPermission("payslips.generate") ? <Button onClick={() => setGenerateOpen(true)}><FileText className="h-4 w-4" />Generate batch</Button> : null} />
+      <PageHeader title="Payslips" description="View finalized payroll snapshots, line-item earnings, deductions, and print-ready payslips." actions={auth.hasPermission("payslips.generate") ? <Button onClick={() => setGenerateOpen(true)}><FileText className="h-4 w-4" />Generate batch</Button> : null} />
       <div className="space-y-4 p-4 md:p-6">
         {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
         {error ? <InlineAlert title={friendlyHrmError(error, "Payslip action could not be completed.", "payroll")} variant="error" /> : null}

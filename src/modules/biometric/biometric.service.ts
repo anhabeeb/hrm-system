@@ -203,8 +203,8 @@ const assertBiometricDeviceCanPush = async (
 
 const assertPayrollUnlocked = async (env: Env, companyId: string, eventTime: string) => {
   const run = await attendanceRepository.findPayrollRunForMonth(env, companyId, payrollMonth(eventTime));
-  if (run?.status === "locked" || run?.status === "paid") {
-    throw new LockedRecordError("This biometric punch belongs to a locked payroll period and needs review.");
+  if (["finalizing", "finalized", "locked", "paid"].includes(run?.status ?? "")) {
+    throw new LockedRecordError("This biometric punch belongs to a finalized payroll period and needs review.");
   }
 };
 
@@ -352,7 +352,7 @@ const applyBiometricLog = async (
     return { log_id: logId, unmatched: true };
   }
 
-  if (mapping.deleted_at || ["archived", "resigned", "terminated"].includes(mapping.employment_status)) {
+  if (mapping.deleted_at || ["archived", "resigned", "terminated", "retired", "inactive"].includes(mapping.employment_status)) {
     const conflict = await createBiometricConflict(env, {
       companyId: device.companyId,
       outletId: device.outletId,

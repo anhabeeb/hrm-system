@@ -5,7 +5,15 @@ import type { ApprovalFilters, ApprovalHistory, ApprovalRequest, ApprovalStep, A
 
 const sanitizeApproval = (approval: ApprovalRequest): ApprovalRequest => ({
   ...approval,
-  payload_json: sanitizeApprovalPayload(approval.payload_json),
+  can_approve: approval.can_approve ?? approval.actions_available?.can_approve,
+  can_reject: approval.can_reject ?? approval.actions_available?.can_reject,
+  can_return: approval.can_return ?? approval.actions_available?.can_return,
+  can_cancel: approval.can_cancel ?? approval.actions_available?.can_cancel,
+  can_override: approval.can_override ?? approval.actions_available?.can_override,
+  can_retry: approval.can_retry ?? approval.actions_available?.can_retry,
+  disabled_reason: approval.disabled_reason ?? approval.actions_available?.disabled_reason,
+  payload_json: sanitizeApprovalPayload(approval.payload_json ?? approval.payload_summary),
+  payload_summary: sanitizeApprovalPayload(approval.payload_summary ?? approval.payload_json),
 });
 
 export const approvalsApi = {
@@ -21,6 +29,8 @@ export const approvalsApi = {
   approve: (id: string, reason: string) => api.post<ApprovalRequest>(`/approvals/${id}/approve`, { reason }),
   reject: (id: string, reason: string) => api.post<ApprovalRequest>(`/approvals/${id}/reject`, { reason }),
   returnForInfo: (id: string, reason: string) => api.post<ApprovalRequest>(`/approvals/${id}/return`, { reason }),
+  cancel: (id: string, reason: string) => api.post<ApprovalRequest>(`/approvals/${id}/cancel`, { reason }),
+  retry: (id: string, reason: string) => api.post<ApprovalRequest>(`/approvals/${id}/retry`, { reason }),
   override: (id: string, decision: "approve" | "reject", reason: string) => api.post<ApprovalRequest>(`/approvals/${id}/override`, { decision, reason }),
   workflows: (filters: WorkflowFilters = {}) => api.get<ApprovalWorkflow[]>(`/approvals/workflows${buildQueryString(filters)}`),
   getWorkflow: (id: string) => api.get<ApprovalWorkflow>(`/approvals/workflows/${id}`),

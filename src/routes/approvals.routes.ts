@@ -36,9 +36,11 @@ approvalsRoutes.get("/thresholds/:thresholdId/history", requirePermission("appro
 
 approvalsRoutes.get("/", requirePermission("approvals.view"), controller.listApprovals);
 approvalsRoutes.get("/:id/history", requirePermission("approvals.view_history"), controller.getHistory);
-approvalsRoutes.post("/:id/approve", requirePermission("approvals.approve"), requireReason(), controller.approveApproval);
-approvalsRoutes.post("/:id/reject", requirePermission("approvals.reject"), requireReason(), controller.rejectApproval);
+approvalsRoutes.post("/:id/approve", requirePermission("approvals.approve"), controller.approveApproval);
+approvalsRoutes.post("/:id/reject", requirePermission("approvals.reject"), controller.rejectApproval);
 approvalsRoutes.post("/:id/return", requirePermission("approvals.return"), requireReason(), controller.returnApproval);
+approvalsRoutes.post("/:id/cancel", requireReason(), controller.cancelApproval);
+approvalsRoutes.post("/:id/retry", requirePermission("approvals.approve"), requireReason(), controller.retryApproval);
 approvalsRoutes.post("/:id/override", requirePermission("approvals.override"), requireReason(), controller.overrideApproval);
 approvalsRoutes.get("/:id", requirePermission("approvals.view"), controller.getApproval);
 

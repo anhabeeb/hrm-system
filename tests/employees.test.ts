@@ -5,7 +5,7 @@ import {
   validateEmployeeUpdateInput,
   validateSalaryHistoryInput,
 } from "../src/modules/employees/employees.validators";
-import { AppError, ValidationError } from "../src/utils/errors";
+import { AppError } from "../src/utils/errors";
 
 const startingSalary = {
   amount: 750000,
@@ -203,9 +203,126 @@ describe("employee validators", () => {
       validateSalaryHistoryInput({
         monthly_salary_amount: 1000.5,
         effective_from: "2026-06-01",
+        change_type: "increment",
         reason: "Salary setup",
       }),
-    ).toThrow(ValidationError);
+    ).toThrow(AppError);
+  });
+
+  it("accepts a salary increment with integer minor units and normalized currency", () => {
+    const input = validateSalaryHistoryInput({
+      monthly_salary_amount: 850000,
+      currency: "mvr",
+      effective_from: "2026-07-01",
+      change_type: "increment",
+      reason: "Annual salary increment after performance review",
+    });
+
+    expect(input.monthly_salary_amount).toBe(850000);
+    expect(input.currency).toBe("MVR");
+    expect(input.change_type).toBe("increment");
+  });
+
+  it("returns salary-specific field errors for invalid increment amount", () => {
+    try {
+      validateSalaryHistoryInput({
+        monthly_salary_amount: 0,
+        effective_from: "2026-07-01",
+        change_type: "increment",
+        reason: "Annual salary increment",
+      });
+    } catch (error) {
+      expect(error).toBeInstanceOf(AppError);
+      expect((error as AppError).code).toBe("INVALID_SALARY_AMOUNT");
+      expect((error as AppError).fieldErrors?.monthly_salary_amount).toBe("Salary amount must be greater than zero.");
+    }
+  });
+
+  it("rejects negative salary amounts", () => {
+    try {
+      validateSalaryHistoryInput({
+        monthly_salary_amount: -1,
+        effective_from: "2026-07-01",
+        change_type: "increment",
+        reason: "Annual salary increment",
+      });
+    } catch (error) {
+      expect(error).toBeInstanceOf(AppError);
+      expect((error as AppError).code).toBe("INVALID_SALARY_AMOUNT");
+      expect((error as AppError).fieldErrors?.monthly_salary_amount).toBe("Salary amount must be greater than zero.");
+    }
+  });
+
+  it("defaults salary change currency to MVR when omitted", () => {
+    const input = validateSalaryHistoryInput({
+      monthly_salary_amount: 850000,
+      effective_from: "2026-07-01",
+      change_type: "increment",
+      reason: "Annual salary increment",
+    });
+
+    expect(input.currency).toBe("MVR");
+  });
+
+  it("rejects invalid salary currency codes", () => {
+    try {
+      validateSalaryHistoryInput({
+        monthly_salary_amount: 850000,
+        currency: "MVRF",
+        effective_from: "2026-07-01",
+        change_type: "increment",
+        reason: "Annual salary increment",
+      });
+    } catch (error) {
+      expect(error).toBeInstanceOf(AppError);
+      expect((error as AppError).code).toBe("VALIDATION_ERROR");
+      expect((error as AppError).fieldErrors?.currency).toBe("Please enter a valid currency code.");
+    }
+  });
+
+  it("requires a valid salary effective date", () => {
+    try {
+      validateSalaryHistoryInput({
+        monthly_salary_amount: 850000,
+        effective_from: "2026-99-99",
+        change_type: "increment",
+        reason: "Annual salary increment",
+      });
+    } catch (error) {
+      expect(error).toBeInstanceOf(AppError);
+      expect((error as AppError).code).toBe("INVALID_SALARY_EFFECTIVE_DATE");
+      expect((error as AppError).fieldErrors?.effective_from).toBe("Please enter a valid effective date.");
+    }
+  });
+
+  it("requires a supported salary change type", () => {
+    try {
+      validateSalaryHistoryInput({
+        monthly_salary_amount: 850000,
+        effective_from: "2026-07-01",
+        change_type: "promotion",
+        reason: "Annual salary increment",
+      });
+    } catch (error) {
+      expect(error).toBeInstanceOf(AppError);
+      expect((error as AppError).code).toBe("INVALID_SALARY_CHANGE_TYPE");
+      expect((error as AppError).fieldErrors?.change_type).toBe("Select a valid salary change type.");
+    }
+  });
+
+  it("requires a salary change reason", () => {
+    try {
+      validateSalaryHistoryInput({
+        monthly_salary_amount: 850000,
+        effective_from: "2026-07-01",
+        change_type: "increment",
+        reason: "",
+      });
+    } catch (error) {
+      expect(error).toBeInstanceOf(AppError);
+      expect((error as AppError).code).toBe("SALARY_CHANGE_REASON_REQUIRED");
+      expect((error as AppError).fieldErrors?.reason).toBe("Reason is required.");
+    }
   });
 
   it("rejects employment status changes from general employee update", () => {
@@ -279,6 +396,15 @@ describe("employee module placeholders", () => {
   it.todo("terminated status disables linked user account and revokes sessions");
   it.todo("restore does not automatically re-enable linked user account");
   it.todo("salary history requires salary.view");
+  it.todo("salary change closes the previous active salary one day before the new effective date");
+  it.todo("salary change inserts a new active employee_salary_history row with change_type and reason");
+  it.todo("salary overlap returns SALARY_OVERLAP and does not silently overwrite future records");
+  it.todo("employees without salary history can only add starting salary or correction");
+  it.todo("authorized HR users can add salary change from Employee Profile Salary & Compensation");
+  it.todo("salary change form converts user-friendly major-unit input to integer minor units");
+  it.todo("salary edit permissions include employees.salary.manage, employees.edit_salary, and payroll.manage");
+  it.todo("salary view permissions include employees.salary.view, employees.view_salary, and payroll.view");
+  it.todo("salary change audit is best-effort and includes old and new salary values with reason");
   it.todo("employee creation does not create a user login");
   it.todo("outlet manager cannot access another outlet's employee");
   it.todo("unauthorized user cannot view salary history");

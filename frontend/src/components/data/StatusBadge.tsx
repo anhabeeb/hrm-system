@@ -5,6 +5,7 @@ const statusMap: Record<string, { label: string; variant: "default" | "secondary
   active: { label: "Active", variant: "success" },
   inactive: { label: "Inactive", variant: "muted" },
   pending: { label: "Pending", variant: "warning" },
+  applying: { label: "Applying change...", variant: "warning" },
   approved: { label: "Approved", variant: "success" },
   rejected: { label: "Rejected", variant: "destructive" },
   locked: { label: "Locked", variant: "secondary" },

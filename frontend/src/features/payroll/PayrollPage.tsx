@@ -23,7 +23,7 @@ import { PayrollRunForm } from "./PayrollRunForm";
 import { PayrollRunsTable } from "./PayrollRunsTable";
 import type { PayrollCalculatePayload, PayrollException, PayrollFilters as PayrollFilterValues, PayrollItem, PayrollRun } from "./payroll.types";
 
-type PayrollAction = "recalculate" | "submit" | "approve" | "reject" | "lock" | "requestReopen" | "reopen" | "resolveException" | null;
+type PayrollAction = "recalculate" | "submit" | "approve" | "reject" | "finalize" | "resolveException" | null;
 
 export const PayrollPage = () => {
   const auth = useAuth();
@@ -80,9 +80,8 @@ export const PayrollPage = () => {
       if (action === "submit") return payrollApi.submitApproval(selectedRun.id, reason);
       if (action === "approve") return payrollApi.approve(selectedRun.id, reason);
       if (action === "reject") return payrollApi.reject(selectedRun.id, reason);
-      if (action === "lock") return payrollApi.lock(selectedRun.id, reason);
-      if (action === "requestReopen") return payrollApi.requestReopen(selectedRun.id, reason);
-      return payrollApi.reopen(selectedRun.id, reason);
+      if (action === "finalize") return payrollApi.finalize(selectedRun.id, reason);
+      throw new Error("Select a payroll action first.");
     },
     onSuccess: async () => {
       const messages: Record<Exclude<PayrollAction, null>, string> = {
@@ -90,9 +89,7 @@ export const PayrollPage = () => {
         submit: "Payroll submitted for approval.",
         approve: "Payroll approved.",
         reject: "Payroll rejected.",
-        lock: "Payroll locked successfully.",
-        requestReopen: "Payroll reopen requested.",
-        reopen: "Payroll reopened successfully.",
+        finalize: "Payroll finalized successfully.",
         resolveException: "Payroll exception resolved.",
       };
       setSuccessMessage(action ? messages[action] : "Payroll action completed successfully.");
@@ -109,9 +106,7 @@ export const PayrollPage = () => {
   const canSubmitForApproval = hasPayrollPermission("payroll.review");
   const canApprove = hasPayrollPermission("payroll.approve");
   const canReject = hasPayrollPermission("payroll.reject");
-  const canLock = hasPayrollPermission("payroll.lock");
-  const canRequestReopen = hasPayrollPermission("payroll.request_reopen");
-  const canReopen = hasPayrollPermission("payroll.reopen");
+  const canFinalize = hasPayrollPermission("payroll.finalize");
   const canResolve = auth.hasPermission("payroll.resolve_exceptions");
 
   const actionCopy = {
@@ -119,9 +114,7 @@ export const PayrollPage = () => {
     submit: ["Submit payroll for approval", "Submit this company-wide payroll run for approval.", "Submit"],
     approve: ["Approve payroll", "Approve this payroll run after review.", "Approve"],
     reject: ["Reject payroll", "Reject this payroll run and send it back for correction.", "Reject"],
-    lock: ["Lock payroll", "Locking prevents payroll-impacting edits until a proper reopen workflow is completed.", "Lock payroll"],
-    requestReopen: ["Request payroll reopen", "Request a locked payroll run to be reopened.", "Request reopen"],
-    reopen: ["Reopen payroll", "Reopen this payroll run so corrections can be recalculated.", "Reopen"],
+    finalize: ["Finalize payroll", "Finalize this payroll run, apply approved repayment deductions, create payslip snapshots, and prevent further payroll-impacting edits.", "Finalize payroll"],
     resolveException: ["Resolve payroll exception", "Record the resolution notes for this payroll exception.", "Resolve"],
   } as const;
   const selectedActionCopy = action ? actionCopy[action] : ["Payroll action", "A reason is required.", "Continue"];
@@ -130,7 +123,7 @@ export const PayrollPage = () => {
     <div>
       <PageHeader
         title="Payroll"
-        description="Calculate draft payroll, review exceptions, approve, lock, and safely reopen company-wide runs."
+        description="Calculate draft payroll, review exceptions, approve, finalize, and safely protect company-wide runs."
         actions={canCalculate ? <Button onClick={() => setFormOpen(true)}><Calculator className="h-4 w-4" />Calculate draft</Button> : null}
       />
       <div className="space-y-4 p-4 md:p-6">
@@ -150,16 +143,12 @@ export const PayrollPage = () => {
               onSubmit={(row) => { setSelectedRun(row); setAction("submit"); }}
               onApprove={(row) => { setSelectedRun(row); setAction("approve"); }}
               onReject={(row) => { setSelectedRun(row); setAction("reject"); }}
-              onLock={(row) => { setSelectedRun(row); setAction("lock"); }}
-              onRequestReopen={(row) => { setSelectedRun(row); setAction("requestReopen"); }}
-              onReopen={(row) => { setSelectedRun(row); setAction("reopen"); }}
+              onFinalize={(row) => { setSelectedRun(row); setAction("finalize"); }}
               canRecalculate={canRecalculate}
               canSubmit={canSubmitForApproval}
               canApprove={canApprove}
               canReject={canReject}
-              canLock={canLock}
-              canRequestReopen={canRequestReopen}
-              canReopen={canReopen}
+              canFinalize={canFinalize}
               onPageChange={(page) => updateFilters({ page })}
               onPageSizeChange={(page_size) => updateFilters({ page: 1, page_size })}
             />

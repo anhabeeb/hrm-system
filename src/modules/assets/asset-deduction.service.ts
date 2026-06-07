@@ -9,8 +9,8 @@ import { createPrefixedId } from "../../utils/ids";
 export const assertDeductionMonthUnlocked = async (env: Env, companyId: string, deductionMonth?: string) => {
   if (!deductionMonth) return;
   const run = await repository.findPayrollRun(env, companyId, deductionMonth);
-  if (run && ["locked", "paid"].includes(run.status)) {
-    throw new LockedRecordError("This deduction affects a locked payroll period.");
+  if (run && ["finalizing", "finalized", "locked", "paid"].includes(run.status)) {
+    throw new LockedRecordError("This deduction affects a finalized payroll period.");
   }
 };
 

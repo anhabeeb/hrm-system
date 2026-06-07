@@ -18,8 +18,25 @@ export interface ApprovalRequest {
   can_approve?: boolean | number;
   can_reject?: boolean | number;
   can_return?: boolean | number;
+  can_cancel?: boolean | number;
   can_override?: boolean | number;
+  can_retry?: boolean | number;
+  disabled_reason?: string | null;
+  actions_available?: {
+    can_approve?: boolean | number;
+    can_reject?: boolean | number;
+    can_return?: boolean | number;
+    can_cancel?: boolean | number;
+    can_override?: boolean | number;
+    can_retry?: boolean | number;
+    disabled_reason?: string | null;
+  };
   payload_json?: unknown;
+  payload_summary?: unknown;
+  applied_at?: string | null;
+  applying_started_at?: string | null;
+  failure_code?: string | null;
+  failure_message?: string | null;
   created_at?: string;
   updated_at?: string;
 }

@@ -140,6 +140,54 @@ export const areApprovalWorkflowsEnabled = async (
   return settings.approval_workflows_enabled !== false;
 };
 
+export interface SalaryApprovalSettings {
+  salary_change_approval_enabled: boolean;
+  promotion_salary_change_approval_enabled: boolean;
+  salary_correction_approval_enabled: boolean;
+  allow_requester_self_approval: boolean;
+  allow_super_admin_override: boolean;
+  auto_apply_when_no_eligible_approver: boolean;
+  approval_request_expiry_days: number | null;
+  approval_applying_recovery_minutes: number;
+  require_reason_for_approval: boolean;
+  require_reason_for_rejection: boolean;
+  compensation_component_approval_enabled: boolean;
+  compensation_allowance_approval_enabled: boolean;
+  compensation_benefit_approval_enabled: boolean;
+  compensation_deduction_approval_enabled: boolean;
+}
+
+export const getSalaryApprovalSettings = async (
+  env: Env,
+  companyId: string,
+): Promise<SalaryApprovalSettings> => {
+  const settings = await getJsonSetting<Partial<SalaryApprovalSettings>>(
+    env,
+    companyId,
+    "approvals.salary_rules",
+    {},
+  );
+
+  const expiryDays = Number(settings.approval_request_expiry_days);
+  const recoveryMinutes = Number(settings.approval_applying_recovery_minutes);
+  return {
+    salary_change_approval_enabled: settings.salary_change_approval_enabled !== false,
+    promotion_salary_change_approval_enabled: settings.promotion_salary_change_approval_enabled !== false,
+    salary_correction_approval_enabled: settings.salary_correction_approval_enabled !== false,
+    allow_requester_self_approval: settings.allow_requester_self_approval === true,
+    allow_super_admin_override: settings.allow_super_admin_override !== false,
+    auto_apply_when_no_eligible_approver: settings.auto_apply_when_no_eligible_approver !== false,
+    approval_request_expiry_days: Number.isInteger(expiryDays) && expiryDays > 0 ? expiryDays : null,
+    approval_applying_recovery_minutes: Number.isInteger(recoveryMinutes) && recoveryMinutes > 0 ? recoveryMinutes : 5,
+    require_reason_for_approval: settings.require_reason_for_approval !== false,
+    require_reason_for_rejection: settings.require_reason_for_rejection !== false,
+    compensation_component_approval_enabled: settings.compensation_component_approval_enabled === true,
+    compensation_allowance_approval_enabled: settings.compensation_allowance_approval_enabled === true,
+    compensation_benefit_approval_enabled: settings.compensation_benefit_approval_enabled === true,
+    compensation_deduction_approval_enabled: settings.compensation_deduction_approval_enabled === true,
+  };
+};
+
 export const shouldRequireApproval = async (
   env: Env,
   companyId: string,

@@ -8,7 +8,7 @@ export const isPayrollRunLocked = (run: PayrollRunRecord) =>
 
 export const assertPayrollRunEditable = (run: PayrollRunRecord) => {
   if (isPayrollRunLocked(run)) {
-    throw new LockedRecordError("This payroll period is locked.");
+    throw new LockedRecordError("This payroll period has been finalized and cannot be edited.");
   }
 };
 
@@ -19,8 +19,14 @@ export const assertPayrollMonthUnlocked = async (
 ) => {
   const run = await repository.findRunByMonth(env, companyId, payrollMonth);
   if (run && isPayrollRunLocked(run)) {
-    throw new LockedRecordError("This payroll period is locked.");
+    throw new LockedRecordError("This payroll period has been finalized and cannot be edited.");
   }
 };
+
+export const assertPayrollPeriodNotFinalized = async (
+  env: Env,
+  companyId: string,
+  payrollMonth: string,
+) => assertPayrollMonthUnlocked(env, companyId, payrollMonth);
 
 export const getPayrollMonthFromDate = (date: string) => date.slice(0, 7);

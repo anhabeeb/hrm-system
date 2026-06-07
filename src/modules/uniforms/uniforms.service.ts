@@ -31,7 +31,7 @@ const audit = async (env: Env, context: AuthActor, input: { action: string; enti
 const ensureEmployee = async (env: Env, context: AuthActor, employeeId: string) => {
   const employee = await repository.findEmployee(env, context.companyId, employeeId);
   if (!employee || employee.deleted_at) throw new NotFoundError("The requested employee could not be found.");
-  if (["archived", "resigned", "terminated"].includes(employee.employment_status)) throw new ConflictError("This employee is not active.");
+  if (["archived", "resigned", "terminated", "retired", "inactive"].includes(employee.employment_status)) throw new ConflictError("This employee is not active.");
   if (!permissionService.hasOutletAccess(context, employee.primary_outlet_id)) throw new OutletAccessError("You do not have access to this employee's outlet.");
   return employee;
 };

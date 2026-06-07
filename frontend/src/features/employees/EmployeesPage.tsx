@@ -112,7 +112,12 @@ export const EmployeesPage = () => {
 
   const canCreate = auth.hasPermission("employees.create");
   const canEdit = auth.hasPermission("employees.edit");
-  const canViewSalary = auth.hasAnyPermission(["salary.view", "payroll.view"]);
+  const canManageStatus = auth.hasPermission("employees.manage_status");
+  const canManageOffboarding = auth.hasPermission("employees.offboarding.manage") || auth.hasPermission("employees.edit");
+  const canManageContracts = auth.hasAnyPermission(["employees.contracts.manage", "contracts.manage", "employees.edit"]);
+  const canManageJobChange = auth.hasAnyPermission(["employees.edit", "employees.job_change.manage", "employees.manage"]);
+  const canViewSalary = auth.hasAnyPermission(["payroll.view", "employees.salary.view", "employees.view_salary", "salary.view", "salary.history"]);
+  const canEditSalary = auth.hasAnyPermission(["payroll.manage", "employees.salary.manage", "employees.edit_salary", "salary.create", "salary.edit"]);
   const canViewDocuments = auth.hasPermission("documents.view") && auth.hasFeature("documents");
   const canViewSensitiveDocuments = auth.hasPermission("documents.view_sensitive");
   const canUploadDocuments = auth.hasPermission("documents.upload") && auth.hasFeature("documents");
@@ -164,12 +169,17 @@ export const EmployeesPage = () => {
           onOpenChange={setDrawerOpen}
           onEdit={openEdit}
           canEdit={canEdit}
+          canManageJobChange={canManageJobChange}
           canViewSalary={canViewSalary}
+          canEditSalary={canEditSalary}
           canViewDocuments={canViewDocuments}
           canViewSensitiveDocuments={canViewSensitiveDocuments}
           canUploadDocuments={canUploadDocuments}
           canEditDocuments={canEditDocuments}
           canViewNotes={canViewNotes}
+          canManageStatus={canManageStatus}
+          canManageOffboarding={canManageOffboarding}
+          canManageContracts={canManageContracts}
         />
         <EmployeeForm
           open={formOpen}

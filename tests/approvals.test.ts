@@ -10,6 +10,8 @@ import {
 import { assertApprovalIsActionable, assertNotSelfApproval } from "../src/modules/approvals/approval-action.service";
 import { canActorApproveStep } from "../src/modules/approvals/approval-step.service";
 import { AppError, ValidationError } from "../src/utils/errors";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 const actor = {
   companyId: "company_1",
@@ -27,9 +29,14 @@ const actor = {
 };
 
 describe("approval validators and guards", () => {
-  it("requires a reason for approval actions", () => {
-    expect(() => validateApprovalAction({})).toThrow(ValidationError);
+  it("lets service settings decide whether approval actions require a reason", () => {
+    const service = readFileSync(resolve(process.cwd(), "src/modules/approvals/approvals.service.ts"), "utf8");
+
+    expect(validateApprovalAction({}).reason).toBeNull();
     expect(validateApprovalAction({ reason: "Reviewed and approved" }).reason).toBe("Reviewed and approved");
+    expect(service).toContain("assertReasonPolicy");
+    expect(service).toContain("require_reason_for_approval");
+    expect(service).toContain("require_reason_for_rejection");
   });
 
   it("validates override decision values", () => {
@@ -77,7 +84,8 @@ describe("approval validators and guards", () => {
   });
 
   it("keeps unsafe target integration conservative", async () => {
-    await expect(applyApprovedTargetChange({} as Env, {
+    await expect(applyApprovedTargetChange({} as Env, actor, {
+      id: "approval_1",
       module: "payroll",
       entity_type: "payroll_run",
       entity_id: "pay_1",

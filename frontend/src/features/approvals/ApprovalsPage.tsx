@@ -25,7 +25,7 @@ import { ApprovalWorkflowForm } from "./ApprovalWorkflowForm";
 import { ApprovalWorkflowTable } from "./ApprovalWorkflowTable";
 import type { ApprovalFilters as ApprovalFilterValues, ApprovalRequest, ApprovalStep, ApprovalThreshold, ApprovalWorkflow } from "./approvals.types";
 
-type ApprovalAction = "approve" | "reject" | "return" | "override" | null;
+type ApprovalAction = "approve" | "reject" | "return" | "cancel" | "retry" | "override" | null;
 type WorkflowStatusAction = "enableWorkflow" | "disableWorkflow" | "deleteStep" | "enableThreshold" | "disableThreshold" | null;
 
 export const ApprovalsPage = () => {
@@ -73,7 +73,15 @@ export const ApprovalsPage = () => {
   const workflowsQuery = useQuery({ queryKey: ["approvals", "workflows", filters], queryFn: () => approvalsApi.workflows(filters), enabled: activeTab === "workflows" && canViewWorkflows });
   const stepsQuery = useQuery({ queryKey: ["approvals", "steps", selectedWorkflow?.id], queryFn: () => approvalsApi.steps(selectedWorkflow!.id), enabled: Boolean(activeTab === "workflows" && canViewWorkflows && selectedWorkflow?.id) });
   const thresholdsQuery = useQuery({ queryKey: ["approvals", "thresholds", filters], queryFn: () => approvalsApi.thresholds(filters), enabled: activeTab === "thresholds" && canViewThresholds });
-  const settingsQuery = useQuery({ queryKey: ["approvals", "settings-summary"], queryFn: approvalsApi.settingsSummary, enabled: activeTab === "settings" && canViewSettings, retry: false });
+  const settingsQuery = useQuery({ queryKey: ["approvals", "settings-summary"], queryFn: approvalsApi.settingsSummary, enabled: canViewSettings || canViewInbox, retry: false });
+  const salaryApprovalSettings = (settingsQuery.data?.data?.salary_approval_settings ?? {}) as {
+    require_reason_for_approval?: boolean;
+    require_reason_for_rejection?: boolean;
+  };
+  const approvalReasonRequired =
+    approvalAction === "approve" ? salaryApprovalSettings.require_reason_for_approval !== false :
+      approvalAction === "reject" ? salaryApprovalSettings.require_reason_for_rejection !== false :
+        Boolean(approvalAction);
   const refresh = async () => queryClient.invalidateQueries({ queryKey: ["approvals"] });
   const approvalMutation = useMutation({
     mutationFn: ({ reason, decision }: { reason: string; decision?: "approve" | "reject" }) => {
@@ -81,10 +89,12 @@ export const ApprovalsPage = () => {
       if (approvalAction === "approve") return approvalsApi.approve(selected.id, reason);
       if (approvalAction === "reject") return approvalsApi.reject(selected.id, reason);
       if (approvalAction === "return") return approvalsApi.returnForInfo(selected.id, reason);
+      if (approvalAction === "cancel") return approvalsApi.cancel(selected.id, reason);
+      if (approvalAction === "retry") return approvalsApi.retry(selected.id, reason);
       return approvalsApi.override(selected.id, decision ?? "approve", reason);
     },
     onSuccess: async () => {
-      setSuccessMessage(approvalAction === "approve" ? "Approval request approved." : approvalAction === "reject" ? "Approval request rejected." : approvalAction === "return" ? "Approval request returned for more information." : "Approval request overridden successfully.");
+      setSuccessMessage(approvalAction === "approve" ? "Approval request approved." : approvalAction === "reject" ? "Approval request rejected." : approvalAction === "return" ? "Approval request returned for more information." : approvalAction === "cancel" ? "Approval request cancelled." : approvalAction === "retry" ? "Approval request retry completed." : "Approval request overridden successfully.");
       setApprovalAction(null);
       await refresh();
     },
@@ -123,7 +133,7 @@ export const ApprovalsPage = () => {
         <ApprovalFilters filters={filters} onChange={updateFilters} onClear={() => setSearchParams(new URLSearchParams({ page: "1", page_size: String(filters.page_size), tab: activeTab }))} />
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList><TabsTrigger value="inbox">Inbox</TabsTrigger>{canViewWorkflows ? <TabsTrigger value="workflows">Workflows</TabsTrigger> : null}{canViewThresholds ? <TabsTrigger value="thresholds">Thresholds</TabsTrigger> : null}{canViewSettings ? <TabsTrigger value="settings">Settings Summary</TabsTrigger> : null}</TabsList>
-          <TabsContent value="inbox"><ApprovalInboxTable rows={listQuery.data?.data ?? []} loading={listQuery.isLoading} pagination={listQuery.data?.pagination} canApprove={has("approvals.approve")} canReject={has("approvals.reject")} canReturn={has("approvals.return")} canOverride={has("approvals.override")} canHistory={has("approvals.view_history") || has("approvals.view")} onView={(row) => { setSelected(row); setDrawerOpen(true); }} onApprove={(row) => { setSelected(row); setApprovalAction("approve"); }} onReject={(row) => { setSelected(row); setApprovalAction("reject"); }} onReturn={(row) => { setSelected(row); setApprovalAction("return"); }} onOverride={(row) => { setSelected(row); setApprovalAction("override"); }} onHistory={(row) => { setSelected(row); setDrawerOpen(true); }} onPageChange={(page) => updateFilters({ page })} onPageSizeChange={(page_size) => updateFilters({ page: 1, page_size })} /></TabsContent>
+          <TabsContent value="inbox"><ApprovalInboxTable rows={listQuery.data?.data ?? []} loading={listQuery.isLoading} pagination={listQuery.data?.pagination} canApprove={has("approvals.approve")} canReject={has("approvals.reject")} canReturn={has("approvals.return")} canCancel={has("approvals.view")} canRetry={has("approvals.approve")} canOverride={has("approvals.override")} canHistory={has("approvals.view_history") || has("approvals.view")} onView={(row) => { setSelected(row); setDrawerOpen(true); }} onApprove={(row) => { setSelected(row); setApprovalAction("approve"); }} onReject={(row) => { setSelected(row); setApprovalAction("reject"); }} onReturn={(row) => { setSelected(row); setApprovalAction("return"); }} onCancel={(row) => { setSelected(row); setApprovalAction("cancel"); }} onRetry={(row) => { setSelected(row); setApprovalAction("retry"); }} onOverride={(row) => { setSelected(row); setApprovalAction("override"); }} onHistory={(row) => { setSelected(row); setDrawerOpen(true); }} onPageChange={(page) => updateFilters({ page })} onPageSizeChange={(page_size) => updateFilters({ page: 1, page_size })} /></TabsContent>
           {canViewWorkflows ? <TabsContent value="workflows">
             {has("approval_workflows.manage") ? (
               <div className="mb-3 flex flex-wrap gap-2">
@@ -144,7 +154,7 @@ export const ApprovalsPage = () => {
         </Tabs>
       </div>
       <ApprovalDetailDrawer approval={selected} history={historyQuery.data?.data ?? []} historyLoading={historyQuery.isLoading} open={drawerOpen} onOpenChange={setDrawerOpen} />
-      <ApprovalActionDialog action={approvalAction ?? "approve"} open={Boolean(approvalAction)} loading={approvalMutation.isPending} error={approvalMutation.error ? friendlyHrmError(approvalMutation.error, "Approval action could not be completed.", "approval") : null} onOpenChange={(open) => !open && setApprovalAction(null)} onSubmit={(payload) => approvalMutation.mutate(payload)} />
+      <ApprovalActionDialog action={approvalAction ?? "approve"} open={Boolean(approvalAction)} loading={approvalMutation.isPending} error={approvalMutation.error ? friendlyHrmError(approvalMutation.error, "Approval action could not be completed.", "approval") : null} reasonRequired={approvalReasonRequired} onOpenChange={(open) => !open && setApprovalAction(null)} onSubmit={(payload) => approvalMutation.mutate(payload)} />
       <ApprovalWorkflowForm workflow={selectedWorkflow} open={workflowFormOpen} loading={workflowMutation.isPending} error={workflowMutation.error ? friendlyHrmError(workflowMutation.error, "Workflow could not be saved.") : null} onOpenChange={setWorkflowFormOpen} onSubmit={(payload) => workflowMutation.mutate(payload)} />
       <ApprovalStepDialog step={selectedStep} open={stepFormOpen} loading={stepMutation.isPending} error={stepMutation.error ? friendlyHrmError(stepMutation.error, "Approval step could not be saved.") : null} onOpenChange={setStepFormOpen} onSubmit={(payload) => stepMutation.mutate(payload)} />
       <ApprovalThresholdDialog threshold={selectedThreshold} open={thresholdFormOpen} loading={thresholdMutation.isPending} error={thresholdMutation.error ? friendlyHrmError(thresholdMutation.error, "Approval threshold could not be saved.") : null} onOpenChange={setThresholdFormOpen} onSubmit={(payload) => thresholdMutation.mutate(payload)} />

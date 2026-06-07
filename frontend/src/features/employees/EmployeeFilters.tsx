@@ -72,7 +72,7 @@ export const EmployeeFilters = ({
         <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All statuses</SelectItem>
-          {["active", "on_leave", "long_leave", "suspended", "resigned", "terminated", "archived"].map((status) => (
+          {["active", "probation", "confirmed", "on_leave", "long_leave", "suspended", "resigned", "terminated", "retired", "inactive", "rehired", "archived"].map((status) => (
             <SelectItem key={status} value={status}>{status.replace(/_/g, " ")}</SelectItem>
           ))}
         </SelectContent>

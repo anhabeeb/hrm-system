@@ -14,6 +14,9 @@ export const documentTypeOptions = [
   { value: "medical_certificate", label: "Medical Certificate" },
   { value: "insurance", label: "Insurance" },
   { value: "driving_license", label: "Driving License" },
+  { value: "employment_contract", label: "Employment Contract" },
+  { value: "contract_renewal", label: "Contract Renewal" },
+  { value: "contract_amendment", label: "Contract Amendment" },
   { value: "other", label: "Other" },
 ];
 

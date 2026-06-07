@@ -2,9 +2,12 @@ import { Hono } from "hono";
 
 import { authMiddleware } from "../middleware/auth.middleware";
 import { requireFeature } from "../middleware/feature.middleware";
-import { requireAnyPermission, requirePermission } from "../middleware/permission.middleware";
+import { requireAnyPermission, requireAnyPermissionOrError, requirePermission } from "../middleware/permission.middleware";
 import { requireReason } from "../middleware/reason-required.middleware";
 import * as employeesController from "../modules/employees/employees.controller";
+import * as contractsController from "../modules/employee-contracts/employee-contracts.controller";
+import * as offboardingController from "../modules/offboarding/offboarding.controller";
+import * as payslipsController from "../modules/payslips/payslips.controller";
 import type { AppContext } from "../types/api.types";
 
 const employeesRoutes = new Hono<AppContext>();
@@ -14,6 +17,148 @@ employeesRoutes.use("*", requireFeature("employee_management"));
 
 employeesRoutes.get("/", requirePermission("employees.view"), employeesController.listEmployees);
 employeesRoutes.post("/", requirePermission("employees.create"), employeesController.createEmployee);
+employeesRoutes.get(
+  "/:id/payslips",
+  requireFeature("payslips"),
+  requirePermission("payslips.view"),
+  payslipsController.listEmployeePayslips,
+);
+employeesRoutes.get(
+  "/:id/offboarding",
+  requireAnyPermissionOrError(["employees.offboarding.view", "offboarding.view", "employees.view"], {
+    code: "OFFBOARDING_PERMISSION_DENIED",
+    message: "You do not have permission to view employee offboarding.",
+  }),
+  offboardingController.listEmployeeOffboarding,
+);
+employeesRoutes.get(
+  "/:id/contracts",
+  requireAnyPermissionOrError(["employees.contracts.view", "contracts.view", "employees.view"], {
+    code: "CONTRACT_PERMISSION_DENIED",
+    message: "You do not have permission to view employee contracts.",
+  }),
+  contractsController.listEmployeeContracts,
+);
+employeesRoutes.post(
+  "/:id/contracts",
+  requireAnyPermissionOrError(["employees.contracts.manage", "contracts.manage", "employees.edit"], {
+    code: "CONTRACT_PERMISSION_DENIED",
+    message: "You do not have permission to manage employee contracts.",
+  }),
+  contractsController.createContract,
+);
+employeesRoutes.get(
+  "/:id/contracts/:contractId",
+  requireAnyPermissionOrError(["employees.contracts.view", "contracts.view", "employees.view"], {
+    code: "CONTRACT_PERMISSION_DENIED",
+    message: "You do not have permission to view employee contracts.",
+  }),
+  contractsController.getContract,
+);
+employeesRoutes.patch(
+  "/:id/contracts/:contractId",
+  requireAnyPermissionOrError(["employees.contracts.manage", "contracts.manage", "employees.edit"], {
+    code: "CONTRACT_PERMISSION_DENIED",
+    message: "You do not have permission to manage employee contracts.",
+  }),
+  contractsController.updateContract,
+);
+employeesRoutes.post(
+  "/:id/contracts/:contractId/renew",
+  requireAnyPermissionOrError(["employees.contracts.manage", "contracts.manage", "employees.edit"], {
+    code: "CONTRACT_PERMISSION_DENIED",
+    message: "You do not have permission to renew employee contracts.",
+  }),
+  contractsController.renewContract,
+);
+employeesRoutes.post(
+  "/:id/contracts/:contractId/archive",
+  requireAnyPermissionOrError(["employees.contracts.manage", "contracts.manage", "employees.edit"], {
+    code: "CONTRACT_PERMISSION_DENIED",
+    message: "You do not have permission to archive employee contracts.",
+  }),
+  contractsController.archiveContract,
+);
+employeesRoutes.get(
+  "/:id/contracts/:contractId/history",
+  requireAnyPermissionOrError(["employees.contracts.view", "contracts.view", "employees.view"], {
+    code: "CONTRACT_PERMISSION_DENIED",
+    message: "You do not have permission to view employee contract history.",
+  }),
+  contractsController.contractHistory,
+);
+employeesRoutes.post(
+  "/:id/offboarding/start",
+  requireAnyPermissionOrError(["employees.offboarding.manage", "offboarding.manage", "employees.edit"], {
+    code: "OFFBOARDING_PERMISSION_DENIED",
+    message: "You do not have permission to start employee offboarding.",
+  }),
+  offboardingController.startCase,
+);
+employeesRoutes.get(
+  "/:id/offboarding/:caseId",
+  requireAnyPermissionOrError(["employees.offboarding.view", "offboarding.view", "employees.view"], {
+    code: "OFFBOARDING_PERMISSION_DENIED",
+    message: "You do not have permission to view employee offboarding.",
+  }),
+  offboardingController.getCase,
+);
+employeesRoutes.patch(
+  "/:id/offboarding/:caseId",
+  requireAnyPermissionOrError(["employees.offboarding.manage", "offboarding.manage", "employees.edit"], {
+    code: "OFFBOARDING_PERMISSION_DENIED",
+    message: "You do not have permission to update employee offboarding.",
+  }),
+  offboardingController.updateCase,
+);
+employeesRoutes.post(
+  "/:id/offboarding/:caseId/tasks/:taskId/complete",
+  requireAnyPermissionOrError(["employees.offboarding.complete_task", "offboarding.complete_task", "employees.edit"], {
+    code: "OFFBOARDING_PERMISSION_DENIED",
+    message: "You do not have permission to complete offboarding tasks.",
+  }),
+  offboardingController.completeTask,
+);
+employeesRoutes.post(
+  "/:id/offboarding/:caseId/tasks/:taskId/waive",
+  requireAnyPermissionOrError(["employees.offboarding.complete_task", "offboarding.complete_task", "employees.edit"], {
+    code: "OFFBOARDING_PERMISSION_DENIED",
+    message: "You do not have permission to waive offboarding tasks.",
+  }),
+  offboardingController.waiveTask,
+);
+employeesRoutes.post(
+  "/:id/offboarding/:caseId/cancel",
+  requireAnyPermissionOrError(["employees.offboarding.manage", "offboarding.manage", "employees.edit"], {
+    code: "OFFBOARDING_PERMISSION_DENIED",
+    message: "You do not have permission to cancel offboarding.",
+  }),
+  offboardingController.cancelCase,
+);
+employeesRoutes.post(
+  "/:id/offboarding/:caseId/prepare-final-settlement",
+  requireAnyPermissionOrError(["employees.offboarding.final_settlement", "offboarding.final_settlement", "payroll.manage"], {
+    code: "OFFBOARDING_PERMISSION_DENIED",
+    message: "You do not have permission to prepare final settlement.",
+  }),
+  offboardingController.prepareFinalSettlement,
+);
+employeesRoutes.post(
+  "/:id/offboarding/:caseId/mark-ready",
+  requireAnyPermissionOrError(["employees.offboarding.manage", "offboarding.manage", "employees.edit"], {
+    code: "OFFBOARDING_PERMISSION_DENIED",
+    message: "You do not have permission to mark offboarding ready.",
+  }),
+  offboardingController.markReady,
+);
+employeesRoutes.post(
+  "/:id/offboarding/:caseId/complete",
+  requireAnyPermissionOrError(["employees.offboarding.manage", "offboarding.manage", "employees.edit"], {
+    code: "OFFBOARDING_PERMISSION_DENIED",
+    message: "You do not have permission to complete offboarding.",
+  }),
+  offboardingController.completeCase,
+);
 employeesRoutes.get("/:id", requirePermission("employees.view"), employeesController.getEmployee);
 employeesRoutes.patch("/:id", requirePermission("employees.edit"), employeesController.updateEmployee);
 employeesRoutes.post(
@@ -35,6 +180,12 @@ employeesRoutes.post(
   employeesController.changeStatus,
 );
 employeesRoutes.post(
+  "/:id/status-change",
+  requirePermission("employees.manage_status"),
+  requireReason(),
+  employeesController.changeStatus,
+);
+employeesRoutes.post(
   "/:id/outlet-assignment",
   requirePermission("employees.manage_outlet_assignment"),
   requireReason(),
@@ -42,13 +193,18 @@ employeesRoutes.post(
 );
 employeesRoutes.post(
   "/:id/job-change",
-  requirePermission("employees.edit"),
-  requireReason(),
+  requireAnyPermissionOrError(
+    ["employees.edit", "employees.job_change.manage", "employees.manage"],
+    {
+      code: "JOB_CHANGE_PERMISSION_DENIED",
+      message: "You do not have permission to record employee job changes.",
+    },
+  ),
   employeesController.changeJob,
 );
 employeesRoutes.get(
   "/:id/job-history",
-  requirePermission("employees.view"),
+  requireAnyPermission(["employees.view", "employees.job_history.view"]),
   employeesController.listJobHistory,
 );
 employeesRoutes.get(
@@ -58,14 +214,80 @@ employeesRoutes.get(
 );
 employeesRoutes.get(
   "/:id/salary-history",
-  requirePermission("salary.view"),
+  requireAnyPermissionOrError(
+    ["payroll.view", "employees.salary.view", "employees.view_salary", "salary.view", "salary.history"],
+    {
+      code: "SALARY_PERMISSION_DENIED",
+      message: "You do not have permission to view employee salary history.",
+    },
+  ),
   employeesController.listSalaryHistory,
 );
 employeesRoutes.post(
   "/:id/salary-history",
-  requireAnyPermission(["salary.create", "salary.edit"]),
-  requireReason(),
+  requireAnyPermissionOrError(
+    ["payroll.manage", "employees.salary.manage", "employees.edit_salary", "salary.create", "salary.edit"],
+    {
+      code: "SALARY_PERMISSION_DENIED",
+      message: "You do not have permission to update employee salary history.",
+    },
+  ),
   employeesController.addSalaryHistory,
+);
+employeesRoutes.get(
+  "/:id/compensation-summary",
+  requireAnyPermissionOrError(
+    ["employees.compensation.view", "payroll.view", "employees.salary.view", "employees.view_salary", "salary.view", "salary.history"],
+    {
+      code: "COMPENSATION_PERMISSION_DENIED",
+      message: "You do not have permission to view employee compensation.",
+    },
+  ),
+  employeesController.getCompensationSummary,
+);
+employeesRoutes.get(
+  "/:id/compensation-components",
+  requireAnyPermissionOrError(
+    ["employees.compensation.view", "payroll.view", "employees.salary.view", "employees.view_salary", "salary.view", "salary.history"],
+    {
+      code: "COMPENSATION_PERMISSION_DENIED",
+      message: "You do not have permission to view employee compensation.",
+    },
+  ),
+  employeesController.listCompensationComponents,
+);
+employeesRoutes.post(
+  "/:id/compensation-components",
+  requireAnyPermissionOrError(
+    ["employees.compensation.manage", "payroll.manage", "employees.salary.manage", "employees.edit_salary", "salary.create", "salary.edit"],
+    {
+      code: "COMPENSATION_PERMISSION_DENIED",
+      message: "You do not have permission to manage employee compensation.",
+    },
+  ),
+  employeesController.createCompensationComponent,
+);
+employeesRoutes.patch(
+  "/:id/compensation-components/:componentId",
+  requireAnyPermissionOrError(
+    ["employees.compensation.manage", "payroll.manage", "employees.salary.manage", "employees.edit_salary", "salary.create", "salary.edit"],
+    {
+      code: "COMPENSATION_PERMISSION_DENIED",
+      message: "You do not have permission to manage employee compensation.",
+    },
+  ),
+  employeesController.changeCompensationComponent,
+);
+employeesRoutes.post(
+  "/:id/compensation-components/:componentId/end",
+  requireAnyPermissionOrError(
+    ["employees.compensation.manage", "payroll.manage", "employees.salary.manage", "employees.edit_salary", "salary.create", "salary.edit"],
+    {
+      code: "COMPENSATION_PERMISSION_DENIED",
+      message: "You do not have permission to manage employee compensation.",
+    },
+  ),
+  employeesController.endCompensationComponent,
 );
 employeesRoutes.get(
   "/:id/documents",

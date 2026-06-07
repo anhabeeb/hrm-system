@@ -27,16 +27,12 @@ export const PayrollRunsTable = ({
   onSubmit,
   onApprove,
   onReject,
-  onLock,
-  onRequestReopen,
-  onReopen,
+  onFinalize,
   canRecalculate,
   canSubmit,
   canApprove,
   canReject,
-  canLock,
-  canRequestReopen,
-  canReopen,
+  canFinalize,
   onPageChange,
   onPageSizeChange,
 }: {
@@ -48,16 +44,12 @@ export const PayrollRunsTable = ({
   onSubmit: (row: PayrollRun) => void;
   onApprove: (row: PayrollRun) => void;
   onReject: (row: PayrollRun) => void;
-  onLock: (row: PayrollRun) => void;
-  onRequestReopen: (row: PayrollRun) => void;
-  onReopen: (row: PayrollRun) => void;
+  onFinalize: (row: PayrollRun) => void;
   canRecalculate?: boolean;
   canSubmit?: boolean;
   canApprove?: boolean;
   canReject?: boolean;
-  canLock?: boolean;
-  canRequestReopen?: boolean;
-  canReopen?: boolean;
+  canFinalize?: boolean;
   onPageChange?: (page: number) => void;
   onPageSizeChange?: (pageSize: number) => void;
 }) => (
@@ -74,17 +66,14 @@ export const PayrollRunsTable = ({
     emptyDescription="Calculate a draft payroll run to begin the review workflow."
     rowActions={(row) => {
       const status = row.status.toLowerCase();
-      const editable = !["locked", "paid"].includes(status);
-      const locked = ["locked", "paid"].includes(status);
-      const approvable = editable && !["approved"].includes(status);
+      const immutable = ["finalizing", "finalized", "locked", "paid"].includes(status);
+      const editable = !immutable;
       const actions: RowAction[] = [{ key: "view", onSelect: () => onView(row) }];
       if (canRecalculate && editable) actions.push({ key: "more", label: "Recalculate", onSelect: () => onRecalculate(row) });
-      if (canSubmit && editable) actions.push({ key: "approve", label: "Submit approval", onSelect: () => onSubmit(row) });
-      if (canApprove && approvable) actions.push({ key: "approve", label: "Approve", onSelect: () => onApprove(row) });
-      if (canReject && editable) actions.push({ key: "reject", label: "Reject", onSelect: () => onReject(row) });
-      if (canLock && status === "approved") actions.push({ key: "approve", label: "Lock", onSelect: () => onLock(row) });
-      if (canRequestReopen && locked) actions.push({ key: "more", label: "Request reopen", onSelect: () => onRequestReopen(row) });
-      if (canReopen && locked) actions.push({ key: "more", label: "Reopen", onSelect: () => onReopen(row) });
+      if (canSubmit && ["calculated", "reviewed", "reopened"].includes(status)) actions.push({ key: "approve", label: "Submit approval", onSelect: () => onSubmit(row) });
+      if (canApprove && ["pending_approval", "submitted"].includes(status)) actions.push({ key: "approve", label: "Approve", onSelect: () => onApprove(row) });
+      if (canReject && ["pending_approval", "submitted"].includes(status)) actions.push({ key: "reject", label: "Reject", onSelect: () => onReject(row) });
+      if (canFinalize && ["approved", "calculated", "reviewed", "reopened", "finalization_failed"].includes(status)) actions.push({ key: "approve", label: "Finalize", onSelect: () => onFinalize(row) });
       return <RowActions actions={actions} />;
     }}
   />

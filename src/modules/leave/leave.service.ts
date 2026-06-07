@@ -104,7 +104,7 @@ const ensureEmployeeAccess = async (env: Env, context: AuthActor, employeeId: st
 };
 
 const assertEmployeeCanUseLeave = (employee: Awaited<ReturnType<typeof ensureEmployeeAccess>>) => {
-  if (employee.deleted_at || ["archived", "resigned", "terminated"].includes(employee.employment_status)) {
+  if (employee.deleted_at || ["archived", "resigned", "terminated", "retired", "inactive"].includes(employee.employment_status)) {
     throw new ConflictError("This employee cannot create a new leave request.");
   }
 };

@@ -50,14 +50,25 @@ export const countPayrollItemsForRun = async (env: Env, companyId: string, payro
   );
   return row?.total ?? 0;
 };
-export const createPayslip = (env: Env, input: { id: string; companyId: string; payrollRunId: string; payrollItemId: string; employeeId: string; generatedBy: string }) =>
+export const markPayslipDownloaded = (env: Env, companyId: string, id: string) =>
   run(
     env,
-    `INSERT INTO payslips (
-      id, company_id, payroll_run_id, payroll_item_id, employee_id,
-      file_key, status, generated_by, generated_at, downloaded_at
-    ) VALUES (?, ?, ?, ?, ?, NULL, 'generated', ?, ?, NULL)`,
-    [input.id, input.companyId, input.payrollRunId, input.payrollItemId, input.employeeId, input.generatedBy, new Date().toISOString()],
+    `UPDATE payslips
+     SET downloaded_at = COALESCE(downloaded_at, ?),
+       last_downloaded_at = ?,
+       download_count = COALESCE(download_count, 0) + 1
+     WHERE company_id = ? AND id = ?`,
+    [new Date().toISOString(), new Date().toISOString(), companyId, id],
+  );
+
+export const markPayslipPrinted = (env: Env, companyId: string, id: string) =>
+  run(
+    env,
+    `UPDATE payslips
+     SET last_printed_at = ?,
+       printed_count = COALESCE(printed_count, 0) + 1
+     WHERE company_id = ? AND id = ?`,
+    [new Date().toISOString(), companyId, id],
   );
 const where = (companyId: string, filters: PayslipFilters, outletIds: string[], isSuperAdmin: boolean) => {
   const clauses = ["p.company_id = ?"];
@@ -103,11 +114,12 @@ export const countPayslips = async (env: Env, companyId: string, filters: Paysli
 export const findPayslip = (env: Env, companyId: string, id: string) =>
   one<any>(
     env,
-    `SELECT p.*, r.payroll_month, e.employee_code, e.full_name AS employee_name, i.outlet_id
+    `SELECT p.*, r.payroll_month, e.employee_code, e.full_name AS employee_name, i.outlet_id, o.name AS outlet_name
      FROM payslips p
      JOIN payroll_runs r ON r.id = p.payroll_run_id
      JOIN payroll_items i ON i.id = p.payroll_item_id
      JOIN employees e ON e.id = p.employee_id
+     LEFT JOIN outlets o ON o.id = i.outlet_id
      WHERE p.company_id = ? AND p.id = ? LIMIT 1`,
     [companyId, id],
   );

@@ -33,7 +33,7 @@ export const listKioskEmployees = (
     "e.company_id = ?",
     "e.primary_outlet_id = ?",
     "e.deleted_at IS NULL",
-    "e.employment_status NOT IN ('archived', 'resigned', 'terminated')",
+    "e.employment_status NOT IN ('archived', 'resigned', 'terminated', 'retired', 'inactive')",
   ];
   const values: unknown[] = [companyId, outletId];
   if (filters.search) {
@@ -64,7 +64,7 @@ export const countKioskEmployees = async (
     "company_id = ?",
     "primary_outlet_id = ?",
     "deleted_at IS NULL",
-    "employment_status NOT IN ('archived', 'resigned', 'terminated')",
+    "employment_status NOT IN ('archived', 'resigned', 'terminated', 'retired', 'inactive')",
   ];
   const values: unknown[] = [companyId, outletId];
   if (filters.search) {
@@ -101,7 +101,7 @@ export const deviceSummary = async (env: Env, companyId: string, outletId: strin
   }>(
     env,
     `SELECT
-      (SELECT COUNT(*) FROM employees WHERE company_id = ? AND primary_outlet_id = ? AND deleted_at IS NULL AND employment_status NOT IN ('archived', 'resigned', 'terminated')) AS total_employees_available,
+      (SELECT COUNT(*) FROM employees WHERE company_id = ? AND primary_outlet_id = ? AND deleted_at IS NULL AND employment_status NOT IN ('archived', 'resigned', 'terminated', 'retired', 'inactive')) AS total_employees_available,
       (SELECT COUNT(*) FROM attendance_daily_summary WHERE company_id = ? AND outlet_id = ? AND attendance_date = ? AND first_clock_in IS NOT NULL) AS checked_in_today,
       (SELECT COUNT(*) FROM attendance_daily_summary WHERE company_id = ? AND outlet_id = ? AND attendance_date = ? AND last_clock_out IS NOT NULL) AS checked_out_today,
       (SELECT COUNT(*) FROM attendance_daily_summary WHERE company_id = ? AND outlet_id = ? AND attendance_date = ? AND status IN ('checked_in', 'missing_clock_out')) AS missing_clock_out_count`,

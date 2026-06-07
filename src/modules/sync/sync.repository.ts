@@ -227,7 +227,7 @@ export const listSafeEmployeesForOutlet = (env: Env, companyId: string, outletId
      LEFT JOIN departments d ON d.id = e.department_id
      LEFT JOIN positions p ON p.id = e.position_id
      WHERE e.company_id = ? AND e.primary_outlet_id = ? AND e.deleted_at IS NULL
-       AND e.employment_status NOT IN ('archived', 'resigned', 'terminated')
+       AND e.employment_status NOT IN ('archived', 'resigned', 'terminated', 'retired', 'inactive')
      ORDER BY e.full_name
      LIMIT 500`,
     [companyId, outletId],

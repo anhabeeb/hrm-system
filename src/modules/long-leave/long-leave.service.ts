@@ -240,7 +240,7 @@ export const getLongLeave = async (env: Env, context: AuthActor, id: string) => 
 
 export const createLongLeave = async (env: Env, context: AuthActor, input: LongLeaveCreateInput) => {
   const employee = await ensureEmployeeAccess(env, context, input.employee_id);
-  if (employee.deleted_at || ["archived", "resigned", "terminated"].includes(employee.employment_status)) {
+  if (employee.deleted_at || ["archived", "resigned", "terminated", "retired", "inactive"].includes(employee.employment_status)) {
     throw new ConflictError("This employee cannot be placed on long leave.");
   }
   const totalDays = calculator.countInclusiveDays(input.start_date, input.expected_return_date);

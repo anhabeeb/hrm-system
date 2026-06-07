@@ -19,6 +19,9 @@ describe("document UI helpers", () => {
       "Medical Certificate",
       "Insurance",
       "Driving License",
+      "Employment Contract",
+      "Contract Renewal",
+      "Contract Amendment",
       "Other",
     ]);
   });

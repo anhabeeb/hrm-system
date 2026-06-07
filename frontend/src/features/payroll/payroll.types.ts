@@ -3,6 +3,20 @@ export interface PayrollRun {
   payroll_month: string;
   status: string;
   totals_scope?: string;
+  payroll_year?: number;
+  payroll_month_number?: number;
+  period_start?: string;
+  period_end?: string;
+  currency?: string;
+  calculation_status?: string;
+  calculation_version?: number;
+  calculated_at?: string | null;
+  approval_request_id?: string | null;
+  submitted_for_approval_at?: string | null;
+  finalized_by?: string | null;
+  finalized_at?: string | null;
+  finalization_started_at?: string | null;
+  finalization_failed_reason?: string | null;
   employee_count?: number;
   item_count?: number;
   exception_count?: number;
@@ -29,6 +43,9 @@ export interface PayrollItem {
   net_amount?: number;
   status?: string;
   payslip_status?: string;
+  calculation_code?: string | null;
+  calculation_description?: string | null;
+  calculation_metadata_json?: string | null;
 }
 
 export interface PayrollException {

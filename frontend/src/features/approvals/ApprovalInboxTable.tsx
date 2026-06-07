@@ -19,20 +19,24 @@ const columns: TableColumn<ApprovalRequest>[] = [
   { key: "created_at", header: "Created", cell: (row) => formatDateTime(row.created_at) },
 ];
 
-export const ApprovalInboxTable = ({ rows, loading, pagination, canApprove, canReject, canReturn, canOverride, canHistory, onView, onApprove, onReject, onReturn, onOverride, onHistory, onPageChange, onPageSizeChange }: {
+export const ApprovalInboxTable = ({ rows, loading, pagination, canApprove, canReject, canReturn, canCancel, canOverride, canRetry, canHistory, onView, onApprove, onReject, onReturn, onCancel, onOverride, onRetry, onHistory, onPageChange, onPageSizeChange }: {
   rows: ApprovalRequest[];
   loading?: boolean;
   pagination?: Pagination;
   canApprove?: boolean;
   canReject?: boolean;
   canReturn?: boolean;
+  canCancel?: boolean;
   canOverride?: boolean;
+  canRetry?: boolean;
   canHistory?: boolean;
   onView: (row: ApprovalRequest) => void;
   onApprove: (row: ApprovalRequest) => void;
   onReject: (row: ApprovalRequest) => void;
   onReturn: (row: ApprovalRequest) => void;
+  onCancel: (row: ApprovalRequest) => void;
   onOverride: (row: ApprovalRequest) => void;
+  onRetry: (row: ApprovalRequest) => void;
   onHistory: (row: ApprovalRequest) => void;
   onPageChange?: (page: number) => void;
   onPageSizeChange?: (pageSize: number) => void;
@@ -53,6 +57,8 @@ export const ApprovalInboxTable = ({ rows, loading, pagination, canApprove, canR
       if (canApprove && boolish(row.can_approve)) actions.push({ key: "approve", onSelect: () => onApprove(row) });
       if (canReject && boolish(row.can_reject)) actions.push({ key: "reject", onSelect: () => onReject(row) });
       if (canReturn && boolish(row.can_return)) actions.push({ key: "more", label: "Return", onSelect: () => onReturn(row) });
+      if (canCancel && boolish(row.can_cancel)) actions.push({ key: "more", label: "Cancel", onSelect: () => onCancel(row) });
+      if (canRetry && boolish(row.can_retry)) actions.push({ key: "more", label: "Retry", onSelect: () => onRetry(row) });
       if (canOverride && boolish(row.can_override)) actions.push({ key: "more", label: "Override", onSelect: () => onOverride(row) });
       if (canHistory) actions.push({ key: "more", label: "History", onSelect: () => onHistory(row) });
       return <RowActions actions={actions} />;

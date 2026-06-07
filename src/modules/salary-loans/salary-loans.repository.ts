@@ -138,7 +138,7 @@ export const listLockedPayrollMonths = async (env: Env, companyId: string, month
     env,
     `SELECT payroll_month FROM payroll_runs
      WHERE company_id = ? AND payroll_month IN (${months.map(() => "?").join(", ")})
-       AND status IN ('locked', 'paid')`,
+       AND status IN ('finalizing', 'finalized', 'locked', 'paid')`,
     [companyId, ...months],
   );
   return rows.map((row) => row.payroll_month);

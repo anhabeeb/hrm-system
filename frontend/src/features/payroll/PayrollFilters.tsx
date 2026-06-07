@@ -26,7 +26,12 @@ export const PayrollFilters = ({
         <SelectContent>
           <SelectItem value="all">All statuses</SelectItem>
           <SelectItem value="draft">Draft</SelectItem>
+          <SelectItem value="calculated">Calculated</SelectItem>
+          <SelectItem value="pending_approval">Pending approval</SelectItem>
           <SelectItem value="approved">Approved</SelectItem>
+          <SelectItem value="finalizing">Finalizing</SelectItem>
+          <SelectItem value="finalized">Finalized</SelectItem>
+          <SelectItem value="finalization_failed">Finalization failed</SelectItem>
           <SelectItem value="locked">Locked</SelectItem>
           <SelectItem value="reopened">Reopened</SelectItem>
         </SelectContent>

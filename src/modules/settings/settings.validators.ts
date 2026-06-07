@@ -74,7 +74,7 @@ const ALLOWED_SETTING_KEYS_BY_GROUP: Partial<Record<SettingsGroup, Set<string>>>
   attendance: new Set(["attendance.default_rules"]),
   leave: new Set(["leave.default_rules", "long_leave.default_rules", "holiday.default_rules"]),
   payroll: new Set(["payroll.default_rules", "payroll.earnings_toggles"]),
-  documents: new Set(["documents.default_rules", "documents.categories", "documents.foreign_employee_expected"]),
+  documents: new Set(["documents.default_rules", "documents.categories", "documents.foreign_employee_expected", "documents.contract_rules"]),
   backup_recovery: new Set(["backup.default_rules"]),
   notifications: new Set(["notifications.default_rules"]),
   reports: new Set(["reports.default_rules"]),

@@ -262,7 +262,7 @@ const processPushEvent = async (
     return { kind: "conflict" as const, local_id: event.local_id, conflict_id: conflict.id, conflict_type: conflict.conflict_type };
   }
 
-  if (["archived", "resigned", "terminated"].includes(employee.employment_status)) {
+  if (["archived", "resigned", "terminated", "retired", "inactive"].includes(employee.employment_status)) {
     const conflict = await createSyncConflict(env, {
       companyId: device.companyId,
       outletId,

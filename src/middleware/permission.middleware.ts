@@ -34,6 +34,20 @@ export const requireAnyPermission = (permissionKeys: string[]) =>
     await next();
   });
 
+export const requireAnyPermissionOrError = (
+  permissionKeys: string[],
+  error: { code: string; message: string },
+) =>
+  createMiddleware<AppContext>(async (c, next) => {
+    const context = getContext(c.get("authUser"));
+
+    if (!permissionService.hasAnyPermission(context, permissionKeys)) {
+      throw new PermissionError(error.message, error.code);
+    }
+
+    await next();
+  });
+
 export const requireAllPermissions = (permissionKeys: string[]) =>
   createMiddleware<AppContext>(async (c, next) => {
     const context = getContext(c.get("authUser"));

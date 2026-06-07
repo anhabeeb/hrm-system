@@ -7,6 +7,10 @@ import type { Employee } from "./employees.types";
 import { EmployeeDocumentsPanel } from "./EmployeeDocumentsPanel";
 import { EmployeeNotesPanel } from "./EmployeeNotesPanel";
 import { EmployeeSalaryHistoryPanel } from "./EmployeeSalaryHistoryPanel";
+import { EmployeeJobHistoryPanel } from "./EmployeeJobHistoryPanel";
+import { EmployeeLifecyclePanel } from "./EmployeeLifecyclePanel";
+import { OffboardingPanel } from "@/features/offboarding/OffboardingPanel";
+import { EmployeeContractsPanel } from "@/features/contracts/EmployeeContractsPanel";
 
 const expiryStatus = (date?: string | null) => {
   if (!date) return "Not available";
@@ -26,12 +30,17 @@ interface EmployeeDetailDrawerProps {
   onOpenChange: (open: boolean) => void;
   onEdit?: (employee: Employee) => void;
   canEdit: boolean;
+  canManageJobChange: boolean;
   canViewSalary: boolean;
+  canEditSalary: boolean;
   canViewDocuments: boolean;
   canViewSensitiveDocuments: boolean;
   canUploadDocuments: boolean;
   canEditDocuments: boolean;
   canViewNotes: boolean;
+  canManageStatus: boolean;
+  canManageOffboarding: boolean;
+  canManageContracts: boolean;
 }
 
 export const EmployeeDetailDrawer = ({
@@ -40,12 +49,17 @@ export const EmployeeDetailDrawer = ({
   onOpenChange,
   onEdit,
   canEdit,
+  canManageJobChange,
   canViewSalary,
+  canEditSalary,
   canViewDocuments,
   canViewSensitiveDocuments,
   canUploadDocuments,
   canEditDocuments,
   canViewNotes,
+  canManageStatus,
+  canManageOffboarding,
+  canManageContracts,
 }: EmployeeDetailDrawerProps) => {
   if (!employee) return null;
 
@@ -92,6 +106,27 @@ export const EmployeeDetailDrawer = ({
           { label: "Contract type", value: employee.contract_type ?? "Not available" },
         ]}
       />
+      <section className="space-y-3">
+        <h3 className="text-sm font-semibold">Contracts</h3>
+        <EmployeeContractsPanel employee={employee} canManage={canManageContracts} />
+      </section>
+      <section className="space-y-3">
+        <h3 className="text-sm font-semibold">Lifecycle / Status History</h3>
+        <EmployeeLifecyclePanel employee={employee} canManageStatus={canManageStatus} />
+      </section>
+      <section className="space-y-3">
+        <h3 className="text-sm font-semibold">Offboarding / Final Settlement Preparation</h3>
+        <OffboardingPanel employee={employee} canManage={canManageOffboarding} />
+      </section>
+      <section className="space-y-3">
+        <h3 className="text-sm font-semibold">Employment / Job History</h3>
+        <EmployeeJobHistoryPanel
+          employee={employee}
+          canManageJobChange={canManageJobChange}
+          canViewSalary={canViewSalary}
+          canEditSalary={canEditSalary}
+        />
+      </section>
       <DetailSection
         title="Contact Information"
         rows={[
@@ -100,8 +135,8 @@ export const EmployeeDetailDrawer = ({
         ]}
       />
       <section className="space-y-3">
-        <h3 className="text-sm font-semibold">Salary Summary</h3>
-        <EmployeeSalaryHistoryPanel employeeId={employee.id} canViewSalary={canViewSalary} />
+        <h3 className="text-sm font-semibold">Salary & Compensation</h3>
+        <EmployeeSalaryHistoryPanel employeeId={employee.id} canViewSalary={canViewSalary} canEditSalary={canEditSalary} />
       </section>
       <section className="space-y-3">
         <h3 className="text-sm font-semibold">Documents & Compliance</h3>
