@@ -588,6 +588,63 @@ const ensureEmployeeAccess = async (
   return employee;
 };
 
+export const resolveActorLinkedEmployeeId = async (
+  env: Env,
+  context: AuthActor,
+): Promise<string | null> => {
+  const linked = await employeesRepository.findLinkedEmployeeIdForUser(
+    env,
+    context.companyId,
+    context.actorUserId,
+  );
+
+  return linked?.employee_id ?? null;
+};
+
+const ensureEmployeeSelfServiceAccess = async (
+  env: Env,
+  context: AuthActor,
+  employeeId: string,
+): Promise<EmployeeListRow> => {
+  const linkedEmployeeId = await resolveActorLinkedEmployeeId(env, context);
+  if (!linkedEmployeeId || linkedEmployeeId !== employeeId) {
+    throw new PermissionError("You can only view alerts for your own employee profile.");
+  }
+
+  const employee = await employeesRepository.findEmployeeById(
+    env,
+    context.companyId,
+    employeeId,
+  );
+
+  if (!employee) {
+    throw new NotFoundError("The requested employee could not be found.");
+  }
+
+  return employee;
+};
+
+const ensureEmployeeProfileSectionAccess = async (
+  env: Env,
+  context: AuthActor,
+  employeeId: string,
+  options: {
+    scopedPermissions: string[];
+    ownPermissions: string[];
+    ownDeniedMessage: string;
+  },
+): Promise<EmployeeListRow> => {
+  if (permissionService.hasAnyPermission(context, options.scopedPermissions)) {
+    return ensureEmployeeAccess(env, context, employeeId);
+  }
+
+  if (permissionService.hasAnyPermission(context, options.ownPermissions)) {
+    return ensureEmployeeSelfServiceAccess(env, context, employeeId);
+  }
+
+  throw new PermissionError(options.ownDeniedMessage);
+};
+
 const ensureReferenceData = async (
   env: Env,
   context: AuthActor,
@@ -732,6 +789,292 @@ export const getEmployee = async (
   context: AuthActor,
   employeeId: string,
 ) => maskEmployee(await ensureEmployeeAccess(env, context, employeeId), hasSensitivePermission(context));
+
+const profileLimit = (limit?: number) => Math.min(Math.max(limit ?? 25, 1), 100);
+
+const monthStart = () => {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString().slice(0, 10);
+};
+
+const today = () => new Date().toISOString().slice(0, 10);
+
+const requireProfilePermission = (context: AuthActor, permissions: string[], message: string) => {
+  if (!permissionService.hasAnyPermission(context, permissions)) {
+    throw new PermissionError(message);
+  }
+};
+
+export const getEmployeeProfileSummary = async (
+  env: Env,
+  context: AuthActor,
+  employeeId: string,
+) => {
+  const employee = await ensureEmployeeAccess(env, context, employeeId);
+  const warnings = await employeesRepository.profileWarnings(env, context.companyId, employeeId);
+
+  return {
+    employee: maskEmployee(employee, hasSensitivePermission(context)),
+    warnings: {
+      expiring_documents: Number(warnings?.expiring_documents ?? 0),
+      active_long_leave: Number(warnings?.active_long_leave ?? 0),
+      missing_punches: Number(warnings?.missing_punches ?? 0),
+      pending_approvals: Number(warnings?.pending_approvals ?? 0),
+      payroll_warnings: Number(warnings?.payroll_warnings ?? 0),
+      unresolved_expiry_alerts: Number(warnings?.unresolved_expiry_alerts ?? 0),
+    },
+    generated_at: new Date().toISOString(),
+  };
+};
+
+export const getEmployeeProfileAttendance = async (
+  env: Env,
+  context: AuthActor,
+  employeeId: string,
+  limit?: number,
+) => {
+  requireProfilePermission(context, ["attendance.view", "attendance.reports.view", "dashboard.attendance.view"], "You do not have permission to view employee attendance.");
+  await ensureEmployeeAccess(env, context, employeeId);
+  const safeLimit = profileLimit(limit);
+  const [summary, recent_rows, source_summary] = await Promise.all([
+    employeesRepository.profileAttendanceSummary(env, context.companyId, employeeId, monthStart(), today()),
+    employeesRepository.profileAttendanceRows(env, context.companyId, employeeId, safeLimit),
+    employeesRepository.profileAttendanceSources(env, context.companyId, employeeId, 10),
+  ]);
+
+  return {
+    today: recent_rows.find((row: any) => row.attendance_date === today()) ?? null,
+    current_month_summary: {
+      present_days: Number(summary?.present_days ?? 0),
+      absent_days: Number(summary?.absent_days ?? 0),
+      late_days: Number(summary?.late_days ?? 0),
+      early_checkout_days: Number(summary?.early_checkout_days ?? 0),
+      missing_punch_days: Number(summary?.missing_punch_days ?? 0),
+      overtime_days: Number(summary?.overtime_days ?? 0),
+      holiday_work_days: Number(summary?.holiday_work_days ?? 0),
+    },
+    recent_rows,
+    source_summary,
+    report_href: `/attendance/reports?employee_id=${encodeURIComponent(employeeId)}`,
+  };
+};
+
+export const getEmployeeProfileLeave = async (
+  env: Env,
+  context: AuthActor,
+  employeeId: string,
+  limit?: number,
+) => {
+  requireProfilePermission(context, ["leave.view", "dashboard.leave.view"], "You do not have permission to view employee leave.");
+  await ensureEmployeeAccess(env, context, employeeId);
+  const safeLimit = profileLimit(limit);
+  const [balances, recent_requests, transactions] = await Promise.all([
+    employeesRepository.profileLeaveBalances(env, context.companyId, employeeId),
+    employeesRepository.profileLeaveRequests(env, context.companyId, employeeId, safeLimit),
+    permissionService.hasAnyPermission(context, ["leave.transactions.view", "leave.balances.view", "leave.view"])
+      ? employeesRepository.profileLeaveTransactions(env, context.companyId, employeeId, safeLimit)
+      : Promise.resolve([]),
+  ]);
+  return { balances, recent_requests, transactions };
+};
+
+export const getEmployeeProfileLongLeave = async (
+  env: Env,
+  context: AuthActor,
+  employeeId: string,
+  limit?: number,
+) => {
+  requireProfilePermission(context, ["long_leave.view", "dashboard.long_leave.view"], "You do not have permission to view employee long leave.");
+  await ensureEmployeeAccess(env, context, employeeId);
+  const safeLimit = profileLimit(limit);
+  const [records, payroll_impacts] = await Promise.all([
+    employeesRepository.profileLongLeave(env, context.companyId, employeeId, safeLimit),
+    permissionService.hasAnyPermission(context, ["long_leave.payroll_preview", "payroll.view", "dashboard.payroll_readiness.view"])
+      ? employeesRepository.profileLongLeaveImpacts(env, context.companyId, employeeId, safeLimit)
+      : Promise.resolve([]),
+  ]);
+  return {
+    active: records.find((row: any) => ["approved", "active", "extended"].includes(row.status)) ?? null,
+    history: records,
+    payroll_impacts,
+  };
+};
+
+export const getEmployeeProfileDocuments = async (
+  env: Env,
+  context: AuthActor,
+  employeeId: string,
+  limit?: number,
+) => {
+  requireProfilePermission(context, ["documents.view"], "You do not have permission to view employee documents.");
+  await ensureEmployeeAccess(env, context, employeeId);
+  const includeSensitive = permissionService.hasPermission(context, "documents.view_sensitive");
+  const rows = await employeesRepository.profileDocuments(env, context.companyId, employeeId, profileLimit(limit));
+  return {
+    documents: rows.map((row: any) => ({
+      ...row,
+      file_name: row.is_sensitive === 1 && !includeSensitive ? "Sensitive document" : row.file_name,
+    })),
+  };
+};
+
+export const getEmployeeProfileContracts = async (
+  env: Env,
+  context: AuthActor,
+  employeeId: string,
+  limit?: number,
+) => {
+  requireProfilePermission(context, ["employees.contracts.view", "contracts.view", "employees.view"], "You do not have permission to view employee contracts.");
+  await ensureEmployeeAccess(env, context, employeeId);
+  const contracts = await employeesRepository.profileContracts(env, context.companyId, employeeId, profileLimit(limit));
+  return {
+    active_contract: contracts.find((row: any) => row.contract_status === "active") ?? contracts[0] ?? null,
+    contracts,
+  };
+};
+
+export const getEmployeeProfileAssets = async (
+  env: Env,
+  context: AuthActor,
+  employeeId: string,
+  limit?: number,
+) => {
+  requireProfilePermission(context, ["assets.view", "uniforms.view"], "You do not have permission to view employee assets or uniforms.");
+  await ensureEmployeeAccess(env, context, employeeId);
+  const safeLimit = profileLimit(limit);
+  const [assets, uniforms] = await Promise.all([
+    permissionService.hasPermission(context, "assets.view")
+      ? employeesRepository.profileAssets(env, context.companyId, employeeId, safeLimit)
+      : Promise.resolve([]),
+    permissionService.hasPermission(context, "uniforms.view")
+      ? employeesRepository.profileUniforms(env, context.companyId, employeeId, safeLimit)
+      : Promise.resolve([]),
+  ]);
+  return { assets, uniforms };
+};
+
+export const getEmployeeProfilePayrollReadiness = async (
+  env: Env,
+  context: AuthActor,
+  employeeId: string,
+  limit?: number,
+) => {
+  requireProfilePermission(context, ["payroll.view", "salary.view", "employees.salary.view", "dashboard.payroll_readiness.view"], "You do not have permission to view payroll readiness for this employee.");
+  await ensureEmployeeAccess(env, context, employeeId);
+  const safeLimit = profileLimit(limit);
+  const [salary, attendance, long_leave_impacts, leave] = await Promise.all([
+    employeesRepository.profileSalarySummary(env, context.companyId, employeeId),
+    employeesRepository.profileAttendanceSummary(env, context.companyId, employeeId, monthStart(), today()),
+    employeesRepository.profileLongLeaveImpacts(env, context.companyId, employeeId, safeLimit),
+    employeesRepository.profileLeaveBalances(env, context.companyId, employeeId),
+  ]);
+  return {
+    salary_summary: salary,
+    attendance_exceptions_affecting_payroll: Number(attendance?.missing_punch_days ?? 0),
+    long_leave_payroll_impact: long_leave_impacts,
+    leave_balance_warnings: leave.filter((row: any) => Number(row.available_days ?? 0) < 0),
+  };
+};
+
+export const getEmployeeProfileAlerts = async (
+  env: Env,
+  context: AuthActor,
+  employeeId: string,
+  limit?: number,
+) => {
+  requireProfilePermission(context, ["expiry_alerts.view", "expiry_alerts.view_own"], "You do not have permission to view employee alerts.");
+  await ensureEmployeeProfileSectionAccess(env, context, employeeId, {
+    scopedPermissions: ["expiry_alerts.view"],
+    ownPermissions: ["expiry_alerts.view_own"],
+    ownDeniedMessage: "You do not have permission to view employee alerts.",
+  });
+  const alerts = await employeesRepository.profileAlerts(env, context.companyId, employeeId, profileLimit(limit));
+  return {
+    alerts,
+    open_count: alerts.filter((row: any) => ["open", "acknowledged", "snoozed"].includes(row.status)).length,
+    critical_count: alerts.filter((row: any) => ["critical", "urgent", "high"].includes(row.severity)).length,
+  };
+};
+
+export const getEmployeeProfileTimeline = async (
+  env: Env,
+  context: AuthActor,
+  employeeId: string,
+  limit?: number,
+) => {
+  requireProfilePermission(context, ["employees.view", "audit_logs.view"], "You do not have permission to view employee history.");
+  await ensureEmployeeAccess(env, context, employeeId);
+  const safeLimit = profileLimit(limit);
+  const [statusHistory, jobHistory, leaveRequests, longLeave, documents, auditEvents] = await Promise.all([
+    employeesRepository.profileStatusHistory(env, context.companyId, employeeId, safeLimit),
+    employeesRepository.profileJobHistory(env, context.companyId, employeeId, safeLimit),
+    employeesRepository.profileLeaveRequests(env, context.companyId, employeeId, 10),
+    employeesRepository.profileLongLeave(env, context.companyId, employeeId, 10),
+    permissionService.hasPermission(context, "documents.view")
+      ? employeesRepository.profileDocuments(env, context.companyId, employeeId, 10)
+      : Promise.resolve([]),
+    permissionService.hasPermission(context, "audit_logs.view")
+      ? employeesRepository.profileAuditTimeline(env, context.companyId, employeeId, safeLimit)
+      : Promise.resolve([]),
+  ]);
+  const events = [
+    ...statusHistory.map((row: any) => ({ id: row.id, type: "status", label: `Status changed to ${row.new_status}`, date: row.changed_at ?? row.created_at, reason: row.reason ?? null })),
+    ...jobHistory.map((row: any) => ({ id: row.id, type: "job", label: `Job history: ${row.change_type}`, date: row.effective_from, reason: row.reason ?? null })),
+    ...leaveRequests.map((row: any) => ({ id: row.id, type: "leave", label: `Leave ${row.status}`, date: row.start_date, reason: row.reason ?? null })),
+    ...longLeave.map((row: any) => ({ id: row.id, type: "long_leave", label: `Long leave ${row.status}`, date: row.start_date, reason: row.reason ?? null })),
+    ...documents.map((row: any) => ({ id: row.id, type: "document", label: `Document ${row.document_type}`, date: row.created_at, reason: null })),
+    ...auditEvents.map((row: any) => ({ id: row.id, type: "audit", label: `${row.module}: ${row.action}`, date: row.created_at, reason: row.reason ?? null })),
+  ]
+    .sort((a, b) => String(b.date ?? "").localeCompare(String(a.date ?? "")))
+    .slice(0, safeLimit);
+  return { events };
+};
+
+export const getEmployeeProfile = async (
+  env: Env,
+  context: AuthActor,
+  employeeId: string,
+  limit?: number,
+) => {
+  const summary = await getEmployeeProfileSummary(env, context, employeeId);
+  const section = async <T>(fn: () => Promise<T>) => {
+    try {
+      return await fn();
+    } catch (error) {
+      if (error instanceof PermissionError) return null;
+      throw error;
+    }
+  };
+
+  const [attendance, leave, long_leave, documents, contracts, assets, payroll_readiness, alerts, timeline] = await Promise.all([
+    section(() => getEmployeeProfileAttendance(env, context, employeeId, limit)),
+    section(() => getEmployeeProfileLeave(env, context, employeeId, limit)),
+    section(() => getEmployeeProfileLongLeave(env, context, employeeId, limit)),
+    section(() => getEmployeeProfileDocuments(env, context, employeeId, limit)),
+    section(() => getEmployeeProfileContracts(env, context, employeeId, limit)),
+    section(() => getEmployeeProfileAssets(env, context, employeeId, limit)),
+    section(() => getEmployeeProfilePayrollReadiness(env, context, employeeId, limit)),
+    section(() => getEmployeeProfileAlerts(env, context, employeeId, limit)),
+    section(() => getEmployeeProfileTimeline(env, context, employeeId, limit)),
+  ]);
+
+  return {
+    summary,
+    attendance,
+    leave,
+    long_leave,
+    documents,
+    contracts,
+    assets,
+    payroll_readiness,
+    alerts,
+    timeline,
+    meta: {
+      employee_id: employeeId,
+      generated_at: new Date().toISOString(),
+    },
+  };
+};
 
 export const createEmployee = async (
   env: Env,

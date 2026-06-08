@@ -12,7 +12,16 @@ export interface DeviceRecord {
   updated_at: string;
 }
 
-export type DeviceType = "kiosk" | "biometric_placeholder" | "local_bridge" | "tablet" | "other";
+export type DeviceType =
+  | "kiosk"
+  | "biometric"
+  | "biometric_placeholder"
+  | "bridge"
+  | "local_bridge"
+  | "mobile"
+  | "web"
+  | "tablet"
+  | "other";
 
 export interface DeviceListFilters {
   outlet_id?: string;

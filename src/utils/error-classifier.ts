@@ -6,6 +6,7 @@ import {
   StorageError,
   UnknownAppError,
 } from "./errors";
+import { sanitizeSensitiveText } from "./sanitize";
 
 export interface ErrorClassificationContext {
   requestId?: string;
@@ -14,15 +15,8 @@ export interface ErrorClassificationContext {
   step?: string;
 }
 
-const SECRET_PATTERN =
-  /(authorization|bearer|token|password|secret|private[_-]?key|jwt|cookie|session)[\s:=]+[^\s,;}"']+/gi;
-
 export const sanitizeTechnicalMessage = (message: string): string =>
-  message
-    .replace(/authorization\s+bearer\s+[^\s,;}"']+/gi, "Authorization=[redacted]")
-    .replace(/bearer\s+[^\s,;}"']+/gi, "Bearer [redacted]")
-    .replace(SECRET_PATTERN, "$1=[redacted]")
-    .replace(/([A-Za-z0-9+/]{80,}={0,2})/g, "[redacted]");
+  sanitizeSensitiveText(message, { mask: "[redacted]" });
 
 const getMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);

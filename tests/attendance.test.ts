@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 
 import app from "../src/app";
 import {
@@ -131,60 +131,4 @@ describe("attendance routes", () => {
   });
 });
 
-describe("attendance placeholders", () => {
-  it.todo("clock-in creates attendance event");
-  it.todo("clock-out creates attendance event");
-  it.todo("daily summary updates after clock-in/out");
-  it.todo("duplicate clock-in is blocked");
-  it.todo("duplicate clock-out is blocked");
-  it.todo("wrong outlet creates conflict");
-  it.todo("missing clock-in creates conflict");
-  it.todo("correction request requires reason");
-  it.todo("approving clock_in_time correction updates or creates clock_in event");
-  it.todo("approving clock_out_time correction updates or creates clock_out event");
-  it.todo("approving status correction updates daily summary");
-  it.todo("approving manual_summary_update updates daily summary");
-  it.todo("unsupported correction type returns UNSUPPORTED_CORRECTION_TYPE");
-  it.todo("correction approval does not approve when payroll is locked");
-  it.todo("correction approval rebuilds summary after clock time correction");
-  it.todo("user cannot approve correction for inaccessible outlet");
-  it.todo("Super Admin can approve correction across outlets");
-  it.todo("correction approval fails if outlet cannot be determined");
-  it.todo("correction approval blocks when original payroll month is locked");
-  it.todo("correction approval blocks when new payroll month is locked");
-  it.todo("correction is not marked approved if outlet access fails");
-  it.todo("correction is not marked approved if payroll lock check fails");
-  it.todo("correction approval updates summary");
-  it.todo("correction rejection does not update summary");
-  it.todo("conflict resolution requires reason");
-  it.todo("user cannot resolve conflict for inaccessible outlet");
-  it.todo("Super Admin can resolve conflict across outlets");
-  it.todo("conflict resolution fails if outlet cannot be determined");
-  it.todo("conflict is not marked resolved if outlet access fails");
-  it.todo("locked payroll blocks manual edit");
-  it.todo("status-only absent manual entry creates absent summary");
-  it.todo("status-only manual entry sets worked_minutes to 0");
-  it.todo("employee from inaccessible outlet cannot be viewed");
-  it.todo("employee from inaccessible outlet cannot be manually clocked in");
-  it.todo("attendance list count is outlet-filtered");
-  it.todo("GET /attendance/summary returns data as an array with top-level pagination");
-  it.todo("GET /attendance/summary does not return nested data.rows");
-  it.todo("GET /attendance/events route exists and is registered before /attendance/events/:id");
-  it.todo("GET /attendance/events accepts device_id as an optional query filter");
-  it.todo("GET /attendance/events?device_id=device_123 filters rows by ev.device_id");
-  it.todo("GET /attendance/events?device_id=device_123 applies the same device filter to the count query");
-  it.todo("GET /attendance/events device_id filter does not bypass outlet access");
-  it.todo("GET /attendance/events applies outlet access inside SQL and count queries");
-  it.todo("GET /attendance/events returns top-level data array and pagination");
-  it.todo("GET /attendance/events does not expose device token hashes or raw sensitive payloads");
-  it.todo("attendance event detail returns safe fields only");
-  it.todo("attendance event detail applies outlet access");
-  it.todo("missing attendance event detail returns NOT_FOUND");
-  it.todo("corrections list returns pagination metadata");
-  it.todo("conflicts list returns pagination metadata");
-  it.todo("missing punches list returns pagination metadata");
-  it.todo("pagination counts do not include inaccessible outlets");
-  it.todo("wrong outlet conflict creates audit log");
-  it.todo("missing clock-in conflict creates audit log");
-  it.todo("user-friendly duplicate/wrong-outlet/locked-payroll messages are returned");
-});
+

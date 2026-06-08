@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { UserPlus } from "lucide-react";
 
 import { InlineAlert } from "@/components/feedback/InlineAlert";
@@ -25,6 +25,7 @@ const saveError = () => new ApiError("The record could not be saved. Please revi
 
 export const EmployeesPage = () => {
   const auth = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -159,6 +160,7 @@ export const EmployeesPage = () => {
             setSelectedEmployee(employee);
             setDrawerOpen(true);
           }}
+          onProfile={(employee) => navigate(`/employees/${employee.id}`)}
           onEdit={openEdit}
           onPageChange={(page) => updateFilters({ page })}
           onPageSizeChange={(page_size) => updateFilters({ page: 1, page_size })}

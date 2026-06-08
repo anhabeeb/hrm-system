@@ -4,9 +4,12 @@ import * as service from "./long-leave.service";
 import {
   validateLongLeaveAction,
   validateLongLeaveCreate,
+  validateLongLeaveExtend,
   validateLongLeaveFilters,
   validateLongLeaveOverride,
   validateLongLeaveReturn,
+  validateLongLeaveSettings,
+  validateLongLeaveUpdate,
 } from "./long-leave.validators";
 import type { AppContext, AuthActor } from "../../types/api.types";
 import { AuthError, ValidationError } from "../../utils/errors";
@@ -53,20 +56,38 @@ export const createLongLeave = async (c: Context<AppContext>) =>
     );
   };
 
+export const updateLongLeave = async (c: Context<AppContext>) =>
+  ok(await service.updateLongLeaveRecord(c.env, actor(c), id(c), validateLongLeaveUpdate(await body(c))), "Long leave updated successfully.", { requestId: c.get("requestId") });
+
 export const getSalaryImpact = async (c: Context<AppContext>) =>
   ok({ months: await service.getSalaryImpact(c.env, actor(c), id(c)) }, "Long leave salary impact loaded successfully.", { requestId: c.get("requestId") });
 
 export const calculateSalaryImpact = async (c: Context<AppContext>) =>
   ok(await service.calculateSalaryImpact(c.env, actor(c), id(c)), "Long leave salary impact calculated successfully.", { requestId: c.get("requestId") });
 
+export const payrollPreview = async (c: Context<AppContext>) =>
+  ok(await service.previewPayrollImpact(c.env, actor(c), id(c)), "Long leave payroll impact preview generated successfully.", { requestId: c.get("requestId") });
+
+export const payrollApply = async (c: Context<AppContext>) =>
+  ok(await service.applyPayrollImpact(c.env, actor(c), id(c), validateLongLeaveAction(await body(c))), "Long leave payroll impact marked for review successfully.", { requestId: c.get("requestId") });
+
 export const confirmSalaryImpact = async (c: Context<AppContext>) =>
   ok(await service.confirmSalaryImpact(c.env, actor(c), id(c), validateLongLeaveAction(await body(c))), "Long leave salary impact confirmed.", { requestId: c.get("requestId") });
+
+export const submitLongLeave = async (c: Context<AppContext>) =>
+  ok(await service.submitLongLeave(c.env, actor(c), id(c), validateLongLeaveAction(await body(c))), "Long leave submitted.", { requestId: c.get("requestId") });
 
 export const approveLongLeave = async (c: Context<AppContext>) =>
   ok(await service.approveLongLeave(c.env, actor(c), id(c), validateLongLeaveAction(await body(c))), "Long leave approved.", { requestId: c.get("requestId") });
 
 export const rejectLongLeave = async (c: Context<AppContext>) =>
   ok(await service.rejectLongLeave(c.env, actor(c), id(c), validateLongLeaveAction(await body(c))), "Long leave rejected.", { requestId: c.get("requestId") });
+
+export const cancelLongLeave = async (c: Context<AppContext>) =>
+  ok(await service.cancelLongLeave(c.env, actor(c), id(c), validateLongLeaveAction(await body(c))), "Long leave cancelled.", { requestId: c.get("requestId") });
+
+export const extendLongLeave = async (c: Context<AppContext>) =>
+  ok(await service.extendLongLeave(c.env, actor(c), id(c), validateLongLeaveExtend(await body(c))), "Long leave extended.", { requestId: c.get("requestId") });
 
 export const returnFromLongLeave = async (c: Context<AppContext>) =>
   ok(await service.returnFromLongLeave(c.env, actor(c), id(c), validateLongLeaveReturn(await body(c))), "Long leave return confirmed.", { requestId: c.get("requestId") });
@@ -76,3 +97,12 @@ export const overrideImpact = async (c: Context<AppContext>) =>
 
 export const settingsPreview = async (c: Context<AppContext>) =>
   ok(await service.settingsPreview(c.env, actor(c)), "Long leave settings preview loaded successfully.", { requestId: c.get("requestId") });
+
+export const getSettings = async (c: Context<AppContext>) =>
+  ok(await service.settingsPreview(c.env, actor(c)), "Long leave settings loaded successfully.", { requestId: c.get("requestId") });
+
+export const updateSettings = async (c: Context<AppContext>) =>
+  ok(await service.updateSettings(c.env, actor(c), validateLongLeaveSettings(await body(c))), "Long leave settings updated successfully.", { requestId: c.get("requestId") });
+
+export const timeline = async (c: Context<AppContext>) =>
+  ok(await service.getTimeline(c.env, actor(c), id(c)), "Long leave timeline loaded successfully.", { requestId: c.get("requestId") });

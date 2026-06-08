@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 
 import app from "../src/app";
 import {
@@ -745,7 +745,4 @@ describe("document service hardening", () => {
   });
 });
 
-describe("document module placeholders", () => {
-  it.todo("document download route integration sets Content-Type and Content-Disposition with a real R2 object");
-  it.todo("future expiry notification alerts do not include file keys or sensitive file data");
-});
+

@@ -162,6 +162,9 @@ export const AttendancePage = () => {
           </div>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" asChild>
+              <Link to="/attendance/reports">Open Attendance Reports</Link>
+            </Button>
+            <Button variant="outline" asChild>
               <Link to="/attendance/corrections">Open Time Corrections</Link>
             </Button>
             {canManualEntry ? (

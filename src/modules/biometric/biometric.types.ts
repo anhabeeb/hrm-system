@@ -16,6 +16,9 @@ export interface BiometricPunchInput {
   event_type: BiometricEventType;
   verification_method?: BiometricVerificationMethod;
   device_event_id?: string;
+  external_employee_identifier?: string;
+  raw_punch_code?: string;
+  outlet_id?: string;
   raw_payload_json?: Record<string, unknown>;
   bridge_app_version?: string;
   source_device_serial?: string;
@@ -55,6 +58,10 @@ export interface BiometricDeviceInput {
   device_serial: string;
   device_type: BiometricDeviceType;
   sync_mode: BiometricSyncMode;
+  device_code?: string;
+  external_device_id?: string;
+  vendor?: string;
+  model?: string;
 }
 
 export interface BiometricDeviceUpdateInput {
@@ -63,6 +70,10 @@ export interface BiometricDeviceUpdateInput {
   device_serial?: string;
   device_type?: BiometricDeviceType;
   sync_mode?: BiometricSyncMode;
+  device_code?: string;
+  external_device_id?: string;
+  vendor?: string;
+  model?: string;
 }
 
 export interface BiometricMappingInput {
@@ -100,6 +111,12 @@ export interface BiometricLogRecord {
   verification_method: string | null;
   raw_payload_json: string | null;
   dedupe_key: string | null;
+  source_event_id?: string | null;
+  device_timestamp?: string | null;
+  attendance_event_id?: string | null;
+  resolved_by?: string | null;
+  resolved_at?: string | null;
+  resolution_reason?: string | null;
   sync_status: string;
   created_at: string;
   updated_at: string;

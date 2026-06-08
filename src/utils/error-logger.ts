@@ -2,6 +2,7 @@ import type { Context } from "hono";
 
 import type { AppContext } from "../types/api.types";
 import type { AppError } from "./errors";
+import { sanitizeSensitivePayload, sanitizeSensitiveText } from "./sanitize";
 
 const errorStack = (error: unknown): string | undefined =>
   error instanceof Error ? error.stack : undefined;
@@ -9,12 +10,71 @@ const errorStack = (error: unknown): string | undefined =>
 const errorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
+const isProduction = (environment: string | undefined): boolean =>
+  ["production", "prod"].includes((environment ?? "").toLowerCase());
+
+const sanitizeMaybeText = (value: string | undefined | null): string | undefined =>
+  value ? sanitizeSensitiveText(value) : undefined;
+
+const shouldSuppressErrorDetails = (appError: AppError): boolean =>
+  appError.statusCode === 401 || appError.statusCode === 403;
+
 const safeStringify = (value: unknown): string | null => {
   try {
-    return JSON.stringify(value);
+    const json = JSON.stringify(sanitizeSensitivePayload(value));
+    return json ? sanitizeSensitiveText(json) : null;
   } catch {
     return null;
   }
+};
+
+export const sanitizedStackForEnvironment = (
+  stack: string | undefined,
+  environment: string | undefined,
+): string | null => {
+  if (!stack || isProduction(environment)) return null;
+  return sanitizeSensitiveText(stack);
+};
+
+export const buildSanitizedErrorLogPayload = (
+  input: {
+    requestId?: string;
+    environment?: string;
+    route: string;
+    method: string;
+    userId?: string;
+    companyId?: string;
+    outletId?: string;
+    deviceId?: string;
+    appError: AppError;
+    originalError: unknown;
+  },
+) => {
+  const { appError, originalError } = input;
+  return {
+    requestId: input.requestId,
+    timestamp: new Date().toISOString(),
+    environment: input.environment ?? "unknown",
+    route: input.route,
+    method: input.method,
+    userId: input.userId,
+    companyId: input.companyId,
+    outletId: input.outletId,
+    deviceId: input.deviceId,
+    error: {
+      code: appError.code,
+      title: sanitizeMaybeText(appError.title),
+      message: sanitizeMaybeText(appError.message),
+      technicalMessage: sanitizeMaybeText(appError.technicalMessage),
+      step: sanitizeMaybeText(appError.step),
+      status: appError.statusCode,
+      retryable: appError.retryable,
+      details: appError.details && !shouldSuppressErrorDetails(appError) ? safeStringify(appError.details) : undefined,
+      originalMessage: sanitizeMaybeText(errorMessage(originalError)),
+      stack: sanitizedStackForEnvironment(errorStack(originalError), input.environment),
+      cause: appError.cause ? sanitizeMaybeText(errorMessage(appError.cause)) : undefined,
+    },
+  };
 };
 
 const writeSystemErrorLogIfAvailable = async (
@@ -63,12 +123,12 @@ const writeSystemErrorLogIfAvailable = async (
         authUser?.companyId ?? null,
         appError.code,
         appError.title,
-        appError.message,
-        appError.technicalMessage ?? null,
-        appError.step ?? null,
+        sanitizeMaybeText(appError.message) ?? appError.message,
+        sanitizeMaybeText(appError.technicalMessage) ?? null,
+        sanitizeMaybeText(appError.step) ?? null,
         appError.statusCode,
         appError.retryable ? 1 : 0,
-        errorStack(originalError) ?? null,
+        sanitizedStackForEnvironment(errorStack(originalError), c.env.ENVIRONMENT) ?? null,
       )
       .run();
   } catch (loggingError) {
@@ -76,7 +136,7 @@ const writeSystemErrorLogIfAvailable = async (
       requestId: c.get("requestId"),
       route: c.req.path,
       method: c.req.method,
-      error_message: errorMessage(loggingError),
+      error_message: sanitizeSensitiveText(errorMessage(loggingError)),
     });
   }
 };
@@ -88,9 +148,8 @@ export const logAppError = async (
 ): Promise<void> => {
   const authUser = c.get("authUser");
   const deviceAuth = c.get("deviceAuth");
-  const payload = {
+  const payload = buildSanitizedErrorLogPayload({
     requestId: c.get("requestId"),
-    timestamp: new Date().toISOString(),
     environment: c.env.ENVIRONMENT ?? "unknown",
     route: c.req.path,
     method: c.req.method,
@@ -98,19 +157,9 @@ export const logAppError = async (
     companyId: authUser?.companyId ?? deviceAuth?.companyId,
     outletId: deviceAuth?.outletId ?? (authUser?.outletIds.length === 1 ? authUser.outletIds[0] : undefined),
     deviceId: deviceAuth?.deviceId,
-    error: {
-      code: appError.code,
-      title: appError.title,
-      message: appError.message,
-      technicalMessage: appError.technicalMessage,
-      step: appError.step,
-      status: appError.statusCode,
-      retryable: appError.retryable,
-      details: appError.details ? safeStringify(appError.details) : undefined,
-      stack: errorStack(originalError),
-      cause: appError.cause ? errorMessage(appError.cause) : undefined,
-    },
-  };
+    appError,
+    originalError,
+  });
 
   console.error("Application request error", payload);
   await writeSystemErrorLogIfAvailable(c, appError, originalError);

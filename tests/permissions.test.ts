@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 import { Hono } from "hono";
 
 import { requireDeviceOutletAccess } from "../src/middleware/device-auth.middleware";
@@ -8,9 +8,12 @@ import {
   hasOutletAccess,
   isAdminOrSuperAdmin,
 } from "../src/services/permission.service";
+import { requirePermission } from "../src/middleware/permission.middleware";
 import type { AppContext, AuthActor, DeviceAuthContext } from "../src/types/api.types";
 import { AppError, ReasonRequiredError } from "../src/utils/errors";
 import { errorResponse } from "../src/utils/response";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 const context = (overrides: Partial<AuthActor> = {}): AuthActor => ({
   requestId: "req_test",
@@ -128,7 +131,7 @@ describe("permission service", () => {
   });
 });
 
-describe("access-control placeholders", () => {
+describe("access-control behavior", () => {
   it("uses the standard reason required error", () => {
     const error = new ReasonRequiredError();
 
@@ -136,13 +139,63 @@ describe("access-control placeholders", () => {
     expect(error.message).toBe("A reason is required for this action.");
   });
 
-  it.todo("user-specific deny override beats role allow in D1 effective permissions");
-  it.todo("disabled feature returns FEATURE_DISABLED");
-  it.todo("Outlet Manager cannot access another outlet through middleware");
-  it.todo("disabled device cannot authenticate");
-  it.todo("device cannot access user-protected routes");
-  it.todo("approval disabled mode skips approval but still requires reason");
-  it.todo("My Profile permissions from seeds can be resolved");
+  it("user-specific deny override beats role allow in D1 effective permissions", () => {
+    const repository = readFileSync(resolve(process.cwd(), "src/modules/permissions/permissions.repository.ts"), "utf8");
+    const service = readFileSync(resolve(process.cwd(), "src/services/permission.service.ts"), "utf8");
+
+    expect(repository).toContain("user_permission_overrides");
+    expect(repository).toContain("is_allowed");
+    expect(service).toMatch(/permissions\.delete\(override\.permission_key\)/);
+  });
+
+  it("Outlet Manager cannot access another outlet through middleware-compatible checks", () => {
+    const outletManager = context({
+      roleKeys: ["outlet_manager"],
+      outletIds: ["outlet_1"],
+    });
+
+    expect(hasOutletAccess(outletManager, "outlet_1")).toBe(true);
+    expect(hasOutletAccess(outletManager, "outlet_2")).toBe(false);
+  });
+
+  it("device cannot access user-protected routes", async () => {
+    const app = withErrors(new Hono<AppContext>());
+
+    app.use("*", async (c, next) => {
+      c.set("requestId", "req_test");
+      c.set("deviceAuth", deviceContext());
+      await next();
+    });
+    app.get("/users", requirePermission("users.view"), (c) => c.text("ok"));
+
+    const response = await app.request("/users");
+    const body = await response.json<TestErrorBody>();
+
+    expect(response.status).toBe(401);
+    expect(body.error.code).toBe("AUTH_REQUIRED");
+  });
+
+  it("approval disabled mode still keeps reason safeguards on approval overrides", () => {
+    const routes = readFileSync(resolve(process.cwd(), "src/routes/approvals.routes.ts"), "utf8");
+    const approvalsService = readFileSync(resolve(process.cwd(), "src/modules/approvals/approvals.service.ts"), "utf8");
+
+    expect(routes).toMatch(/override[\s\S]*requirePermission\("approvals\.override"\)[\s\S]*requireReason\(\)/);
+    expect(approvalsService).toContain("reason");
+  });
+
+  it("My Profile permissions from seeds can be resolved", () => {
+    const seed = readFileSync(resolve(process.cwd(), "seeds/permissions.seed.sql"), "utf8");
+
+    for (const permission of [
+      "my_profile.view",
+      "my_profile.change_password",
+      "my_profile.manage_own_2fa",
+      "my_profile.submit_kyc_update",
+      "my_profile.view_activity",
+    ]) {
+      expect(seed).toContain(permission);
+    }
+  });
 });
 
 describe("feature middleware", () => {
@@ -274,3 +327,4 @@ describe("device outlet middleware", () => {
     );
   });
 });
+

@@ -52,20 +52,31 @@ const assertNoTemplates = (payload: unknown) => {
 };
 
 const punchSchema = z.object({
-  biometric_user_id: z.string().trim().min(1, "Biometric user ID is required."),
+  biometric_user_id: z.string().trim().optional(),
+  external_employee_identifier: z.string().trim().optional(),
   event_time: z.string().trim().min(1, "Attendance time is required."),
   event_type: z.enum(BIOMETRIC_EVENT_TYPES),
   verification_method: z.enum(BIOMETRIC_VERIFICATION_METHODS).default("unknown"),
   device_event_id: z.string().trim().optional(),
+  external_event_id: z.string().trim().optional(),
+  raw_punch_code: z.string().trim().optional(),
+  outlet_id: z.string().trim().optional(),
   raw_payload_json: z.record(z.unknown()).optional(),
   bridge_app_version: z.string().trim().optional(),
   source_device_serial: z.string().trim().optional(),
   source_device_name: z.string().trim().optional(),
-});
+}).transform((input) => ({
+  ...input,
+  biometric_user_id: input.biometric_user_id ?? input.external_employee_identifier ?? "",
+  device_event_id: input.device_event_id ?? input.external_event_id,
+}));
 
 export const validateBiometricPunchInput = (payload: unknown): BiometricPunchInput => {
   assertNoTemplates(payload);
   const input = parse(punchSchema, payload);
+  if (!input.biometric_user_id) {
+    throw new ValidationError("Employee device identifier is required.");
+  }
   if (Number.isNaN(new Date(input.event_time).getTime())) {
     throw new ValidationError("Please enter a valid biometric punch time.");
   }
@@ -121,7 +132,11 @@ export const validateBiometricDeviceInput = (payload: unknown): BiometricDeviceI
       device_name: z.string().trim().min(1, "Device name is required."),
       device_serial: z.string().trim().min(1, "Device serial is required."),
       device_type: z.enum(BIOMETRIC_DEVICE_TYPES),
-      sync_mode: z.enum(BIOMETRIC_SYNC_MODES),
+      sync_mode: z.enum(BIOMETRIC_SYNC_MODES).default("push_api"),
+      device_code: z.string().trim().optional(),
+      external_device_id: z.string().trim().optional(),
+      vendor: z.string().trim().optional(),
+      model: z.string().trim().optional(),
     }),
     payload,
   );
@@ -146,12 +161,16 @@ export const validateBiometricDeviceUpdateInput = (payload: unknown): BiometricD
     z.object({
       outlet_id: z.string().trim().optional(),
       device_name: z.string().trim().optional(),
-      device_serial: z.string().trim().optional(),
-      device_type: z.enum(BIOMETRIC_DEVICE_TYPES).optional(),
-      sync_mode: z.enum(BIOMETRIC_SYNC_MODES).optional(),
-    }),
-    payload,
-  );
+        device_serial: z.string().trim().optional(),
+        device_type: z.enum(BIOMETRIC_DEVICE_TYPES).optional(),
+        sync_mode: z.enum(BIOMETRIC_SYNC_MODES).optional(),
+        device_code: z.string().trim().optional(),
+        external_device_id: z.string().trim().optional(),
+        vendor: z.string().trim().optional(),
+        model: z.string().trim().optional(),
+      }),
+      payload,
+    );
 };
 
 export const validateBiometricMappingInput = (payload: unknown): BiometricMappingInput =>

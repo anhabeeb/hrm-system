@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 import { Hono } from "hono";
 
 import {
@@ -311,9 +311,4 @@ describe("settings access control", () => {
   });
 });
 
-describe("settings persistence placeholders", () => {
-  it.todo("lists settings groups from D1 without failing on empty groups");
-  it.todo("creates settings_change_log rows for settings updates");
-  it.todo("creates mandatory audit log rows for settings updates");
-  it.todo("approval disabled mode still requires reason and audit logging");
-});
+

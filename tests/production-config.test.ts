@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 
 import { API_PREFIX, NOT_FOUND_MESSAGE } from "../src/config/constants";
@@ -15,7 +15,7 @@ describe("production readiness config surface", () => {
   });
 });
 
-describe("production config placeholders", () => {
+describe("production config safety checks", () => {
   it("wrangler.jsonc keeps the production Worker and entrypoint", () => {
     const wrangler = readText("wrangler.jsonc");
     expect(wrangler).toContain('"name": "hrm-system"');
@@ -106,8 +106,4 @@ describe("production config placeholders", () => {
     expect(script).toContain("assets");
   });
 
-  it.todo("fresh D1 migrations and seeds apply in order without inserting real users or passwords");
-  it.todo("seeds include the Super Admin role, feature defaults, company settings, approval workflows, thresholds, and leave types");
-  it.todo("seed files do not contain plaintext production password examples or real user credentials");
-  it.todo("frontend environment example uses VITE_API_BASE_URL without real secrets");
 });

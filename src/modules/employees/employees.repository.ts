@@ -2250,6 +2250,20 @@ export const findLinkedUsersByEmployeeId = (
     [companyId, employeeId],
   );
 
+export const findLinkedEmployeeIdForUser = (
+  env: Env,
+  companyId: string,
+  userId: string,
+): Promise<{ employee_id: string | null } | null> =>
+  queryOne(
+    env,
+    `SELECT employee_id
+     FROM users
+     WHERE company_id = ? AND id = ? AND status = 'active' AND deleted_at IS NULL
+     LIMIT 1`,
+    [companyId, userId],
+  );
+
 export const countActiveSuperAdminsExcludingUser = (
   env: Env,
   companyId: string,
@@ -2286,4 +2300,266 @@ export const revokeUserSessions = (env: Env, companyId: string, userId: string) 
     env,
     "UPDATE sessions SET revoked_at = ? WHERE company_id = ? AND user_id = ? AND revoked_at IS NULL",
     [new Date().toISOString(), companyId, userId],
+  );
+
+export const profileSummary = (
+  env: Env,
+  companyId: string,
+  employeeId: string,
+) =>
+  queryOne<any>(
+    env,
+    `${employeeSelect}
+     WHERE e.company_id = ? AND e.id = ? AND e.deleted_at IS NULL
+     GROUP BY e.id
+     LIMIT 1`,
+    [companyId, employeeId],
+  );
+
+export const profileWarnings = (
+  env: Env,
+  companyId: string,
+  employeeId: string,
+) =>
+  queryOne<any>(
+    env,
+    `SELECT
+      (SELECT COUNT(*) FROM expiry_alerts a WHERE a.company_id = ? AND a.employee_id = ? AND a.status IN ('open', 'acknowledged', 'snoozed') AND a.severity IN ('critical', 'urgent', 'high')) AS expiring_documents,
+      (SELECT COUNT(*) FROM long_leave_records ll WHERE ll.company_id = ? AND ll.employee_id = ? AND ll.status IN ('approved', 'active', 'extended')) AS active_long_leave,
+      (SELECT COUNT(*) FROM attendance_daily_summary s WHERE s.company_id = ? AND s.employee_id = ? AND s.attendance_date >= date('now', '-7 day') AND s.status IN ('missing_clock_in', 'missing_clock_out', 'missing_check_in', 'missing_checkout', 'conflict')) AS missing_punches,
+      (SELECT COUNT(*) FROM leave_requests l WHERE l.company_id = ? AND l.employee_id = ? AND (l.status IN ('submitted', 'pending', 'pending_approval', 'partially_approved') OR l.approval_status IN ('pending', 'pending_approval'))) AS pending_approvals,
+      (SELECT COUNT(*) FROM long_leave_payroll_impacts i WHERE i.company_id = ? AND i.employee_id = ? AND i.status IN ('pending_review', 'blocked')) AS payroll_warnings,
+      (SELECT COUNT(*) FROM expiry_alerts a WHERE a.company_id = ? AND a.employee_id = ? AND a.status IN ('open', 'acknowledged', 'snoozed')) AS unresolved_expiry_alerts`,
+    [
+      companyId,
+      employeeId,
+      companyId,
+      employeeId,
+      companyId,
+      employeeId,
+      companyId,
+      employeeId,
+      companyId,
+      employeeId,
+      companyId,
+      employeeId,
+    ],
+  );
+
+export const profileAttendanceSummary = (
+  env: Env,
+  companyId: string,
+  employeeId: string,
+  fromDate: string,
+  toDate: string,
+) =>
+  queryOne<any>(
+    env,
+    `SELECT
+      SUM(CASE WHEN status IN ('present', 'checked_in', 'holiday_work') THEN 1 ELSE 0 END) AS present_days,
+      SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) AS absent_days,
+      SUM(CASE WHEN COALESCE(late_minutes, 0) > 0 THEN 1 ELSE 0 END) AS late_days,
+      SUM(CASE WHEN COALESCE(early_out_minutes, 0) > 0 THEN 1 ELSE 0 END) AS early_checkout_days,
+      SUM(CASE WHEN status IN ('missing_clock_in', 'missing_clock_out', 'missing_check_in', 'missing_checkout') THEN 1 ELSE 0 END) AS missing_punch_days,
+      SUM(CASE WHEN COALESCE(overtime_minutes, 0) > 0 THEN 1 ELSE 0 END) AS overtime_days,
+      SUM(CASE WHEN status = 'holiday_work' THEN 1 ELSE 0 END) AS holiday_work_days
+     FROM attendance_daily_summary
+     WHERE company_id = ? AND employee_id = ? AND attendance_date BETWEEN ? AND ?`,
+    [companyId, employeeId, fromDate, toDate],
+  );
+
+export const profileAttendanceRows = (env: Env, companyId: string, employeeId: string, limit: number) =>
+  queryMany<any>(
+    env,
+    `SELECT id, attendance_date, first_clock_in, last_clock_out, worked_minutes, late_minutes,
+      early_out_minutes, overtime_minutes, status, payroll_status
+     FROM attendance_daily_summary
+     WHERE company_id = ? AND employee_id = ?
+     ORDER BY attendance_date DESC
+     LIMIT ?`,
+    [companyId, employeeId, limit],
+  );
+
+export const profileAttendanceSources = (env: Env, companyId: string, employeeId: string, limit: number) =>
+  queryMany<any>(
+    env,
+    `SELECT id, device_id, event_type, event_time, attendance_method, source, sync_status, approval_status
+     FROM attendance_events
+     WHERE company_id = ? AND employee_id = ?
+     ORDER BY event_time DESC
+     LIMIT ?`,
+    [companyId, employeeId, limit],
+  );
+
+export const profileLeaveBalances = (env: Env, companyId: string, employeeId: string) =>
+  queryMany<any>(
+    env,
+    `SELECT lb.id, lb.leave_type_id, lt.leave_name, lt.leave_key, lb.year, lb.policy_year,
+      lb.entitlement_days, lb.opening_balance, lb.accrued_days, lb.used_days, lb.pending_days,
+      lb.adjusted_days, lb.carried_forward_days, lb.expired_days,
+      COALESCE(lb.available_days, lb.remaining_days) AS available_days,
+      lb.last_accrual_date, lb.next_accrual_date, lb.status
+     FROM leave_balances lb
+     LEFT JOIN leave_types lt ON lt.company_id = lb.company_id AND lt.id = lb.leave_type_id
+     WHERE lb.company_id = ? AND lb.employee_id = ?
+     ORDER BY lb.year DESC, lt.sort_order, lt.leave_name`,
+    [companyId, employeeId],
+  );
+
+export const profileLeaveRequests = (env: Env, companyId: string, employeeId: string, limit: number) =>
+  queryMany<any>(
+    env,
+    `SELECT l.id, l.leave_type_id, lt.leave_name, l.start_date, l.end_date, l.total_days,
+      l.status, COALESCE(l.approval_status, l.status) AS approval_status, l.reason, l.created_at
+     FROM leave_requests l
+     LEFT JOIN leave_types lt ON lt.company_id = l.company_id AND lt.id = l.leave_type_id
+     WHERE l.company_id = ? AND l.employee_id = ?
+     ORDER BY l.start_date DESC, l.created_at DESC
+     LIMIT ?`,
+    [companyId, employeeId, limit],
+  );
+
+export const profileLeaveTransactions = (env: Env, companyId: string, employeeId: string, limit: number) =>
+  queryMany<any>(
+    env,
+    `SELECT id, leave_type_id, leave_request_id, transaction_type, quantity_days,
+      balance_before, balance_after, effective_date, source, reason, created_at
+     FROM leave_balance_transactions
+     WHERE company_id = ? AND employee_id = ?
+     ORDER BY effective_date DESC, created_at DESC
+     LIMIT ?`,
+    [companyId, employeeId, limit],
+  );
+
+export const profileLongLeave = (env: Env, companyId: string, employeeId: string, limit: number) =>
+  queryMany<any>(
+    env,
+    `SELECT id, leave_request_id, start_date, expected_return_date, actual_return_date,
+      total_days, status, approval_status, payroll_status, salary_treatment, deduction_method,
+      reason, submitted_at, approved_at, returned_at, updated_at
+     FROM long_leave_records
+     WHERE company_id = ? AND employee_id = ?
+     ORDER BY start_date DESC
+     LIMIT ?`,
+    [companyId, employeeId, limit],
+  );
+
+export const profileLongLeaveImpacts = (env: Env, companyId: string, employeeId: string, limit: number) =>
+  queryMany<any>(
+    env,
+    `SELECT id, long_leave_id, payroll_month, total_days, long_leave_days, payable_days,
+      unpaid_days, deduction_amount, payable_salary, status, calculated_at
+     FROM long_leave_payroll_impacts
+     WHERE company_id = ? AND employee_id = ?
+     ORDER BY payroll_month DESC
+     LIMIT ?`,
+    [companyId, employeeId, limit],
+  );
+
+export const profileDocuments = (env: Env, companyId: string, employeeId: string, limit: number) =>
+  queryMany<any>(
+    env,
+    `SELECT id, document_type, file_name, mime_type, expiry_date, status, is_sensitive,
+      uploaded_by, created_at, updated_at
+     FROM employee_documents
+     WHERE company_id = ? AND employee_id = ? AND deleted_at IS NULL
+     ORDER BY COALESCE(expiry_date, created_at) DESC
+     LIMIT ?`,
+    [companyId, employeeId, limit],
+  );
+
+export const profileContracts = (env: Env, companyId: string, employeeId: string, limit: number) =>
+  queryMany<any>(
+    env,
+    `SELECT id, contract_number, contract_type, contract_status, start_date, end_date,
+      signed_date, probation_end_date, version_number, salary_snapshot_amount, currency,
+      position_id, department_id, outlet_id, created_at, updated_at
+     FROM employee_contracts
+     WHERE company_id = ? AND employee_id = ? AND archived_at IS NULL
+     ORDER BY start_date DESC
+     LIMIT ?`,
+    [companyId, employeeId, limit],
+  );
+
+export const profileAssets = (env: Env, companyId: string, employeeId: string, limit: number) =>
+  queryMany<any>(
+    env,
+    `SELECT aa.id, aa.asset_id, a.asset_code, a.asset_name, a.asset_type,
+      aa.issued_date, aa.returned_date, aa.status, aa.issue_condition, aa.return_condition
+     FROM asset_assignments aa
+     LEFT JOIN assets a ON a.company_id = aa.company_id AND a.id = aa.asset_id
+     WHERE aa.company_id = ? AND aa.employee_id = ?
+     ORDER BY aa.issued_date DESC
+     LIMIT ?`,
+    [companyId, employeeId, limit],
+  );
+
+export const profileUniforms = (env: Env, companyId: string, employeeId: string, limit: number) =>
+  queryMany<any>(
+    env,
+    `SELECT id, uniform_type, quantity, issued_date, returned_date, status
+     FROM uniform_issues
+     WHERE company_id = ? AND employee_id = ?
+     ORDER BY issued_date DESC
+     LIMIT ?`,
+    [companyId, employeeId, limit],
+  );
+
+export const profileSalarySummary = (env: Env, companyId: string, employeeId: string) =>
+  queryOne<any>(
+    env,
+    `SELECT id, monthly_salary_amount, currency, effective_from, effective_to, reason, created_at
+     FROM employee_salary_history
+     WHERE company_id = ? AND employee_id = ?
+     ORDER BY effective_from DESC, created_at DESC
+     LIMIT 1`,
+    [companyId, employeeId],
+  );
+
+export const profileAlerts = (env: Env, companyId: string, employeeId: string, limit: number) =>
+  queryMany<any>(
+    env,
+    `SELECT id, source_type, source_label, expiry_date, days_until_expiry, alert_type,
+      severity, status, title, message, action_url, acknowledged_at, resolved_at, dismissed_at,
+      snoozed_until, created_at, updated_at
+     FROM expiry_alerts
+     WHERE company_id = ? AND employee_id = ?
+     ORDER BY expiry_date ASC, created_at DESC
+     LIMIT ?`,
+    [companyId, employeeId, limit],
+  );
+
+export const profileStatusHistory = (env: Env, companyId: string, employeeId: string, limit: number) =>
+  queryMany<any>(
+    env,
+    `SELECT id, old_status, new_status, reason, changed_by, changed_at, created_at
+     FROM employee_status_history
+     WHERE company_id = ? AND employee_id = ?
+     ORDER BY COALESCE(changed_at, created_at) DESC
+     LIMIT ?`,
+    [companyId, employeeId, limit],
+  );
+
+export const profileJobHistory = (env: Env, companyId: string, employeeId: string, limit: number) =>
+  queryMany<any>(
+    env,
+    `SELECT id, change_type, old_outlet_id, new_outlet_id, old_department_id, new_department_id,
+      old_position_id, new_position_id, effective_from, effective_to, reason, created_by, created_at
+     FROM employee_job_history
+     WHERE company_id = ? AND employee_id = ?
+     ORDER BY effective_from DESC, created_at DESC
+     LIMIT ?`,
+    [companyId, employeeId, limit],
+  );
+
+export const profileAuditTimeline = (env: Env, companyId: string, employeeId: string, limit: number) =>
+  queryMany<any>(
+    env,
+    `SELECT id, module, action, severity, entity_type, entity_id, actor_user_id,
+      reason, effective_date, approval_request_id, created_at
+     FROM audit_logs
+     WHERE company_id = ? AND employee_id = ?
+     ORDER BY created_at DESC
+     LIMIT ?`,
+    [companyId, employeeId, limit],
   );

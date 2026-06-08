@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import type { ReactNode } from "react";
+import { lazy, Suspense, type ComponentType, type ReactNode } from "react";
 
 import { AppShell } from "@/components/layout/AppShell";
 import { PermissionDenied } from "@/components/feedback/PermissionDenied";
@@ -9,50 +9,72 @@ import { TwoFactorPage } from "@/features/auth/TwoFactorPage";
 import { ForgotPasswordPage } from "@/features/auth/ForgotPasswordPage";
 import { ResetPasswordPage } from "@/features/auth/ResetPasswordPage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
-import { UsersAccessPage } from "@/features/users/UsersAccessPage";
-import { OutletsPage } from "@/features/outlets/OutletsPage";
-import { DepartmentsPage } from "@/features/departments/DepartmentsPage";
-import { PositionsPage } from "@/features/positions/PositionsPage";
-import { EmployeesPage } from "@/features/employees/EmployeesPage";
-import { ContractsPage } from "@/features/contracts/ContractsPage";
-import { OffboardingPage } from "@/features/offboarding/OffboardingPage";
-import { AttendancePage } from "@/features/attendance/AttendancePage";
-import { AttendanceCorrectionsPage } from "@/features/attendance/AttendanceCorrectionsPage";
-import { KioskDevicesPage } from "@/features/devices/KioskDevicesPage";
-import { SyncStatusPage } from "@/features/sync/SyncStatusPage";
-import { BiometricPage } from "@/features/biometric/BiometricPage";
-import { LeavePage } from "@/features/leave/LeavePage";
-import { LongLeavePage } from "@/features/long-leave/LongLeavePage";
-import { PayrollPage } from "@/features/payroll/PayrollPage";
-import { PayslipsPage } from "@/features/payslips/PayslipsPage";
-import { AdvancesPage } from "@/features/advances/AdvancesPage";
-import { SalaryLoansPage } from "@/features/salary-loans/SalaryLoansPage";
-import { AssetsPage } from "@/features/assets/AssetsPage";
-import { UniformsPage } from "@/features/uniforms/UniformsPage";
-import { DocumentsPage } from "@/features/documents/DocumentsPage";
-import { ApprovalsPage } from "@/features/approvals/ApprovalsPage";
-import { ReportsPage } from "@/features/reports/ReportsPage";
-import { ImportExportPage } from "@/features/import-export/ImportExportPage";
-import { BackupRecoveryPage } from "@/features/backup-recovery/BackupRecoveryPage";
-import { SettingsPage } from "@/features/settings/SettingsPage";
-import { CompanyInformationPage } from "@/features/settings/company/CompanyInformationPage";
-import { SecuritySettingsPage } from "@/features/settings/security/SecuritySettingsPage";
-import { AttendanceSettingsPage } from "@/features/settings/attendance/AttendanceSettingsPage";
-import { LeaveSettingsPage } from "@/features/settings/leave/LeaveSettingsPage";
-import { PayrollSettingsPage } from "@/features/settings/payroll/PayrollSettingsPage";
-import { DocumentsSettingsPage } from "@/features/settings/documents/DocumentsSettingsPage";
-import { BackupSettingsPage } from "@/features/settings/backup/BackupSettingsPage";
-import { NotificationsSettingsPage } from "@/features/settings/notifications/NotificationsSettingsPage";
-import { ReportsSettingsPage } from "@/features/settings/reports/ReportsSettingsPage";
-import { ImportExportSettingsPage } from "@/features/settings/import-export/ImportExportSettingsPage";
-import { DevicesSyncSettingsPage } from "@/features/settings/devices-sync/DevicesSyncSettingsPage";
-import { AuditLogsPage } from "@/features/audit/AuditLogsPage";
-import { ProfileUpdateRequestsPage } from "@/features/profile-update-requests/ProfileUpdateRequestsPage";
 import { FirstTimeSetupPlaceholder } from "@/features/bootstrap/FirstTimeSetupPlaceholder";
 import { FirstTimeSetupPage } from "@/features/bootstrap/FirstTimeSetupPage";
 import { ProfilePage } from "@/features/profile/ProfilePage";
 import { SecurityPage } from "@/features/profile/SecurityPage";
 import { KycUpdatePage } from "@/features/profile/KycUpdatePage";
+
+const lazyNamed = <T extends Record<string, ComponentType<any>>>(
+  loader: () => Promise<T>,
+  exportName: keyof T,
+) => lazy(async () => ({ default: (await loader())[exportName] }));
+
+const UsersAccessPage = lazyNamed(() => import("@/features/users/UsersAccessPage"), "UsersAccessPage");
+const OutletsPage = lazyNamed(() => import("@/features/outlets/OutletsPage"), "OutletsPage");
+const DepartmentsPage = lazyNamed(() => import("@/features/departments/DepartmentsPage"), "DepartmentsPage");
+const PositionsPage = lazyNamed(() => import("@/features/positions/PositionsPage"), "PositionsPage");
+const EmployeesPage = lazyNamed(() => import("@/features/employees/EmployeesPage"), "EmployeesPage");
+const Employee360Page = lazyNamed(() => import("@/features/employees/Employee360Page"), "Employee360Page");
+const ContractsPage = lazyNamed(() => import("@/features/contracts/ContractsPage"), "ContractsPage");
+const OffboardingPage = lazyNamed(() => import("@/features/offboarding/OffboardingPage"), "OffboardingPage");
+const AttendancePage = lazyNamed(() => import("@/features/attendance/AttendancePage"), "AttendancePage");
+const AttendanceCorrectionsPage = lazyNamed(() => import("@/features/attendance/AttendanceCorrectionsPage"), "AttendanceCorrectionsPage");
+const AttendanceReportsPage = lazyNamed(() => import("@/features/attendance/AttendanceReportsPage"), "AttendanceReportsPage");
+const RostersPage = lazyNamed(() => import("@/features/rosters/RostersPage"), "RostersPage");
+const KioskDevicesPage = lazyNamed(() => import("@/features/devices/KioskDevicesPage"), "KioskDevicesPage");
+const SyncStatusPage = lazyNamed(() => import("@/features/sync/SyncStatusPage"), "SyncStatusPage");
+const BiometricPage = lazyNamed(() => import("@/features/biometric/BiometricPage"), "BiometricPage");
+const LeavePage = lazyNamed(() => import("@/features/leave/LeavePage"), "LeavePage");
+const HolidayCalendarPage = lazyNamed(() => import("@/features/holidays/HolidayCalendarPage"), "HolidayCalendarPage");
+const LongLeavePage = lazyNamed(() => import("@/features/long-leave/LongLeavePage"), "LongLeavePage");
+const PayrollPage = lazyNamed(() => import("@/features/payroll/PayrollPage"), "PayrollPage");
+const PayslipsPage = lazyNamed(() => import("@/features/payslips/PayslipsPage"), "PayslipsPage");
+const AdvancesPage = lazyNamed(() => import("@/features/advances/AdvancesPage"), "AdvancesPage");
+const SalaryLoansPage = lazyNamed(() => import("@/features/salary-loans/SalaryLoansPage"), "SalaryLoansPage");
+const AssetsPage = lazyNamed(() => import("@/features/assets/AssetsPage"), "AssetsPage");
+const UniformsPage = lazyNamed(() => import("@/features/uniforms/UniformsPage"), "UniformsPage");
+const DocumentsPage = lazyNamed(() => import("@/features/documents/DocumentsPage"), "DocumentsPage");
+const ApprovalsPage = lazyNamed(() => import("@/features/approvals/ApprovalsPage"), "ApprovalsPage");
+const ReportsPage = lazyNamed(() => import("@/features/reports/ReportsPage"), "ReportsPage");
+const NotificationsPage = lazyNamed(() => import("@/features/notifications/NotificationsPage"), "NotificationsPage");
+const ExpiryAlertsPage = lazyNamed(() => import("@/features/expiry-alerts/ExpiryAlertsPage"), "ExpiryAlertsPage");
+const HrReportsPage = lazyNamed(() => import("@/features/hr-reports/HrReportsPage"), "HrReportsPage");
+const PayrollReportsPage = lazyNamed(() => import("@/features/payroll-reports/PayrollReportsPage"), "PayrollReportsPage");
+const ExportHistoryPage = lazyNamed(() => import("@/features/report-exports/ExportHistoryPage"), "ExportHistoryPage");
+const ReportPrintPage = lazyNamed(() => import("@/features/report-exports/ReportPrintPage"), "ReportPrintPage");
+const ImportExportPage = lazyNamed(() => import("@/features/import-export/ImportExportPage"), "ImportExportPage");
+const ImportCenterPage = lazyNamed(() => import("@/features/imports/ImportCenterPage"), "ImportCenterPage");
+const BackupRecoveryPage = lazyNamed(() => import("@/features/backup-recovery/BackupRecoveryPage"), "BackupRecoveryPage");
+const DataRetentionPage = lazyNamed(() => import("@/features/data-retention/DataRetentionPage"), "DataRetentionPage");
+const SettingsPage = lazyNamed(() => import("@/features/settings/SettingsPage"), "SettingsPage");
+const CompanyInformationPage = lazyNamed(() => import("@/features/settings/company/CompanyInformationPage"), "CompanyInformationPage");
+const SecuritySettingsPage = lazyNamed(() => import("@/features/settings/security/SecuritySettingsPage"), "SecuritySettingsPage");
+const AttendanceSettingsPage = lazyNamed(() => import("@/features/settings/attendance/AttendanceSettingsPage"), "AttendanceSettingsPage");
+const LeaveSettingsPage = lazyNamed(() => import("@/features/settings/leave/LeaveSettingsPage"), "LeaveSettingsPage");
+const PayrollSettingsPage = lazyNamed(() => import("@/features/settings/payroll/PayrollSettingsPage"), "PayrollSettingsPage");
+const DocumentsSettingsPage = lazyNamed(() => import("@/features/settings/documents/DocumentsSettingsPage"), "DocumentsSettingsPage");
+const BackupSettingsPage = lazyNamed(() => import("@/features/settings/backup/BackupSettingsPage"), "BackupSettingsPage");
+const NotificationsSettingsPage = lazyNamed(() => import("@/features/settings/notifications/NotificationsSettingsPage"), "NotificationsSettingsPage");
+const ReportsSettingsPage = lazyNamed(() => import("@/features/settings/reports/ReportsSettingsPage"), "ReportsSettingsPage");
+const ImportExportSettingsPage = lazyNamed(() => import("@/features/settings/import-export/ImportExportSettingsPage"), "ImportExportSettingsPage");
+const DevicesSyncSettingsPage = lazyNamed(() => import("@/features/settings/devices-sync/DevicesSyncSettingsPage"), "DevicesSyncSettingsPage");
+const AuditLogsPage = lazyNamed(() => import("@/features/audit/AuditLogsPage"), "AuditLogsPage");
+const ProfileUpdateRequestsPage = lazyNamed(() => import("@/features/profile-update-requests/ProfileUpdateRequestsPage"), "ProfileUpdateRequestsPage");
+
+const routeFallback = (
+  <div className="p-4 text-sm text-muted-foreground md:p-6">Loading page...</div>
+);
 
 const guarded = (
   element: ReactNode,
@@ -68,6 +90,7 @@ const guarded = (
 );
 
 export const AppRouter = () => (
+  <Suspense fallback={routeFallback}>
   <Routes>
     <Route element={<PublicRoute />}>
       <Route path="/login" element={<LoginPage />} />
@@ -78,13 +101,18 @@ export const AppRouter = () => (
     <Route path="/setup" element={<FirstTimeSetupPage />} />
     <Route path="/setup-placeholder" element={<FirstTimeSetupPlaceholder />} />
     <Route element={<ProtectedRoute />}>
+      <Route path="/reports/print/:reportKey" element={guarded(<ReportPrintPage />, { permission: "report_exports.print", feature: "reports" })} />
+      <Route path="/employees/:employeeId/print" element={guarded(<ReportPrintPage employeeProfile />, { permission: "report_exports.employee_profile.print", feature: "employee_management" })} />
       <Route element={<AppShell />}>
         <Route index element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/dashboard" element={guarded(<DashboardPage />, { permissionsAny: ["dashboard.view", "dashboard.view_company", "dashboard.view_outlet"] })} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/profile/security" element={<SecurityPage />} />
         <Route path="/profile/kyc-update" element={<KycUpdatePage />} />
+        <Route path="/notifications" element={guarded(<NotificationsPage />, { permissionsAny: ["notifications.view", "notifications.manage_own"] })} />
+        <Route path="/expiry-alerts" element={guarded(<ExpiryAlertsPage />, { permissionsAny: ["expiry_alerts.view", "expiry_alerts.view_own"] })} />
         <Route path="/employees" element={guarded(<EmployeesPage />, { permission: "employees.view", feature: "employee_management" })} />
+        <Route path="/employees/:employeeId" element={guarded(<Employee360Page />, { permission: "employees.view", feature: "employee_management" })} />
         <Route path="/contracts" element={guarded(<ContractsPage />, { permissionsAny: ["contracts.view", "employees.contracts.view", "employees.view"], feature: "employee_management" })} />
         <Route path="/offboarding" element={guarded(<OffboardingPage />, { permissionsAny: ["employees.offboarding.view", "employees.view"], feature: "employee_management" })} />
         <Route path="/users-access" element={guarded(<UsersAccessPage />, { permission: "users.view", feature: "user_management" })} />
@@ -93,10 +121,13 @@ export const AppRouter = () => (
         <Route path="/positions" element={guarded(<PositionsPage />, { permission: "positions.view", feature: "employee_management" })} />
         <Route path="/attendance" element={guarded(<AttendancePage />, { permission: "attendance.view", feature: "attendance" })} />
         <Route path="/attendance/corrections" element={guarded(<AttendanceCorrectionsPage />, { permission: "attendance.view", feature: "attendance" })} />
+        <Route path="/attendance/reports" element={guarded(<AttendanceReportsPage />, { permission: "attendance.reports.view", feature: "attendance" })} />
+        <Route path="/rosters" element={guarded(<RostersPage />, { permissionsAny: ["rosters.view", "roster.view"], feature: "roster" })} />
         <Route path="/kiosk-devices" element={guarded(<KioskDevicesPage />, { permissionsAny: ["devices.view", "kiosk.view"], feature: "offline_sync" })} />
         <Route path="/sync-status" element={guarded(<SyncStatusPage />, { permission: "sync.view", feature: "offline_sync" })} />
         <Route path="/biometric" element={guarded(<BiometricPage />, { permissionsAny: ["biometric.view", "devices.view"], feature: "biometric_attendance" })} />
         <Route path="/leave" element={guarded(<LeavePage />, { permission: "leave.view", feature: "leave_management" })} />
+        <Route path="/holidays" element={guarded(<HolidayCalendarPage />, { permissionsAny: ["holidays.view", "holidays.calendar.view"], feature: "holidays" })} />
         <Route path="/long-leave" element={guarded(<LongLeavePage />, { permission: "long_leave.view", feature: "long_leave" })} />
         <Route path="/payroll" element={guarded(<PayrollPage />, { permission: "payroll.view", feature: "payroll" })} />
         <Route path="/payslips" element={guarded(<PayslipsPage />, { permission: "payslips.view", feature: "payslips" })} />
@@ -107,8 +138,13 @@ export const AppRouter = () => (
         <Route path="/documents" element={guarded(<DocumentsPage />, { permission: "documents.view", feature: "documents" })} />
         <Route path="/approvals" element={guarded(<ApprovalsPage />, { permission: "approvals.view", feature: "approvals" })} />
         <Route path="/reports" element={guarded(<ReportsPage />, { permission: "reports.view", feature: "reports" })} />
+        <Route path="/hr-reports" element={guarded(<HrReportsPage />, { permissionsAny: ["hr_reports.view", "hr_reports.catalog.view"], feature: "reports" })} />
+        <Route path="/payroll-reports" element={guarded(<PayrollReportsPage />, { permissionsAny: ["payroll_reports.view", "payroll_reports.catalog.view"], feature: "reports" })} />
+        <Route path="/report-exports" element={guarded(<ExportHistoryPage />, { permissionsAny: ["report_exports.history.view", "report_exports.admin.manage"], feature: "reports" })} />
+        <Route path="/imports" element={guarded(<ImportCenterPage />, { permissionsAny: ["imports.view", "imports.upload", "imports.templates.view"], feature: "import_export" })} />
         <Route path="/import-export" element={guarded(<ImportExportPage />, { permissionsAny: ["export.view", "import.view"], feature: "import_export" })} />
         <Route path="/backup-recovery" element={guarded(<BackupRecoveryPage />, { permissionsAny: ["backup.view", "backup.view_history", "backup.restore_request"], feature: "backup_recovery" })} />
+        <Route path="/data-retention" element={guarded(<DataRetentionPage />, { permissionsAny: ["data_retention.view", "data_retention.preview"], feature: "backup_recovery" })} />
         <Route path="/settings" element={guarded(<SettingsPage />, { permission: "settings.view", feature: "settings" })} />
         <Route path="/settings/company" element={guarded(<CompanyInformationPage />, { permissionsAny: ["company.view", "settings.view"], feature: "settings" })} />
         <Route path="/settings/security" element={guarded(<SecuritySettingsPage />, { permissionsAny: ["security.view", "audit_settings.view", "settings.view"], feature: "settings" })} />
@@ -127,4 +163,5 @@ export const AppRouter = () => (
       </Route>
     </Route>
   </Routes>
+  </Suspense>
 );

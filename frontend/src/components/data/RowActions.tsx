@@ -1,4 +1,4 @@
-import { Archive, Check, Download, Edit, Eye, KeyRound, MoreHorizontal, ShieldPlus, Trash2, UserCheck, UserX, X } from "lucide-react";
+import { Archive, Check, Download, Edit, Eye, KeyRound, MoreHorizontal, RefreshCw, RotateCcw, ShieldPlus, TimerOff, Trash2, UserCheck, UserX, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +21,10 @@ type RowActionKey =
   | "reset-password"
   | "assign-role"
   | "download"
+  | "opening"
+  | "carry-forward"
+  | "expire"
+  | "rebuild"
   | "more";
 
 const actionMeta: Record<RowActionKey, { label: string; icon: React.ElementType }> = {
@@ -35,6 +39,10 @@ const actionMeta: Record<RowActionKey, { label: string; icon: React.ElementType 
   "reset-password": { label: "Reset password", icon: KeyRound },
   "assign-role": { label: "Assign role", icon: ShieldPlus },
   download: { label: "Download", icon: Download },
+  opening: { label: "Set opening balance", icon: RotateCcw },
+  "carry-forward": { label: "Carry forward", icon: RefreshCw },
+  expire: { label: "Expire leave", icon: TimerOff },
+  rebuild: { label: "Rebuild from ledger", icon: RefreshCw },
   more: { label: "More", icon: MoreHorizontal },
 };
 

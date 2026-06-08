@@ -5,6 +5,7 @@ import { requireFeature } from "../middleware/feature.middleware";
 import { requireAnyPermission, requirePermission } from "../middleware/permission.middleware";
 import { requireReason } from "../middleware/reason-required.middleware";
 import * as controller from "../modules/attendance/attendance.controller";
+import * as reportController from "../modules/attendance/attendance-reports.controller";
 import type { AppContext } from "../types/api.types";
 
 const attendanceRoutes = new Hono<AppContext>();
@@ -16,6 +17,12 @@ attendanceRoutes.get("/", requirePermission("attendance.view"), controller.listA
 attendanceRoutes.get("/today", requirePermission("attendance.view"), controller.today);
 attendanceRoutes.get("/monthly", requirePermission("attendance.view"), controller.monthly);
 attendanceRoutes.get("/summary", requirePermission("attendance.view"), controller.summary);
+attendanceRoutes.get("/reports/daily", requirePermission("attendance.reports.view"), reportController.daily);
+attendanceRoutes.get("/reports/monthly", requirePermission("attendance.reports.view"), reportController.monthly);
+attendanceRoutes.get("/reports/employee/:employeeId", requirePermission("attendance.reports.view"), reportController.employee);
+attendanceRoutes.get("/reports/exceptions", requireAnyPermission(["attendance.exceptions.view", "attendance.reports.view"]), reportController.exceptions);
+attendanceRoutes.get("/reports/device-punches", requireAnyPermission(["attendance.device_punches.view", "attendance.reports.view"]), reportController.devicePunches);
+attendanceRoutes.get("/reports/summary", requirePermission("attendance.reports.view"), reportController.summary);
 attendanceRoutes.get("/events", requirePermission("attendance.view"), controller.listEvents);
 attendanceRoutes.get("/events/:id", requirePermission("attendance.view"), controller.getEvent);
 attendanceRoutes.post("/clock-in", requireAnyPermission(["attendance.create", "attendance.manual_entry"]), controller.clockIn);

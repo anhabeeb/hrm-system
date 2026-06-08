@@ -159,6 +159,91 @@ employeesRoutes.post(
   }),
   offboardingController.completeCase,
 );
+employeesRoutes.get(
+  "/:id/profile",
+  requireAnyPermissionOrError(["employees.view", "dashboard.view", "dashboard.view_outlet", "dashboard.view_company"], {
+    code: "EMPLOYEE_PROFILE_PERMISSION_DENIED",
+    message: "You do not have permission to view Employee 360 profiles.",
+  }),
+  employeesController.getEmployeeProfile,
+);
+employeesRoutes.get(
+  "/:id/profile/summary",
+  requireAnyPermissionOrError(["employees.view", "dashboard.view", "dashboard.view_outlet", "dashboard.view_company"], {
+    code: "EMPLOYEE_PROFILE_PERMISSION_DENIED",
+    message: "You do not have permission to view this employee profile.",
+  }),
+  employeesController.getEmployeeProfileSummary,
+);
+employeesRoutes.get(
+  "/:id/profile/attendance",
+  requireAnyPermissionOrError(["attendance.view", "attendance.reports.view", "dashboard.attendance.view"], {
+    code: "EMPLOYEE_PROFILE_PERMISSION_DENIED",
+    message: "You do not have permission to view employee attendance.",
+  }),
+  employeesController.getEmployeeProfileAttendance,
+);
+employeesRoutes.get(
+  "/:id/profile/leave",
+  requireAnyPermissionOrError(["leave.view", "dashboard.leave.view"], {
+    code: "EMPLOYEE_PROFILE_PERMISSION_DENIED",
+    message: "You do not have permission to view employee leave.",
+  }),
+  employeesController.getEmployeeProfileLeave,
+);
+employeesRoutes.get(
+  "/:id/profile/long-leave",
+  requireAnyPermissionOrError(["long_leave.view", "dashboard.long_leave.view"], {
+    code: "EMPLOYEE_PROFILE_PERMISSION_DENIED",
+    message: "You do not have permission to view employee long leave.",
+  }),
+  employeesController.getEmployeeProfileLongLeave,
+);
+employeesRoutes.get(
+  "/:id/profile/documents",
+  requirePermission("documents.view"),
+  employeesController.getEmployeeProfileDocuments,
+);
+employeesRoutes.get(
+  "/:id/profile/contracts",
+  requireAnyPermissionOrError(["employees.contracts.view", "contracts.view", "employees.view"], {
+    code: "EMPLOYEE_PROFILE_PERMISSION_DENIED",
+    message: "You do not have permission to view employee contracts.",
+  }),
+  employeesController.getEmployeeProfileContracts,
+);
+employeesRoutes.get(
+  "/:id/profile/assets",
+  requireAnyPermissionOrError(["assets.view", "uniforms.view"], {
+    code: "EMPLOYEE_PROFILE_PERMISSION_DENIED",
+    message: "You do not have permission to view employee assets or uniforms.",
+  }),
+  employeesController.getEmployeeProfileAssets,
+);
+employeesRoutes.get(
+  "/:id/profile/payroll-readiness",
+  requireAnyPermissionOrError(["payroll.view", "salary.view", "employees.salary.view", "dashboard.payroll_readiness.view"], {
+    code: "EMPLOYEE_PROFILE_PERMISSION_DENIED",
+    message: "You do not have permission to view employee payroll readiness.",
+  }),
+  employeesController.getEmployeeProfilePayrollReadiness,
+);
+employeesRoutes.get(
+  "/:id/profile/alerts",
+  requireAnyPermissionOrError(["expiry_alerts.view", "expiry_alerts.view_own"], {
+    code: "EMPLOYEE_PROFILE_PERMISSION_DENIED",
+    message: "You do not have permission to view employee alerts.",
+  }),
+  employeesController.getEmployeeProfileAlerts,
+);
+employeesRoutes.get(
+  "/:id/profile/timeline",
+  requireAnyPermissionOrError(["employees.view", "audit_logs.view"], {
+    code: "EMPLOYEE_PROFILE_PERMISSION_DENIED",
+    message: "You do not have permission to view employee timeline.",
+  }),
+  employeesController.getEmployeeProfileTimeline,
+);
 employeesRoutes.get("/:id", requirePermission("employees.view"), employeesController.getEmployee);
 employeesRoutes.patch("/:id", requirePermission("employees.edit"), employeesController.updateEmployee);
 employeesRoutes.post(

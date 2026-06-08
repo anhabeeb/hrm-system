@@ -16,6 +16,7 @@ export const EmployeeList = ({
   pagination,
   canEdit,
   onView,
+  onProfile,
   onEdit,
   onPageChange,
   onPageSizeChange,
@@ -25,6 +26,7 @@ export const EmployeeList = ({
   pagination?: Pagination;
   canEdit: boolean;
   onView: (employee: Employee) => void;
+  onProfile: (employee: Employee) => void;
   onEdit: (employee: Employee) => void;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
@@ -55,6 +57,7 @@ export const EmployeeList = ({
       <RowActions
         actions={[
           { key: "view", onSelect: () => onView(row) },
+          { key: "more", label: "View 360 Profile", onSelect: () => onProfile(row) },
           ...(canEdit ? [{ key: "edit" as const, onSelect: () => onEdit(row) }] : []),
         ]}
       />

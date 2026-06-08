@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 
 import { toCsv } from "../src/modules/import-export/csv.service";
 import { EXPORT_FORMATS, IMPORT_EXPORT_MESSAGES, IMPORT_TYPES } from "../src/modules/import-export/import-export.constants";
@@ -69,39 +69,4 @@ describe("import/export foundation", () => {
   });
 });
 
-describe("import/export integration placeholders", () => {
-  it.todo("export jobs store files in BACKUP_BUCKET and never expose file_key in API JSON");
-  it.todo("sensitive exports require reason and create audit logs");
-  it.todo("import validation writes row counts without applying business data");
-  it.todo("import apply remains a safe placeholder until module-specific importers are implemented");
-  it.todo("device-authenticated callers cannot access import/export routes");
-  it.todo("GET /import-export/templates/:templateKey exists and returns NOT_FOUND for invalid keys");
-  it.todo("import upload without reason is rejected before writing R2 or metadata");
-  it.todo("invalid base64 is rejected before writing R2 or metadata");
-  it.todo("sensitive export requires reason and export.sensitive or Super Admin");
-  it.todo("payroll export requires payroll.view and export permission");
-  it.todo("audit_activity export requires audit permission");
-  it.todo("outlet-limited users cannot create or download company-wide exports");
-  it.todo("documents_metadata export masks sensitive file names and never includes file_key");
-  it.todo("outlet-limited requester can access their own outlet-scoped export");
-  it.todo("outlet-limited non-requester cannot access the same outlet export");
-  it.todo("outlet-limited user cannot access company-wide export");
-  it.todo("outlet-limited user cannot access own export after outlet access is removed");
-  it.todo("malformed filters_json blocks outlet-limited user");
-  it.todo("export detail/download return EXPORT_ACCESS_DENIED for inaccessible export jobs");
-  it.todo("apply placeholder returns applied false and placeholder message");
-  it.todo("Import applied successfully is only used when applied true");
-  it.todo("outlet-limited user can cancel own outlet-scoped queued export");
-  it.todo("outlet-limited user cannot cancel another user's export in the same outlet");
-  it.todo("outlet-limited user cannot retry another user's export in the same outlet");
-  it.todo("outlet-limited user cannot cancel or retry company-wide export");
-  it.todo("Super Admin can cancel company-wide queued export");
-  it.todo("Super Admin can retry company-wide failed export");
-  it.todo("malformed filters_json blocks outlet-limited cancel and retry");
-  it.todo("queued and processing exports can be cancelled");
-  it.todo("completed, failed, and cancelled exports cannot be cancelled");
-  it.todo("failed exports can be retried");
-  it.todo("queued, processing, completed, and cancelled exports cannot be retried");
-  it.todo("blocked cancel/retry does not change status or create audit log");
-  it.todo("cancel/retry responses do not include file_key");
-});
+

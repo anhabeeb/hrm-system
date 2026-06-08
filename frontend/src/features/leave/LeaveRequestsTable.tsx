@@ -19,17 +19,22 @@ const columns: TableColumn<LeaveRequest>[] = [
   { key: "requested_by", header: "Requested By", cell: (row) => row.requested_by_name ?? row.requested_by ?? "—" },
 ];
 
-export const LeaveRequestsTable = ({ rows, loading, pagination, canApprove, canReject, canCancel, onView, onApprove, onReject, onCancel, onPageChange, onPageSizeChange }: {
+export const LeaveRequestsTable = ({ rows, loading, pagination, canApprove, canReject, canCancel, canWithdraw, canEscalate, onView, onTimeline, onApprove, onReject, onCancel, onWithdraw, onEscalate, onPageChange, onPageSizeChange }: {
   rows: LeaveRequest[];
   loading?: boolean;
   pagination?: Pagination;
   canApprove: boolean;
   canReject: boolean;
   canCancel: boolean;
+  canWithdraw: boolean;
+  canEscalate: boolean;
   onView: (row: LeaveRequest) => void;
+  onTimeline: (row: LeaveRequest) => void;
   onApprove: (row: LeaveRequest) => void;
   onReject: (row: LeaveRequest) => void;
   onCancel: (row: LeaveRequest) => void;
+  onWithdraw: (row: LeaveRequest) => void;
+  onEscalate: (row: LeaveRequest) => void;
   onPageChange: (page: number) => void;
   onPageSizeChange: (pageSize: number) => void;
 }) => (
@@ -46,9 +51,12 @@ export const LeaveRequestsTable = ({ rows, loading, pagination, canApprove, canR
     rowActions={(row) => (
       <RowActions actions={[
         { key: "view", onSelect: () => onView(row) },
+        { key: "more", label: "Timeline", onSelect: () => onTimeline(row) },
         ...(canApprove ? [{ key: "approve" as const, label: "Approve", onSelect: () => onApprove(row) }] : []),
         ...(canReject ? [{ key: "reject" as const, label: "Reject", onSelect: () => onReject(row) }] : []),
+        ...(canWithdraw ? [{ key: "archive" as const, label: "Withdraw", onSelect: () => onWithdraw(row) }] : []),
         ...(canCancel ? [{ key: "disable" as const, label: `Cancel ${humanize(row.status)}`, onSelect: () => onCancel(row) }] : []),
+        ...(canEscalate ? [{ key: "edit" as const, label: "Escalate", onSelect: () => onEscalate(row) }] : []),
       ]} />
     )}
     emptyTitle="No leave requests found"

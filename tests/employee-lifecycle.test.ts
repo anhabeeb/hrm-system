@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+﻿import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -205,7 +205,4 @@ describe("employee lifecycle backend wiring", () => {
     expect(panel).toContain("Revoke active sessions when this status is applied");
   });
 
-  it.todo("approval-enabled termination creates a pending approval after employee status approval settings are wired");
-  it.todo("approval applies lifecycle status change once after approval-backed status application is implemented");
-  it.todo("approval rejection leaves employee status unchanged after approval-backed status application is implemented");
 });

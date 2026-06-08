@@ -6,9 +6,15 @@ import {
 } from "./leave.constants";
 import type {
   LeaveActionInput,
+  LeaveAccrualInput,
   LeaveBalanceAdjustInput,
   LeaveBalanceFilters,
+  LeaveBalanceTransactionFilters,
+  LeaveCarryForwardInput,
   LeaveCalendarFilters,
+  LeaveDelegateInput,
+  LeaveExpiryInput,
+  LeaveOpeningBalanceInput,
   LeavePolicyFilters,
   LeavePolicyInput,
   LeavePolicyUpdateInput,
@@ -85,11 +91,56 @@ export const validateLeaveTypeUpdate = (payload: unknown): LeaveTypeUpdateInput 
   if (defaultDays !== undefined && (!Number.isInteger(defaultDays) || defaultDays < 0)) {
     throw new ValidationError("Please enter a valid number of leave days.");
   }
+  const frequency = asString(payload.accrual_frequency);
+  if (frequency && !["none", "monthly", "yearly", "daily", "custom"].includes(frequency)) {
+    throw new ValidationError("Please select a valid accrual frequency.");
+  }
+  const maxNegativeBalance = asNumber(payload.max_negative_balance);
+  if (maxNegativeBalance !== undefined && maxNegativeBalance < 0) {
+    throw new ValidationError("Maximum negative balance cannot be below zero.");
+  }
+  const annualEntitlementDays = asNumber(payload.annual_entitlement_days);
+  if (annualEntitlementDays !== undefined && annualEntitlementDays < 0) {
+    throw new ValidationError("Annual entitlement cannot be below zero.");
+  }
+  const accrualAmount = asNumber(payload.accrual_amount);
+  if (accrualAmount !== undefined && accrualAmount < 0) {
+    throw new ValidationError("Accrual amount cannot be below zero.");
+  }
+  const carryForwardLimit = asNumber(payload.carry_forward_limit_days);
+  if (carryForwardLimit !== undefined && carryForwardLimit < 0) {
+    throw new ValidationError("Carry-forward limit cannot be below zero.");
+  }
+  const carryForwardExpiryMonth = asNumber(payload.carry_forward_expiry_month);
+  if (carryForwardExpiryMonth !== undefined && (!Number.isInteger(carryForwardExpiryMonth) || carryForwardExpiryMonth < 1 || carryForwardExpiryMonth > 12)) {
+    throw new ValidationError("Carry-forward expiry month must be between 1 and 12.");
+  }
+  const carryForwardExpiryDay = asNumber(payload.carry_forward_expiry_day);
+  if (carryForwardExpiryDay !== undefined && (!Number.isInteger(carryForwardExpiryDay) || carryForwardExpiryDay < 1 || carryForwardExpiryDay > 31)) {
+    throw new ValidationError("Carry-forward expiry day must be between 1 and 31.");
+  }
+  const sortOrder = asNumber(payload.sort_order);
   return {
     is_enabled: asBoolean(payload.is_enabled),
+    is_paid: asBoolean(payload.is_paid),
     default_days: payload.default_days === null ? null : defaultDays,
     requires_attachment: asBoolean(payload.requires_attachment),
     affects_payroll: asBoolean(payload.affects_payroll),
+    requires_balance: asBoolean(payload.requires_balance),
+    allow_negative_balance: asBoolean(payload.allow_negative_balance),
+    max_negative_balance: payload.max_negative_balance === null ? null : maxNegativeBalance,
+    accrual_enabled: asBoolean(payload.accrual_enabled),
+    accrual_frequency: frequency,
+    annual_entitlement_days: payload.annual_entitlement_days === null ? null : annualEntitlementDays,
+    accrual_amount: payload.accrual_amount === null ? null : accrualAmount,
+    prorate_on_joining: asBoolean(payload.prorate_on_joining),
+    prorate_on_termination: asBoolean(payload.prorate_on_termination),
+    carry_forward_enabled: asBoolean(payload.carry_forward_enabled),
+    carry_forward_limit_days: payload.carry_forward_limit_days === null ? null : carryForwardLimit,
+    carry_forward_expiry_month: payload.carry_forward_expiry_month === null ? null : carryForwardExpiryMonth,
+    carry_forward_expiry_day: payload.carry_forward_expiry_day === null ? null : carryForwardExpiryDay,
+    half_day_enabled: asBoolean(payload.half_day_enabled),
+    sort_order: sortOrder === undefined ? undefined : Math.trunc(sortOrder),
     reason: requireReason(payload.reason),
   };
 };
@@ -156,6 +207,7 @@ export const validateBalanceFilters = (query: Record<string, unknown>): LeaveBal
   department_id: asString(query.department_id),
   leave_type_id: asString(query.leave_type_id),
   year: asNumber(query.year),
+  status: asString(query.status),
   page: page(query.page),
   page_size: pageSize(query.page_size),
 });
@@ -176,6 +228,83 @@ export const validateBalanceAdjust = (payload: unknown): LeaveBalanceAdjustInput
   };
 };
 
+export const validateOpeningBalance = (payload: unknown): LeaveOpeningBalanceInput => {
+  if (!isObject(payload)) throw new ValidationError();
+  const employeeId = asString(payload.employee_id);
+  const leaveTypeId = asString(payload.leave_type_id);
+  const year = asNumber(payload.year);
+  const openingBalance = asNumber(payload.opening_balance);
+  if (!employeeId) throw new ValidationError("Employee is required.");
+  if (!leaveTypeId) throw new ValidationError("Leave type is required.");
+  if (!year || !Number.isInteger(year)) throw new ValidationError("Please select a valid leave year.");
+  if (openingBalance === undefined || !Number.isFinite(openingBalance)) throw new ValidationError("Please enter a valid opening balance.");
+  return {
+    employee_id: employeeId,
+    leave_type_id: leaveTypeId,
+    year,
+    opening_balance: openingBalance,
+    reason: requireReason(payload.reason),
+  };
+};
+
+export const validateTransactionFilters = (
+  query: Record<string, unknown>,
+  employeeId: string,
+): LeaveBalanceTransactionFilters => ({
+  employee_id: employeeId,
+  leave_type_id: asString(query.leave_type_id),
+  year: asNumber(query.year),
+  transaction_type: asString(query.transaction_type),
+  page: page(query.page),
+  page_size: pageSize(query.page_size),
+});
+
+export const validateAccrualInput = (payload: unknown): LeaveAccrualInput => {
+  if (!isObject(payload)) throw new ValidationError();
+  return {
+    as_of_date: requireDate(payload.as_of_date, "Please choose a valid accrual date."),
+    employee_id: asString(payload.employee_id),
+    leave_type_id: asString(payload.leave_type_id),
+    outlet_id: asString(payload.outlet_id),
+    department_id: asString(payload.department_id),
+    preview: asBoolean(payload.preview),
+    reason: asString(payload.reason),
+  };
+};
+
+export const validateCarryForwardInput = (payload: unknown): LeaveCarryForwardInput => {
+  if (!isObject(payload)) throw new ValidationError();
+  const employeeId = asString(payload.employee_id);
+  const leaveTypeId = asString(payload.leave_type_id);
+  const sourceYear = asNumber(payload.source_year);
+  const destinationYear = asNumber(payload.destination_year);
+  if (!employeeId) throw new ValidationError("Employee is required.");
+  if (!leaveTypeId) throw new ValidationError("Leave type is required.");
+  if (!sourceYear || !Number.isInteger(sourceYear)) throw new ValidationError("Please select a valid source year.");
+  if (!destinationYear || !Number.isInteger(destinationYear)) throw new ValidationError("Please select a valid destination year.");
+  return { employee_id: employeeId, leave_type_id: leaveTypeId, source_year: sourceYear, destination_year: destinationYear, reason: requireReason(payload.reason) };
+};
+
+export const validateExpiryInput = (payload: unknown): LeaveExpiryInput => {
+  if (!isObject(payload)) throw new ValidationError();
+  const employeeId = asString(payload.employee_id);
+  const leaveTypeId = asString(payload.leave_type_id);
+  const year = asNumber(payload.year);
+  const expiryDays = asNumber(payload.expiry_days);
+  if (!employeeId) throw new ValidationError("Employee is required.");
+  if (!leaveTypeId) throw new ValidationError("Leave type is required.");
+  if (!year || !Number.isInteger(year)) throw new ValidationError("Please select a valid leave year.");
+  if (expiryDays === undefined || expiryDays <= 0) throw new ValidationError("Please enter a valid expiry amount.");
+  return {
+    employee_id: employeeId,
+    leave_type_id: leaveTypeId,
+    year,
+    expiry_days: expiryDays,
+    effective_date: requireDate(payload.effective_date, "Please choose a valid expiry date."),
+    reason: requireReason(payload.reason),
+  };
+};
+
 export const validateRequestFilters = (query: Record<string, unknown>): LeaveRequestFilters => {
   const status = asString(query.status);
   if (status && !LEAVE_REQUEST_STATUSES.includes(status as any)) throw new ValidationError("Please select a valid leave status.");
@@ -190,6 +319,7 @@ export const validateRequestFilters = (query: Record<string, unknown>): LeaveReq
     date_from: asString(query.date_from),
     date_to: asString(query.date_to),
     employee_type: asString(query.employee_type),
+    approval_status: asString(query.approval_status),
     page: page(query.page),
     page_size: pageSize(query.page_size),
     sort_by: allowedSort.includes(sortBy) ? sortBy : "created_at",
@@ -232,6 +362,13 @@ export const validateLeaveRequestUpdate = (payload: unknown): LeaveRequestUpdate
 export const validateLeaveAction = (payload: unknown): LeaveActionInput => {
   if (!isObject(payload)) throw new ValidationError();
   return { reason: requireReason(payload.reason) };
+};
+
+export const validateLeaveDelegate = (payload: unknown): LeaveDelegateInput => {
+  if (!isObject(payload)) throw new ValidationError();
+  const delegatedTo = asString(payload.delegated_to);
+  if (!delegatedTo) throw new ValidationError("Please choose the delegated approver.");
+  return { delegated_to: delegatedTo, reason: requireReason(payload.reason) };
 };
 
 export const validateCalendarFilters = (query: Record<string, unknown>): LeaveCalendarFilters => ({

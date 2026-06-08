@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 
 import { validateAdvanceCreate } from "../src/modules/advances/advances.validators";
 import { ValidationError } from "../src/utils/errors";
@@ -17,10 +17,4 @@ describe("advance validators", () => {
   });
 });
 
-describe("advance placeholders", () => {
-  it.todo("create advance");
-  it.todo("approve advance");
-  it.todo("approved advance deducts in payroll");
-  it.todo("pending advance does not deduct");
-  it.todo("cannot edit advance in locked payroll month");
-});
+

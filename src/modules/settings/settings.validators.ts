@@ -71,7 +71,7 @@ const requireEffectiveDateForPayrollImpact = (
 
 const ALLOWED_SETTING_KEYS_BY_GROUP: Partial<Record<SettingsGroup, Set<string>>> = {
   company: new Set(["company.basic", "company.profile"]),
-  attendance: new Set(["attendance.default_rules"]),
+  attendance: new Set(["attendance.default_rules", "attendance.roster_rules"]),
   leave: new Set(["leave.default_rules", "long_leave.default_rules", "holiday.default_rules"]),
   payroll: new Set(["payroll.default_rules", "payroll.earnings_toggles"]),
   documents: new Set(["documents.default_rules", "documents.categories", "documents.foreign_employee_expected", "documents.contract_rules"]),
@@ -140,7 +140,19 @@ const validateTypedSettingValues = (
 
   for (const [settingKey, value] of Object.entries(settings)) {
     for (const [fieldKey, fieldValue] of Object.entries(value)) {
-      if (fieldKey.endsWith("_enabled") || fieldKey.startsWith("allow_") || fieldKey.startsWith("require_") || fieldKey.startsWith("show_") || fieldKey.startsWith("deduct_")) {
+      if (
+        fieldKey.endsWith("_enabled") ||
+        fieldKey.endsWith("_required") ||
+        fieldKey.endsWith("_requires_approval") ||
+        fieldKey.startsWith("allow_") ||
+        fieldKey.startsWith("require_") ||
+        fieldKey.startsWith("show_") ||
+        fieldKey.startsWith("deduct_") ||
+        fieldKey.startsWith("absent_if_") ||
+        fieldKey === "manual_attendance_requires_reason" ||
+        fieldKey === "missing_attendance_counts_as_absent" ||
+        fieldKey === "use_default_shift_when_no_roster"
+      ) {
         assertBoolean(fieldValue, fieldKey.replaceAll("_", " "));
       }
       if (
@@ -160,6 +172,16 @@ const validateTypedSettingValues = (
 
     if (settingKey === "payroll.default_rules" && value.salary_calculation_basis !== undefined && !["calendar_days", "fixed_30_days", "working_days", "custom_days"].includes(String(value.salary_calculation_basis))) {
       throw new ValidationError("Please choose a valid salary calculation method.");
+    }
+    if (settingKey === "attendance.default_rules") {
+      if (value.missed_punch_policy !== undefined && !["incomplete", "absent", "warning"].includes(String(value.missed_punch_policy))) {
+        throw new ValidationError("Please choose a valid missed punch policy.");
+      }
+      for (const timeKey of ["default_shift_start_time", "default_shift_end_time"]) {
+        if (value[timeKey] !== undefined && !/^\d{2}:\d{2}$/.test(String(value[timeKey]))) {
+          throw new ValidationError("Please enter attendance times in HH:mm format.");
+        }
+      }
     }
   }
 };

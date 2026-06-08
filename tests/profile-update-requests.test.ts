@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 
 import {
   assertAllowedRequestType,
@@ -26,12 +26,4 @@ describe("profile update request validators", () => {
   });
 });
 
-describe("profile update request placeholders", () => {
-  it.todo("admin can list profile update requests");
-  it.todo("approve request applies safe user and employee changes");
-  it.todo("reject request does not change employee or user data");
-  it.todo("returned request status works");
-  it.todo("user cannot approve own request unless Super Admin");
-  it.todo("address_update approval records manual follow-up when no address field exists");
-  it.todo("audit logs are created for review decisions");
-});
+

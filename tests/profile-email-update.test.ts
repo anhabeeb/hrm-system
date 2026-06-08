@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AuthActor } from "../src/types/api.types";
 
@@ -67,6 +67,8 @@ vi.mock("../src/services/realtime.service", () => ({
   broadcastEvent: vi.fn(async () => undefined),
 }));
 
+import * as service from "../src/modules/profile-update-requests/profile-update-requests.service";
+
 const context = (overrides: Partial<AuthActor> = {}): AuthActor => ({
   requestId: "req_test",
   companyId: "company_1",
@@ -85,6 +87,7 @@ const context = (overrides: Partial<AuthActor> = {}): AuthActor => ({
 });
 
 beforeEach(() => {
+  vi.useRealTimers();
   vi.clearAllMocks();
   profileRepoMock.state.request.status = "pending";
   profileRepoMock.state.request.requested_value_json = JSON.stringify({ email: "New.Email@Example.COM" });
@@ -95,10 +98,12 @@ beforeEach(() => {
   profileRepoMock.state.sessionsRevoked = false;
 });
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe("profile update email approval", () => {
   it("approves email_update by normalizing email, updating the user, and revoking sessions", async () => {
-    const service = await import("../src/modules/profile-update-requests/profile-update-requests.service");
-
     const result = await service.approveRequest({} as Env, context(), "req_email", {
       reason: "Approved",
       review_notes: "Approved",
@@ -111,7 +116,6 @@ describe("profile update email approval", () => {
   });
 
   it("revalidates duplicate email before approval and does not update the user", async () => {
-    const service = await import("../src/modules/profile-update-requests/profile-update-requests.service");
     profileRepoMock.state.duplicateUser = { id: "other_user", email: "new.email@example.com" };
 
     await expect(service.approveRequest({} as Env, context(), "req_email", {
@@ -127,8 +131,6 @@ describe("profile update email approval", () => {
   });
 
   it("still enforces company scope when Super Admin reviews a request", async () => {
-    const service = await import("../src/modules/profile-update-requests/profile-update-requests.service");
-
     await expect(service.approveRequest({} as Env, context({ companyId: "company_2" }), "req_email", {
       reason: "Approved",
       review_notes: "Approved",

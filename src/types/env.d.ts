@@ -18,6 +18,13 @@ declare global {
     DEVICE_TOKEN_SECRET: string;
     TOTP_ENCRYPTION_KEY: string;
     BOOTSTRAP_ADMIN_TOKEN?: string;
+    EMAIL_NOTIFICATIONS_ENABLED?: string;
+    EMAIL_PROVIDER?: string;
+    EMAIL_FROM_ADDRESS?: string;
+    EMAIL_FROM_NAME?: string;
+    EMAIL_REPLY_TO?: string;
+    EMAIL_DRY_RUN?: string;
+    RESEND_API_KEY?: string;
   }
 }
 

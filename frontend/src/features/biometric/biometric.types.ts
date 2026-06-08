@@ -6,6 +6,8 @@ export interface BiometricDevice {
   outlet_name?: string;
   device_name?: string;
   device_serial?: string;
+  device_code?: string;
+  external_device_id?: string;
   device_type?: string;
   vendor?: string;
   model?: string;
@@ -66,8 +68,12 @@ export interface BiometricDevicePayload {
   outlet_id: string;
   device_name: string;
   device_serial?: string;
+  device_code?: string;
+  external_device_id?: string;
   device_type: string;
   sync_mode?: string;
+  vendor?: string;
+  model?: string;
   reason?: string;
 }
 
@@ -91,6 +97,8 @@ export interface BiometricMutationResult {
   device_token?: string;
   raw_token?: string;
   updated?: boolean;
+  rejected?: boolean;
+  revoked?: boolean;
 }
 
 export interface PaginatedBiometricResult<T> {

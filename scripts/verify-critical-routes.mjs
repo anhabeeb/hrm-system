@@ -38,6 +38,8 @@ export const verifyCriticalRoutes = (baseDir = rootDir) => {
     "src/routes/roles.routes.ts",
     "src/routes/permissions.routes.ts",
     "src/routes/version.routes.ts",
+    "src/routes/holidays.routes.ts",
+    "src/routes/dashboard.routes.ts",
   ]) {
     if (!exists(file, baseDir)) {
       failures.push(`${file}: critical API route file is missing.`);
@@ -82,12 +84,28 @@ export const verifyCriticalRoutes = (baseDir = rootDir) => {
     /import\s*\{\s*versionRoutes\s*\}\s*from\s*["']\.\/routes\/version\.routes["'];/,
     "missing versionRoutes import.",
   );
+  assertContains(
+    failures,
+    appPath,
+    app,
+    /import\s*\{\s*holidaysRoutes\s*\}\s*from\s*["']\.\/routes\/holidays\.routes["'];/,
+    "missing holidaysRoutes import.",
+  );
+  assertContains(
+    failures,
+    appPath,
+    app,
+    /import\s*\{\s*dashboardRoutes\s*\}\s*from\s*["']\.\/routes\/dashboard\.routes["'];/,
+    "missing dashboardRoutes import.",
+  );
 
   for (const [route, variable] of [
     ["/version", "versionRoutes"],
     ["/users", "usersRoutes"],
     ["/roles", "rolesRoutes"],
     ["/permissions", "permissionsRoutes"],
+    ["/holidays", "holidaysRoutes"],
+    ["/dashboard", "dashboardRoutes"],
   ]) {
     assertContains(
       failures,

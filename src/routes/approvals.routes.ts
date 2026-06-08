@@ -15,16 +15,16 @@ approvalsRoutes.use("*", requireFeature("approvals"));
 approvalsRoutes.get("/settings-summary", requireAnyPermission(["approvals.view", "approval_workflows.view", "approval_thresholds.view"]), controller.getSettingsSummary);
 approvalsRoutes.get("/my-pending-count", requirePermission("approvals.view"), controller.getMyPendingCount);
 
-approvalsRoutes.get("/workflows", requirePermission("approval_workflows.view"), controller.listWorkflows);
-approvalsRoutes.post("/workflows", requirePermission("approval_workflows.manage"), requireReason(), controller.createWorkflow);
-approvalsRoutes.get("/workflows/:workflowId", requirePermission("approval_workflows.view"), controller.getWorkflow);
-approvalsRoutes.patch("/workflows/:workflowId", requirePermission("approval_workflows.manage"), controller.updateWorkflow);
-approvalsRoutes.post("/workflows/:workflowId/enable", requirePermission("approval_workflows.manage"), requireReason(), controller.enableWorkflow);
-approvalsRoutes.post("/workflows/:workflowId/disable", requirePermission("approval_workflows.manage"), requireReason(), controller.disableWorkflow);
-approvalsRoutes.get("/workflows/:workflowId/steps", requirePermission("approval_workflows.view"), controller.listWorkflowSteps);
-approvalsRoutes.post("/workflows/:workflowId/steps", requirePermission("approval_workflows.manage"), requireReason(), controller.createWorkflowStep);
-approvalsRoutes.patch("/workflows/:workflowId/steps/:stepId", requirePermission("approval_workflows.manage"), requireReason(), controller.updateWorkflowStep);
-approvalsRoutes.delete("/workflows/:workflowId/steps/:stepId", requirePermission("approval_workflows.manage"), requireReason(), controller.deleteWorkflowStep);
+approvalsRoutes.get("/workflows", requireAnyPermission(["approval_workflows.view", "leave.approvals.settings.manage"]), controller.listWorkflows);
+approvalsRoutes.post("/workflows", requireAnyPermission(["approval_workflows.manage", "leave.approvals.settings.manage"]), requireReason(), controller.createWorkflow);
+approvalsRoutes.get("/workflows/:workflowId", requireAnyPermission(["approval_workflows.view", "leave.approvals.settings.manage"]), controller.getWorkflow);
+approvalsRoutes.patch("/workflows/:workflowId", requireAnyPermission(["approval_workflows.manage", "leave.approvals.settings.manage"]), controller.updateWorkflow);
+approvalsRoutes.post("/workflows/:workflowId/enable", requireAnyPermission(["approval_workflows.manage", "leave.approvals.settings.manage"]), requireReason(), controller.enableWorkflow);
+approvalsRoutes.post("/workflows/:workflowId/disable", requireAnyPermission(["approval_workflows.manage", "leave.approvals.settings.manage"]), requireReason(), controller.disableWorkflow);
+approvalsRoutes.get("/workflows/:workflowId/steps", requireAnyPermission(["approval_workflows.view", "leave.approvals.settings.manage"]), controller.listWorkflowSteps);
+approvalsRoutes.post("/workflows/:workflowId/steps", requireAnyPermission(["approval_workflows.manage", "leave.approvals.settings.manage"]), requireReason(), controller.createWorkflowStep);
+approvalsRoutes.patch("/workflows/:workflowId/steps/:stepId", requireAnyPermission(["approval_workflows.manage", "leave.approvals.settings.manage"]), requireReason(), controller.updateWorkflowStep);
+approvalsRoutes.delete("/workflows/:workflowId/steps/:stepId", requireAnyPermission(["approval_workflows.manage", "leave.approvals.settings.manage"]), requireReason(), controller.deleteWorkflowStep);
 
 approvalsRoutes.get("/thresholds", requirePermission("approval_thresholds.view"), controller.listThresholds);
 approvalsRoutes.post("/thresholds", requirePermission("approval_thresholds.edit"), requireReason(), controller.createThreshold);

@@ -38,7 +38,7 @@ export const BiometricPage = () => {
   const [selectedLog, setSelectedLog] = useState<BiometricLog | null>(null);
   const [unmatchedLog, setUnmatchedLog] = useState<BiometricLog | null>(null);
   const [detailLog, setDetailLog] = useState<BiometricLog | null>(null);
-  const [reasonAction, setReasonAction] = useState<"device-status" | "rotate" | "disable-mapping" | null>(null);
+  const [reasonAction, setReasonAction] = useState<"device-status" | "rotate" | "revoke" | "disable-mapping" | "reject-log" | null>(null);
   const [oneTimeToken, setOneTimeToken] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -96,12 +96,13 @@ export const BiometricPage = () => {
     mutationFn: ({ reason }: { reason: string }) => {
       if (!selectedDevice) throw new Error("Device is required.");
       if (reasonAction === "rotate") return biometricApi.rotateDeviceToken(selectedDevice.id, { reason });
+      if (reasonAction === "revoke") return biometricApi.revokeDevice(selectedDevice.id, { reason });
       if (selectedDevice.status === "active") return biometricApi.disableDevice(selectedDevice.id, { reason });
       return biometricApi.enableDevice(selectedDevice.id, { reason });
     },
     onSuccess: async (response) => {
       setOneTimeToken(extractToken(response.data));
-      setSuccessMessage(reasonAction === "rotate" ? "Biometric device token rotated successfully." : "Biometric device status updated successfully.");
+      setSuccessMessage(reasonAction === "rotate" ? "Biometric device token rotated successfully." : reasonAction === "revoke" ? "Biometric device revoked successfully." : "Biometric device status updated successfully.");
       setReasonAction(null);
       setSelectedDevice(null);
       await refresh();
@@ -141,11 +142,21 @@ export const BiometricPage = () => {
     },
   });
 
+  const rejectLogMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => biometricApi.rejectLog(id, { reason }),
+    onSuccess: async () => {
+      setSuccessMessage("Biometric punch rejected successfully.");
+      setSelectedLog(null);
+      setReasonAction(null);
+      await refresh();
+    },
+  });
+
   const canManageDevices = auth.hasPermission("biometric.manage_devices");
   const canMap = auth.hasPermission("biometric.map_employee");
-  const canResolve = auth.hasAnyPermission(["biometric.resolve_unmatched", "biometric.sync"]);
+  const canResolve = auth.hasAnyPermission(["biometric.resolve_punches", "biometric.resolve_unmatched", "biometric.sync"]);
 
-  const actionError = deviceMutation.error ?? deviceReasonMutation.error ?? mappingMutation.error ?? disableMappingMutation.error ?? reprocessMutation.error;
+  const actionError = deviceMutation.error ?? deviceReasonMutation.error ?? mappingMutation.error ?? disableMappingMutation.error ?? reprocessMutation.error ?? rejectLogMutation.error;
 
   return (
     <div>
@@ -192,6 +203,7 @@ export const BiometricPage = () => {
               canManage={canManageDevices}
               onEdit={(device) => { setSelectedDevice(device); setDeviceDialogOpen(true); }}
               onStatus={(device) => { setSelectedDevice(device); setReasonAction("device-status"); }}
+              onRevoke={(device) => { setSelectedDevice(device); setReasonAction("revoke"); }}
               onRotate={(device) => { setSelectedDevice(device); setReasonAction("rotate"); setOneTimeToken(null); }}
               onPageChange={(page) => updateFilters({ page })}
               onPageSizeChange={(page_size) => updateFilters({ page: 1, page_size })}
@@ -217,6 +229,7 @@ export const BiometricPage = () => {
               canReprocess={canResolve}
               onView={setDetailLog}
               onReprocess={setSelectedLog}
+              onReject={(log) => { setSelectedLog(log); setReasonAction("reject-log"); }}
               onPageChange={(page) => updateFilters({ page })}
               onPageSizeChange={(page_size) => updateFilters({ page: 1, page_size })}
             />
@@ -226,8 +239,9 @@ export const BiometricPage = () => {
               rows={unmatchedQuery.data?.data ?? []}
               loading={unmatchedQuery.isLoading}
               pagination={unmatchedQuery.data?.pagination}
-              canMap={auth.hasPermission("biometric.resolve_unmatched")}
+              canMap={auth.hasAnyPermission(["biometric.resolve_punches", "biometric.resolve_unmatched"])}
               onMap={setUnmatchedLog}
+              onReject={(log) => { setSelectedLog(log); setReasonAction("reject-log"); }}
               onPageChange={(page) => updateFilters({ page })}
               onPageSizeChange={(page_size) => updateFilters({ page: 1, page_size })}
             />
@@ -266,12 +280,16 @@ export const BiometricPage = () => {
       />
       <BiometricReasonDialog
         open={Boolean(reasonAction)}
-        title={reasonAction === "rotate" ? "Rotate biometric device token" : reasonAction === "disable-mapping" ? "Disable biometric mapping" : "Update biometric device status"}
+        title={reasonAction === "rotate" ? "Rotate biometric device token" : reasonAction === "revoke" ? "Revoke biometric device" : reasonAction === "disable-mapping" ? "Disable biometric mapping" : reasonAction === "reject-log" ? "Reject biometric punch" : "Update biometric device status"}
         description="A reason is required for audit history."
-        loading={deviceReasonMutation.isPending || disableMappingMutation.isPending}
-        error={deviceReasonMutation.error ?? disableMappingMutation.error}
+        loading={deviceReasonMutation.isPending || disableMappingMutation.isPending || rejectLogMutation.isPending}
+        error={deviceReasonMutation.error ?? disableMappingMutation.error ?? rejectLogMutation.error}
         onOpenChange={(open) => !open && setReasonAction(null)}
-        onSubmit={(reason) => reasonAction === "disable-mapping" ? disableMappingMutation.mutate({ reason }) : deviceReasonMutation.mutate({ reason })}
+        onSubmit={(reason) => {
+          if (reasonAction === "disable-mapping") disableMappingMutation.mutate({ reason });
+          else if (reasonAction === "reject-log" && selectedLog) rejectLogMutation.mutate({ id: selectedLog.id, reason });
+          else deviceReasonMutation.mutate({ reason });
+        }}
       />
       <DetailDrawer open={Boolean(detailLog)} onOpenChange={(open) => !open && setDetailLog(null)} title="Biometric log detail" subtitle={detailLog?.biometric_user_id}>
         {detailLog ? <DetailSection title="Safe log detail" rows={[{ label: "Payload", value: <pre className="max-h-96 overflow-auto rounded bg-muted p-3 text-xs">{JSON.stringify(sanitizeForDisplay(detailLog), null, 2)}</pre> }]} /> : null}

@@ -15,6 +15,7 @@ import {
 import type { AppContext, AuthActor } from "../../types/api.types";
 import { AuthError, ValidationError } from "../../utils/errors";
 import { created, ok, paginated } from "../../utils/response";
+import { safeAttachmentHeader } from "../../utils/security";
 
 const actor = (c: Context<AppContext>): AuthActor => {
   const authUser = c.get("authUser");
@@ -65,10 +66,9 @@ export const deleteDocument = async (c: Context<AppContext>) =>
 export const downloadDocument = async (c: Context<AppContext>) =>
   {
     const result = await service.downloadDocument(c.env, actor(c), id(c));
-    const fileName = String(result.file_name ?? "document").replace(/["\\\r\n]/g, "_");
     const headers = new Headers();
     headers.set("Content-Type", result.mime_type ?? result.object.httpMetadata?.contentType ?? "application/octet-stream");
-    headers.set("Content-Disposition", `attachment; filename="${fileName}"`);
+    headers.set("Content-Disposition", safeAttachmentHeader(result.file_name, "document"));
     headers.set("Cache-Control", "private, no-store");
     headers.set("x-request-id", c.get("requestId"));
     return new Response(result.object.body, { status: 200, headers });

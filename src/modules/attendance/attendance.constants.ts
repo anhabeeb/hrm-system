@@ -11,6 +11,7 @@ export const ATTENDANCE_METHODS = [
   "pin",
   "qr",
   "kiosk",
+  "biometric_device",
   "biometric_placeholder",
   "import_placeholder",
 ] as const;
@@ -19,6 +20,10 @@ export const ATTENDANCE_SOURCES = [
   "admin_dashboard",
   "manager_dashboard",
   "kiosk",
+  "biometric_device",
+  "manual",
+  "import",
+  "system",
   "biometric_placeholder",
   "import_placeholder",
   "sync_placeholder",
@@ -41,9 +46,14 @@ export const ATTENDANCE_CONFLICT_TYPES = [
   "wrong_outlet",
   "missing_clock_in",
   "missing_clock_out",
+  "incomplete_attendance",
   "inactive_employee",
   "manual_vs_device",
   "payroll_locked",
+  "overtime_pending_approval",
+  "attendance_on_leave",
+  "attendance_outside_roster",
+  "missing_roster",
   "device_time_warning_placeholder",
 ] as const;
 

@@ -130,6 +130,95 @@ export const getEmployee = async (c: Context<AppContext>) =>
     { requestId: c.get("requestId") },
   );
 
+const profileLimit = (c: Context<AppContext>) => {
+  const limit = Number(c.req.query("limit") ?? 25);
+  return Number.isFinite(limit) ? Math.min(Math.max(limit, 1), 100) : 25;
+};
+
+const profileResponse = <T>(c: Context<AppContext>, data: T, filters: Record<string, unknown> = {}) =>
+  ok(
+    {
+      data,
+      filters,
+      generated_at: new Date().toISOString(),
+    },
+    "Employee profile section loaded successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const getEmployeeProfile = async (c: Context<AppContext>) =>
+  ok(
+    await employeesService.getEmployeeProfile(c.env, actor(c), requiredId(c), profileLimit(c)),
+    "Employee 360 profile loaded successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const getEmployeeProfileSummary = async (c: Context<AppContext>) =>
+  profileResponse(c, await employeesService.getEmployeeProfileSummary(c.env, actor(c), requiredId(c)));
+
+export const getEmployeeProfileAttendance = async (c: Context<AppContext>) =>
+  profileResponse(
+    c,
+    await employeesService.getEmployeeProfileAttendance(c.env, actor(c), requiredId(c), profileLimit(c)),
+    { limit: profileLimit(c) },
+  );
+
+export const getEmployeeProfileLeave = async (c: Context<AppContext>) =>
+  profileResponse(
+    c,
+    await employeesService.getEmployeeProfileLeave(c.env, actor(c), requiredId(c), profileLimit(c)),
+    { limit: profileLimit(c) },
+  );
+
+export const getEmployeeProfileLongLeave = async (c: Context<AppContext>) =>
+  profileResponse(
+    c,
+    await employeesService.getEmployeeProfileLongLeave(c.env, actor(c), requiredId(c), profileLimit(c)),
+    { limit: profileLimit(c) },
+  );
+
+export const getEmployeeProfileDocuments = async (c: Context<AppContext>) =>
+  profileResponse(
+    c,
+    await employeesService.getEmployeeProfileDocuments(c.env, actor(c), requiredId(c), profileLimit(c)),
+    { limit: profileLimit(c) },
+  );
+
+export const getEmployeeProfileContracts = async (c: Context<AppContext>) =>
+  profileResponse(
+    c,
+    await employeesService.getEmployeeProfileContracts(c.env, actor(c), requiredId(c), profileLimit(c)),
+    { limit: profileLimit(c) },
+  );
+
+export const getEmployeeProfileAssets = async (c: Context<AppContext>) =>
+  profileResponse(
+    c,
+    await employeesService.getEmployeeProfileAssets(c.env, actor(c), requiredId(c), profileLimit(c)),
+    { limit: profileLimit(c) },
+  );
+
+export const getEmployeeProfilePayrollReadiness = async (c: Context<AppContext>) =>
+  profileResponse(
+    c,
+    await employeesService.getEmployeeProfilePayrollReadiness(c.env, actor(c), requiredId(c), profileLimit(c)),
+    { limit: profileLimit(c) },
+  );
+
+export const getEmployeeProfileAlerts = async (c: Context<AppContext>) =>
+  profileResponse(
+    c,
+    await employeesService.getEmployeeProfileAlerts(c.env, actor(c), requiredId(c), profileLimit(c)),
+    { limit: profileLimit(c) },
+  );
+
+export const getEmployeeProfileTimeline = async (c: Context<AppContext>) =>
+  profileResponse(
+    c,
+    await employeesService.getEmployeeProfileTimeline(c.env, actor(c), requiredId(c), profileLimit(c)),
+    { limit: profileLimit(c) },
+  );
+
 export const createEmployee = async (c: Context<AppContext>) =>
   created(
     await employeesService.createEmployee(

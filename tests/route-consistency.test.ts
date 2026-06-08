@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 
 import app from "../src/app";
 import worker from "../src/index";
@@ -263,10 +263,4 @@ describe("Worker API/static asset routing", () => {
   }
 });
 
-describe("route consistency placeholders", () => {
-  it.todo("bootstrap status works without normal auth");
-  it.todo("bootstrap initialize requires BOOTSTRAP_ADMIN_TOKEN and cannot run after setup");
-  it.todo("device token cannot access admin/user routes");
-  it.todo("admin session cannot access device-only routes without device auth");
-  it.todo("static routes such as documents/expiring, approvals/workflows, reports/catalog, and backup restore detail are not shadowed");
-});
+

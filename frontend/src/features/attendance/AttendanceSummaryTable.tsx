@@ -14,6 +14,8 @@ const columns: TableColumn<AttendanceSummary>[] = [
   { key: "employee_name", header: "Employee", cell: employeeName },
   { key: "outlet_name", header: "Outlet", cell: (row) => row.outlet_name ?? row.outlet_id ?? "—" },
   { key: "status", header: "Status", cell: (row) => <StatusBadge status={row.status} /> },
+  { key: "classification", header: "Classification", cell: (row) => <StatusBadge status={row.classification ?? row.status} /> },
+  { key: "expected_start", header: "Expected Shift", cell: (row) => row.expected_start && row.expected_end ? `${formatDateTime(row.expected_start)} - ${formatDateTime(row.expected_end)}` : "Not rostered" },
   { key: "first_clock_in", header: "Clock In", cell: (row) => formatDateTime(row.first_clock_in ?? row.clock_in_time) },
   { key: "last_clock_out", header: "Clock Out", cell: (row) => formatDateTime(row.last_clock_out ?? row.clock_out_time) },
   { key: "late_minutes", header: "Late", cell: (row) => row.late_minutes ?? 0 },

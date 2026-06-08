@@ -8,12 +8,14 @@ import { SalaryImpactTable } from "./SalaryImpactTable";
 export const LongLeaveDetailDrawer = ({
   record,
   impactRows,
+  payrollPreviewRows,
   impactLoading,
   open,
   onOpenChange,
 }: {
   record: LongLeaveRecord | null;
   impactRows: SalaryImpactRow[];
+  payrollPreviewRows?: SalaryImpactRow[];
   impactLoading?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -39,6 +41,14 @@ export const LongLeaveDetailDrawer = ({
           ]}
         />
         <SalaryImpactTable rows={impactRows} loading={impactLoading} />
+        <DetailSection
+          title="Payroll preview"
+          rows={[
+            { label: "Preview status", value: payrollPreviewRows && payrollPreviewRows.length > 0 ? "Generated" : "Not generated yet" },
+            { label: "Source", value: "Preview is read-only. Apply marks the impact for payroll review without finalizing payroll." },
+          ]}
+        />
+        <SalaryImpactTable rows={payrollPreviewRows ?? []} loading={impactLoading} />
       </>
     ) : null}
   </DetailDrawer>

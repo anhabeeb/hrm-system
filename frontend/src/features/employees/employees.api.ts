@@ -1,11 +1,22 @@
 import { api } from "@/lib/api-client";
 import { buildQueryString } from "@/lib/query-string";
 import type { DocumentUpdatePayload, DocumentUploadPayload } from "@/features/documents/documents.types";
-import type { CompensationComponentDefinition, CompensationComponentDefinitionPayload, Employee, EmployeeCompensationComponent, EmployeeCompensationComponentEndPayload, EmployeeCompensationComponentMutationResponse, EmployeeCompensationComponentPayload, EmployeeCompensationSummary, EmployeeDetailResponse, EmployeeDocumentCompliance, EmployeeDocumentRow, EmployeeFilters, EmployeeJobChangePayload, EmployeeJobChangeResponse, EmployeeJobHistoryRow, EmployeeNoteRow, EmployeePayload, EmployeeSalaryChangePayload, EmployeeSalaryChangeResponse, EmployeeSalaryRow, EmployeeStatusChangePayload, EmployeeStatusHistoryRow, EmployeeUpdatePayload } from "./employees.types";
+import type { CompensationComponentDefinition, CompensationComponentDefinitionPayload, Employee, Employee360Profile, EmployeeCompensationComponent, EmployeeCompensationComponentEndPayload, EmployeeCompensationComponentMutationResponse, EmployeeCompensationComponentPayload, EmployeeCompensationSummary, EmployeeDetailResponse, EmployeeDocumentCompliance, EmployeeDocumentRow, EmployeeFilters, EmployeeJobChangePayload, EmployeeJobChangeResponse, EmployeeJobHistoryRow, EmployeeNoteRow, EmployeePayload, EmployeeSalaryChangePayload, EmployeeSalaryChangeResponse, EmployeeSalaryRow, EmployeeStatusChangePayload, EmployeeStatusHistoryRow, EmployeeUpdatePayload } from "./employees.types";
 
 export const employeesApi = {
   list: (filters: EmployeeFilters) => api.get<Employee[]>(`/employees${buildQueryString(filters)}`),
   get: (id: string) => api.get<EmployeeDetailResponse>(`/employees/${id}`),
+  profile: (id: string, filters: { limit?: number } = {}) => api.get<Employee360Profile>(`/employees/${id}/profile${buildQueryString(filters)}`),
+  profileSummary: (id: string) => api.get<{ data: Employee360Profile["summary"] }>(`/employees/${id}/profile/summary`),
+  profileAttendance: (id: string, filters: { limit?: number } = {}) => api.get<{ data: Employee360Profile["attendance"] }>(`/employees/${id}/profile/attendance${buildQueryString(filters)}`),
+  profileLeave: (id: string, filters: { limit?: number } = {}) => api.get<{ data: Employee360Profile["leave"] }>(`/employees/${id}/profile/leave${buildQueryString(filters)}`),
+  profileLongLeave: (id: string, filters: { limit?: number } = {}) => api.get<{ data: Employee360Profile["long_leave"] }>(`/employees/${id}/profile/long-leave${buildQueryString(filters)}`),
+  profileDocuments: (id: string, filters: { limit?: number } = {}) => api.get<{ data: Employee360Profile["documents"] }>(`/employees/${id}/profile/documents${buildQueryString(filters)}`),
+  profileContracts: (id: string, filters: { limit?: number } = {}) => api.get<{ data: Employee360Profile["contracts"] }>(`/employees/${id}/profile/contracts${buildQueryString(filters)}`),
+  profileAssets: (id: string, filters: { limit?: number } = {}) => api.get<{ data: Employee360Profile["assets"] }>(`/employees/${id}/profile/assets${buildQueryString(filters)}`),
+  profilePayrollReadiness: (id: string, filters: { limit?: number } = {}) => api.get<{ data: Employee360Profile["payroll_readiness"] }>(`/employees/${id}/profile/payroll-readiness${buildQueryString(filters)}`),
+  profileAlerts: (id: string, filters: { limit?: number } = {}) => api.get<{ data: Employee360Profile["alerts"] }>(`/employees/${id}/profile/alerts${buildQueryString(filters)}`),
+  profileTimeline: (id: string, filters: { limit?: number } = {}) => api.get<{ data: Employee360Profile["timeline"] }>(`/employees/${id}/profile/timeline${buildQueryString(filters)}`),
   create: (payload: EmployeePayload) => api.post<{ employee: Employee } | { id: string }>("/employees", payload),
   update: (id: string, payload: EmployeeUpdatePayload) => api.patch<{ employee: Employee } | { updated: boolean }>(`/employees/${id}`, payload),
   statusHistory: (id: string) => api.get<{ history: EmployeeStatusHistoryRow[] }>(`/employees/${id}/status-history`),

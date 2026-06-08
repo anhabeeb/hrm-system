@@ -36,11 +36,27 @@ export interface RestoreRequest {
 export interface BackupCreatePayload {
   backup_type: string;
   reason: string;
+  include_audit_logs?: boolean;
+  include_document_metadata?: boolean;
+  include_notification_history?: boolean;
 }
 
 export interface RestoreRequestPayload {
   backup_id?: string;
   restore_scope: string;
+  restore_mode?: string;
+  confirmation?: string;
+  reason: string;
+}
+
+export interface RestoreJobPayload {
+  backup_job_id?: string;
+  restore_mode: string;
+  reason: string;
+}
+
+export interface RestoreApplyPayload {
+  confirmation: string;
   reason: string;
 }
 
@@ -49,5 +65,20 @@ export interface RetentionPolicyPayload {
   keep_monthly_count?: number;
   keep_yearly_count?: number;
   auto_delete_enabled?: boolean;
+  reason: string;
+}
+
+export interface BackupRestoreSettingsPayload {
+  backup_enabled?: boolean;
+  backup_expiry_days?: number;
+  max_backup_rows?: number;
+  max_backup_size?: number;
+  allow_manual_backup?: boolean;
+  allow_restore_preview?: boolean;
+  allow_restore_apply?: boolean;
+  require_super_admin_for_restore?: boolean;
+  include_audit_logs?: boolean;
+  include_document_metadata?: boolean;
+  include_document_file_manifest?: boolean;
   reason: string;
 }

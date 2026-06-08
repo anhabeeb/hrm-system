@@ -9,20 +9,20 @@ export const authenticateDevice = async (
   requestId: string,
 ): Promise<DeviceAuthContext> => {
   if (!token) {
-    throw new DeviceAuthError("Device authentication is required.");
+    throw new DeviceAuthError("Device token is required.", "DEVICE_TOKEN_REQUIRED");
   }
 
   const tokenHash = await hashToken(token, env.DEVICE_TOKEN_SECRET);
   const device = await devicesRepository.findDeviceByTokenHash(env, tokenHash);
 
   if (!device) {
-    throw new DeviceAuthError("Device authentication is required.");
+    throw new DeviceAuthError("Device authentication failed.", "DEVICE_AUTH_FAILED");
   }
 
   if (device.status !== "active") {
     throw new DeviceAuthError(
-      "This device is disabled. Please contact your system administrator.",
-      "DEVICE_DISABLED",
+      "This device is inactive. Please contact your system administrator.",
+      "DEVICE_INACTIVE",
     );
   }
 

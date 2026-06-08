@@ -5,15 +5,21 @@ import {
   validateBalanceAdjust,
   validateBalanceFilters,
   validateCalendarFilters,
+  validateAccrualInput,
+  validateCarryForwardInput,
+  validateExpiryInput,
   validateLeaveAction,
+  validateLeaveDelegate,
   validateLeaveRequestCreate,
   validateLeaveRequestUpdate,
   validateLeaveTypeFilters,
   validateLeaveTypeUpdate,
+  validateOpeningBalance,
   validatePolicyCreate,
   validatePolicyFilters,
   validatePolicyUpdate,
   validateRequestFilters,
+  validateTransactionFilters,
 } from "./leave.validators";
 import type { AppContext, AuthActor } from "../../types/api.types";
 import { AuthError, ValidationError } from "../../utils/errors";
@@ -81,10 +87,57 @@ export const getEmployeeBalances = async (c: Context<AppContext>) =>
 export const adjustBalance = async (c: Context<AppContext>) =>
   ok(await service.adjustBalance(c.env, actor(c), id(c, "employeeId"), validateBalanceAdjust(await body(c))), "Leave balance updated successfully.", { requestId: c.get("requestId") });
 
+export const adjustBalanceFromBody = async (c: Context<AppContext>) => {
+  const payload = await body(c);
+  const employeeId = typeof payload.employee_id === "string" && payload.employee_id.trim() ? payload.employee_id.trim() : "";
+  if (!employeeId) throw new ValidationError("Employee is required.");
+  return ok(await service.adjustBalance(c.env, actor(c), employeeId, validateBalanceAdjust(payload)), "Leave balance updated successfully.", { requestId: c.get("requestId") });
+};
+
+export const setOpeningBalance = async (c: Context<AppContext>) =>
+  ok(await service.setOpeningBalance(c.env, actor(c), validateOpeningBalance(await body(c))), "Opening balance saved successfully.", { requestId: c.get("requestId") });
+
+export const listBalanceTransactions = async (c: Context<AppContext>) => {
+  const employeeId = id(c, "employeeId");
+  const result = await service.listBalanceTransactions(c.env, actor(c), validateTransactionFilters(query(c), employeeId));
+  return paginated(result.rows, result.pagination, "Leave balance transactions loaded successfully.", { requestId: c.get("requestId") });
+};
+
+export const previewAccrual = async (c: Context<AppContext>) =>
+  ok(await service.previewAccrual(c.env, actor(c), validateAccrualInput(await body(c))), "Leave accrual preview generated successfully.", { requestId: c.get("requestId") });
+
+export const applyAccrual = async (c: Context<AppContext>) =>
+  ok(await service.applyAccrual(c.env, actor(c), validateAccrualInput(await body(c))), "Leave accrual applied successfully.", { requestId: c.get("requestId") });
+
+export const applyCarryForward = async (c: Context<AppContext>) =>
+  ok(await service.applyCarryForward(c.env, actor(c), validateCarryForwardInput(await body(c))), "Leave carry-forward applied successfully.", { requestId: c.get("requestId") });
+
+export const applyExpiry = async (c: Context<AppContext>) =>
+  ok(await service.applyExpiry(c.env, actor(c), validateExpiryInput(await body(c))), "Leave expiry applied successfully.", { requestId: c.get("requestId") });
+
+export const rebuildBalances = async (c: Context<AppContext>) =>
+  ok(await service.rebuildEmployeeLeaveBalances(c.env, actor(c), id(c, "employeeId"), Number(c.req.query("year") ?? new Date().getFullYear())), "Leave balance rebuild completed successfully.", { requestId: c.get("requestId") });
+
 export const listRequests = async (c: Context<AppContext>) => {
   const result = await service.listRequests(c.env, actor(c), validateRequestFilters(query(c)));
   return paginated(result.rows, result.pagination, "Leave requests loaded successfully.", { requestId: c.get("requestId") });
 };
+
+export const listApprovalInbox = async (c: Context<AppContext>) => {
+  const result = await service.listApprovalInbox(c.env, actor(c), validateRequestFilters(query(c)));
+  return paginated(result.rows, result.pagination, "Leave approval inbox loaded successfully.", { requestId: c.get("requestId") });
+};
+
+export const listApprovalHistory = async (c: Context<AppContext>) => {
+  const result = await service.listApprovalHistory(c.env, actor(c), validateRequestFilters(query(c)));
+  return paginated(result.rows, result.pagination, "Leave approval history loaded successfully.", { requestId: c.get("requestId") });
+};
+
+export const getApprovalDetail = async (c: Context<AppContext>) =>
+  ok(await service.getApprovalDetail(c.env, actor(c), id(c, "requestId")), "Leave approval detail loaded successfully.", { requestId: c.get("requestId") });
+
+export const getTimeline = async (c: Context<AppContext>) =>
+  ok(await service.getApprovalDetail(c.env, actor(c), id(c, "requestId")), "Leave request timeline loaded successfully.", { requestId: c.get("requestId") });
 
 export const getRequest = async (c: Context<AppContext>) =>
   ok({ leave_request: await service.getRequest(c.env, actor(c), id(c)) }, "Leave request loaded successfully.", { requestId: c.get("requestId") });
@@ -113,6 +166,9 @@ export const updateRequest = async (c: Context<AppContext>) =>
     );
   };
 
+export const submitRequest = async (c: Context<AppContext>) =>
+  ok(await service.submitRequest(c.env, actor(c), id(c), validateLeaveAction(await body(c))), "Leave request submitted.", { requestId: c.get("requestId") });
+
 export const approveRequest = async (c: Context<AppContext>) =>
   {
     const result = await service.approveRequest(c.env, actor(c), id(c), validateLeaveAction(await body(c)));
@@ -130,6 +186,15 @@ export const rejectRequest = async (c: Context<AppContext>) =>
 
 export const cancelRequest = async (c: Context<AppContext>) =>
   ok(await service.cancelRequest(c.env, actor(c), id(c), validateLeaveAction(await body(c))), "Leave request cancelled.", { requestId: c.get("requestId") });
+
+export const withdrawRequest = async (c: Context<AppContext>) =>
+  ok(await service.withdrawRequest(c.env, actor(c), id(c), validateLeaveAction(await body(c))), "Leave request withdrawn.", { requestId: c.get("requestId") });
+
+export const delegateRequest = async (c: Context<AppContext>) =>
+  ok(await service.delegateRequest(c.env, actor(c), id(c), validateLeaveDelegate(await body(c))), "Leave approval delegated.", { requestId: c.get("requestId") });
+
+export const escalateRequest = async (c: Context<AppContext>) =>
+  ok(await service.escalateRequest(c.env, actor(c), id(c), validateLeaveAction(await body(c))), "Leave approval escalated.", { requestId: c.get("requestId") });
 
 export const calendar = async (c: Context<AppContext>) =>
   ok({ calendar: await service.calendar(c.env, actor(c), validateCalendarFilters(query(c))) }, "Leave calendar loaded successfully.", { requestId: c.get("requestId") });

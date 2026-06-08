@@ -229,6 +229,34 @@ npx wrangler d1 execute hrm-system --remote --command "SELECT name, sql FROM sql
 - Confirm `documents.contract_rules` settings and employment contract document categories are seeded before enabling contract UI flows.
 - Contract renewal must create a new linked contract record and preserve the old contract history. Contract expiry must not automatically terminate an employee.
 - Run `npm run verify:contract-schema` locally before deployment.
+- Apply migration `0033_roster_scheduling_hardening.sql` before enabling duty roster scheduling in production.
+- Confirm roster schema support exists for `shift_templates`, `roster_shifts`, and `roster_conflicts`, including shift template code/scope, roster date, break minutes, publish/cancel fields, conflict detection timestamps, and roster indexes.
+- Confirm `attendance.roster_rules` settings are allowed and seeded before exposing roster settings.
+- Roster edits must remain blocked for finalized, locked, paid, or finalizing payroll months. Do not use roster tools to reopen or mutate finalized attendance/payroll.
+- Run `npm run verify:roster-schema` locally before deployment.
+
+## Phase 8B Attendance Rule Hardening
+
+- Apply migration `0034_attendance_rule_hardening.sql` before relying on hardened attendance classification metadata.
+- Confirm `attendance_daily_summary` includes expected shift, classification, absence minutes, leave/holiday/rest/incomplete flags, warnings/source metadata, calculated timestamp, and correction reference columns.
+- Confirm attendance rule settings expose grace period, missed punch policy, default shift fallback, roster requirement, overtime rules, complete-attendance-before-payroll, and missing-attendance-as-absence controls.
+- Payroll must continue reading `attendance_daily_summary` and must not double-deduct unpaid leave as absence.
+- Run `npm run verify:attendance-schema` locally before deployment.
+
+## Phase 9A Leave Balance / Accrual Hardening
+
+- Apply migration `0037_leave_balance_accrual_hardening.sql` before enabling hardened leave balances, accrual, carry-forward, expiry, opening balances, or manual adjustments.
+- Confirm `leave_balances` includes pending, adjusted, carried-forward, expired, available, entitlement, accrual-period, and accrual-date fields.
+- Confirm `leave_balance_transactions` exists and includes idempotency keys, source metadata, balance-before/after values, and leave request linkage.
+- Leave balance changes must be written through the transaction ledger. Do not directly edit ledger rows in production.
+- Accrual-enabled leave types start with entitlement as metadata only; accrual transactions credit earned leave. Carry-forward must come from carry-forward transactions, not from default policy prefill.
+- If historical migration `0019_job_history_old_new_columns.sql` was partially applied in production, inspect `employee_job_history` before retrying because SQLite/D1 additive column migrations can fail on duplicate columns:
+
+```bash
+npx wrangler d1 execute hrm-system --remote --command "PRAGMA table_info(employee_job_history);"
+```
+
+- Run `npm run verify:leave-balance-schema` locally before deployment.
 
 ## Approval Finalization Migration Guardrails
 
@@ -280,6 +308,71 @@ Expected production result:
 - `/api/not-real` returns `404 API_ROUTE_NOT_FOUND` JSON
 - `/` returns `200` HTML
 - `/dashboard` returns `200` HTML
+
+## Production Acceptance
+
+Before go-live, run the local verification chain from a clean checkout:
+
+```bash
+npm ci
+npm audit --audit-level=critical
+npm run build
+npm run typecheck
+npm test
+npm run verify:production-readiness
+npm run verify:production-acceptance
+```
+
+After deployment, run the read-only production smoke test:
+
+```bash
+SMOKE_BASE_URL=https://hrm.cafeasiana.com.mv npm run smoke:production
+```
+
+If frontend and API use separate domains, run:
+
+```bash
+SMOKE_BASE_URL=https://hrm.cafeasiana.com.mv SMOKE_API_BASE_URL=https://api.hrm.cafeasiana.com.mv SMOKE_ALLOWED_ORIGIN=https://hrm.cafeasiana.com.mv npm run smoke:production
+```
+
+Staging-only authenticated acceptance can be run with test credentials:
+
+```bash
+ACCEPTANCE_BASE_URL=https://staging-hrm.example.com ACCEPTANCE_USERNAME=staging-admin ACCEPTANCE_PASSWORD=*** npm run acceptance:staging
+```
+
+Do not run staging mutation tests in production. Imports, restores, archives, payroll finalization, destructive settings changes, and data repair scripts require an explicit staging-only or approved production change window.
+
+## Production Migration Safety
+
+- Take a backup before applying D1 migrations.
+- Verify the backup is stable, retrievable, and checksummed.
+- Apply D1 migrations once and in order with `wrangler d1 migrations apply DB --remote`.
+- Run schema verifiers after migration through `npm run build`.
+- Verify bootstrap/setup state after migration.
+- Do not run destructive restore/archive/import tests in production.
+- If a migration fails, stop, inspect the affected table with `PRAGMA table_info(...)`, and create a forward repair migration where practical.
+- D1 migrations may not be reversible; do not assume rollback can undo schema changes.
+
+## Route And Domain Guardrails
+
+- Make sure `/api/*` routes go to Worker API through `assets.run_worker_first`.
+- Make sure SPA routes return frontend HTML, not API JSON.
+- Make sure API routes return structured JSON, not frontend HTML.
+- Keep `hrm.cafeasiana.com.mv` routed to the current Worker deployment.
+- Use `api.hrm.cafeasiana.com.mv` only if CORS, cookies, and routing are intentionally configured for a separate API domain.
+- Do not deploy from stale ZIP folders. Git is source of truth.
+- Do not use old Cloudflare rollback before route fixes unless intentionally returning to a known-good deployment with the same critical route coverage.
+
+## Rollback Guidance
+
+- Identify the previous known-good deployment before deploying.
+- Keep the pre-migration backup available until acceptance is complete.
+- Worker rollback can restore code/assets but cannot automatically reverse D1 schema migrations.
+- Prefer forward-fix migrations for D1 after schema changes.
+- If deployment smoke fails because API routes return HTML, check Worker `run_worker_first` and domain routing before rolling back.
+- If smoke fails because protected routes return 404, production likely deployed stale source or an old route table.
+- If smoke fails because frontend routes return API JSON, check SPA asset fallback and route configuration.
 
 ## Warnings
 

@@ -176,8 +176,15 @@ export const enableDevice = async (c: Context<AppContext>) =>
 
 export const disableDevice = async (c: Context<AppContext>) =>
   ok(
-    await service.setDeviceStatus(c.env, actor(c), id(c), "disabled", validateBiometricReasonInput(await body(c))),
+    await service.setDeviceStatus(c.env, actor(c), id(c), "suspended", validateBiometricReasonInput(await body(c))),
     "Biometric device disabled successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const revokeDevice = async (c: Context<AppContext>) =>
+  ok(
+    await service.setDeviceStatus(c.env, actor(c), id(c), "revoked", validateBiometricReasonInput(await body(c))),
+    "Biometric device revoked successfully.",
     { requestId: c.get("requestId") },
   );
 
@@ -238,3 +245,10 @@ export const reprocessLog = async (c: Context<AppContext>) =>
     const result = await service.reprocessBiometricLog(c.env, actor(c), id(c), validateBiometricReasonInput(await body(c)));
     return ok(result, getBiometricReprocessMessage(result), { requestId: c.get("requestId") });
   };
+
+export const rejectLog = async (c: Context<AppContext>) =>
+  ok(
+    await service.rejectBiometricLog(c.env, actor(c), id(c), validateBiometricReasonInput(await body(c))),
+    "Biometric punch rejected successfully.",
+    { requestId: c.get("requestId") },
+  );

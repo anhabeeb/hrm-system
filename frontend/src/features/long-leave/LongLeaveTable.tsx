@@ -13,6 +13,8 @@ const columns: TableColumn<LongLeaveRecord>[] = [
   { key: "expected_return_date", header: "Expected return", cell: (row) => formatDate(row.expected_return_date) },
   { key: "actual_return_date", header: "Actual return", cell: (row) => formatDate(row.actual_return_date) },
   { key: "status", header: "Status", cell: (row) => <StatusBadge status={row.status} /> },
+  { key: "approval_status", header: "Approval", cell: (row) => <StatusBadge status={row.approval_status ?? row.status} /> },
+  { key: "payroll_status", header: "Payroll", cell: (row) => <StatusBadge status={row.payroll_status ?? "not_started"} /> },
   {
     key: "salary_impact_confirmed",
     header: "Salary impact",
@@ -28,11 +30,19 @@ export const LongLeaveTable = ({
   canReject,
   canReturn,
   canConfirm,
+  canSubmit,
+  canCancel,
+  canPayrollPreview,
+  canPayrollApply,
   onView,
+  onSubmit,
   onApprove,
   onReject,
+  onCancel,
   onReturn,
   onConfirm,
+  onPayrollPreview,
+  onPayrollApply,
   onPageChange,
   onPageSizeChange,
 }: {
@@ -43,11 +53,19 @@ export const LongLeaveTable = ({
   canReject?: boolean;
   canReturn?: boolean;
   canConfirm?: boolean;
+  canSubmit?: boolean;
+  canCancel?: boolean;
+  canPayrollPreview?: boolean;
+  canPayrollApply?: boolean;
   onView: (row: LongLeaveRecord) => void;
+  onSubmit: (row: LongLeaveRecord) => void;
   onApprove: (row: LongLeaveRecord) => void;
   onReject: (row: LongLeaveRecord) => void;
+  onCancel: (row: LongLeaveRecord) => void;
   onReturn: (row: LongLeaveRecord) => void;
   onConfirm: (row: LongLeaveRecord) => void;
+  onPayrollPreview: (row: LongLeaveRecord) => void;
+  onPayrollApply: (row: LongLeaveRecord) => void;
   onPageChange?: (page: number) => void;
   onPageSizeChange?: (pageSize: number) => void;
 }) => (
@@ -64,9 +82,13 @@ export const LongLeaveTable = ({
     onRowClick={onView}
     rowActions={(row) => {
       const actions: RowAction[] = [{ key: "view", onSelect: () => onView(row) }];
-      if (canConfirm) actions.push({ key: "approve", label: "Confirm salary impact", onSelect: () => onConfirm(row) });
-      if (canApprove) actions.push({ key: "approve", label: "Approve", onSelect: () => onApprove(row), disabled: humanize(row.status) !== "Pending" });
-      if (canReject) actions.push({ key: "reject", label: "Reject", onSelect: () => onReject(row), disabled: humanize(row.status) !== "Pending" });
+      if (canSubmit) actions.push({ key: "edit", label: "Submit", onSelect: () => onSubmit(row), disabled: !["draft"].includes(row.status) });
+      if (canConfirm) actions.push({ key: "enable", label: "Confirm salary impact", onSelect: () => onConfirm(row) });
+      if (canPayrollPreview) actions.push({ key: "download", label: "Payroll preview", onSelect: () => onPayrollPreview(row) });
+      if (canPayrollApply) actions.push({ key: "carry-forward", label: "Apply payroll review", onSelect: () => onPayrollApply(row), disabled: row.payroll_status === "payroll_adjusted" });
+      if (canApprove) actions.push({ key: "approve", label: "Approve", onSelect: () => onApprove(row), disabled: !["pending", "pending_approval", "submitted"].includes(row.status) });
+      if (canReject) actions.push({ key: "reject", label: "Reject", onSelect: () => onReject(row), disabled: !["pending", "pending_approval", "submitted"].includes(row.status) });
+      if (canCancel) actions.push({ key: "delete", label: "Cancel", onSelect: () => onCancel(row), disabled: ["cancelled", "returned", "rejected"].includes(row.status) });
       if (canReturn) actions.push({ key: "more", label: "Confirm return", onSelect: () => onReturn(row) });
       return <RowActions actions={actions} />;
     }}

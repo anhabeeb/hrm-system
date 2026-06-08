@@ -267,11 +267,12 @@ export const findEmployeeForAttendance = (
     employee_code: string;
     full_name: string;
     primary_outlet_id: string | null;
+    department_id: string | null;
     employment_status: string;
     deleted_at: string | null;
   }>(
     env,
-    "SELECT id, employee_code, full_name, primary_outlet_id, employment_status, deleted_at FROM employees WHERE company_id = ? AND id = ? LIMIT 1",
+    "SELECT id, employee_code, full_name, primary_outlet_id, department_id, employment_status, joined_at, resigned_at, terminated_at, deleted_at FROM employees WHERE company_id = ? AND id = ? LIMIT 1",
     [companyId, employeeId],
   );
 
@@ -324,6 +325,110 @@ export const listEventsForDate = (
     [companyId, employeeId, attendanceDate],
   );
 
+export const filterEventsForAttendanceWindow = (
+  events: AttendanceEventRecord[],
+  window?: { start: string; end: string } | null,
+) => {
+  if (!window) return events;
+  const start = new Date(window.start).getTime();
+  const end = new Date(window.end).getTime();
+  return events.filter((event) => {
+    const value = new Date(event.event_time).getTime();
+    return Number.isFinite(value) && value >= start && value <= end;
+  });
+};
+
+export const listEventsForAttendanceWindow = async (
+  env: Env,
+  companyId: string,
+  employeeId: string,
+  attendanceDate: string,
+  window?: { start: string; end: string } | null,
+) => {
+  if (!window) {
+    return listEventsForDate(env, companyId, employeeId, attendanceDate);
+  }
+  const rows = await many<AttendanceEventRecord>(
+    env,
+    `SELECT * FROM attendance_events
+     WHERE company_id = ? AND employee_id = ?
+       AND substr(event_time, 1, 10) BETWEEN ? AND date(?, '+1 day')
+     ORDER BY event_time ASC`,
+    [companyId, employeeId, attendanceDate, attendanceDate],
+  );
+  return filterEventsForAttendanceWindow(rows, window);
+};
+
+export const findRosterShiftForAttendanceDate = (
+  env: Env,
+  companyId: string,
+  employeeId: string,
+  attendanceDate: string,
+  publishedOnly = false,
+) =>
+  one<{
+    id: string;
+    roster_date: string;
+    start_time: string;
+    end_time: string;
+    break_minutes: number | null;
+    status: string;
+    source: string | null;
+  }>(
+    env,
+    `SELECT id, COALESCE(roster_date, shift_date) AS roster_date, start_time, end_time,
+       break_minutes, status, source
+     FROM roster_shifts
+     WHERE company_id = ? AND employee_id = ?
+       AND COALESCE(roster_date, shift_date) = ?
+       AND status IN (${publishedOnly ? "'published', 'completed'" : "'draft', 'published', 'completed'"})
+     ORDER BY CASE status WHEN 'published' THEN 0 WHEN 'completed' THEN 1 ELSE 2 END, start_time ASC
+     LIMIT 1`,
+    [companyId, employeeId, attendanceDate],
+  );
+
+export const findApprovedLeaveForDate = (
+  env: Env,
+  companyId: string,
+  employeeId: string,
+  attendanceDate: string,
+) =>
+  one<{ id: string; is_paid: number; affects_payroll: number }>(
+    env,
+    `SELECT lr.id, lt.is_paid, lr.affects_payroll
+     FROM leave_requests lr
+     JOIN leave_types lt ON lt.company_id = lr.company_id AND lt.id = lr.leave_type_id
+     WHERE lr.company_id = ? AND lr.employee_id = ?
+       AND lr.status = 'approved'
+       AND lr.start_date <= ? AND lr.end_date >= ?
+     LIMIT 1`,
+    [companyId, employeeId, attendanceDate, attendanceDate],
+  );
+
+export const findAttendanceHolidayForDate = (
+  env: Env,
+  companyId: string,
+  outletId: string,
+  attendanceDate: string,
+) =>
+  one<{ id: string; holiday_name: string | null; is_paid: number | null }>(
+    env,
+    `SELECT h.id, COALESCE(h.name, h.holiday_name) AS holiday_name, COALESCE(h.paid_holiday, h.is_paid, 1) AS is_paid
+     FROM holidays h
+     WHERE h.company_id = ? AND COALESCE(h.is_enabled, 1) = 1
+       AND COALESCE(h.status, CASE WHEN h.is_enabled = 1 THEN 'active' ELSE 'inactive' END) = 'active'
+       AND COALESCE(h.affects_attendance_absence, h.affects_attendance, 1) = 1
+       AND h.start_date <= ? AND COALESCE(h.end_date, h.start_date) >= ?
+       AND (
+         COALESCE(h.applies_to_all_outlets, 1) = 1
+         OR h.outlet_id = ?
+         OR NOT EXISTS (SELECT 1 FROM holiday_outlets ho WHERE ho.company_id = h.company_id AND ho.holiday_id = h.id)
+         OR EXISTS (SELECT 1 FROM holiday_outlets ho WHERE ho.company_id = h.company_id AND ho.holiday_id = h.id AND ho.outlet_id = ?)
+       )
+     LIMIT 1`,
+    [companyId, attendanceDate, attendanceDate, outletId, outletId],
+  );
+
 export const updateAttendanceEvent = (
   env: Env,
   companyId: string,
@@ -349,8 +454,9 @@ export const createAttendanceEvent = (
     `INSERT INTO attendance_events (
       id, company_id, employee_id, outlet_id, device_id, event_type,
       event_time, attendance_method, source, local_id, created_offline,
-      sync_status, approval_status, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      sync_status, approval_status, source_device_id, source_event_id,
+      metadata_json, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       input.id,
       input.company_id,
@@ -365,6 +471,9 @@ export const createAttendanceEvent = (
       input.created_offline,
       input.sync_status,
       input.approval_status,
+      input.source_device_id ?? null,
+      input.source_event_id ?? null,
+      input.metadata_json ?? null,
       new Date().toISOString(),
       new Date().toISOString(),
     ],
@@ -379,8 +488,11 @@ export const upsertDailySummary = (
     `INSERT INTO attendance_daily_summary (
       id, company_id, employee_id, outlet_id, attendance_date, first_clock_in,
       last_clock_out, worked_minutes, late_minutes, early_out_minutes,
-      break_minutes, overtime_minutes, status, payroll_status, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      break_minutes, overtime_minutes, status, payroll_status, expected_start,
+      expected_end, classification, absence_minutes, is_paid_leave, is_unpaid_leave,
+      is_holiday, is_rest_day, is_incomplete, warnings_json, source_references_json,
+      calculated_at, recalculated_by, correction_applied_id, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(company_id, employee_id, attendance_date) DO UPDATE SET
       outlet_id = excluded.outlet_id,
       first_clock_in = excluded.first_clock_in,
@@ -392,6 +504,20 @@ export const upsertDailySummary = (
       overtime_minutes = excluded.overtime_minutes,
       status = excluded.status,
       payroll_status = excluded.payroll_status,
+      expected_start = excluded.expected_start,
+      expected_end = excluded.expected_end,
+      classification = excluded.classification,
+      absence_minutes = excluded.absence_minutes,
+      is_paid_leave = excluded.is_paid_leave,
+      is_unpaid_leave = excluded.is_unpaid_leave,
+      is_holiday = excluded.is_holiday,
+      is_rest_day = excluded.is_rest_day,
+      is_incomplete = excluded.is_incomplete,
+      warnings_json = excluded.warnings_json,
+      source_references_json = excluded.source_references_json,
+      calculated_at = excluded.calculated_at,
+      recalculated_by = excluded.recalculated_by,
+      correction_applied_id = excluded.correction_applied_id,
       updated_at = excluded.updated_at`,
     [
       summary.id,
@@ -408,6 +534,20 @@ export const upsertDailySummary = (
       summary.overtime_minutes,
       summary.status,
       summary.payroll_status,
+      summary.expected_start ?? null,
+      summary.expected_end ?? null,
+      summary.classification ?? summary.status,
+      summary.absence_minutes ?? 0,
+      summary.is_paid_leave ?? 0,
+      summary.is_unpaid_leave ?? 0,
+      summary.is_holiday ?? 0,
+      summary.is_rest_day ?? 0,
+      summary.is_incomplete ?? 0,
+      summary.warnings_json ?? null,
+      summary.source_references_json ?? null,
+      summary.calculated_at ?? new Date().toISOString(),
+      summary.recalculated_by ?? null,
+      summary.correction_applied_id ?? null,
       new Date().toISOString(),
       new Date().toISOString(),
     ],
@@ -572,6 +712,64 @@ export const createConflict = (env: Env, input: {
       input.conflictType,
       input.localPayloadJson ?? null,
       input.serverPayloadJson ?? null,
+      new Date().toISOString(),
+    ],
+  );
+
+export const findOpenAttendanceRuleConflict = (
+  env: Env,
+  input: {
+    companyId: string;
+    employeeId: string;
+    attendanceDate: string;
+    conflictType: string;
+  },
+) =>
+  one<{ id: string }>(
+    env,
+    `SELECT id FROM attendance_conflicts
+     WHERE company_id = ? AND employee_id = ? AND attendance_date = ?
+       AND conflict_type = ? AND source = 'attendance_rule_engine'
+       AND status IN ('pending', 'open')
+     LIMIT 1`,
+    [input.companyId, input.employeeId, input.attendanceDate, input.conflictType],
+  );
+
+export const createAttendanceRuleConflict = (
+  env: Env,
+  input: {
+    id: string;
+    companyId: string;
+    employeeId: string;
+    outletId?: string | null;
+    conflictType: string;
+    attendanceDate: string;
+    severity: "warning" | "error";
+    message: string;
+  },
+) =>
+  run(
+    env,
+    `INSERT INTO attendance_conflicts (
+      id, company_id, employee_id, outlet_id, device_id, conflict_type,
+      local_payload_json, server_payload_json, status, attendance_date,
+      severity, message, source, created_at
+    ) VALUES (?, ?, ?, ?, NULL, ?, NULL, ?, 'open', ?, ?, ?, 'attendance_rule_engine', ?)`,
+    [
+      input.id,
+      input.companyId,
+      input.employeeId,
+      input.outletId ?? null,
+      input.conflictType,
+      JSON.stringify({
+        attendance_date: input.attendanceDate,
+        severity: input.severity,
+        message: input.message,
+        source: "attendance_rule_engine",
+      }),
+      input.attendanceDate,
+      input.severity,
+      input.message,
       new Date().toISOString(),
     ],
   );

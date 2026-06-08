@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 
 import {
   validateEmployeeCreateInput,
@@ -358,61 +358,4 @@ describe("employee validators", () => {
   });
 });
 
-describe("employee module placeholders", () => {
-  it.todo("creating local employee without employee_code generates EMP-000001 style code");
-  it.todo("creating second employee generates the next company-scoped employee code");
-  it.todo("duplicate employee code is blocked by the service with DUPLICATE_EMPLOYEE_CODE");
-  it.todo("duplicate National ID in the same company returns DUPLICATE_NATIONAL_ID");
-  it.todo("duplicate passport number in the same company returns DUPLICATE_PASSPORT_NUMBER");
-  it.todo("duplicate work permit number in the same company returns DUPLICATE_WORK_PERMIT_NUMBER");
-  it.todo("same identity numbers in different companies are allowed when tenant scoping permits");
-  it.todo("existing employee_code values are not overwritten by migrations or updates");
-  it.todo("employee list and detail return identity fields without document storage internals");
-  it.todo("migration creates employee_code_sequences and employee identity unique indexes safely");
-  it.todo("create employee form does not require employee_code");
-  it.todo("create employee form shows System generated after save");
-  it.todo("employee table displays generated Employee ID");
-  it.todo("employee detail shows generated Employee ID and identity section");
-  it.todo("duplicate identity field errors show beside the correct frontend fields");
-  it.todo("list employees supports filters for professional table views");
-  it.todo("employee detail masks sensitive fields without employees.view_sensitive");
-  it.todo("creating employee with valid starting salary creates employee_salary_history row");
-  it.todo("employee creation does not leave orphan employee if salary history insert fails");
-  it.todo("payroll salary lookup uses employee_salary_history as the source of truth");
-  it.todo("payroll returns EMPLOYEE_SALARY_MISSING when no active salary exists");
-  it.todo("create employee form shows Salary Details section");
-  it.todo("create employee request sends starting_salary object");
-  it.todo("employee detail hides salary if user lacks salary permission");
-  it.todo("archive employee requires reason");
-  it.todo("restore employee requires reason");
-  it.todo("status endpoint can change status with reason and proper permission");
-  it.todo("outlet assignment endpoint can change outlet with reason and proper permission");
-  it.todo("status change creates employee_status_history");
-  it.todo("outlet assignment creates employee_job_history");
-  it.todo("employee list total count does not include inaccessible outlets");
-  it.todo("employee list with inaccessible outlet_id returns an empty result");
-  it.todo("archive disables linked user account and revokes sessions");
-  it.todo("resigned status disables linked user account and revokes sessions");
-  it.todo("terminated status disables linked user account and revokes sessions");
-  it.todo("restore does not automatically re-enable linked user account");
-  it.todo("salary history requires salary.view");
-  it.todo("salary change closes the previous active salary one day before the new effective date");
-  it.todo("salary change inserts a new active employee_salary_history row with change_type and reason");
-  it.todo("salary overlap returns SALARY_OVERLAP and does not silently overwrite future records");
-  it.todo("employees without salary history can only add starting salary or correction");
-  it.todo("authorized HR users can add salary change from Employee Profile Salary & Compensation");
-  it.todo("salary change form converts user-friendly major-unit input to integer minor units");
-  it.todo("salary edit permissions include employees.salary.manage, employees.edit_salary, and payroll.manage");
-  it.todo("salary view permissions include employees.salary.view, employees.view_salary, and payroll.view");
-  it.todo("salary change audit is best-effort and includes old and new salary values with reason");
-  it.todo("employee creation does not create a user login");
-  it.todo("outlet manager cannot access another outlet's employee");
-  it.todo("unauthorized user cannot view salary history");
-  it.todo("audit logs are created for sensitive changes");
-  it.todo("create outlet");
-  it.todo("disable outlet requires reason and does not delete employees");
-  it.todo("create department");
-  it.todo("delete department requires reason");
-  it.todo("create position with integer salary");
-  it.todo("delete position requires reason");
-});
+

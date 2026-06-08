@@ -52,6 +52,9 @@ export interface AttendanceEventRecord {
   attendance_method: AttendanceMethod;
   source: AttendanceSource;
   local_id: string | null;
+  source_device_id?: string | null;
+  source_event_id?: string | null;
+  metadata_json?: string | null;
   created_offline: number;
   sync_status: string;
   approval_status: string;
@@ -95,6 +98,20 @@ export interface AttendanceSummaryRecord {
   overtime_minutes: number;
   status: AttendanceSummaryStatus;
   payroll_status: string;
+  expected_start?: string | null;
+  expected_end?: string | null;
+  classification?: string | null;
+  absence_minutes?: number;
+  is_paid_leave?: number;
+  is_unpaid_leave?: number;
+  is_holiday?: number;
+  is_rest_day?: number;
+  is_incomplete?: number;
+  warnings_json?: string | null;
+  source_references_json?: string | null;
+  calculated_at?: string | null;
+  recalculated_by?: string | null;
+  correction_applied_id?: string | null;
   created_at: string;
   updated_at: string;
 }

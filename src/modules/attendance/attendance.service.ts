@@ -959,7 +959,7 @@ export const resolveConflict = async (
 ) => {
   const conflict = await repository.findConflictById(env, context.companyId, id);
   if (!conflict) throw new NotFoundError("The requested attendance conflict could not be found.");
-  if (conflict.status !== "pending") throw new ConflictError("This conflict has already been resolved.");
+  if (!["pending", "open"].includes(conflict.status)) throw new ConflictError("This conflict has already been resolved.");
   const outletId = await resolveConflictOutletId(env, context.companyId, conflict);
   if (!outletId) {
     throw new ValidationError(

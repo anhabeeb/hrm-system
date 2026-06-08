@@ -14,7 +14,6 @@ import {
   handleSessionExpired,
   type ApiErrorDiagnostics,
 } from "./api-errors";
-import { getAuthToken } from "./auth-token";
 
 type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE";
 
@@ -189,17 +188,12 @@ const request = async <T>(
     throw createMixedContentError(baseDiagnostics());
   }
 
-  const token = getAuthToken();
   const headers = new Headers({
     Accept: "application/json",
   });
 
   if (body !== undefined) {
     headers.set("Content-Type", "application/json");
-  }
-
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`);
   }
 
   for (const [key, value] of Object.entries(options.headers ?? {})) {
@@ -261,9 +255,7 @@ export const api = {
   patch: <T>(path: string, body?: unknown, options?: RequestOptions) => request<T>("PATCH", path, body, options),
   delete: <T>(path: string, body?: unknown, options?: RequestOptions) => request<T>("DELETE", path, body, options),
   download: async (path: string) => {
-    const token = getAuthToken();
     const headers = new Headers();
-    if (token) headers.set("Authorization", `Bearer ${token}`);
 
     const requestInfo = getApiRequestInfo(path);
     const response = await fetch(requestInfo.url, {

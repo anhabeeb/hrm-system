@@ -3,9 +3,11 @@ import {
   BadgeCheck,
   Banknote,
   BarChart3,
+  Bell,
   BriefcaseBusiness,
   Building2,
   CalendarClock,
+  CalendarDays,
   ClipboardCheck,
   Clock3,
   FileClock,
@@ -14,6 +16,8 @@ import {
   FileCheck2,
   FileArchive,
   FileText,
+  Download,
+  Upload,
   FileSignature,
   Fingerprint,
   History,
@@ -40,7 +44,11 @@ import { hasAnyPermission, hasPermission } from "./permissions";
 export const navigationGroups: NavGroup[] = [
   {
     label: "Main",
-    items: [{ label: "Dashboard", path: "/dashboard", icon: LayoutDashboard }],
+    items: [
+      { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
+      { label: "Notifications", path: "/notifications", icon: Bell, requiredPermissionsAny: ["notifications.view", "notifications.manage_own"] },
+      { label: "Expiry Alerts", path: "/expiry-alerts", icon: FileClock, requiredPermissionsAny: ["expiry_alerts.view", "expiry_alerts.view_own"] },
+    ],
   },
   {
     label: "People",
@@ -58,6 +66,8 @@ export const navigationGroups: NavGroup[] = [
     items: [
       { label: "Attendance", path: "/attendance", icon: Clock3, requiredFeature: "attendance", requiredPermission: "attendance.view" },
       { label: "Time Corrections", path: "/attendance/corrections", icon: FileClock, requiredFeature: "attendance", requiredPermission: "attendance.view" },
+      { label: "Attendance Reports", path: "/attendance/reports", icon: BarChart3, requiredFeature: "attendance", requiredPermission: "attendance.reports.view" },
+      { label: "Duty Rosters", path: "/rosters", icon: CalendarDays, requiredFeature: "roster", requiredPermissionsAny: ["rosters.view", "roster.view"] },
       { label: "Kiosk Devices", path: "/kiosk-devices", icon: TabletSmartphone, requiredFeature: "offline_sync", requiredPermissionsAny: ["devices.view", "kiosk.view"] },
       { label: "Sync Status", path: "/sync-status", icon: Repeat, requiredFeature: "offline_sync", requiredPermission: "sync.view" },
       { label: "Biometric", path: "/biometric", icon: Fingerprint, requiredFeature: "biometric_attendance", requiredPermission: "biometric.view" },
@@ -67,6 +77,7 @@ export const navigationGroups: NavGroup[] = [
     label: "Leave & Payroll",
     items: [
       { label: "Leave", path: "/leave", icon: CalendarClock, requiredFeature: "leave_management", requiredPermission: "leave.view" },
+      { label: "Holiday Calendar", path: "/holidays", icon: CalendarDays, requiredFeature: "holidays", requiredPermissionsAny: ["holidays.view", "holidays.calendar.view"] },
       { label: "Long Leave", path: "/long-leave", icon: FileArchive, requiredFeature: "long_leave", requiredPermission: "long_leave.view" },
       { label: "Payroll", path: "/payroll", icon: Landmark, requiredFeature: "payroll", requiredPermission: "payroll.view" },
       { label: "Payslips", path: "/payslips", icon: ReceiptText, requiredFeature: "payslips", requiredPermission: "payslips.view" },
@@ -89,9 +100,14 @@ export const navigationGroups: NavGroup[] = [
   {
     label: "Reports & Data",
     items: [
+      { label: "HR Reports", path: "/hr-reports", icon: BarChart3, requiredFeature: "reports", requiredPermissionsAny: ["hr_reports.view", "hr_reports.catalog.view"] },
+      { label: "Payroll / Finance Reports", path: "/payroll-reports", icon: Landmark, requiredFeature: "reports", requiredPermissionsAny: ["payroll_reports.view", "payroll_reports.catalog.view"] },
+      { label: "Export History", path: "/report-exports", icon: Download, requiredFeature: "reports", requiredPermissionsAny: ["report_exports.history.view", "report_exports.admin.manage"] },
+      { label: "Import Center", path: "/imports", icon: Upload, requiredFeature: "import_export", requiredPermissionsAny: ["imports.view", "imports.upload", "imports.templates.view"] },
       { label: "Reports", path: "/reports", icon: BarChart3, requiredFeature: "reports", requiredPermission: "reports.view" },
       { label: "Import / Export", path: "/import-export", icon: Archive, requiredFeature: "import_export", requiredPermissionsAny: ["export.view", "import.view"] },
       { label: "Backup & Recovery", path: "/backup-recovery", icon: DatabaseBackup, requiredFeature: "backup_recovery", requiredPermissionsAny: ["backup.view", "backup.view_history", "backup.restore_request"] },
+      { label: "Data Retention", path: "/data-retention", icon: FileArchive, requiredFeature: "backup_recovery", requiredPermissionsAny: ["data_retention.view", "data_retention.preview"] },
     ],
   },
   {

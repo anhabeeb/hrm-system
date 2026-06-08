@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+﻿import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
@@ -351,7 +351,6 @@ describe("Users & Access API routes", () => {
     }
   });
 
-  it.todo("GET /api/v1/users/:id returns safe user detail without password or auth secrets");
   it("POST /api/v1/users rejects duplicate email within the same company", async () => {
     const response = await request("/api/v1/users", {
       method: "POST",
@@ -365,7 +364,6 @@ describe("Users & Access API routes", () => {
     expect(body.error.message).toBe("A user with this email already exists.");
   });
 
-  it.todo("PATCH /api/v1/users/:id updates only allowed profile/access fields");
   it("POST /api/v1/users/:id/disable cannot disable the last active Super Admin", async () => {
     const response = await request("/api/v1/users/user_super_only/disable", {
       method: "POST",
@@ -402,7 +400,6 @@ describe("Users & Access API routes", () => {
     expect(body.data.find((role) => role.id === "role_super")?.users_count).toBe(1);
   });
 
-  it.todo("GET /api/v1/roles/:id returns role permissions");
   it("GET /api/v1/permissions returns seeded permissions ordered by module/action/key", async () => {
     const response = await request("/api/v1/permissions", { headers: authHeaders });
     const body = await response.json() as { success: boolean; data: Array<{ permission_key: string; module: string; action: string }> };
@@ -415,5 +412,4 @@ describe("Users & Access API routes", () => {
     );
   });
 
-  it.todo("audit log failure does not fail user create/update/enable/disable/reset/role assignment");
 });

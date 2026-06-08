@@ -9,6 +9,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { SidebarNavItem } from "@/components/layout/SidebarNavItem";
 import { appConfig } from "@/app/config";
 import { useAuth } from "@/features/auth/auth.store";
+import { NotificationBell } from "@/features/notifications/NotificationBell";
 import { getVisibleNavigation } from "@/lib/navigation";
 
 export const Topbar = () => {
@@ -52,6 +53,7 @@ export const Topbar = () => {
           Search placeholder
         </div>
         <Badge variant="outline">{appConfig.environmentLabel}</Badge>
+        <NotificationBell />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" aria-label="Open user menu">

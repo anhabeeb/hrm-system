@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { clearAuthToken, getAuthToken, setAuthToken } from "@/lib/auth-token";
+import { clearAuthToken } from "@/lib/auth-token";
 import { hasAllPermissions as userHasAllPermissions, hasAnyPermission as userHasAnyPermission, hasPermission as userHasPermission } from "@/lib/permissions";
 import { hasFeature as userHasFeature } from "@/lib/features";
 import { ApiError } from "@/lib/api-errors";
@@ -40,7 +40,6 @@ const normalizeUser = (
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<CurrentUser | null>(null);
-  const [token, setToken] = useState<string | null>(() => getAuthToken());
   const [isLoading, setIsLoading] = useState(true);
   const [hasHydrated, setHasHydrated] = useState(false);
   const [requires2FA, setRequires2FA] = useState(false);
@@ -66,7 +65,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } catch {
       applyUser(null);
       clearAuthToken();
-      setToken(null);
     } finally {
       setIsLoading(false);
       setHasHydrated(true);
@@ -78,7 +76,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const onSessionExpired = () => {
       applyUser(null);
-      setToken(null);
+      clearAuthToken();
     };
 
     window.addEventListener("hrm:session-expired", onSessionExpired);
@@ -106,10 +104,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       setPendingTwoFactorLogin(null);
-      if (response.data.token) {
-        setAuthToken(response.data.token);
-        setToken(response.data.token);
-      }
+      clearAuthToken();
 
       if (response.data.user) {
         applyUser(response.data.user);
@@ -135,10 +130,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             totp_code: code,
           });
 
-      if (response.data.token) {
-        setAuthToken(response.data.token);
-        setToken(response.data.token);
-      }
+      clearAuthToken();
 
       if (response.data.user) {
         applyUser(response.data.user);
@@ -159,7 +151,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = useCallback(async () => {
     await authApi.logout().catch(() => undefined);
     clearAuthToken();
-    setToken(null);
     applyUser(null);
     setPendingTwoFactorLogin(null);
     setRequires2FA(false);
@@ -179,7 +170,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       features,
       roles,
       outletIds,
-      token,
+      token: null,
       isAuthenticated: Boolean(user),
       isLoading,
       hasHydrated,
@@ -198,7 +189,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       hasAllPermissions: (nextPermissions?: string[]) => userHasAllPermissions(user, nextPermissions),
       hasFeature: (feature?: string) => userHasFeature(user, feature),
     };
-  }, [clearPendingTwoFactorLogin, features, hasHydrated, isAdmin, isLoading, isSuperAdmin, login, logout, outletIds, pendingTwoFactorLogin, permissions, refreshMe, requires2FA, roles, token, user, verifyLoginTwoFactor]);
+  }, [clearPendingTwoFactorLogin, features, hasHydrated, isAdmin, isLoading, isSuperAdmin, login, logout, outletIds, pendingTwoFactorLogin, permissions, refreshMe, requires2FA, roles, user, verifyLoginTwoFactor]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

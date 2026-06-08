@@ -17,4 +17,4 @@ export const findApplicablePolicy = (
   );
 
 export const shouldCheckBalance = (leaveType: LeaveTypeRecord): boolean =>
-  leaveType.is_paid === 1 && (leaveType.default_days ?? 0) > 0;
+  (leaveType.requires_balance ?? (leaveType.is_paid === 1 && (leaveType.default_days ?? 0) > 0 ? 1 : 0)) === 1;

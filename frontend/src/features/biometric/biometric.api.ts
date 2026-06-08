@@ -18,6 +18,7 @@ export const biometricApi = {
   updateDevice: (id: string, payload: Partial<BiometricDevicePayload>) => api.patch<BiometricMutationResult>(`/biometric/devices/${id}`, payload),
   enableDevice: (id: string, payload: BiometricReasonPayload) => api.post<BiometricMutationResult>(`/biometric/devices/${id}/enable`, payload),
   disableDevice: (id: string, payload: BiometricReasonPayload) => api.post<BiometricMutationResult>(`/biometric/devices/${id}/disable`, payload),
+  revokeDevice: (id: string, payload: BiometricReasonPayload) => api.post<BiometricMutationResult>(`/biometric/devices/${id}/revoke`, payload),
   rotateDeviceToken: (id: string, payload: BiometricReasonPayload) => api.post<BiometricMutationResult>(`/biometric/devices/${id}/rotate-token`, payload),
   listMappings: (filters: BiometricFilters = {}) => api.get<BiometricMapping[]>(`/biometric/mappings${buildQueryString(filters)}`),
   createMapping: (payload: BiometricMappingPayload) => api.post<BiometricMutationResult>("/biometric/mappings", payload),
@@ -28,4 +29,5 @@ export const biometricApi = {
   listUnmatched: (filters: BiometricFilters = {}) => api.get<BiometricLog[]>(`/biometric/unmatched${buildQueryString(filters)}`),
   mapUnmatched: (logId: string, payload: BiometricReasonPayload) => api.post<BiometricMutationResult>(`/biometric/unmatched/${logId}/map`, payload),
   reprocessLog: (id: string, payload: BiometricReasonPayload) => api.post<{ reprocessed: boolean }>(`/biometric/logs/${id}/reprocess`, payload),
+  rejectLog: (id: string, payload: BiometricReasonPayload) => api.post<BiometricMutationResult>(`/biometric/logs/${id}/reject`, payload),
 };

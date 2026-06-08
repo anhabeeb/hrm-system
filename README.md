@@ -397,6 +397,12 @@ Important rules:
 - Correction approval applies the requested attendance change before marking the correction approved
 - Status-only manual entries are supported for records such as absent, holiday, off day, and on leave
 - Manual entry can accept time-only values when an attendance date is supplied
+- Daily attendance summaries are recalculated through a central rule classifier that uses roster shifts when available and default shift rules when no roster exists.
+- Attendance classification now records expected shift, actual punches, late minutes, early checkout minutes, overtime minutes, absence minutes, warnings, and source references for traceability.
+- Approved paid leave overrides absence and does not create absence deductions; approved unpaid leave is classified as leave so payroll does not double-deduct it as absence.
+- Cross-midnight roster shifts are handled using deterministic date windows, so overnight attendance can produce the correct expected end date and worked minutes.
+- Overtime is calculated from expected shift end when enabled, and overtime requiring approval is recorded as a warning/source metadata for later payroll/reporting workflows.
+- Attendance settings include grace period, missed punch policy, default shift, roster requirement, overtime rules, complete-attendance-before-payroll, and missing-attendance-as-absence controls.
 - Correction approval checks outlet access before applying changes
 - Conflict resolution checks outlet access before resolving
 - Corrections that move attendance between dates or months check both the original and new payroll periods
@@ -410,6 +416,24 @@ Important rules:
 - Duplicate kiosk `local_id` requests return the existing event instead of creating duplicates
 
 Future frontend work should show attendance, corrections, and conflicts in professional list/table views with filters, status badges, compact daily summaries, and row action icons for view, correct, approve, reject, resolve, and export. Kiosk UI should stay simple and fast, and must not show HR, payroll, document, user, report, or settings pages.
+
+## Duty Rosters / Shift Scheduling
+
+Duty Rosters are available under `/api/v1/rosters`, with reusable shift templates under `/api/v1/shift-templates` and the frontend page at `/rosters`.
+
+Key rules:
+
+- Rosters are planned by company, outlet, date, employee, and shift template, with optional department/position filtering.
+- The UI uses searchable Outlet, Department, Position, and Employee selectors; users should not type raw IDs for normal roster workflows.
+- Shift templates support code/name, start and end time, break minutes, optional outlet/department scope, active/inactive status, notes, and midnight-crossing shifts.
+- Roster creation, update, bulk creation, cancellation, and publishing are authenticated, permission-protected, outlet-scoped, and audited best-effort.
+- Conflict detection checks overlapping shifts, approved leave, inactive/resigned/terminated employees, suspended employees, outside-contract warnings, roster-affecting holidays, and finalized payroll periods.
+- Draft rosters may retain warning conflicts for HR review, but hard conflicts block creation or publishing.
+- Bulk roster creation supports outlet, date range, selected employees, selected weekdays, and a shift template; duplicate employee/date/template rows are skipped.
+- Publishing marks draft roster shifts as published only when blocking conflicts are resolved.
+- Roster edits are blocked inside finalized, locked, paid, or finalizing payroll periods.
+- The attendance module can use `getExpectedRosterForEmployeeDate` later to improve expected-day and expected-shift behavior; Phase 8A does not rewrite attendance or payroll calculation.
+- Advanced auto-scheduling/optimization is intentionally not implemented in this phase.
 
 ## Sync Engine + Offline Attendance
 
@@ -809,6 +833,7 @@ Prompt 17 adds a separate `frontend/` React + TypeScript + Vite application for 
 - Attendance now has table-first tabs for daily summaries, raw events, corrections, and conflicts, with URL-backed filters, backend pagination, detail drawers, reason dialogs, and locked-payroll error handling.
 - Manual attendance now supports outlet-first batch entry: HR/Admin selects an outlet, loads assigned employees, toggles rows, enters clock/status values, and submits multiple entries to `/api/v1/attendance/manual-batch` while backend payroll locks and employee/outlet scope remain enforced.
 - Time Corrections are also available as a dedicated `/attendance/corrections` page with outlet/employee/status/date filters, correction request creation, and approve/reject actions when permitted.
+- Duty Rosters are available at `/rosters` with roster list/week views, bulk creation, shift templates, conflict badges, publish flow, and selector-based outlet/department/position/employee filters.
 - The Attendance Summary endpoint now uses the standard paginated API shape with top-level `data` and `pagination`; it no longer returns nested `data.rows`.
 - The Attendance Events tab uses `GET /api/v1/attendance/events` for raw attendance events, which is separate from daily summaries returned by `/attendance` and `/attendance/summary`.
 - Kiosk Devices now has a table-first fleet view, device registration, enable/disable, rotate-token dialogs, health summary integration, and permission-aware row actions.

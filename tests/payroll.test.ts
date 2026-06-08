@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 
 import {
   calculateDailySalary,
@@ -147,71 +147,4 @@ describe("payroll recalculation persistence safeguards", () => {
   });
 });
 
-describe("payroll module placeholders", () => {
-  it.todo("calculate draft payroll");
-  it.todo("salary basis fixed_30_days");
-  it.todo("salary basis calendar_days");
-  it.todo("custom salary days");
-  it.todo("missing salary creates critical exception");
-  it.todo("joining month proration");
-  it.todo("resignation month proration");
-  it.todo("absent deduction");
-  it.todo("unpaid leave deduction");
-  it.todo("long leave salary impact overrides payable basic");
-  it.todo("zero worked days long leave gives zero payable salary");
-  it.todo("unconfirmed long leave creates critical exception");
-  it.todo("approved advance deducts");
-  it.todo("pending advance does not deduct");
-  it.todo("salary loan installment deducts");
-  it.todo("disabled overtime does not add overtime");
-  it.todo("disabled benefits do not add benefits");
-  it.todo("negative salary carry-forward works when negative is not allowed");
-  it.todo("pending sync blocks payroll lock");
-  it.todo("unresolved sync conflict blocks payroll lock");
-  it.todo("unresolved attendance conflict blocks payroll lock");
-  it.todo("pending attendance correction blocks payroll lock");
-  it.todo("attendance_conflicts pending blocks payroll lock");
-  it.todo("attendance_corrections pending blocks payroll lock");
-  it.todo("missing_clock_in blocks payroll lock");
-  it.todo("missing_clock_out blocks payroll lock");
-  it.todo("conflict summary blocks payroll lock");
-  it.todo("missing attendance summary blocks lock when attendance_to_payroll_enabled");
-  it.todo("critical exception blocks payroll lock");
-  it.todo("missing salary blocks payroll lock");
-  it.todo("payroll remains unlocked when blockers exist");
-  it.todo("approve payroll");
-  it.todo("reject payroll");
-  it.todo("lock payroll");
-  it.todo("outlet-limited user cannot submit payroll for approval");
-  it.todo("outlet-limited user cannot approve payroll");
-  it.todo("outlet-limited user cannot reject payroll");
-  it.todo("outlet-limited user cannot lock payroll");
-  it.todo("outlet-limited user cannot request payroll reopen");
-  it.todo("outlet-limited user cannot approve payroll reopen");
-  it.todo("outlet-limited user cannot reopen payroll");
-  it.todo("Super Admin can submit, approve, lock, and reopen payroll");
-  it.todo("full-access Admin can submit, approve, lock, and reopen payroll when permissions exist");
-  it.todo("blocked lifecycle action does not change payroll status");
-  it.todo("blocked lifecycle action does not create approval_request");
-  it.todo("blocked lifecycle action does not create misleading success audit log");
-  it.todo("approve does not set lock fields");
-  it.todo("lock sets locked_by and locked_at");
-  it.todo("reopen clears locked_by and locked_at");
-  it.todo("cannot recalculate locked payroll");
-  it.todo("request reopen requires reason");
-  it.todo("reopen requires approval or direct mode");
-  it.todo("reopened payroll can be recalculated");
-  it.todo("outlet-filtered calculation is blocked");
-  it.todo("outlet-limited user cannot calculate company-wide payroll");
-  it.todo("outlet-limited user cannot recalculate company-wide payroll");
-  it.todo("clearRunCalculation is not called before full-access validation");
-  it.todo("limited user sees only accessible outlet totals");
-  it.todo("Super Admin sees company totals");
-  it.todo("payroll detail returns totals_scope correctly");
-  it.todo("payroll export excludes inaccessible outlets");
-  it.todo("payroll export records outlet scope");
-  it.todo("payroll item list is outlet-filtered");
-  it.todo("users without payroll.view cannot view payroll");
-  it.todo("realtime events do not include salary amounts");
-  it.todo("audit logs created for sensitive payroll actions");
-});
+

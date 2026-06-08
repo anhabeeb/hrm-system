@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+﻿import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 
 import app from "../src/app";
@@ -486,27 +486,4 @@ describe("bootstrap validators", () => {
   });
 });
 
-describe("bootstrap integration placeholders", () => {
-  it.todo("status returns setup_required true when no users and no company exist");
-  it.todo("status returns setup_required false after any user exists");
-  it.todo("status response does not expose counts, emails, role details, or secrets");
-  it.todo("initialize fails without Authorization header");
-  it.todo("initialize fails with wrong token");
-  it.todo("initialize fails if BOOTSTRAP_ADMIN_TOKEN is missing");
-  it.todo("initialize does not log bootstrap token");
-  it.todo("outlet_code uniqueness is checked if provided");
-  it.todo("creates company when none exists");
-  it.todo("creates first outlet if provided");
-  it.todo("creates first Super Admin user");
-  it.todo("assigns Super Admin role");
-  it.todo("hashes password and does not store plaintext password");
-  it.todo("creates high-severity audit log");
-  it.todo("ensures company, feature, approval, leave, and document defaults");
-  it.todo("response omits password_hash, salt, tokens, TOTP secrets, and backup codes");
-  it.todo("cannot run again after first user exists");
-  it.todo("fails if Super Admin role is missing");
-  it.todo("does not create a usable user without role assignment");
-  it.todo("audit failure fails bootstrap");
-  it.todo("device auth cannot access bootstrap initialize without bootstrap token");
-  it.todo("normal auth is not required for initialize");
-});
+

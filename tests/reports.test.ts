@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 
 import { REPORT_DEFINITIONS } from "../src/modules/reports/reports.constants";
 import { maskSensitiveValue } from "../src/modules/reports/report-permission.service";
@@ -41,23 +41,4 @@ describe("reports foundation", () => {
   });
 });
 
-describe("reports integration placeholders", () => {
-  it.todo("dashboard summary applies outlet access filtering");
-  it.todo("payroll reports do not expose salary data without payroll permission");
-  it.todo("document compliance reports never expose raw R2 file keys");
-  it.todo("audit activity report masks sensitive old/new values");
-  it.todo("device-authenticated callers cannot access report routes");
-  it.todo("exportable reports create audit logs when sensitive data is generated");
-  it.todo("user with payroll.view but without reports.view cannot access payroll summary report");
-  it.todo("user with reports.view but without payroll.view cannot access payroll summary report");
-  it.todo("user with both reports.view and payroll.view can access payroll summary report");
-  it.todo("asset, document, audit, device health, sync status, and dashboard reports are outlet-filtered");
-  it.todo("sensitive expiring document file_name is masked without documents.view_sensitive");
-  it.todo("document reports never include file_key");
-  it.todo("missing documents report uses real document category applicability");
-  it.todo("missing documents report respects foreign/local employee applicability");
-  it.todo("missing documents report is outlet-filtered and paginated");
-  it.todo("missing documents report never returns file_key or placeholder note");
-  it.todo("asset summary includes status counts, pending returns, deductions, by_outlet, and by_asset_type");
-  it.todo("document summary includes missing_required_count from real missing-document logic");
-});
+

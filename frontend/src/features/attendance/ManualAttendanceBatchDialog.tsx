@@ -125,7 +125,7 @@ export const ManualAttendanceBatchDialog = ({
       <DialogContent className="max-w-6xl">
         <DialogHeader>
           <DialogTitle>Manual attendance by outlet</DialogTitle>
-          <DialogDescription>Select an outlet, review assigned employees, then submit multiple manual attendance entries in one batch.</DialogDescription>
+          <DialogDescription>Select an outlet, review assigned employees, then submit multiple manual attendance entries in one batch. Approved leave and roster-rule warnings are shown after the rules engine reviews each row.</DialogDescription>
         </DialogHeader>
         <div className="grid gap-3 md:grid-cols-[1.2fr_1fr_1.4fr]">
           <Label className="space-y-1.5 text-sm">Outlet<OutletCombobox value={outletId} onChange={(value) => { setOutletId(value ?? ""); setRows([]); }} placeholder="Select outlet first" /></Label>
@@ -143,6 +143,7 @@ export const ManualAttendanceBatchDialog = ({
                   <th className="w-12 px-3 py-2">Use</th>
                   <th className="px-3 py-2">Employee ID</th>
                   <th className="px-3 py-2">Employee</th>
+                  <th className="px-3 py-2">Expected shift</th>
                   <th className="px-3 py-2">Clock in</th>
                   <th className="px-3 py-2">Clock out</th>
                   <th className="px-3 py-2">Status</th>
@@ -151,9 +152,9 @@ export const ManualAttendanceBatchDialog = ({
               </thead>
               <tbody>
                 {employeesQuery.isLoading ? (
-                  <tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">Loading employees...</td></tr>
+                  <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">Loading employees...</td></tr>
                 ) : rows.length === 0 ? (
-                  <tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">No employees found for this outlet.</td></tr>
+                  <tr><td colSpan={8} className="px-3 py-8 text-center text-muted-foreground">No employees found for this outlet.</td></tr>
                 ) : rows.map((row) => {
                   const errors = rowErrors.get(row.employee.id) ?? [];
                   return (
@@ -164,6 +165,7 @@ export const ManualAttendanceBatchDialog = ({
                         <div>{row.employee.name}</div>
                         {errors.map((rowError) => <div key={`${rowError.code}-${rowError.index}`} className="mt-1 text-xs text-destructive">{rowError.message}</div>)}
                       </td>
+                      <td className="px-3 py-2 text-muted-foreground">Roster shift shown after attendance rules sync</td>
                       <td className="px-3 py-2"><Input type="time" value={row.clock_in_time} onChange={(event) => updateRow(row.employee.id, { clock_in_time: event.target.value, included: true })} /></td>
                       <td className="px-3 py-2"><Input type="time" value={row.clock_out_time} onChange={(event) => updateRow(row.employee.id, { clock_out_time: event.target.value, included: true })} /></td>
                       <td className="px-3 py-2">

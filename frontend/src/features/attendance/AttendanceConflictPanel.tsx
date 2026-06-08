@@ -11,6 +11,7 @@ const columns: TableColumn<AttendanceConflict>[] = [
   { key: "employee_name", header: "Employee", cell: (row) => row.employee_name ?? row.employee_id ?? "Unknown employee" },
   { key: "outlet_name", header: "Outlet", cell: (row) => row.outlet_name ?? row.outlet_id ?? "—" },
   { key: "conflict_type", header: "Conflict Type", cell: (row) => humanize(row.conflict_type) },
+  { key: "message", header: "Message", cell: (row) => row.message ?? "Review attendance rule conflict." },
   { key: "source", header: "Source", cell: (row) => humanize(row.source) },
   { key: "severity", header: "Severity", cell: (row) => <StatusBadge status={row.severity ?? "warning"} /> },
   { key: "status", header: "Status", cell: (row) => <StatusBadge status={row.status} /> },

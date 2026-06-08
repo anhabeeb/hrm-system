@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 
 import { authMiddleware } from "../middleware/auth.middleware";
+import { requireAnyPermissionOrError } from "../middleware/permission.middleware";
+import * as permissionService from "../services/permission.service";
 import type { AppContext, AuthActor, PaginationMeta } from "../types/api.types";
 import { AuthError } from "../utils/errors";
 import { paginated } from "../utils/response";
@@ -17,6 +19,76 @@ interface LookupRow {
 const lookupsRoutes = new Hono<AppContext>();
 
 lookupsRoutes.use("*", authMiddleware);
+
+const lookupPermissionError = {
+  code: "LOOKUP_PERMISSION_DENIED",
+  message: "You do not have permission to load this lookup.",
+};
+
+const EMPLOYEE_LOOKUP_BROAD_PERMISSIONS = [
+  "employees.view",
+  "employees.profile.view",
+  "dashboard.view",
+  "attendance.view",
+  "attendance.reports.view",
+  "leave.requests.create_for_employee",
+  "leave.approvals.view",
+  "hr_reports.view",
+  "payroll_reports.view",
+];
+
+const EMPLOYEE_LOOKUP_OWN_PERMISSIONS = [
+  "my_profile.view",
+  "leave.requests.submit",
+  "expiry_alerts.view_own",
+  "payslips.view",
+];
+
+const EMPLOYEE_LOOKUP_PERMISSIONS = [
+  ...EMPLOYEE_LOOKUP_BROAD_PERMISSIONS,
+  ...EMPLOYEE_LOOKUP_OWN_PERMISSIONS,
+];
+
+const OUTLET_LOOKUP_PERMISSIONS = [
+  "outlets.view",
+  "employees.view",
+  "dashboard.view",
+  "hr_reports.view",
+  "payroll_reports.view",
+];
+
+const DEPARTMENT_LOOKUP_PERMISSIONS = [
+  "departments.view",
+  "employees.view",
+  "dashboard.view",
+  "hr_reports.view",
+];
+
+const POSITION_LOOKUP_PERMISSIONS = [
+  "positions.view",
+  "employees.view",
+  "hr_reports.view",
+];
+
+const LEAVE_TYPE_LOOKUP_PERMISSIONS = [
+  "leave.view",
+  "leave.requests.submit",
+  "leave.requests.create_for_employee",
+  "leave.balances.view",
+  "leave.approvals.view",
+  "hr_reports.leave.view",
+];
+
+const PAYROLL_PERIOD_LOOKUP_PERMISSIONS = [
+  "payroll.view",
+  "payroll_reports.view",
+  "payroll_reports.summary.view",
+  "payroll_reports.employee.view",
+  "payroll_reports.payslips.view",
+  "payroll_reports.approvals.view",
+  "payroll_reports.cost.view",
+  "payroll_reports.finance_summary.view",
+];
 
 const bind = (statement: D1PreparedStatement, values: readonly unknown[]) =>
   statement.bind(...(values as Parameters<D1PreparedStatement["bind"]>));
@@ -50,12 +122,35 @@ const pagination = (page: number, pageSize: number, total: number): PaginationMe
 
 const like = (value?: string) => `%${value ?? ""}%`;
 
+const isCompanyScoped = (context: AuthActor) =>
+  context.isSuperAdmin || context.isAdmin || context.outletIds.length === 0;
+
 const scopedOutletClause = (context: AuthActor, alias: string, values: unknown[]) => {
-  if (context.isSuperAdmin) return "";
+  if (isCompanyScoped(context)) return "";
   if (context.outletIds.length === 0) return " AND 1 = 0";
   values.push(...context.outletIds);
   return ` AND ${alias} IN (${context.outletIds.map(() => "?").join(", ")})`;
 };
+
+const employeeOutletExistsClause = (context: AuthActor, outerTable: string, columnSql: string, values: unknown[]) => {
+  if (isCompanyScoped(context)) return "";
+  if (context.outletIds.length === 0) return " AND 1 = 0";
+  values.push(...context.outletIds);
+  return ` AND EXISTS (
+    SELECT 1 FROM employees scope_employee
+    WHERE scope_employee.company_id = ${outerTable}.company_id
+      AND scope_employee.deleted_at IS NULL
+      AND scope_employee.${columnSql} = ${outerTable}.id
+      AND scope_employee.primary_outlet_id IN (${context.outletIds.map(() => "?").join(", ")})
+  )`;
+};
+
+const linkedEmployeeId = async (env: Env, context: AuthActor) =>
+  (await one<{ employee_id: string | null }>(
+    env,
+    "SELECT employee_id FROM users WHERE company_id = ? AND id = ? AND deleted_at IS NULL LIMIT 1",
+    [context.companyId, context.actorUserId],
+  ))?.employee_id ?? null;
 
 const monthLabel = (payrollMonth: string) => {
   const [year, month] = payrollMonth.split("-").map(Number);
@@ -63,7 +158,7 @@ const monthLabel = (payrollMonth: string) => {
   return new Intl.DateTimeFormat("en", { month: "long", year: "numeric", timeZone: "UTC" }).format(date);
 };
 
-lookupsRoutes.get("/employees", async (c) => {
+lookupsRoutes.get("/employees", requireAnyPermissionOrError(EMPLOYEE_LOOKUP_PERMISSIONS, lookupPermissionError), async (c) => {
   const context = actor(c);
   const { page, pageSize, offset } = pageInput(c);
   const search = c.req.query("search")?.trim();
@@ -73,12 +168,23 @@ lookupsRoutes.get("/employees", async (c) => {
   const status = c.req.query("status")?.trim() || "active";
   const clauses = ["company_id = ?", "deleted_at IS NULL"];
   const values: unknown[] = [context.companyId];
+  const hasBroadLookupAccess = permissionService.hasAnyPermission(context, EMPLOYEE_LOOKUP_BROAD_PERMISSIONS);
 
-  const outletScope = scopedOutletClause(context, "primary_outlet_id", values);
-  if (outletScope) clauses.push(outletScope.replace(/^ AND /, ""));
-  if (outletId) {
-    clauses.push("primary_outlet_id = ?");
-    values.push(outletId);
+  if (hasBroadLookupAccess) {
+    const outletScope = scopedOutletClause(context, "primary_outlet_id", values);
+    if (outletScope) clauses.push(outletScope.replace(/^ AND /, ""));
+    if (outletId) {
+      clauses.push("primary_outlet_id = ?");
+      values.push(outletId);
+    }
+  } else {
+    const ownEmployeeId = await linkedEmployeeId(c.env, context);
+    if (!ownEmployeeId) {
+      clauses.push("1 = 0");
+    } else {
+      clauses.push("id = ?");
+      values.push(ownEmployeeId);
+    }
   }
   if (departmentId) {
     clauses.push("department_id = ?");
@@ -127,7 +233,7 @@ lookupsRoutes.get("/employees", async (c) => {
   );
 });
 
-lookupsRoutes.get("/outlets", async (c) => {
+lookupsRoutes.get("/outlets", requireAnyPermissionOrError(OUTLET_LOOKUP_PERMISSIONS, lookupPermissionError), async (c) => {
   const context = actor(c);
   const { page, pageSize, offset } = pageInput(c);
   const search = c.req.query("search")?.trim();
@@ -150,12 +256,14 @@ lookupsRoutes.get("/outlets", async (c) => {
   return paginated(rows.map((row) => ({ ...row, label: `${row.code ?? row.id} - ${row.name}` })), pagination(page, pageSize, total), "Outlet lookup loaded successfully.", { requestId: c.get("requestId") });
 });
 
-lookupsRoutes.get("/departments", async (c) => {
+lookupsRoutes.get("/departments", requireAnyPermissionOrError(DEPARTMENT_LOOKUP_PERMISSIONS, lookupPermissionError), async (c) => {
   const context = actor(c);
   const { page, pageSize, offset } = pageInput(c);
   const search = c.req.query("search")?.trim();
   const clauses = ["company_id = ?", "deleted_at IS NULL"];
   const values: unknown[] = [context.companyId];
+  const scope = employeeOutletExistsClause(context, "departments", "department_id", values);
+  if (scope) clauses.push(scope.replace(/^ AND /, ""));
   if (search) {
     clauses.push("(lower(name) LIKE lower(?) OR lower(COALESCE(code, '')) LIKE lower(?))");
     values.push(like(search), like(search));
@@ -171,13 +279,15 @@ lookupsRoutes.get("/departments", async (c) => {
   return paginated(rows.map((row) => ({ ...row, label: `${row.code ?? row.id} - ${row.name}` })), pagination(page, pageSize, total), "Department lookup loaded successfully.", { requestId: c.get("requestId") });
 });
 
-lookupsRoutes.get("/positions", async (c) => {
+lookupsRoutes.get("/positions", requireAnyPermissionOrError(POSITION_LOOKUP_PERMISSIONS, lookupPermissionError), async (c) => {
   const context = actor(c);
   const { page, pageSize, offset } = pageInput(c);
   const search = c.req.query("search")?.trim();
   const departmentId = c.req.query("department_id")?.trim();
   const clauses = ["company_id = ?", "deleted_at IS NULL"];
   const values: unknown[] = [context.companyId];
+  const scope = employeeOutletExistsClause(context, "positions", "position_id", values);
+  if (scope) clauses.push(scope.replace(/^ AND /, ""));
   if (departmentId) {
     clauses.push("department_id = ?");
     values.push(departmentId);
@@ -197,7 +307,7 @@ lookupsRoutes.get("/positions", async (c) => {
   return paginated(rows.map((row) => ({ ...row, label: `${row.code ?? row.id} - ${row.name}` })), pagination(page, pageSize, total), "Position lookup loaded successfully.", { requestId: c.get("requestId") });
 });
 
-lookupsRoutes.get("/leave-types", async (c) => {
+lookupsRoutes.get("/leave-types", requireAnyPermissionOrError(LEAVE_TYPE_LOOKUP_PERMISSIONS, lookupPermissionError), async (c) => {
   const context = actor(c);
   const { page, pageSize, offset } = pageInput(c);
   const search = c.req.query("search")?.trim();
@@ -224,12 +334,28 @@ lookupsRoutes.get("/leave-types", async (c) => {
   return paginated(rows.map((row) => ({ ...row, label: row.name })), pagination(page, pageSize, total), "Leave type lookup loaded successfully.", { requestId: c.get("requestId") });
 });
 
-lookupsRoutes.get("/payroll-periods", async (c) => {
+lookupsRoutes.get("/payroll-periods", requireAnyPermissionOrError(PAYROLL_PERIOD_LOOKUP_PERMISSIONS, lookupPermissionError), async (c) => {
   const context = actor(c);
   const { page, pageSize, offset } = pageInput(c);
   const search = c.req.query("search")?.trim();
   const clauses = ["company_id = ?"];
   const values: unknown[] = [context.companyId];
+  if (!isCompanyScoped(context)) {
+    if (context.outletIds.length === 0) {
+      clauses.push("1 = 0");
+    } else {
+      values.push(...context.outletIds);
+      clauses.push(`EXISTS (
+        SELECT 1
+        FROM payroll_items pi
+        JOIN employees e ON e.company_id = pi.company_id AND e.id = pi.employee_id
+        WHERE pi.company_id = payroll_runs.company_id
+          AND pi.payroll_run_id = payroll_runs.id
+          AND e.deleted_at IS NULL
+          AND e.primary_outlet_id IN (${context.outletIds.map(() => "?").join(", ")})
+      )`);
+    }
+  }
   if (search) {
     clauses.push("(payroll_month LIKE ? OR status LIKE ?)");
     values.push(like(search), like(search));

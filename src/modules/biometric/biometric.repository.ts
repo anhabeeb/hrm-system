@@ -51,19 +51,31 @@ export const findDeviceBySerial = (env: Env, companyId: string, serial: string) 
     [companyId, serial],
   );
 
+export const findDeviceByIdentifier = (env: Env, companyId: string, identifier: string) =>
+  one<any>(
+    env,
+    `SELECT * FROM biometric_devices
+     WHERE company_id = ?
+       AND (device_serial = ? OR device_code = ? OR external_device_id = ?)
+     LIMIT 1`,
+    [companyId, identifier, identifier, identifier],
+  );
+
 export const createDevice = (
   env: Env,
   id: string,
   companyId: string,
   input: BiometricDeviceInput,
   tokenHash: string,
+  createdBy?: string,
 ) =>
   run(
     env,
     `INSERT INTO biometric_devices (
       id, company_id, outlet_id, device_name, device_serial, device_type,
-      sync_mode, api_token_hash, status, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)`,
+      sync_mode, api_token_hash, status, device_code, external_device_id,
+      vendor, model, created_by, updated_by, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       companyId,
@@ -73,6 +85,12 @@ export const createDevice = (
       input.device_type,
       input.sync_mode,
       tokenHash,
+      input.device_code ?? null,
+      input.external_device_id ?? null,
+      input.vendor ?? null,
+      input.model ?? null,
+      createdBy ?? null,
+      createdBy ?? null,
       new Date().toISOString(),
       new Date().toISOString(),
     ],
@@ -92,6 +110,11 @@ export const updateDevice = (
        device_serial = COALESCE(?, device_serial),
        device_type = COALESCE(?, device_type),
        sync_mode = COALESCE(?, sync_mode),
+       device_code = COALESCE(?, device_code),
+       external_device_id = COALESCE(?, external_device_id),
+       vendor = COALESCE(?, vendor),
+       model = COALESCE(?, model),
+       updated_by = COALESCE(?, updated_by),
        updated_at = ?
      WHERE company_id = ? AND id = ?`,
     [
@@ -100,17 +123,48 @@ export const updateDevice = (
       input.device_serial ?? null,
       input.device_type ?? null,
       input.sync_mode ?? null,
+      input.device_code ?? null,
+      input.external_device_id ?? null,
+      input.vendor ?? null,
+      input.model ?? null,
+      null,
       new Date().toISOString(),
       companyId,
       id,
     ],
   );
 
-export const updateDeviceStatus = (env: Env, companyId: string, id: string, status: string) =>
+export const updateDeviceStatus = (
+  env: Env,
+  companyId: string,
+  id: string,
+  status: string,
+  actorId?: string,
+  reason?: string,
+) =>
   run(
     env,
-    "UPDATE biometric_devices SET status = ?, updated_at = ? WHERE company_id = ? AND id = ?",
-    [status, new Date().toISOString(), companyId, id],
+    `UPDATE biometric_devices
+     SET status = ?,
+       revoked_by = CASE WHEN ? = 'revoked' THEN ? ELSE revoked_by END,
+       revoked_at = CASE WHEN ? = 'revoked' THEN ? ELSE revoked_at END,
+       revoke_reason = CASE WHEN ? = 'revoked' THEN ? ELSE revoke_reason END,
+       updated_by = COALESCE(?, updated_by),
+       updated_at = ?
+     WHERE company_id = ? AND id = ?`,
+    [
+      status,
+      status,
+      actorId ?? null,
+      status,
+      status === "revoked" ? new Date().toISOString() : null,
+      status,
+      reason ?? null,
+      actorId ?? null,
+      new Date().toISOString(),
+      companyId,
+      id,
+    ],
   );
 
 export const updateDeviceToken = (env: Env, companyId: string, id: string, tokenHash: string) =>
@@ -118,6 +172,13 @@ export const updateDeviceToken = (env: Env, companyId: string, id: string, token
     env,
     "UPDATE biometric_devices SET api_token_hash = ?, updated_at = ? WHERE company_id = ? AND id = ?",
     [tokenHash, new Date().toISOString(), companyId, id],
+  );
+
+export const touchBiometricDevice = (env: Env, companyId: string, id: string) =>
+  run(
+    env,
+    "UPDATE biometric_devices SET last_seen_at = ?, updated_at = ? WHERE company_id = ? AND id = ?",
+    [new Date().toISOString(), new Date().toISOString(), companyId, id],
   );
 
 const deviceWhere = (companyId: string, filters: BiometricListFilters, scope: BiometricOutletScope) => {
@@ -129,8 +190,8 @@ const deviceWhere = (companyId: string, filters: BiometricListFilters, scope: Bi
   if (filters.sync_mode) { clauses.push("d.sync_mode = ?"); values.push(filters.sync_mode); }
   if (filters.status) { clauses.push("d.status = ?"); values.push(filters.status); }
   if (filters.search) {
-    clauses.push("(lower(d.device_name) LIKE lower(?) OR lower(d.device_serial) LIKE lower(?))");
-    values.push(`%${filters.search}%`, `%${filters.search}%`);
+    clauses.push("(lower(d.device_name) LIKE lower(?) OR lower(d.device_serial) LIKE lower(?) OR lower(COALESCE(d.device_code, '')) LIKE lower(?) OR lower(COALESCE(d.external_device_id, '')) LIKE lower(?))");
+    values.push(`%${filters.search}%`, `%${filters.search}%`, `%${filters.search}%`, `%${filters.search}%`);
   }
   return { sql: clauses.join(" AND "), values };
 };
@@ -146,6 +207,7 @@ export const listDevices = (
     env,
     `SELECT d.id, d.company_id, d.outlet_id, o.name AS outlet_name,
       d.device_name, d.device_serial, d.device_type, d.sync_mode,
+      d.device_code, d.external_device_id, d.vendor, d.model,
       d.status, d.last_seen_at, d.last_sync_at, d.created_at, d.updated_at
      FROM biometric_devices d
      LEFT JOIN outlets o ON o.id = d.outlet_id
@@ -185,6 +247,22 @@ export const findMapping = (
      WHERE l.company_id = ? AND l.device_id = ? AND l.biometric_user_id = ?
        AND l.is_active = 1
      LIMIT 1`,
+    [companyId, deviceId, biometricUserId],
+  );
+
+export const findMappingsByBiometricUserId = (
+  env: Env,
+  companyId: string,
+  deviceId: string,
+  biometricUserId: string,
+) =>
+  many<any>(
+    env,
+    `SELECT l.*, e.primary_outlet_id, e.employment_status, e.deleted_at
+     FROM employee_biometric_links l
+     JOIN employees e ON e.id = l.employee_id
+     WHERE l.company_id = ? AND l.device_id = ? AND l.biometric_user_id = ?
+       AND l.is_active = 1`,
     [companyId, deviceId, biometricUserId],
   );
 
@@ -333,8 +411,9 @@ export const createLog = (
     `INSERT INTO biometric_attendance_logs (
       id, company_id, device_id, outlet_id, biometric_user_id, employee_id,
       event_time, server_received_at, event_type, verification_method,
-      raw_payload_json, dedupe_key, sync_status, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      raw_payload_json, dedupe_key, source_event_id, device_timestamp,
+      attendance_event_id, sync_status, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       input.id,
       input.company_id,
@@ -348,6 +427,9 @@ export const createLog = (
       input.verification_method,
       input.raw_payload_json,
       input.dedupe_key,
+      input.source_event_id ?? null,
+      input.device_timestamp ?? input.event_time,
+      input.attendance_event_id ?? null,
       input.sync_status,
       new Date().toISOString(),
       new Date().toISOString(),
@@ -367,11 +449,47 @@ export const updateLogStatus = (
     [status, employeeId ?? null, new Date().toISOString(), companyId, id],
   );
 
+export const updateLogAttendanceEvent = (
+  env: Env,
+  companyId: string,
+  id: string,
+  attendanceEventId: string,
+) =>
+  run(
+    env,
+    "UPDATE biometric_attendance_logs SET attendance_event_id = ?, updated_at = ? WHERE company_id = ? AND id = ?",
+    [attendanceEventId, new Date().toISOString(), companyId, id],
+  );
+
+export const resolveLog = (
+  env: Env,
+  companyId: string,
+  id: string,
+  input: { status: string; employeeId?: string | null; actorId?: string | null; reason: string },
+) =>
+  run(
+    env,
+    `UPDATE biometric_attendance_logs
+     SET sync_status = ?, employee_id = COALESCE(?, employee_id), resolved_by = ?,
+       resolved_at = ?, resolution_reason = ?, updated_at = ?
+     WHERE company_id = ? AND id = ?`,
+    [
+      input.status,
+      input.employeeId ?? null,
+      input.actorId ?? null,
+      new Date().toISOString(),
+      input.reason,
+      new Date().toISOString(),
+      companyId,
+      id,
+    ],
+  );
+
 const logWhere = (companyId: string, filters: BiometricListFilters, scope: BiometricOutletScope, unmatched = false) => {
   const clauses = ["l.company_id = ?"];
   const values: unknown[] = [companyId];
   applyOutletScope(clauses, values, "l", filters, scope);
-  if (unmatched) clauses.push("(l.employee_id IS NULL OR l.sync_status = 'unmatched')");
+  if (unmatched) clauses.push("(l.employee_id IS NULL OR l.sync_status IN ('unmatched', 'unmatched_employee', 'ambiguous_employee', 'invalid_timestamp'))");
   if (filters.outlet_id) { clauses.push("l.outlet_id = ?"); values.push(filters.outlet_id); }
   if (filters.device_id) { clauses.push("l.device_id = ?"); values.push(filters.device_id); }
   if (filters.employee_id) { clauses.push("l.employee_id = ?"); values.push(filters.employee_id); }
@@ -395,10 +513,15 @@ export const listLogs = (
     env,
     `SELECT l.id, l.company_id, l.device_id, l.outlet_id, l.biometric_user_id,
       l.employee_id, e.employee_code, e.full_name AS employee_name,
+      d.device_name, o.name AS outlet_name,
       l.event_time, l.server_received_at, l.event_type, l.verification_method,
-      l.dedupe_key, l.sync_status, l.created_at, l.updated_at
+      l.dedupe_key, l.source_event_id, l.device_timestamp, l.attendance_event_id,
+      l.resolved_by, l.resolved_at, l.resolution_reason,
+      l.sync_status, l.created_at, l.updated_at
      FROM biometric_attendance_logs l
      LEFT JOIN employees e ON e.id = l.employee_id
+     LEFT JOIN biometric_devices d ON d.id = l.device_id
+     LEFT JOIN outlets o ON o.id = l.outlet_id
      WHERE ${built.sql}
      ORDER BY l.event_time DESC
      LIMIT ? OFFSET ?`,

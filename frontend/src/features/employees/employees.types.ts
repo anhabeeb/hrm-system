@@ -361,3 +361,57 @@ export interface PaginatedEmployees {
   data: Employee[];
   pagination?: Pagination;
 }
+
+export interface Employee360Profile {
+  summary: {
+    employee: Employee;
+    warnings: Record<string, number>;
+    generated_at: string;
+  };
+  attendance?: {
+    today: Record<string, unknown> | null;
+    current_month_summary: Record<string, number>;
+    recent_rows: Array<Record<string, unknown>>;
+    source_summary: Array<Record<string, unknown>>;
+    report_href: string;
+  } | null;
+  leave?: {
+    balances: Array<Record<string, unknown>>;
+    recent_requests: Array<Record<string, unknown>>;
+    transactions: Array<Record<string, unknown>>;
+  } | null;
+  long_leave?: {
+    active: Record<string, unknown> | null;
+    history: Array<Record<string, unknown>>;
+    payroll_impacts: Array<Record<string, unknown>>;
+  } | null;
+  documents?: {
+    documents: Array<Record<string, unknown>>;
+  } | null;
+  contracts?: {
+    active_contract: Record<string, unknown> | null;
+    contracts: Array<Record<string, unknown>>;
+  } | null;
+  assets?: {
+    assets: Array<Record<string, unknown>>;
+    uniforms: Array<Record<string, unknown>>;
+  } | null;
+  payroll_readiness?: {
+    salary_summary: Record<string, unknown> | null;
+    attendance_exceptions_affecting_payroll: number;
+    long_leave_payroll_impact: Array<Record<string, unknown>>;
+    leave_balance_warnings: Array<Record<string, unknown>>;
+  } | null;
+  alerts?: {
+    alerts: Array<Record<string, unknown>>;
+    open_count: number;
+    critical_count: number;
+  } | null;
+  timeline?: {
+    events: Array<Record<string, unknown>>;
+  } | null;
+  meta: {
+    employee_id: string;
+    generated_at: string;
+  };
+}

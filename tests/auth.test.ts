@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+﻿import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { validateKycUpdateRequestInput } from "../src/modules/auth/auth.validators";
 import { PASSWORD_HASH_ALGORITHM, PASSWORD_HASH_VERSION, PBKDF2_MAX_WORKERS_ITERATIONS } from "../src/modules/auth/auth.constants";
@@ -311,14 +311,6 @@ describe("my profile email update requests", () => {
       reason: "Testing",
     }, testRequest)).rejects.toMatchObject({ code: "DUPLICATE_USER_EMAIL" });
   });
-});
-
-describe.todo("auth integration", () => {
-  it.todo("login rejects a wrong password with a generic message");
-  it.todo("forgot password does not reveal whether an email exists");
-  it.todo("password reset tokens are stored only as hashes");
-  it.todo("session tokens are stored only as hashes");
-  it.todo("/me never returns password_hash or token hash fields");
 });
 
 describe("auth two-factor setup and login challenge", () => {
