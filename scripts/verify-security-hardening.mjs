@@ -31,6 +31,7 @@ const assertContains = (label, text, pattern, hint) => {
 };
 
 const app = read("src/app.ts");
+const workerEntrypoint = read("src/index.ts");
 const packageJson = read("package.json");
 const securityMiddleware = read("src/middleware/security.middleware.ts");
 const cors = read("src/middleware/cors.middleware.ts");
@@ -62,6 +63,13 @@ assertContains("security middleware", securityMiddleware, "Cache-Control", "API 
 assertContains("security middleware", securityMiddleware, "CSRF_ORIGIN_DENIED", "unsafe cross-origin mutation guard is missing.");
 assertContains("security middleware", securityMiddleware, "UNSAFE_CONTENT_TYPE", "simple form/text content-type guard is missing.");
 assertContains("security middleware", securityMiddleware, "isDeviceTokenRequest", "device token routes must be separated from cookie CSRF handling.");
+assertContains("worker frontend assets", workerEntrypoint, "withFrontendSecurityHeaders(await env.ASSETS.fetch(request))", "frontend ASSETS responses must be wrapped with security headers.");
+assertContains("worker frontend assets", workerEntrypoint, "frontendAssetsNotConfigured", "missing frontend assets fallback must exist.");
+assertContains("worker frontend assets", workerEntrypoint, "X-Content-Type-Options", "frontend ASSETS responses must include nosniff.");
+assertContains("worker frontend assets", workerEntrypoint, "Referrer-Policy", "frontend ASSETS responses must include Referrer-Policy.");
+assertContains("worker frontend assets", workerEntrypoint, "strict-origin-when-cross-origin", "frontend ASSETS Referrer-Policy must match production smoke expectation.");
+assertContains("worker frontend assets", workerEntrypoint, "X-Frame-Options", "frontend ASSETS responses should deny framing.");
+assertContains("worker frontend assets", workerEntrypoint, "Permissions-Policy", "frontend ASSETS responses should include a safe permissions policy.");
 
 if (/localStorage|sessionStorage|TOKEN_STORAGE_KEY|hrm\.auth\.token/.test(frontendAuthToken)) {
   failures.push("frontend/src/lib/auth-token.ts: auth tokens must not be read from or written to browser storage.");

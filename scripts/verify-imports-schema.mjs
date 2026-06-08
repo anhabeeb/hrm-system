@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 const root = process.cwd();
-const read = (path) => readFileSync(resolve(root, path), "utf8");
+const read = (path) => readFileSync(resolve(root, path), "utf8").replace(/\r\n/g, "\n");
 const fail = (message) => {
   throw new Error(`verify:imports-schema failed: ${message}`);
 };
