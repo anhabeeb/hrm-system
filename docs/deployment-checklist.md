@@ -42,7 +42,7 @@ npm run smoke:production
 - Wrangler Static Assets must keep `assets.directory = ./frontend/dist`.
 - Wrangler Static Assets must keep `assets.not_found_handling = single-page-application`.
 - Wrangler Static Assets must keep `assets.binding = ASSETS`.
-- Wrangler Static Assets must keep `assets.run_worker_first` including `/api/*`.
+- Wrangler Static Assets must keep `assets.run_worker_first = true` so API routes and frontend HTML/static asset responses pass through the Worker.
 
 ## Critical Route Guardrails
 
@@ -356,7 +356,7 @@ Do not run staging mutation tests in production. Imports, restores, archives, pa
 
 ## Route And Domain Guardrails
 
-- Make sure `/api/*` routes go to Worker API through `assets.run_worker_first`.
+- Make sure `assets.run_worker_first = true` so `/api/*` routes go to the Worker API and frontend routes receive Worker security headers before `env.ASSETS.fetch(request)`.
 - Make sure SPA routes return frontend HTML, not API JSON.
 - Make sure API routes return structured JSON, not frontend HTML.
 - Keep `hrm.cafeasiana.com.mv` routed to the current Worker deployment.

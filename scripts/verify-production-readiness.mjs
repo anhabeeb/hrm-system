@@ -56,7 +56,7 @@ if (wranglerPath) {
     '"binding": "BACKUP_BUCKET"',
     '"name": "REALTIME_ROOM"',
     '"directory": "./frontend/dist"',
-    '"run_worker_first": ["/api/*"]',
+    '"run_worker_first": true',
   ]) {
     assert(wrangler.includes(marker), `${wranglerPath} missing production marker ${marker}.`);
   }

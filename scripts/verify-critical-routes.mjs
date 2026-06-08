@@ -149,8 +149,8 @@ export const verifyCriticalRoutes = (baseDir = rootDir) => {
     failures,
     wranglerPath,
     wrangler,
-    /"run_worker_first"\s*:\s*\[[^\]]*["']\/api\/\*["'][^\]]*\]/,
-    'assets.run_worker_first must include "/api/*".',
+    /"run_worker_first"\s*:\s*true/,
+    "assets.run_worker_first must be true so frontend HTML/static asset responses pass through Worker security headers.",
   );
 
   if (scripts.build !== "npm run build:all") {

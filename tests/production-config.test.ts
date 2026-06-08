@@ -71,14 +71,14 @@ describe("production config safety checks", () => {
     expect(envExample).not.toMatch(/SECRET|TOKEN|PASSWORD|PEPPER/i);
   });
 
-  it("wrangler config serves frontend assets through the Worker with API routes worker-first", () => {
+  it("wrangler config serves frontend assets through the Worker so security headers are applied", () => {
     const wrangler = readText("wrangler.jsonc");
 
     expect(wrangler).toContain('"assets"');
     expect(wrangler).toContain('"directory": "./frontend/dist"');
     expect(wrangler).toContain('"not_found_handling": "single-page-application"');
     expect(wrangler).toContain('"binding": "ASSETS"');
-    expect(wrangler).toContain('"run_worker_first": ["/api/*"]');
+    expect(wrangler).toContain('"run_worker_first": true');
   });
 
   it("root deploy script builds API and frontend before deploying", () => {

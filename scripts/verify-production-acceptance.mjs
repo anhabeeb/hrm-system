@@ -94,7 +94,7 @@ if (exists("docs/deployment-checklist.md")) {
     "npm run verify:production-acceptance",
     "npm run smoke:production",
     "Do not deploy from stale ZIP folders",
-    "Make sure `/api/*` routes go to Worker API",
+    "Make sure `assets.run_worker_first = true` so `/api/*` routes go to the Worker API",
     "D1 migrations may not be reversible",
   ]) {
     assert(deployment.includes(marker), `deployment checklist missing production acceptance marker ${marker}.`);
