@@ -257,10 +257,44 @@ describe("Worker API/static asset routing", () => {
 
       expect(response.status).toBe(200);
       expect(response.headers.get("content-type")).toContain("text/html");
+      expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+      expect(response.headers.get("referrer-policy")).toBe("strict-origin-when-cross-origin");
+      expect(response.headers.get("x-frame-options")).toBe("DENY");
+      expect(response.headers.get("permissions-policy")).toContain("camera=()");
       expect(text).toContain("<!doctype html");
       expect(text).not.toContain("ENDPOINT_NOT_FOUND");
     });
   }
+
+  it("keeps frontend security headers on static asset responses", async () => {
+    const response = await fetchWorker("/assets/index.js");
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("referrer-policy")).toBe("strict-origin-when-cross-origin");
+  });
+
+  it("keeps API routes on the API app instead of serving frontend HTML", async () => {
+    const response = await fetchWorker("/api/v1/health", envWithAssets);
+    const text = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(text).toContain('"service":"hrm-api"');
+    expect(text).not.toContain("<!doctype html");
+  });
+
+  it("adds frontend security headers to the missing ASSETS fallback", async () => {
+    const response = await fetchWorker("/", { ENVIRONMENT: "test" } as Env);
+    const text = await response.text();
+
+    expect(response.status).toBe(500);
+    expect(response.headers.get("content-type")).toContain("text/plain");
+    expect(response.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(response.headers.get("referrer-policy")).toBe("strict-origin-when-cross-origin");
+    expect(text).toContain("Frontend assets are not configured");
+  });
 });
 
 
