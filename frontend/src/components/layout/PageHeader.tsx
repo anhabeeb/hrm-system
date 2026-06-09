@@ -1,19 +1,17 @@
 import type { ReactNode } from "react";
 
-export const PageHeader = ({
-  title,
-  description,
-  actions,
-}: {
+export const PageHeader = ({ title, description: _description, actions }: {
   title: string;
   description?: string;
   actions?: ReactNode;
-}) => (
-  <div className="flex flex-col gap-3 border-b bg-background/95 px-4 py-4 md:px-6 lg:flex-row lg:items-center lg:justify-between">
-    <div>
-      <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
-      {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
+}) => {
+  void _description;
+
+  if (!actions) return null;
+
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-2 px-4 pt-3 md:px-6" aria-label={`${title} page actions`}>
+      {actions}
     </div>
-    {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
-  </div>
-);
+  );
+};

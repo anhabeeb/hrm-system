@@ -176,4 +176,39 @@ describe("frontend completed-phase hardening coverage", () => {
     expect(read("frontend/src/components/feedback/AppErrorAlert.tsx")).toContain("AppErrorAlert");
     expect(read("frontend/src/components/feedback/InlineAlert.tsx")).toContain("InlineAlert");
   });
+
+  it("keeps breadcrumbs while replacing large page headers with compact action bars", () => {
+    const topbar = read("frontend/src/components/layout/Topbar.tsx");
+    const breadcrumbs = read("frontend/src/components/layout/Breadcrumbs.tsx");
+    const pageHeader = read("frontend/src/components/layout/PageHeader.tsx");
+
+    expect(topbar).toContain("<Breadcrumbs />");
+    expect(breadcrumbs).toContain('aria-label="Breadcrumb"');
+    expect(pageHeader).not.toContain("<h1");
+    expect(pageHeader).not.toContain("text-xl");
+    expect(pageHeader).not.toContain("tracking-tight");
+    expect(pageHeader).not.toContain("border-b");
+    expect(pageHeader).toContain("justify-end");
+    expect(pageHeader).toContain("flex-wrap");
+    expect(pageHeader).toContain("aria-label");
+  });
+
+  it("preserves critical page action buttons after header compaction", () => {
+    const criticalActions = [
+      ["frontend/src/features/employees/EmployeesPage.tsx", "Add Employee"],
+      ["frontend/src/features/documents/DocumentsPage.tsx", "Upload document"],
+      ["frontend/src/features/imports/ImportCenterPage.tsx", "Template CSV"],
+      ["frontend/src/features/backup-recovery/BackupRecoveryPage.tsx", "Create backup"],
+      ["frontend/src/features/backup-recovery/BackupRecoveryPage.tsx", "Create restore job"],
+      ["frontend/src/features/advances/AdvancesPage.tsx", "New advance"],
+      ["frontend/src/features/salary-loans/SalaryLoansPage.tsx", "New loan"],
+      ["frontend/src/features/assets/AssetsPage.tsx", "Create asset"],
+    ];
+
+    for (const [file, actionText] of criticalActions) {
+      const text = read(file);
+      expect(text).toContain("PageHeader");
+      expect(text).toContain(actionText);
+    }
+  });
 });
