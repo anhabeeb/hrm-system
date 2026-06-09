@@ -4,6 +4,8 @@ import { useState } from "react";
 import { DataTable } from "@/components/data/DataTable";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { toastError, toastSuccess } from "@/components/feedback/toast-helpers";
+import { useToast } from "@/components/feedback/useToast";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/features/auth/auth.store";
 import { ApiError } from "@/lib/api-errors";
@@ -15,21 +17,21 @@ export const FeatureSettingsPanel = () => {
   const auth = useAuth();
   const queryClient = useQueryClient();
   const [pendingChange, setPendingChange] = useState<{ feature: FeatureSetting; enabled: boolean } | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const toast = useToast();
   const canManage = auth.hasAnyPermission(["feature_settings.manage", "settings.manage"]);
   const query = useQuery({ queryKey: ["settings", "features"], queryFn: settingsApi.features });
   const mutation = useMutation({
     mutationFn: ({ feature, enabled, reason }: { feature: FeatureSetting; enabled: boolean; reason: string }) =>
       settingsApi.updateFeature(feature.feature_key, { is_enabled: enabled, status: enabled ? "active" : "disabled", reason }),
     onSuccess: async () => {
-      setSuccessMessage("Feature setting updated successfully.");
+      toastSuccess(toast, "Feature setting updated successfully.");
       setPendingChange(null);
       await queryClient.invalidateQueries({ queryKey: ["settings", "features"] });
     },
+    onError: (error) => toastError(toast, error, "Feature setting could not be updated."),
   });
 
   const toggleFeature = (feature: FeatureSetting, enabled: boolean) => {
-    setSuccessMessage(null);
     setPendingChange({ feature, enabled });
   };
 
@@ -37,7 +39,6 @@ export const FeatureSettingsPanel = () => {
 
   return (
     <div className="space-y-3">
-      {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
       <DataTable
         compact
         loading={query.isLoading}

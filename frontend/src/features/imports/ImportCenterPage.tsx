@@ -9,6 +9,8 @@ import { DetailSection } from "@/components/data/DetailSection";
 import { RowActions } from "@/components/data/RowActions";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { toastError, toastSuccess } from "@/components/feedback/toast-helpers";
+import { useToast } from "@/components/feedback/useToast";
 import { LoadingButton } from "@/components/forms/LoadingButton";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -37,7 +39,7 @@ export const ImportCenterPage = () => {
   const [fileName, setFileName] = useState("import.csv");
   const [preview, setPreview] = useState<ImportPreviewResult | null>(null);
   const [drawerRows, setDrawerRows] = useState<ImportRow[]>([]);
-  const [message, setMessage] = useState<string | null>(null);
+  const toast = useToast();
   const has = (permission: string) => auth.isSuperAdmin || auth.hasPermission(permission);
   const filters = useMemo(() => ({
     import_type: params.get("import_type") || undefined,
@@ -72,37 +74,41 @@ export const ImportCenterPage = () => {
     mutationFn: importsApi.preview,
     onSuccess: (response) => {
       setPreview(response.data);
-      setMessage("Preview completed. No business records were changed.");
+      toastSuccess(toast, "Preview completed.", "No business records were changed.");
     },
+    onError: (error) => toastError(toast, error, "Import preview could not be generated."),
   });
   const createMutation = useMutation({
     mutationFn: importsApi.createJob,
     onSuccess: async (response) => {
       setPreview({ job: response.data.job, summary: response.data.summary, sample_rows: response.data.sample_rows.map((row) => row.normalized_data), errors: response.data.errors });
-      setMessage("Import job created and validated. Review errors before applying.");
+      toastSuccess(toast, "Import job created and validated.", "Review errors before applying.");
       await queryClient.invalidateQueries({ queryKey: ["imports", "jobs"] });
     },
+    onError: (error) => toastError(toast, error, "Import job could not be created."),
   });
   const applyMutation = useMutation({
     mutationFn: importsApi.applyJob,
     onSuccess: async () => {
-      setMessage("Import apply completed. Review the job detail for row outcomes.");
+      toastSuccess(toast, "Import apply completed.", "Review the job detail for row outcomes.");
       await queryClient.invalidateQueries({ queryKey: ["imports", "jobs"] });
     },
+    onError: (error) => toastError(toast, error, "Import job could not be applied."),
   });
   const cancelMutation = useMutation({
     mutationFn: importsApi.cancelJob,
     onSuccess: async () => {
-      setMessage("Import job cancelled.");
+      toastSuccess(toast, "Import job cancelled.");
       await queryClient.invalidateQueries({ queryKey: ["imports", "jobs"] });
     },
+    onError: (error) => toastError(toast, error, "Import job could not be cancelled."),
   });
   const loadRows = async (job: ImportJob, status?: string) => {
     const response = await importsApi.rows(job.id, { status, page: 1, page_size: 100 });
     setSelectedJob(job);
     setDrawerRows(response.data.data);
   };
-  const error = previewMutation.error ?? createMutation.error ?? applyMutation.error ?? cancelMutation.error ?? templates.error ?? jobs.error;
+  const error = templates.error ?? jobs.error;
   const blockingErrors = (preview?.summary.invalid_rows ?? 0) + (preview?.summary.duplicate_rows ?? 0) > 0;
 
   return (
@@ -113,7 +119,6 @@ export const ImportCenterPage = () => {
         actions={<Button variant="outline" onClick={() => void downloadTemplate(activeTemplate)} disabled={!activeTemplate || !has("imports.templates.view")}><Download className="h-4 w-4" />Template CSV</Button>}
       />
       <div className="space-y-4 p-4 md:p-6">
-        {message ? <InlineAlert title={message} variant="success" /> : null}
         {error ? <InlineAlert title={friendlyHrmError(error, "Import action could not be completed.")} variant="error" /> : null}
         <Tabs defaultValue="center">
           <TabsList><TabsTrigger value="center">Import Center</TabsTrigger><TabsTrigger value="history">Import History</TabsTrigger><TabsTrigger value="templates">Templates</TabsTrigger></TabsList>

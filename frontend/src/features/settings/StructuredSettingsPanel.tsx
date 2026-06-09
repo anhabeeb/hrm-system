@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
 import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { toastError, toastSuccess } from "@/components/feedback/toast-helpers";
+import { useToast } from "@/components/feedback/useToast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,6 +34,7 @@ export const StructuredSettingsPanel = ({ definition }: { definition: SettingsPa
   const [editing, setEditing] = useState(false);
   const [reason, setReason] = useState("");
   const [values, setValues] = useState<SettingsValue>({});
+  const toast = useToast();
   const canEdit = hasAnyPermission(user, [definition.managePermission, "settings.manage"]);
 
   const query = useQuery({
@@ -52,9 +55,11 @@ export const StructuredSettingsPanel = ({ definition }: { definition: SettingsPa
     onSuccess: () => {
       setEditing(false);
       setReason("");
+      toastSuccess(toast, "Settings updated successfully.");
       queryClient.invalidateQueries({ queryKey: ["settings", definition.endpointPath] });
       queryClient.invalidateQueries({ queryKey: ["settings"] });
     },
+    onError: (error) => toastError(toast, error, "Settings could not be saved."),
   });
 
   const setField = (settingKey: string, fieldKey: string, nextValue: unknown) => {
@@ -71,12 +76,6 @@ export const StructuredSettingsPanel = ({ definition }: { definition: SettingsPa
 
   return (
     <div className="space-y-4">
-      {mutation.isError ? (
-        <InlineAlert title="Settings could not be saved." variant="error">
-          {mutation.error instanceof Error ? mutation.error.message : undefined}
-        </InlineAlert>
-      ) : null}
-      {mutation.isSuccess ? <InlineAlert title="Settings updated successfully." variant="success" /> : null}
       <div className="flex flex-wrap items-start justify-between gap-3 rounded-lg border bg-card p-4">
         <div>
           <h2 className="text-base font-semibold">{definition.title}</h2>

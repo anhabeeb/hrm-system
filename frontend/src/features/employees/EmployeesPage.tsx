@@ -4,6 +4,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { UserPlus } from "lucide-react";
 
 import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { toastError, toastSuccess } from "@/components/feedback/toast-helpers";
+import { useToast } from "@/components/feedback/useToast";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/auth.store";
@@ -32,8 +34,8 @@ export const EmployeesPage = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<"create" | "edit">("create");
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState<ApiError | null>(null);
+  const toast = useToast();
 
   const filters = useMemo(() => ({
     search: searchParams.get("search") || undefined,
@@ -68,23 +70,29 @@ export const EmployeesPage = () => {
   const createMutation = useMutation({
     mutationFn: employeesApi.create,
     onSuccess: async () => {
-      setSuccessMessage("Employee created successfully.");
+      toastSuccess(toast, "Employee created successfully.");
       setMutationError(null);
       setFormOpen(false);
       await refreshList();
     },
-    onError: (error) => setMutationError(error instanceof ApiError ? error : saveError()),
+    onError: (error) => {
+      setMutationError(error instanceof ApiError ? error : saveError());
+      toastError(toast, error, "Employee could not be created.");
+    },
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: EmployeeUpdatePayload }) => employeesApi.update(id, payload),
     onSuccess: async () => {
-      setSuccessMessage("Employee updated successfully.");
+      toastSuccess(toast, "Employee updated successfully.");
       setMutationError(null);
       setFormOpen(false);
       await refreshList();
     },
-    onError: (error) => setMutationError(error instanceof ApiError ? error : saveError()),
+    onError: (error) => {
+      setMutationError(error instanceof ApiError ? error : saveError());
+      toastError(toast, error, "Employee could not be updated.");
+    },
   });
 
   const openCreate = () => {
@@ -129,7 +137,6 @@ export const EmployeesPage = () => {
     <div>
       <PageHeader title="Employees" description="Manage employee profiles, work assignments, and HR record foundations" />
       <div className="space-y-4 p-4 md:p-6">
-        {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
         {employeesQuery.isError ? <InlineAlert title="Employees could not be loaded." variant="error">Please adjust filters or try again.</InlineAlert> : null}
         <div className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
           <div>

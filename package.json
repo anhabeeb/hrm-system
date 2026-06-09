@@ -41,6 +41,7 @@
     "verify:permission-audit": "node scripts/verify-permission-audit.mjs",
     "verify:dependency-security": "node scripts/verify-dependency-security.mjs",
     "verify:security-hardening": "node scripts/verify-security-hardening.mjs && npm run verify:dependency-security",
+    "verify:toast-alerts": "node scripts/verify-toast-alerts.mjs",
     "verify:no-todo-tests": "node scripts/verify-no-todo-tests.mjs",
     "verify:performance-d1": "node scripts/verify-performance-d1.mjs",
     "verify:production-readiness": "node scripts/verify-production-readiness.mjs",

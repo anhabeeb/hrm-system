@@ -4,6 +4,8 @@ import { useSearchParams } from "react-router-dom";
 import { Upload } from "lucide-react";
 
 import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { toastError, toastSuccess } from "@/components/feedback/toast-helpers";
+import { useToast } from "@/components/feedback/useToast";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -33,7 +35,7 @@ export const DocumentsPage = () => {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [updateOpen, setUpdateOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const toast = useToast();
   const has = (permission: string) => auth.isSuperAdmin || auth.hasPermission(permission);
   const canViewExpiring = has("documents.view_expiring");
   const canViewMissing = has("documents.view_missing");
@@ -65,9 +67,21 @@ export const DocumentsPage = () => {
   const missingQuery = useQuery({ queryKey: ["documents", "missing", filters], queryFn: () => documentsApi.missing(filters), enabled: activeTab === "missing" && canViewMissing });
   const categoriesQuery = useQuery({ queryKey: ["documents", "categories", filters], queryFn: () => documentsApi.categories(filters), enabled: activeTab === "categories" && canViewCategories, retry: false });
   const refresh = async () => queryClient.invalidateQueries({ queryKey: ["documents"] });
-  const uploadMutation = useMutation({ mutationFn: documentsApi.upload, onSuccess: async () => { setSuccessMessage("Document uploaded successfully."); setUploadOpen(false); await refresh(); } });
-  const updateMutation = useMutation({ mutationFn: (payload: DocumentUpdatePayload) => documentsApi.update(selected!.id, payload), onSuccess: async () => { setSuccessMessage("Document updated successfully."); setUpdateOpen(false); await refresh(); } });
-  const deleteMutation = useMutation({ mutationFn: (reason: string) => documentsApi.delete(selected!.id, reason), onSuccess: async () => { setSuccessMessage("Document deleted successfully."); setDeleteOpen(false); await refresh(); } });
+  const uploadMutation = useMutation({
+    mutationFn: documentsApi.upload,
+    onSuccess: async () => { toastSuccess(toast, "Document uploaded successfully."); setUploadOpen(false); await refresh(); },
+    onError: (error) => toastError(toast, error, "Document could not be uploaded."),
+  });
+  const updateMutation = useMutation({
+    mutationFn: (payload: DocumentUpdatePayload) => documentsApi.update(selected!.id, payload),
+    onSuccess: async () => { toastSuccess(toast, "Document updated successfully."); setUpdateOpen(false); await refresh(); },
+    onError: (error) => toastError(toast, error, "Document could not be updated."),
+  });
+  const deleteMutation = useMutation({
+    mutationFn: (reason: string) => documentsApi.delete(selected!.id, reason),
+    onSuccess: async () => { toastSuccess(toast, "Document deleted successfully."); setDeleteOpen(false); await refresh(); },
+    onError: (error) => toastError(toast, error, "Document could not be deleted."),
+  });
   const downloadMutation = useMutation({
     mutationFn: async (document: DocumentRecord) => ({ document, blob: await documentsApi.download(document.id) }),
     onSuccess: ({ document, blob }) => {
@@ -77,18 +91,18 @@ export const DocumentsPage = () => {
       link.download = documentName(document, canViewSensitive) || "employee-document";
       link.click();
       window.URL.revokeObjectURL(url);
-      setSuccessMessage("Document downloaded successfully.");
+      toastSuccess(toast, "Document downloaded successfully.");
     },
+    onError: (error) => toastError(toast, error, "Document could not be downloaded."),
   });
   const activeQueryError = activeTab === "expiring" ? expiringQuery.error : activeTab === "missing" ? missingQuery.error : activeTab === "categories" ? categoriesQuery.error : listQuery.error;
-  const error = activeQueryError ?? uploadMutation.error ?? updateMutation.error ?? deleteMutation.error ?? downloadMutation.error;
+  const error = activeQueryError;
   const canViewSensitive = has("documents.view_sensitive");
 
   return (
     <div>
       <PageHeader title="Documents" description="Manage employee documents, expiry tracking, and missing document compliance." actions={has("documents.upload") ? <Button onClick={() => setUploadOpen(true)}><Upload className="h-4 w-4" />Upload document</Button> : null} />
       <div className="space-y-4 p-4 md:p-6">
-        {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
         {error ? <InlineAlert title={friendlyHrmError(error, "Document action could not be completed.")} variant="error" /> : null}
         <DocumentFilters filters={filters} onChange={updateFilters} onClear={() => setSearchParams(new URLSearchParams({ page: "1", page_size: String(filters.page_size), tab: activeTab }))} />
         <Tabs value={activeTab} onValueChange={setActiveTab}>

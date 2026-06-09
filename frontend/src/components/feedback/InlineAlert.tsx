@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
+import { useEffect } from "react";
 import { AlertCircle, CheckCircle2, Info, TriangleAlert } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { useOptionalToast } from "./useToast";
 
 const variants = {
   info: "border-blue-200 bg-blue-50 text-blue-900",
@@ -29,6 +31,16 @@ export const InlineAlert = ({
   requestId?: string;
 }) => {
   const Icon = icons[variant];
+  const toast = useOptionalToast();
+
+  useEffect(() => {
+    if (variant === "success" && toast) {
+      toast.success(title, typeof children === "string" ? children : undefined);
+    }
+  }, [children, title, toast, variant]);
+
+  if (variant === "success") return null;
+
   return (
     <div className={cn("rounded-lg border p-4 text-sm", variants[variant])}>
       <div className="flex gap-3">

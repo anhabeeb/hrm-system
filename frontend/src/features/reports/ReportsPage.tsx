@@ -10,6 +10,8 @@ import { EmptyState } from "@/components/data/EmptyState";
 import { RowActions } from "@/components/data/RowActions";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { toastError, toastSuccess } from "@/components/feedback/toast-helpers";
+import { useToast } from "@/components/feedback/useToast";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmployeeCombobox, OutletCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
@@ -84,6 +86,7 @@ export const ReportsPage = () => {
   const [selectedReport, setSelectedReport] = useState<ReportDefinition | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [generated, setGenerated] = useState<ReportResult | null>(null);
+  const toast = useToast();
   const has = (permission: string) => auth.isSuperAdmin || auth.hasPermission(permission);
   const canPayroll = has("payroll.view");
   const canAudit = has("audit_logs.view");
@@ -140,15 +143,18 @@ export const ReportsPage = () => {
   const devicesQuery = useQuery({ queryKey: ["reports", "devices", filters], queryFn: () => Promise.all([canDevices ? reportsApi.byPath(reportPaths.devices, filters) : Promise.resolve(null), canSync ? reportsApi.byPath(reportPaths.sync, filters) : Promise.resolve(null)]), enabled: activeTab === "devices" && (canDevices || canSync) });
   const generateMutation = useMutation({
     mutationFn: reportsApi.generate,
-    onSuccess: (response) => setGenerated(response.data),
+    onSuccess: (response) => {
+      setGenerated(response.data);
+      toastSuccess(toast, "Report generated successfully.");
+    },
+    onError: (error) => toastError(toast, error, "Report could not be generated."),
   });
   const activeError = activeTab === "payroll" ? payrollQuery.error : activeTab === "audit" ? auditQuery.error : activeTab === "devices" ? devicesQuery.error : activeTab === "compliance" ? documentSummaryQuery.error ?? expiringDocumentsQuery.error ?? missingDocumentsQuery.error : activeTab === "attendance" ? attendanceReportQuery.error ?? leaveReportQuery.error : activeTab === "hr" ? employeeReportQuery.error ?? assetReportQuery.error : activeTab === "catalog" ? catalogQuery.error : null;
   return (
     <div>
       <PageHeader title="Reports" description="Generate operational, compliance, payroll, and audit reports." />
       <div className="space-y-4 p-4 md:p-6">
-        {generateMutation.isSuccess ? <InlineAlert title="Report generated successfully." variant="success" /> : null}
-        {(activeError || generateMutation.error) ? <InlineAlert title={friendlyHrmError(activeError ?? generateMutation.error, "Report data could not be loaded.")} variant="error" /> : null}
+        {activeError ? <InlineAlert title={friendlyHrmError(activeError, "Report data could not be loaded.")} variant="error" /> : null}
         <div className="grid gap-3 rounded-lg border bg-card p-4 md:grid-cols-6">
           <OutletCombobox value={filters.outlet_id} onChange={(value) => updateFilters({ outlet_id: value, employee_id: undefined })} placeholder="All accessible outlets" />
           <EmployeeCombobox value={filters.employee_id} outletId={filters.outlet_id} onChange={(value) => updateFilters({ employee_id: value })} placeholder="All employees" />

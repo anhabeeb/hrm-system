@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { toastError, toastSuccess } from "@/components/feedback/toast-helpers";
+import { useToast } from "@/components/feedback/useToast";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +45,7 @@ export const CompanyInformationPage = () => {
   const [editing, setEditing] = useState(false);
   const [reason, setReason] = useState("");
   const [form, setForm] = useState<Partial<CompanyProfile>>({});
+  const toast = useToast();
   const canEdit = hasAnyPermission(user, ["company.manage", "settings.manage"]);
   const query = useQuery({ queryKey: ["company", "profile"], queryFn: () => settingsApi.companyProfile() });
 
@@ -55,8 +58,10 @@ export const CompanyInformationPage = () => {
     onSuccess: () => {
       setEditing(false);
       setReason("");
+      toastSuccess(toast, "Company information updated successfully.");
       queryClient.invalidateQueries({ queryKey: ["company", "profile"] });
     },
+    onError: (error) => toastError(toast, error, "Company information could not be saved."),
   });
 
   return (
@@ -64,12 +69,6 @@ export const CompanyInformationPage = () => {
       <PageHeader title="Company Information" description="View and update company profile details without re-running first-time setup." />
       <div className="space-y-4 p-4 md:p-6">
         {query.isError ? <InlineAlert title="Company information could not be loaded." variant="error" /> : null}
-        {mutation.isError ? (
-          <InlineAlert title="Company information could not be saved." variant="error">
-            {mutation.error instanceof Error ? mutation.error.message : undefined}
-          </InlineAlert>
-        ) : null}
-        {mutation.isSuccess ? <InlineAlert title="Company information updated successfully." variant="success" /> : null}
         <div className="flex flex-wrap items-start justify-between gap-3 rounded-lg border bg-card p-4">
           <div>
             <h2 className="text-base font-semibold">Company profile</h2>
