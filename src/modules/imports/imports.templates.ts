@@ -36,6 +36,7 @@ export const IMPORT_TEMPLATES: ImportTemplate[] = [
       c("work_permit_number", "Work Permit Number", false, "text", "WP-123", "Work permit number if available.", { sensitive: true }),
       c("emergency_contact_name", "Emergency Contact Name", false, "text", "Ahmed", "Emergency contact name."),
       c("emergency_contact_phone", "Emergency Contact Phone", false, "text", "+9607111111", "Emergency contact phone.", { sensitive: true }),
+      c("emergency_contact_relation", "Emergency Contact Relationship", false, "text", "Parent", "Relationship to emergency contact."),
     ],
   },
   {

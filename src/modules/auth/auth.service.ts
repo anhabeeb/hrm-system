@@ -1247,6 +1247,28 @@ export const createKycRequest = async (
     oldValueJson = JSON.stringify({ email: user.email ?? null });
   }
 
+  if (input.request_type === "emergency_contact_update") {
+    const raw = typeof input.requested_value_json === "object" && input.requested_value_json !== null
+      ? input.requested_value_json as Record<string, unknown>
+      : {};
+    requestedValueJson = {
+      emergency_contact_name:
+        typeof raw.emergency_contact_name === "string" && raw.emergency_contact_name.trim()
+          ? raw.emergency_contact_name.trim()
+          : typeof raw.emergency_contact === "string" && raw.emergency_contact.trim()
+            ? raw.emergency_contact.trim()
+            : undefined,
+      emergency_contact_phone:
+        typeof raw.emergency_contact_phone === "string" && raw.emergency_contact_phone.trim()
+          ? raw.emergency_contact_phone.trim()
+          : undefined,
+      emergency_contact_relation:
+        typeof raw.emergency_contact_relation === "string" && raw.emergency_contact_relation.trim()
+          ? raw.emergency_contact_relation.trim()
+          : undefined,
+    };
+  }
+
   const requestId = createEntityId("user").replace("user_", "kyc_");
 
   await authRepository.createKycRequest(env, {

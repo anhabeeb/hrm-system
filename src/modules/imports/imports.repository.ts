@@ -268,6 +268,7 @@ export const upsertEmployee = (env: Env, input: {
   phone: string | null;
   emergencyContactName: string | null;
   emergencyContactPhone: string | null;
+  emergencyContactRelation: string | null;
   outletId: string | null;
   departmentId: string | null;
   positionId: string | null;
@@ -279,7 +280,7 @@ export const upsertEmployee = (env: Env, input: {
 }) => input.update
   ? execute(env, `UPDATE employees
       SET full_name = ?, employee_type = ?, nationality = ?, id_card_number = ?, passport_number = ?,
-          phone = ?, emergency_contact_name = ?, emergency_contact_phone = ?, primary_outlet_id = ?,
+          phone = ?, emergency_contact_name = ?, emergency_contact_phone = ?, emergency_contact_relation = ?, primary_outlet_id = ?,
           department_id = ?, position_id = ?, employment_status = ?, joined_at = ?, updated_by = ?, updated_at = ?
       WHERE company_id = ? AND employee_code = ?`, [
       input.fullName,
@@ -290,6 +291,7 @@ export const upsertEmployee = (env: Env, input: {
       input.phone,
       input.emergencyContactName,
       input.emergencyContactPhone,
+      input.emergencyContactRelation,
       input.outletId,
       input.departmentId,
       input.positionId,
@@ -302,9 +304,9 @@ export const upsertEmployee = (env: Env, input: {
     ])
   : execute(env, `INSERT INTO employees (
       id, company_id, employee_code, full_name, employee_type, nationality, id_card_number,
-      passport_number, phone, emergency_contact_name, emergency_contact_phone, primary_outlet_id,
+      passport_number, phone, emergency_contact_name, emergency_contact_phone, emergency_contact_relation, primary_outlet_id,
       department_id, position_id, employment_status, joined_at, created_by, updated_by, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
       input.id,
       input.companyId,
       input.employeeCode,
@@ -316,6 +318,7 @@ export const upsertEmployee = (env: Env, input: {
       input.phone,
       input.emergencyContactName,
       input.emergencyContactPhone,
+      input.emergencyContactRelation,
       input.outletId,
       input.departmentId,
       input.positionId,

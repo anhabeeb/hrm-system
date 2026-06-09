@@ -245,6 +245,7 @@ describe("Phase 12A import templates", () => {
     const template = getTemplate("employee_master");
     expect(template?.columns.find((column) => column.key === "full_name")?.required).toBe(true);
     expect(template?.columns.find((column) => column.key === "outlet")?.required).toBe(true);
+    expect(template?.columns.find((column) => column.key === "emergency_contact_relation")?.required).toBe(false);
   });
 
   it("leave balance template has reason field", () => {
@@ -369,6 +370,22 @@ describe("Phase 12A import workflow behavior", () => {
       csv_content: "employee_code,full_name,employee_type,outlet,join_date,national_id\nEMP-001,Aisha Mohamed,local,Male Outlet,2026-06-01,A000001",
     });
     expect(result.errors[0].error_code).toBe("IMPORT_DUPLICATE_RECORD");
+  });
+
+  it("employee master import persists emergency contact relationship", async () => {
+    const env = makeEnv({ employees: { "EMP-002": null } });
+    const created = await importsService.createImportJob(env, actor(), {
+      import_type: "employee_master",
+      mode: "create_only",
+      csv_content: "employee_code,full_name,employee_type,outlet,join_date,national_id,emergency_contact_name,emergency_contact_phone,emergency_contact_relation\nEMP-002,Fathimath,local,Male Outlet,2026-06-01,A000002,Hassan,+9607111111,Guardian",
+    });
+
+    await importsService.applyImportJob(env, actor(), created.job.id);
+
+    const insert = env.__calls.find((call) => call.sql.includes("INSERT INTO employees"));
+    expect(insert?.sql).toContain("emergency_contact_relation");
+    expect(insert?.values).toContain("Guardian");
+    expect(countSqlPlaceholders(insert?.sql)).toBe(insert?.values.length);
   });
 
   it("outlet-scoped user cannot import employee into unauthorized outlet", async () => {

@@ -50,6 +50,7 @@ export interface EmployeeRecord {
   phone: string | null;
   emergency_contact_name: string | null;
   emergency_contact_phone: string | null;
+  emergency_contact_relation: string | null;
   primary_outlet_id: string | null;
   department_id: string | null;
   position_id: string | null;
@@ -93,6 +94,7 @@ export interface EmployeeWriteInput {
   phone?: string | null;
   emergency_contact_name?: string | null;
   emergency_contact_phone?: string | null;
+  emergency_contact_relation?: string | null;
   contract_type?: string | null;
   bank_name?: string | null;
   bank_account_masked?: string | null;

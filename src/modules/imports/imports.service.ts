@@ -422,6 +422,7 @@ const applyRow = async (env: Env, actor: AuthActor, job: ImportJob, row: ImportJ
       phone: data.phone || null,
       emergencyContactName: data.emergency_contact_name || null,
       emergencyContactPhone: data.emergency_contact_phone || null,
+      emergencyContactRelation: data.emergency_contact_relation || null,
       outletId: data.outlet_id || null,
       departmentId: data.department_id || null,
       positionId: data.position_id || null,

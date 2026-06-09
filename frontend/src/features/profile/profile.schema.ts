@@ -21,6 +21,9 @@ export const kycUpdateSchema = z
     confirm_new_email: z.string().trim().optional(),
     address: z.string().trim().optional(),
     emergency_contact: z.string().trim().optional(),
+    emergency_contact_name: z.string().trim().max(120).optional(),
+    emergency_contact_phone: z.string().trim().max(40).optional(),
+    emergency_contact_relation: z.string().trim().max(80).optional(),
     document_note: z.string().trim().optional(),
     reason: z.string().trim().min(1, "Reason is required."),
   })
@@ -47,6 +50,9 @@ export const kycUpdateSchema = z
           value.new_email?.trim() ||
           value.address?.trim() ||
           value.emergency_contact?.trim() ||
+          value.emergency_contact_name?.trim() ||
+          value.emergency_contact_phone?.trim() ||
+          value.emergency_contact_relation?.trim() ||
           value.document_note?.trim(),
       ),
     {

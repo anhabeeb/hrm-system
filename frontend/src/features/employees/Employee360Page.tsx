@@ -24,6 +24,22 @@ const metricRows = (values: Record<string, unknown>) =>
 
 const recordRows = (rows?: Array<Record<string, unknown>> | null) => rows ?? [];
 
+const emergencyContactRows = (employee: {
+  emergency_contact_name?: string | null;
+  emergency_contact_phone?: string | null;
+  emergency_contact_relation?: string | null;
+}) => {
+  if (!employee.emergency_contact_name && !employee.emergency_contact_phone && !employee.emergency_contact_relation) {
+    return [{ metric: "Emergency contact", value: "No emergency contact recorded." }];
+  }
+
+  return metricRows({
+    Name: employee.emergency_contact_name,
+    Phone: employee.emergency_contact_phone,
+    Relationship: employee.emergency_contact_relation,
+  });
+};
+
 const SimpleTable = ({
   title,
   rows,
@@ -127,6 +143,7 @@ export const Employee360Page = () => {
                   "Work permit expiry": employee.work_permit_expiry_date,
                   "Current warnings": Object.values(warnings).reduce((sum, value) => sum + Number(value ?? 0), 0),
                 })} columns={["metric", "value"]} />
+                <SimpleTable title="Emergency Contact" rows={emergencyContactRows(employee)} columns={["metric", "value"]} empty="No emergency contact recorded." />
               </TabsContent>
 
               <TabsContent value="attendance" className="space-y-3">

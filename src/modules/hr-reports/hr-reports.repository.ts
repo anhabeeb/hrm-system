@@ -157,6 +157,7 @@ const employeeMasterSql = (filters: HrReportFilters, context: AuthActor) => {
   const scope = employeeScope(context, filters);
   const sql = `SELECT ${employeeColumns},
       e.phone AS contact_summary,
+      e.emergency_contact_relation,
       CASE
         WHEN e.employee_type = 'foreign' AND (e.passport_number IS NULL OR e.work_permit_number IS NULL) THEN 'missing_required_identity'
         WHEN EXISTS (SELECT 1 FROM expiry_alerts a WHERE a.company_id = e.company_id AND a.employee_id = e.id AND a.status IN ('open', 'acknowledged', 'snoozed') AND a.severity IN ('critical', 'urgent', 'high')) THEN 'risk'

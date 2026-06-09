@@ -81,9 +81,11 @@ describe("Phase 11B HR Reports", () => {
   });
 
   it("Employee Master report returns employee rows and safe metadata", async () => {
-    const { env } = fakeEnv([{ employee_id: "emp_1", employee_code: "EMP-001", employee_name: "Aisha", profile_completeness: "complete" }]);
+    const { env } = fakeEnv([{ employee_id: "emp_1", employee_code: "EMP-001", employee_name: "Aisha", emergency_contact_relation: "Guardian", profile_completeness: "complete" }]);
     const result = await service.runReport(env, actor(), "employee-master", validateHrReportFilters({}));
     expect(result.data[0].employee_code).toBe("EMP-001");
+    expect(result.data[0].emergency_contact_relation).toBe("Guardian");
+    expect(result.meta.columns.map((column) => column.key)).toContain("emergency_contact_relation");
     expect(result.meta.columns.length).toBeGreaterThan(5);
     expect(JSON.stringify(result)).not.toMatch(/password_hash|token_hash|raw_payload|metadata_json|file_key/);
   });

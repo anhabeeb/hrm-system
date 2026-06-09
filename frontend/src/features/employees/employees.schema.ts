@@ -16,6 +16,9 @@ const employeeBaseSchema = z.object({
   work_permit_number: z.string().trim().nullable().optional(),
   work_permit_expiry_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Please enter a valid work permit expiry date.").nullable().optional(),
   phone: z.string().trim().nullable().optional(),
+  emergency_contact_name: z.string().trim().max(120, "Emergency contact name must be 120 characters or fewer.").nullable().optional(),
+  emergency_contact_phone: z.string().trim().max(40, "Emergency contact phone must be 40 characters or fewer.").nullable().optional(),
+  emergency_contact_relation: z.string().trim().max(80, "Emergency contact relationship must be 80 characters or fewer.").nullable().optional(),
   contract_type: z.string().trim().nullable().optional(),
   notes: z.string().trim().nullable().optional(),
 });

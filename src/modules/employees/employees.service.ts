@@ -388,6 +388,7 @@ const normalizeEmployeeInput = <T extends EmployeeWriteInput | EmployeeUpdateInp
   phone: normalizeOptionalText(input.phone),
   emergency_contact_name: normalizeOptionalText(input.emergency_contact_name),
   emergency_contact_phone: normalizeOptionalText(input.emergency_contact_phone),
+  emergency_contact_relation: normalizeOptionalText(input.emergency_contact_relation),
   contract_type: normalizeOptionalText(input.contract_type),
   bank_name: normalizeOptionalText(input.bank_name),
   bank_account_masked: normalizeOptionalText(input.bank_account_masked),
@@ -735,6 +736,10 @@ const mergeEmployee = (
     input.emergency_contact_phone !== undefined
       ? input.emergency_contact_phone
       : existing.emergency_contact_phone,
+  emergency_contact_relation:
+    input.emergency_contact_relation !== undefined
+      ? input.emergency_contact_relation
+      : existing.emergency_contact_relation,
   contract_type:
     input.contract_type !== undefined ? input.contract_type : existing.contract_type,
   bank_name: input.bank_name !== undefined ? input.bank_name : existing.bank_name,

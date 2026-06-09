@@ -24,6 +24,9 @@ const expiryStatus = (date?: string | null) => {
   return displayDate(date);
 };
 
+const hasEmergencyContact = (employee: Employee) =>
+  Boolean(employee.emergency_contact_name || employee.emergency_contact_phone || employee.emergency_contact_relation);
+
 interface EmployeeDetailDrawerProps {
   employee: Employee | null;
   open: boolean;
@@ -133,6 +136,16 @@ export const EmployeeDetailDrawer = ({
           { label: "Phone", value: employee.phone ?? "Not available" },
           { label: "Email", value: employee.email ?? "Not available" },
         ]}
+      />
+      <DetailSection
+        title="Emergency Contact"
+        rows={hasEmergencyContact(employee)
+          ? [
+              { label: "Name", value: employee.emergency_contact_name ?? "Not recorded" },
+              { label: "Phone", value: employee.emergency_contact_phone ?? "Not recorded" },
+              { label: "Relationship", value: employee.emergency_contact_relation ?? "Not recorded" },
+            ]
+          : [{ label: "Emergency contact", value: "No emergency contact recorded." }]}
       />
       <section className="space-y-3">
         <h3 className="text-sm font-semibold">Salary & Compensation</h3>

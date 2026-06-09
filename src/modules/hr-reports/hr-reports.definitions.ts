@@ -29,7 +29,7 @@ export const HR_REPORT_DEFINITIONS: HrReportDefinition[] = [
     required_permission: "hr_reports.employee.view",
     default_filters: { page: 1, page_size: 25 },
     available_filters: ["employee_id", "outlet_id", "department_id", "position_id", "employee_type", "employment_status", "search", "include_archived"],
-    columns: [...employeeBaseColumns, c("nationality", "Nationality", "text"), c("joined_at", "Join Date", "date"), c("document_compliance_status", "Document Compliance", "status"), c("active_contract_status", "Active Contract", "status"), c("expiry_alert_severity", "Expiry Alert", "status"), c("probation_status", "Probation", "status"), c("active_long_leave_status", "Long Leave", "status"), c("profile_completeness", "Profile Completeness", "status")],
+    columns: [...employeeBaseColumns, c("nationality", "Nationality", "text"), c("joined_at", "Join Date", "date"), c("emergency_contact_relation", "Emergency Contact Relationship", "text"), c("document_compliance_status", "Document Compliance", "status"), c("active_contract_status", "Active Contract", "status"), c("expiry_alert_severity", "Expiry Alert", "status"), c("probation_status", "Probation", "status"), c("active_long_leave_status", "Long Leave", "status"), c("profile_completeness", "Profile Completeness", "status")],
     route: "/api/v1/hr-reports/employee-master",
     export_ready: true,
   },

@@ -41,6 +41,7 @@ const employee: EmployeeListRow = {
   phone: null,
   emergency_contact_name: null,
   emergency_contact_phone: null,
+  emergency_contact_relation: null,
   primary_outlet_id: "outlet_1",
   primary_outlet_name: "Main Outlet",
   department_id: null,

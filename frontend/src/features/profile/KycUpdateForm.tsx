@@ -25,6 +25,9 @@ const defaults: KycValues = {
   confirm_new_email: "",
   address: "",
   emergency_contact: "",
+  emergency_contact_name: "",
+  emergency_contact_phone: "",
+  emergency_contact_relation: "",
   document_note: "",
   reason: "",
 };
@@ -34,7 +37,12 @@ const resolveRequestType = (values: KycValues) => {
   if (values.full_name?.trim()) return "name_update";
   if (values.phone?.trim()) return "phone_update";
   if (values.address?.trim()) return "address_update";
-  if (values.emergency_contact?.trim()) return "emergency_contact_update";
+  if (
+    values.emergency_contact?.trim() ||
+    values.emergency_contact_name?.trim() ||
+    values.emergency_contact_phone?.trim() ||
+    values.emergency_contact_relation?.trim()
+  ) return "emergency_contact_update";
   return "document_update";
 };
 
@@ -63,6 +71,9 @@ export const KycUpdateForm = () => {
           phone: values.phone || undefined,
           address: values.address || undefined,
           emergency_contact: values.emergency_contact || undefined,
+          emergency_contact_name: values.emergency_contact_name || values.emergency_contact || undefined,
+          emergency_contact_phone: values.emergency_contact_phone || undefined,
+          emergency_contact_relation: values.emergency_contact_relation || undefined,
           document_note: values.document_note || undefined,
         },
         reason: values.reason,
@@ -135,8 +146,29 @@ export const KycUpdateForm = () => {
           )} />
           <FormField control={form.control} name="emergency_contact" render={({ field }) => (
             <FormItem>
-              <FormLabel>Emergency contact</FormLabel>
+              <FormLabel>Emergency contact (legacy summary)</FormLabel>
               <FormControl><Input {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+          <FormField control={form.control} name="emergency_contact_name" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Emergency contact name</FormLabel>
+              <FormControl><Input {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+          <FormField control={form.control} name="emergency_contact_phone" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Emergency contact phone</FormLabel>
+              <FormControl><Input {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+          <FormField control={form.control} name="emergency_contact_relation" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Emergency contact relationship</FormLabel>
+              <FormControl><Input {...field} placeholder="Parent, spouse, sibling, guardian..." /></FormControl>
               <FormMessage />
             </FormItem>
           )} />

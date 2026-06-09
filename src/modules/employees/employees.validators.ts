@@ -44,6 +44,8 @@ const optionalDate = z
   .optional();
 
 const optionalTrimmed = z.string().trim().nullable().optional();
+const optionalTrimmedMax = (max: number, message: string) =>
+  z.string().trim().max(max, message).nullable().optional();
 
 const reason = z.string().trim().min(3, "A reason is required for this action.");
 
@@ -63,8 +65,9 @@ const employeeBase = z.object({
   work_permit_number: optionalTrimmed,
   work_permit_expiry_date: optionalDate,
   phone: optionalTrimmed,
-  emergency_contact_name: optionalTrimmed,
-  emergency_contact_phone: optionalTrimmed,
+  emergency_contact_name: optionalTrimmedMax(120, "Emergency contact name must be 120 characters or fewer."),
+  emergency_contact_phone: optionalTrimmedMax(40, "Emergency contact phone must be 40 characters or fewer."),
+  emergency_contact_relation: optionalTrimmedMax(80, "Emergency contact relationship must be 80 characters or fewer."),
   contract_type: optionalTrimmed,
   bank_name: optionalTrimmed,
   bank_account_masked: optionalTrimmed,

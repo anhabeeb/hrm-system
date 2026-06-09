@@ -165,6 +165,7 @@ const applyApprovedChange = async (
         await repository.updateEmployeeFields(env, context.companyId, request.employee_id, {
           emergency_contact_name: value.emergency_contact_name,
           emergency_contact_phone: value.emergency_contact_phone,
+          emergency_contact_relation: value.emergency_contact_relation,
         });
       }
       break;

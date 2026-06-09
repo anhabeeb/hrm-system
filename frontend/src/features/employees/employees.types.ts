@@ -28,6 +28,9 @@ export interface Employee {
   work_permit_expiry_date?: string | null;
   phone?: string | null;
   email?: string | null;
+  emergency_contact_name?: string | null;
+  emergency_contact_phone?: string | null;
+  emergency_contact_relation?: string | null;
   primary_outlet_id?: string | null;
   primary_outlet_name?: string | null;
   department_id?: string | null;
@@ -68,6 +71,9 @@ export interface EmployeePayload {
   work_permit_number?: string | null;
   work_permit_expiry_date?: string | null;
   phone?: string | null;
+  emergency_contact_name?: string | null;
+  emergency_contact_phone?: string | null;
+  emergency_contact_relation?: string | null;
   contract_type?: string | null;
   notes?: string | null;
   starting_salary: {

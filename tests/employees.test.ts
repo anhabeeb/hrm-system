@@ -1,5 +1,7 @@
 ﻿import { describe, expect, it } from "vitest";
 
+import { readFileSync } from "node:fs";
+
 import {
   validateEmployeeCreateInput,
   validateEmployeeUpdateInput,
@@ -14,6 +16,8 @@ const startingSalary = {
   effective_from: "2026-05-01",
   reason: "Starting salary",
 };
+
+const source = (path: string) => readFileSync(path, "utf8");
 
 describe("employee validators", () => {
   it("accepts a local employee without creating any user login data", () => {
@@ -77,6 +81,42 @@ describe("employee validators", () => {
     expect(input.starting_salary.effective_from).toBe("2026-05-01");
     expect(input.starting_salary.currency).toBe("MVR");
     expect(input.starting_salary.salary_type).toBe("monthly");
+  });
+
+  it("accepts and trims optional emergency contact relationship fields on create", () => {
+    const input = validateEmployeeCreateInput({
+      full_name: "Ahmed Ali",
+      employee_type: "local",
+      id_card_number: "A123456",
+      primary_outlet_id: "outlet_1",
+      employment_status: "active",
+      joined_at: "2026-05-01",
+      emergency_contact_name: "  Fathimath Ali  ",
+      emergency_contact_phone: "  +9607111111  ",
+      emergency_contact_relation: "  Guardian  ",
+      starting_salary: startingSalary,
+    });
+
+    expect(input.emergency_contact_name).toBe("Fathimath Ali");
+    expect(input.emergency_contact_phone).toBe("+9607111111");
+    expect(input.emergency_contact_relation).toBe("Guardian");
+  });
+
+  it("allows null emergency contact relationship on create and update", () => {
+    const created = validateEmployeeCreateInput({
+      full_name: "Ahmed Ali",
+      employee_type: "local",
+      id_card_number: "A123456",
+      primary_outlet_id: "outlet_1",
+      employment_status: "active",
+      joined_at: "2026-05-01",
+      emergency_contact_relation: null,
+      starting_salary: startingSalary,
+    });
+    const updated = validateEmployeeUpdateInput({ emergency_contact_relation: null });
+
+    expect(created.emergency_contact_relation).toBeNull();
+    expect(updated.emergency_contact_relation).toBeNull();
   });
 
   it("rejects invalid starting salary amount with a field error", () => {
@@ -355,6 +395,41 @@ describe("employee validators", () => {
         primary_outlet_id: "outlet_2",
       }),
     ).toThrow("Employee outlet changes must be made through the outlet assignment action.");
+  });
+});
+
+describe("employee emergency contact wiring", () => {
+  it("migration adds nullable emergency_contact_relation to employees", () => {
+    const migration = source("migrations/0056_employee_emergency_contact_relation.sql");
+    expect(migration).toContain("ALTER TABLE employees ADD COLUMN emergency_contact_relation TEXT");
+  });
+
+  it("repository persists emergency_contact_relation on create and update", () => {
+    const repository = source("src/modules/employees/employees.repository.ts");
+    expect(repository).toContain("emergency_contact_phone, emergency_contact_relation, primary_outlet_id");
+    expect(repository).toContain("emergency_contact_phone = ?, emergency_contact_relation = ?");
+    expect(repository).toContain("input.emergency_contact_relation ?? null");
+  });
+
+  it("EmployeeForm includes a compact Emergency Contact relationship field", () => {
+    const form = source("frontend/src/features/employees/EmployeeForm.tsx");
+    expect(form).toContain("Emergency Contact");
+    expect(form).toContain('name="emergency_contact_relation"');
+    expect(form).toContain("Relationship");
+    expect(form).not.toContain("dark:");
+  });
+
+  it("Employee detail and 360 pages display emergency contact relation and empty state", () => {
+    const drawer = source("frontend/src/features/employees/EmployeeDetailDrawer.tsx");
+    const profile = source("frontend/src/features/employees/Employee360Page.tsx");
+    expect(drawer).toContain("Emergency Contact");
+    expect(drawer).toContain("emergency_contact_relation");
+    expect(drawer).toContain("No emergency contact recorded.");
+    expect(profile).toContain("Emergency Contact");
+    expect(profile).toContain("emergency_contact_relation");
+    expect(profile).toContain("No emergency contact recorded.");
+    expect(drawer).not.toContain("dark:");
+    expect(profile).not.toContain("dark:");
   });
 });
 

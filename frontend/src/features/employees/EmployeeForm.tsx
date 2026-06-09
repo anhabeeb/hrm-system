@@ -19,6 +19,8 @@ import type { ApiError } from "@/lib/api-errors";
 import { employeeCreateSchema, employeeUpdateSchema, type EmployeeFormValues } from "./employees.schema";
 import type { Employee } from "./employees.types";
 
+const emergencyContactRelations = ["Parent", "Spouse", "Sibling", "Child", "Relative", "Friend", "Guardian", "Other"];
+
 const defaults: EmployeeFormValues = {
   employee_code: null,
   full_name: "",
@@ -35,6 +37,9 @@ const defaults: EmployeeFormValues = {
   work_permit_number: null,
   work_permit_expiry_date: null,
   phone: null,
+  emergency_contact_name: null,
+  emergency_contact_phone: null,
+  emergency_contact_relation: null,
   contract_type: null,
   notes: null,
   starting_salary: {
@@ -98,6 +103,9 @@ export const EmployeeForm = ({
       work_permit_number: employee.work_permit_number ?? null,
       work_permit_expiry_date: employee.work_permit_expiry_date ?? null,
       phone: employee.phone ?? null,
+      emergency_contact_name: employee.emergency_contact_name ?? null,
+      emergency_contact_phone: employee.emergency_contact_phone ?? null,
+      emergency_contact_relation: employee.emergency_contact_relation ?? null,
       contract_type: employee.contract_type ?? null,
       notes: null,
       starting_salary: defaults.starting_salary,
@@ -207,6 +215,40 @@ export const EmployeeForm = ({
                 <FormItem><FormLabel>Contract type</FormLabel><FormControl><Input value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value || null)} /></FormControl><FormMessage /></FormItem>
               )} />
             </div>
+            <section className="space-y-3 rounded-lg border bg-muted/20 p-4">
+              <div>
+                <h3 className="text-sm font-semibold">Emergency Contact</h3>
+                <p className="text-xs text-muted-foreground">Optional contact information for urgent employee support.</p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-3">
+                <FormField control={form.control} name="emergency_contact_name" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Emergency Contact Name</FormLabel>
+                    <FormControl><Input value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value || null)} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="emergency_contact_phone" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Emergency Contact Phone</FormLabel>
+                    <FormControl><Input value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value || null)} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="emergency_contact_relation" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Relationship</FormLabel>
+                    <Select value={field.value ?? ""} onValueChange={(value) => field.onChange(value || null)}>
+                      <FormControl><SelectTrigger><SelectValue placeholder="Select relationship" /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        {emergencyContactRelations.map((relation) => <SelectItem key={relation} value={relation}>{relation}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+            </section>
             <FormField control={form.control} name="notes" render={({ field }) => (
               <FormItem><FormLabel>Notes</FormLabel><FormControl><Textarea value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value || null)} /></FormControl><FormMessage /></FormItem>
             )} />
