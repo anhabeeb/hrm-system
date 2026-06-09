@@ -250,6 +250,9 @@ export const getSyncSettings = (
 export interface SessionSecuritySettings {
   session_timeout_minutes: number | null;
   idle_timeout_minutes: number | null;
+  concurrent_session_policy: "block_new_login" | "revoke_old_session";
+  allow_admin_session_override: boolean;
+  session_device_tracking_enabled: boolean;
 }
 
 const positiveMinutesOrNull = (value: unknown): number | null => {
@@ -271,6 +274,12 @@ export const getSessionSecuritySettings = async (
   return {
     session_timeout_minutes: positiveMinutesOrNull(settings.session_timeout_minutes),
     idle_timeout_minutes: positiveMinutesOrNull(settings.idle_timeout_minutes),
+    concurrent_session_policy:
+      settings.concurrent_session_policy === "revoke_old_session"
+        ? "revoke_old_session"
+        : "block_new_login",
+    allow_admin_session_override: settings.allow_admin_session_override === true,
+    session_device_tracking_enabled: settings.session_device_tracking_enabled !== false,
   };
 };
 

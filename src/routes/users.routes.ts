@@ -17,5 +17,8 @@ usersRoutes.post("/:id/enable", requireAnyPermission(["users.enable", "users.edi
 usersRoutes.post("/:id/disable", requireAnyPermission(["users.disable", "users.edit"]), requireReason(), controller.disableUser);
 usersRoutes.post("/:id/reset-password", requireAnyPermission(["users.reset_password", "users.edit"]), requireReason(), controller.resetPassword);
 usersRoutes.post("/:id/roles", requireAnyPermission(["users.edit", "roles.edit"]), requireReason(), controller.assignRoles);
+usersRoutes.get("/:id/sessions", requireAnyPermission(["users.sessions.view", "users.revoke_sessions"]), controller.listUserSessions);
+usersRoutes.post("/:id/sessions/:sessionId/revoke", requireAnyPermission(["users.sessions.revoke", "users.revoke_sessions"]), requireReason(), controller.revokeUserSession);
+usersRoutes.post("/:id/sessions/revoke-all", requireAnyPermission(["users.sessions.revoke_all", "users.revoke_sessions"]), requireReason(), controller.revokeAllUserSessions);
 
 export { usersRoutes };

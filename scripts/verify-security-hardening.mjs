@@ -44,6 +44,8 @@ const frontendAuthApi = read("frontend/src/features/auth/api.ts");
 const frontendNotificationsApi = read("frontend/src/features/notifications/notifications.api.ts");
 const authService = read("src/modules/auth/auth.service.ts");
 const authRepository = read("src/modules/auth/auth.repository.ts");
+const authRoutes = read("src/routes/auth.routes.ts");
+const usersRoutes = read("src/routes/users.routes.ts");
 const settingsService = read("src/services/settings.service.ts");
 const errorLogger = read("src/utils/error-logger.ts");
 const documentsController = read("src/modules/documents/documents.controller.ts");
@@ -56,6 +58,7 @@ const devicesService = read("src/modules/devices/devices.service.ts");
 const notificationsSafety = read("src/modules/notifications/notification-safety.ts");
 const auditLogs = read("src/modules/audit-logs/audit-logs.service.ts");
 const securityTests = exists("tests/security-hardening.test.ts") ? read("tests/security-hardening.test.ts") : "";
+const authTests = exists("tests/auth.test.ts") ? read("tests/auth.test.ts") : "";
 
 assertContains("app", app, "securityHeadersMiddleware", "security headers middleware must be mounted.");
 assertContains("app", app, "unsafeRequestGuardMiddleware", "unsafe request guard middleware must be mounted.");
@@ -129,9 +132,13 @@ assertContains("session tokens", session, /generateSecureToken\(48\)[\s\S]*hashT
 assertContains("session settings", settingsService, "getSessionSecuritySettings", "session timeout settings must have a typed settings loader.");
 assertContains("session settings", settingsService, "session_timeout_minutes", "session_timeout_minutes must be read from security settings.");
 assertContains("session settings", settingsService, "idle_timeout_minutes", "idle_timeout_minutes must be read from security settings.");
+assertContains("session settings", settingsService, "concurrent_session_policy", "concurrent_session_policy must be read from security settings.");
+assertContains("session settings", settingsService, "block_new_login", "block_new_login must be the safe default concurrent session policy.");
 assertContains("session creation", authService, /getSessionSecuritySettings[\s\S]*createSessionToken\(env\.SESSION_SECRET,\s*sessionSettings\)/, "login/session creation must use configured session timeout settings.");
 assertContains("session creation", session, /session_timeout_minutes[\s\S]*SESSION_TTL_DAYS/, "session_timeout_minutes = 0/null must fall back to a safe cookie/session max instead of expiring immediately.");
 assertContains("auth middleware", authMiddleware, /getSessionSecuritySettings[\s\S]*absoluteExpired[\s\S]*idleExpired[\s\S]*sessionExpired/, "auth middleware must enforce absolute and idle session timeout settings.");
+assertContains("auth middleware", authMiddleware, /createAuditLog[\s\S]*session_expired_idle_timeout/, "idle session expiry must be audited safely.");
+assertContains("auth middleware", authMiddleware, /createAuditLog[\s\S]*session_expired_absolute_timeout/, "absolute session expiry must be audited safely.");
 if (authMiddleware.indexOf("if (absoluteExpired || idleExpired)") === -1 || authMiddleware.indexOf("if (absoluteExpired || idleExpired)") > authMiddleware.indexOf("touchSession")) {
   failures.push("src/middleware/auth.middleware.ts: session timeout checks must run before touchSession updates last_seen_at.");
 }
@@ -141,6 +148,15 @@ assertContains("auth middleware", authMiddleware, "x-hrm-user-activity", "auth m
 assertContains("auth login", authService, "LOGIN_ERROR_MESSAGE", "login errors must use generic messaging.");
 assertContains("auth login", authService, "FAILED_LOGIN_LIMIT", "failed login limit must be enforced.");
 assertContains("auth login", authService, "updateFailedLogin", "failed login attempts must be tracked.");
+assertContains("auth login concurrent sessions", authService, "ACTIVE_SESSION_EXISTS", "active concurrent login rejection code must exist.");
+assertContains("auth login concurrent sessions", authService, "enforceConcurrentSessionPolicy", "login must enforce concurrent session policy before session creation.");
+assertContains("auth login concurrent sessions", authService, /listUnrevokedSessionsForUser[\s\S]*isSessionActive[\s\S]*concurrent_session_policy/, "active session check must use stored sessions, timeout logic, and configured policy.");
+assertContains("auth login concurrent sessions", authService, /revoke_old_session[\s\S]*revokeUserSessions/, "revoke_old_session policy must revoke previous active sessions.");
+assertContains("auth login concurrent sessions", authService, /const sessionToken = await createLoginSession\(env,\s*user,\s*request\)/, "login must create sessions only through the concurrent-policy helper.");
+assertContains("auth sessions routes", authRoutes, /\/auth\/sessions[\s\S]*auth\.sessions\.view_own[\s\S]*\/auth\/sessions\/:id\/revoke[\s\S]*auth\.sessions\.revoke_own/, "own session APIs must have explicit permissions.");
+assertContains("user session routes", usersRoutes, /\/:id\/sessions[\s\S]*users\.sessions\.view[\s\S]*\/:id\/sessions\/:sessionId\/revoke[\s\S]*users\.sessions\.revoke[\s\S]*\/:id\/sessions\/revoke-all[\s\S]*users\.sessions\.revoke_all/, "admin session APIs must have explicit user-session permissions.");
+assertContains("session repository", authRepository, /listUnrevokedSessionsForUser[\s\S]*WHERE company_id = \? AND user_id = \? AND revoked_at IS NULL/, "session list queries must be company/user scoped and unrevoked.");
+assertContains("session repository", authRepository, /findSessionById[\s\S]*WHERE company_id = \? AND id = \?/, "session lookup must be company scoped.");
 assertContains("auth password", authService, /verifyPassword\([\s\S]*input\.current_password[\s\S]*revokeUserSessions/, "password change must verify current password and revoke sessions.");
 assertContains("password reset", authService, /hashToken\(token,\s*env\.SESSION_SECRET\)[\s\S]*createPasswordResetToken/, "password reset tokens must be hashed at rest.");
 assertContains("password reset", authRepository, /token_hash[\s\S]*expires_at[\s\S]*used_at[\s\S]*markPasswordResetTokenUsed/, "password reset tokens must be single-use and expiring.");
@@ -196,6 +212,19 @@ for (const phrase of [
   "background auth and notification polling are marked as background requests",
 ]) {
   if (!securityTests.includes(phrase)) failures.push(`tests/security-hardening.test.ts: missing coverage marker "${phrase}".`);
+}
+
+for (const phrase of [
+  "single active session policy",
+  "blocks a second login when concurrent_session_policy is block_new_login",
+  "revokes old active sessions and creates a new one when policy is revoke_old_session",
+  "expired, idle-expired, and revoked sessions do not block a new login",
+  "checks active sessions only after a valid 2FA login challenge",
+  "lets users view and revoke only their own sessions through safe DTOs",
+  "blocks users from revoking another user's session",
+  "allows admin session revocation and revoke-all with safe audit metadata",
+]) {
+  if (!authTests.includes(phrase)) failures.push(`tests/auth.test.ts: missing concurrent-session coverage marker "${phrase}".`);
 }
 
 if (failures.length > 0) {

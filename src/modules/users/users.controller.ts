@@ -1,5 +1,6 @@
 import type { Context } from "hono";
 
+import * as authService from "../auth/auth.service";
 import * as usersService from "./users.service";
 import {
   validateUserCreateInput,
@@ -19,6 +20,16 @@ const actor = (c: Context<AppContext>): AuthActor => {
 };
 
 const body = (c: Context<AppContext>) => c.req.json().catch(() => ({}));
+
+const requestContext = (c: Context<AppContext>) => ({
+  requestId: c.get("requestId"),
+  ipAddress:
+    c.req.header("cf-connecting-ip") ??
+    c.req.header("x-forwarded-for") ??
+    null,
+  userAgent: c.req.header("user-agent") ?? null,
+  deviceId: c.req.header("x-device-id") ?? null,
+});
 
 const id = (c: Context<AppContext>) => {
   const value = c.req.param("id");
@@ -89,6 +100,35 @@ export const assignRoles = async (c: Context<AppContext>) => {
   return ok(
     await usersService.assignRoles(c.env, actor(c), id(c), input.role_ids, input.reason),
     "User roles updated successfully.",
+    { requestId: c.get("requestId") },
+  );
+};
+
+export const listUserSessions = async (c: Context<AppContext>) =>
+  ok(
+    { sessions: await authService.listUserSessionsForAdmin(c.env, actor(c), id(c)) },
+    "User sessions loaded successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const revokeUserSession = async (c: Context<AppContext>) => {
+  const sessionId = c.req.param("sessionId");
+  if (!sessionId) throw new ValidationError("Session is required.");
+  const input = validateUserReasonInput(await body(c));
+
+  return ok(
+    (await authService.revokeUserSessionForAdmin(c.env, actor(c), id(c), sessionId, input.reason, requestContext(c))).response,
+    "User session revoked successfully.",
+    { requestId: c.get("requestId") },
+  );
+};
+
+export const revokeAllUserSessions = async (c: Context<AppContext>) => {
+  const input = validateUserReasonInput(await body(c));
+
+  return ok(
+    (await authService.revokeAllUserSessionsForAdmin(c.env, actor(c), id(c), input.reason, requestContext(c))).response,
+    "User sessions revoked successfully.",
     { requestId: c.get("requestId") },
   );
 };

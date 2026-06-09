@@ -102,6 +102,32 @@ export const authMe = async (c: Context<AppContext>) => {
   });
 };
 
+export const listSessions = async (c: Context<AppContext>) => {
+  const actor = requireActor(c);
+
+  return ok(
+    { sessions: await authService.listOwnSessions(c.env, actor.actorUserId, requireSessionId(c)) },
+    "Active sessions loaded.",
+    { requestId: c.get("requestId") },
+  );
+};
+
+export const revokeSession = async (c: Context<AppContext>) => {
+  const actor = requireActor(c);
+  const sessionId = c.req.param("id");
+  if (!sessionId) throw new AuthError("The requested session could not be found.");
+
+  const result = await authService.revokeOwnSession(
+    c.env,
+    actor.actorUserId,
+    sessionId,
+    requireSessionId(c),
+    requestContext(c),
+  );
+
+  return respondWithCookie(c, result);
+};
+
 export const forgotPassword = async (c: Context<AppContext>) => {
   const input = validateForgotPasswordInput(await readJson(c));
   const result = await authService.forgotPassword(c.env, input, requestContext(c));

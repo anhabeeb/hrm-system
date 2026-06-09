@@ -15,6 +15,9 @@ export const createSessionToken = async (
   settings: SessionSecuritySettings = {
     session_timeout_minutes: null,
     idle_timeout_minutes: null,
+    concurrent_session_policy: "block_new_login",
+    allow_admin_session_override: false,
+    session_device_tracking_enabled: true,
   },
 ): Promise<NewSessionToken> => {
   const token = generateSecureToken(48);

@@ -146,14 +146,18 @@ export const createSession = (
     userAgent: string | null;
     deviceId: string | null;
     expiresAt: string;
+    deviceLabel?: string | null;
+    userAgentSummary?: string | null;
+    ipSummary?: string | null;
   },
 ) =>
   execute(
     env,
     `INSERT INTO sessions (
       id, company_id, user_id, session_token_hash, ip_address, user_agent,
-      device_id, expires_at, revoked_at, created_at, last_seen_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
+      device_id, expires_at, revoked_at, created_at, last_seen_at,
+      device_label, user_agent_summary, ip_summary
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)`,
     [
       session.id,
       session.companyId,
@@ -165,6 +169,9 @@ export const createSession = (
       session.expiresAt,
       new Date().toISOString(),
       new Date().toISOString(),
+      session.deviceLabel ?? null,
+      session.userAgentSummary ?? null,
+      session.ipSummary ?? null,
     ],
   );
 
@@ -184,27 +191,62 @@ export const touchSession = (env: Env, sessionId: string) =>
     sessionId,
   ]);
 
-export const revokeSession = (env: Env, sessionId: string) =>
-  execute(env, "UPDATE sessions SET revoked_at = ? WHERE id = ?", [
+export const revokeSession = (env: Env, sessionId: string, reason = "session_revoked", revokedBy?: string | null) =>
+  execute(env, "UPDATE sessions SET revoked_at = ?, revoked_reason = ?, revoked_by = ? WHERE id = ?", [
     new Date().toISOString(),
+    reason,
+    revokedBy ?? null,
     sessionId,
   ]);
 
-export const revokeUserSessions = (env: Env, userId: string, exceptSessionId?: string) => {
+export const revokeUserSessions = (env: Env, userId: string, exceptSessionId?: string, reason = "user_sessions_revoked", revokedBy?: string | null) => {
   if (exceptSessionId) {
     return execute(
       env,
-      "UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND id <> ? AND revoked_at IS NULL",
-      [new Date().toISOString(), userId, exceptSessionId],
+      "UPDATE sessions SET revoked_at = ?, revoked_reason = ?, revoked_by = ? WHERE user_id = ? AND id <> ? AND revoked_at IS NULL",
+      [new Date().toISOString(), reason, revokedBy ?? null, userId, exceptSessionId],
     );
   }
 
   return execute(
     env,
-    "UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL",
-    [new Date().toISOString(), userId],
+    "UPDATE sessions SET revoked_at = ?, revoked_reason = ?, revoked_by = ? WHERE user_id = ? AND revoked_at IS NULL",
+    [new Date().toISOString(), reason, revokedBy ?? null, userId],
   );
 };
+
+export const listUnrevokedSessionsForUser = (
+  env: Env,
+  companyId: string,
+  userId: string,
+): Promise<SessionRecord[]> =>
+  queryMany<SessionRecord>(
+    env,
+    `SELECT id, company_id, user_id, session_token_hash, ip_address, user_agent,
+            device_id, expires_at, revoked_at, created_at, last_seen_at,
+            device_label, user_agent_summary, ip_summary, revoked_reason, revoked_by
+       FROM sessions
+      WHERE company_id = ? AND user_id = ? AND revoked_at IS NULL
+      ORDER BY last_seen_at DESC, created_at DESC
+      LIMIT 25`,
+    [companyId, userId],
+  );
+
+export const findSessionById = (
+  env: Env,
+  companyId: string,
+  sessionId: string,
+): Promise<SessionRecord | null> =>
+  queryOne<SessionRecord>(
+    env,
+    `SELECT id, company_id, user_id, session_token_hash, ip_address, user_agent,
+            device_id, expires_at, revoked_at, created_at, last_seen_at,
+            device_label, user_agent_summary, ip_summary, revoked_reason, revoked_by
+       FROM sessions
+      WHERE company_id = ? AND id = ?
+      LIMIT 1`,
+    [companyId, sessionId],
+  );
 
 export const countActiveSessions = async (env: Env, userId: string): Promise<number> => {
   const row = await queryOne<{ total: number }>(

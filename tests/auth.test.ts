@@ -4,13 +4,21 @@ import { validateKycUpdateRequestInput } from "../src/modules/auth/auth.validato
 import { PASSWORD_HASH_ALGORITHM, PASSWORD_HASH_VERSION, PBKDF2_MAX_WORKERS_ITERATIONS } from "../src/modules/auth/auth.constants";
 import { hashPassword, passwordNeedsRehash, resolvePasswordHashConfig, verifyPassword } from "../src/services/password.service";
 import { ValidationError } from "../src/utils/errors";
-import type { TwoFactorRecord, UserRecord } from "../src/modules/auth/auth.types";
+import type { SessionRecord, TwoFactorRecord, UserRecord } from "../src/modules/auth/auth.types";
+
+const defaultSessionSettings = () => ({
+  session_timeout_minutes: null as number | null,
+  idle_timeout_minutes: null as number | null,
+  concurrent_session_policy: "block_new_login" as "block_new_login" | "revoke_old_session",
+  allow_admin_session_override: false,
+  session_device_tracking_enabled: true,
+});
 
 const authRepoMock = vi.hoisted(() => {
   const state = {
     users: new Map<string, UserRecord>(),
     twoFactors: new Map<string, TwoFactorRecord>(),
-    sessions: [] as unknown[],
+    sessions: [] as SessionRecord[],
     kycRequests: [] as Array<{
       id: string;
       companyId: string;
@@ -60,10 +68,39 @@ const authRepoMock = vi.hoisted(() => {
         user.password_algo = passwordAlgo;
       }
     }),
-    createSession: vi.fn(async (_env: Env, session: unknown) => {
-      state.sessions.push(session);
+    createSession: vi.fn(async (_env: Env, session: {
+      id: string;
+      companyId: string;
+      userId: string;
+      tokenHash: string;
+      ipAddress: string | null;
+      userAgent: string | null;
+      deviceId: string | null;
+      expiresAt: string;
+      deviceLabel?: string | null;
+      userAgentSummary?: string | null;
+      ipSummary?: string | null;
+    }) => {
+      state.sessions.push({
+        id: session.id,
+        company_id: session.companyId,
+        user_id: session.userId,
+        session_token_hash: session.tokenHash,
+        ip_address: session.ipAddress,
+        user_agent: session.userAgent,
+        device_id: session.deviceId,
+        expires_at: session.expiresAt,
+        revoked_at: null,
+        created_at: new Date().toISOString(),
+        last_seen_at: new Date().toISOString(),
+        device_label: session.deviceLabel ?? null,
+        user_agent_summary: session.userAgentSummary ?? null,
+        ip_summary: session.ipSummary ?? null,
+        revoked_reason: null,
+        revoked_by: null,
+      });
     }),
-    countActiveSessions: vi.fn(async () => state.sessions.length),
+    countActiveSessions: vi.fn(async () => state.sessions.filter((session) => !session.revoked_at).length),
     getTwoFactorByUserId: vi.fn(async (_env: Env, userId: string) =>
       [...state.twoFactors.values()].find((record) => record.user_id === userId && record.method === "totp") ?? null,
     ),
@@ -113,10 +150,32 @@ const authRepoMock = vi.hoisted(() => {
     createPasswordResetToken: vi.fn(),
     findPasswordResetToken: vi.fn(),
     markPasswordResetTokenUsed: vi.fn(),
-    revokeUserSessions: vi.fn(),
+    revokeUserSessions: vi.fn(async (_env: Env, userId: string, exceptSessionId?: string, reason = "user_sessions_revoked", revokedBy?: string | null) => {
+      const revokedAt = new Date().toISOString();
+      for (const session of state.sessions) {
+        if (session.user_id === userId && !session.revoked_at && session.id !== exceptSessionId) {
+          session.revoked_at = revokedAt;
+          session.revoked_reason = reason;
+          session.revoked_by = revokedBy ?? null;
+        }
+      }
+    }),
     findSessionByTokenHash: vi.fn(),
+    listUnrevokedSessionsForUser: vi.fn(async (_env: Env, companyId: string, userId: string) =>
+      state.sessions.filter((session) => session.company_id === companyId && session.user_id === userId && !session.revoked_at),
+    ),
+    findSessionById: vi.fn(async (_env: Env, companyId: string, sessionId: string) =>
+      state.sessions.find((session) => session.company_id === companyId && session.id === sessionId) ?? null,
+    ),
     touchSession: vi.fn(),
-    revokeSession: vi.fn(),
+    revokeSession: vi.fn(async (_env: Env, sessionId: string, reason = "session_revoked", revokedBy?: string | null) => {
+      const session = state.sessions.find((record) => record.id === sessionId);
+      if (session && !session.revoked_at) {
+        session.revoked_at = new Date().toISOString();
+        session.revoked_reason = reason;
+        session.revoked_by = revokedBy ?? null;
+      }
+    }),
     createKycRequest: vi.fn(async (_env: Env, input: {
       id: string;
       companyId: string;
@@ -135,15 +194,23 @@ const authRepoMock = vi.hoisted(() => {
 });
 
 vi.mock("../src/modules/auth/auth.repository", () => authRepoMock);
-vi.mock("../src/services/audit.service", () => ({
+const auditServiceMock = vi.hoisted(() => ({
   createAuditLog: vi.fn(async () => ({ created: true, message: "Audit log recorded." })),
 }));
-vi.mock("../src/services/settings.service", () => ({
-  getSessionSecuritySettings: vi.fn(async () => ({
-    session_timeout_minutes: null,
-    idle_timeout_minutes: null,
-  })),
+
+vi.mock("../src/services/audit.service", () => auditServiceMock);
+const settingsServiceMock = vi.hoisted(() => ({
+  settings: {
+    session_timeout_minutes: null as number | null,
+    idle_timeout_minutes: null as number | null,
+    concurrent_session_policy: "block_new_login" as "block_new_login" | "revoke_old_session",
+    allow_admin_session_override: false,
+    session_device_tracking_enabled: true,
+  },
+  getSessionSecuritySettings: vi.fn(async () => settingsServiceMock.settings),
 }));
+
+vi.mock("../src/services/settings.service", () => settingsServiceMock);
 
 const testRequest = {
   requestId: "req_auth_test",
@@ -181,12 +248,33 @@ const createTestUser = async (): Promise<UserRecord> => ({
   deleted_at: null,
 });
 
+const createSessionRecord = (overrides: Partial<SessionRecord> = {}): SessionRecord => ({
+  id: `sess_${Math.random().toString(36).slice(2, 8)}`,
+  company_id: "company_1",
+  user_id: "user_2fa",
+  session_token_hash: "stored-token-hash",
+  ip_address: "198.51.100.45",
+  user_agent: "Mozilla/5.0 Chrome/120.0 device details",
+  device_id: null,
+  expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+  revoked_at: null,
+  created_at: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+  last_seen_at: new Date(Date.now() - 60 * 1000).toISOString(),
+  device_label: "Chrome on Windows",
+  user_agent_summary: "Chrome on Windows",
+  ip_summary: "198.51.x.x",
+  revoked_reason: null,
+  revoked_by: null,
+  ...overrides,
+});
+
 beforeEach(async () => {
   vi.clearAllMocks();
   authRepoMock.state.users.clear();
   authRepoMock.state.twoFactors.clear();
   authRepoMock.state.sessions.length = 0;
   authRepoMock.state.kycRequests.length = 0;
+  settingsServiceMock.settings = defaultSessionSettings();
   const user = await createTestUser();
   authRepoMock.state.users.set(user.id, user);
 });
@@ -316,6 +404,202 @@ describe("my profile email update requests", () => {
       requested_value_json: { email: "taken@example.com" },
       reason: "Testing",
     }, testRequest)).rejects.toMatchObject({ code: "DUPLICATE_USER_EMAIL" });
+  });
+});
+
+describe("single active session policy", () => {
+  it("first login succeeds and creates a safely summarized session", async () => {
+    const authService = await import("../src/modules/auth/auth.service");
+
+    const result = await authService.login(
+      testEnv,
+      { email: "twofactor@example.com", password: "SecurePass123" },
+      testRequest,
+    );
+
+    expect(result.response.user).toBeTruthy();
+    expect(result.response.user?.email).toBe("twofactor@example.com");
+    expect(result.cookie).toContain("session=");
+    expect(authRepoMock.state.sessions).toHaveLength(1);
+    expect(authRepoMock.state.sessions[0]).toMatchObject({
+      user_id: "user_2fa",
+      device_label: "Browser on Unknown OS",
+      user_agent_summary: "Browser on Unknown OS",
+      ip_summary: "127.0.x.x",
+    });
+  });
+
+  it("blocks a second login when concurrent_session_policy is block_new_login", async () => {
+    const authService = await import("../src/modules/auth/auth.service");
+    authRepoMock.state.sessions.push(createSessionRecord({ id: "sess_existing" }));
+
+    await expect(authService.login(
+      testEnv,
+      { email: "twofactor@example.com", password: "SecurePass123" },
+      testRequest,
+    )).rejects.toMatchObject({
+      code: "ACTIVE_SESSION_EXISTS",
+      statusCode: 409,
+      message: "This user is already signed in on another device. Please logout from that device or ask an administrator to revoke the session.",
+    });
+
+    expect(authRepoMock.createSession).not.toHaveBeenCalled();
+    expect(auditServiceMock.createAuditLog).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      action: "login_blocked_active_session_exists",
+      entityType: "session",
+    }));
+  });
+
+  it("ACTIVE_SESSION_EXISTS does not leak raw device or IP details", async () => {
+    const authService = await import("../src/modules/auth/auth.service");
+    authRepoMock.state.sessions.push(createSessionRecord({
+      ip_address: "203.0.113.99",
+      user_agent: "Sensitive Browser Raw UA token=secret",
+    }));
+
+    let blockedError: unknown;
+    try {
+      await authService.login(
+        testEnv,
+        { email: "twofactor@example.com", password: "SecurePass123" },
+        testRequest,
+      );
+    } catch (error) {
+      blockedError = error;
+    }
+
+    expect(blockedError).toMatchObject({ code: "ACTIVE_SESSION_EXISTS" });
+    const serialized = JSON.stringify(blockedError);
+    expect(serialized).not.toContain("203.0.113.99");
+    expect(serialized).not.toContain("Sensitive Browser Raw UA");
+    expect(serialized).not.toContain("token=secret");
+  });
+
+  it("revokes old active sessions and creates a new one when policy is revoke_old_session", async () => {
+    const authService = await import("../src/modules/auth/auth.service");
+    settingsServiceMock.settings = defaultSessionSettings();
+    settingsServiceMock.settings.concurrent_session_policy = "revoke_old_session";
+    authRepoMock.state.sessions.push(createSessionRecord({ id: "sess_old" }));
+
+    const result = await authService.login(
+      testEnv,
+      { email: "twofactor@example.com", password: "SecurePass123" },
+      testRequest,
+    );
+
+    expect(result.cookie).toContain("session=");
+    expect(authRepoMock.state.sessions.find((session) => session.id === "sess_old")?.revoked_reason).toBe("replaced_by_new_login");
+    expect(authRepoMock.state.sessions.filter((session) => !session.revoked_at)).toHaveLength(1);
+    expect(auditServiceMock.createAuditLog).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      action: "old_sessions_revoked_by_new_login",
+    }));
+  });
+
+  it("expired, idle-expired, and revoked sessions do not block a new login", async () => {
+    const authService = await import("../src/modules/auth/auth.service");
+    settingsServiceMock.settings = defaultSessionSettings();
+    settingsServiceMock.settings.idle_timeout_minutes = 2;
+    authRepoMock.state.sessions.push(
+      createSessionRecord({ id: "sess_expired", expires_at: new Date(Date.now() - 1000).toISOString() }),
+      createSessionRecord({ id: "sess_idle", last_seen_at: new Date(Date.now() - 5 * 60 * 1000).toISOString() }),
+      createSessionRecord({ id: "sess_revoked", revoked_at: new Date().toISOString() }),
+    );
+
+    await authService.login(
+      testEnv,
+      { email: "twofactor@example.com", password: "SecurePass123" },
+      testRequest,
+    );
+
+    expect(authRepoMock.state.sessions.find((session) => session.id === "sess_expired")?.revoked_reason).toBe("expired_before_login");
+    expect(authRepoMock.state.sessions.find((session) => session.id === "sess_idle")?.revoked_reason).toBe("expired_before_login");
+    expect(authRepoMock.createSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("checks active sessions only after a valid 2FA login challenge", async () => {
+    const authService = await import("../src/modules/auth/auth.service");
+    const setup = await authService.setupTwoFactor(testEnv, "user_2fa", testRequest);
+    const setupCode = await authService.generateTotpCodeForSecret(setup.response.manual_setup_key);
+    await authService.verifyTwoFactor(testEnv, "user_2fa", { code: setupCode }, testRequest);
+
+    const challenge = await authService.login(
+      testEnv,
+      { email: "twofactor@example.com", password: "SecurePass123" },
+      testRequest,
+    );
+    expect(challenge.response.two_factor_required).toBe(true);
+    expect(authRepoMock.listUnrevokedSessionsForUser).not.toHaveBeenCalled();
+
+    authRepoMock.state.sessions.push(createSessionRecord({ id: "sess_after_2fa" }));
+    const loginCode = await authService.generateTotpCodeForSecret(setup.response.manual_setup_key);
+
+    await expect(authService.verifyLoginTwoFactorChallenge(
+      testEnv,
+      { challenge_id: challenge.response.challenge_id as string, code: loginCode },
+      testRequest,
+    )).rejects.toMatchObject({ code: "ACTIVE_SESSION_EXISTS" });
+  });
+
+  it("lets users view and revoke only their own sessions through safe DTOs", async () => {
+    const authService = await import("../src/modules/auth/auth.service");
+    authRepoMock.state.sessions.push(createSessionRecord({ id: "sess_current" }));
+
+    const sessions = await authService.listOwnSessions(testEnv, "user_2fa", "sess_current");
+    expect(sessions).toEqual([
+      expect.objectContaining({
+        id: "sess_current",
+        current: true,
+        device_label: "Chrome on Windows",
+        ip_summary: "198.51.x.x",
+      }),
+    ]);
+    expect(JSON.stringify(sessions)).not.toContain("session_token_hash");
+    expect(JSON.stringify(sessions)).not.toContain("203.0.113");
+
+    const result = await authService.revokeOwnSession(testEnv, "user_2fa", "sess_current", "sess_current", testRequest);
+    expect(result.cookie).toContain("Max-Age=0");
+    expect(authRepoMock.state.sessions[0]?.revoked_reason).toBe("user_revoked_own_session");
+  });
+
+  it("blocks users from revoking another user's session", async () => {
+    const authService = await import("../src/modules/auth/auth.service");
+    authRepoMock.state.sessions.push(createSessionRecord({
+      id: "sess_other",
+      user_id: "user_other",
+    }));
+
+    await expect(authService.revokeOwnSession(testEnv, "user_2fa", "sess_other", "sess_current", testRequest))
+      .rejects.toMatchObject({ code: "NOT_FOUND" });
+  });
+
+  it("allows admin session revocation and revoke-all with safe audit metadata", async () => {
+    const authService = await import("../src/modules/auth/auth.service");
+    const actor = {
+      companyId: "company_1",
+      actorUserId: "admin_1",
+      fullName: "Admin",
+      email: "admin@example.test",
+      roles: ["admin"],
+      roleKeys: ["admin"],
+      permissions: ["users.sessions.view", "users.sessions.revoke", "users.sessions.revoke_all"],
+      outletIds: [],
+      isSuperAdmin: false,
+      isAdmin: true,
+      ipAddress: "127.0.0.1",
+      userAgent: "vitest",
+    };
+    authRepoMock.state.sessions.push(createSessionRecord({ id: "sess_admin_1" }), createSessionRecord({ id: "sess_admin_2" }));
+
+    await authService.revokeUserSessionForAdmin(testEnv, actor, "user_2fa", "sess_admin_1", "Security support request.", testRequest);
+    expect(authRepoMock.state.sessions.find((session) => session.id === "sess_admin_1")?.revoked_by).toBe("admin_1");
+
+    await authService.revokeAllUserSessionsForAdmin(testEnv, actor, "user_2fa", "Admin terminated all active sessions.", testRequest);
+    expect(authRepoMock.state.sessions.every((session) => session.revoked_at)).toBe(true);
+    expect(auditServiceMock.createAuditLog).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      action: "admin_revoked_all_sessions",
+      actorId: "admin_1",
+      reason: "Admin terminated all active sessions.",
+    }));
   });
 });
 

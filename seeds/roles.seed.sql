@@ -144,6 +144,8 @@ WHERE permission_key IN (
   'my_profile.manage_own_2fa',
   'my_profile.submit_kyc_update',
   'my_profile.view_activity',
+  'auth.sessions.view_own',
+  'auth.sessions.revoke_own',
   'security.2fa.manage_own',
   'notifications.view',
   'expiry_alerts.view_own'

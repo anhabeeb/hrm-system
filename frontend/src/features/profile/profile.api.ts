@@ -2,6 +2,7 @@ import { api } from "@/lib/api-client";
 
 import type {
   KycRequestRecord,
+  ActiveSession,
   ProfileResponse,
   SecuritySummary,
   TwoFactorSetupResponse,
@@ -11,6 +12,8 @@ import type {
 export const profileApi = {
   me: () => api.get<ProfileResponse>("/me"),
   security: () => api.get<SecuritySummary>("/me/security"),
+  sessions: () => api.get<{ sessions: ActiveSession[] }>("/me/sessions"),
+  revokeSession: (id: string) => api.post<{ revoked: boolean; current_session_revoked?: boolean }>(`/me/sessions/${id}/revoke`, {}),
   twoFactorStatus: () => api.get<SecuritySummary>("/me/2fa/status"),
   changePassword: (input: { current_password: string; new_password: string; confirm_password: string }) =>
     api.post<Record<string, never>>("/me/change-password", input),

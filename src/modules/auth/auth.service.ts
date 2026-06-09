@@ -21,7 +21,9 @@ import type {
   KycUpdateRequestInput,
   LoginInput,
   ResetPasswordInput,
+  SafeSessionRecord,
   SafeUserProfile,
+  SessionRecord,
   TwoFactorDisableInput,
   TwoFactorChallengeVerifyInput,
   TwoFactorRecord,
@@ -35,6 +37,7 @@ import {
   buildSessionCookie,
   createSessionToken,
 } from "../../services/session.service";
+import type { AuthActor } from "../../types/api.types";
 import { AppError, AuthError, LockedRecordError, NotFoundError, ValidationError } from "../../utils/errors";
 import { getSessionSecuritySettings } from "../../services/settings.service";
 import { createEntityId } from "../../utils/ids";
@@ -51,6 +54,8 @@ import {
 
 const base32Alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 const TWO_FACTOR_CHALLENGE_TTL_SECONDS = 5 * 60;
+const ACTIVE_SESSION_EXISTS_MESSAGE =
+  "This user is already signed in on another device. Please logout from that device or ask an administrator to revoke the session.";
 
 const normalizeEmail = (email: string): string => email.trim().toLowerCase();
 
@@ -133,6 +138,7 @@ const audit = async (
     entityType?: string;
     entityId?: string;
     reason?: string;
+    actorId?: string;
   },
 ) => {
   await createAuditLog(env, {
@@ -141,7 +147,7 @@ const audit = async (
     module: "auth",
     entityType: input.entityType ?? "user",
     entityId: input.entityId ?? input.user?.id,
-    actorId: input.user?.id,
+    actorId: input.actorId ?? input.user?.id,
     ipAddress: input.request.ipAddress,
     userAgent: input.request.userAgent,
     reason: input.reason,
@@ -151,6 +157,155 @@ const audit = async (
 
 const addMinutes = (minutes: number): string =>
   new Date(Date.now() + minutes * 60 * 1000).toISOString();
+
+const minutesToMs = (minutes: number) => minutes * 60 * 1000;
+
+const safeUserAgentSummary = (userAgent: string | null): string | null => {
+  if (!userAgent) return null;
+  const browser = /Edg\//.test(userAgent)
+    ? "Edge"
+    : /Chrome\//.test(userAgent)
+      ? "Chrome"
+      : /Firefox\//.test(userAgent)
+        ? "Firefox"
+        : /Safari\//.test(userAgent)
+          ? "Safari"
+          : "Browser";
+  const os = /Windows/i.test(userAgent)
+    ? "Windows"
+    : /Mac OS|Macintosh/i.test(userAgent)
+      ? "macOS"
+      : /Android/i.test(userAgent)
+        ? "Android"
+        : /iPhone|iPad|iOS/i.test(userAgent)
+          ? "iOS"
+          : /Linux/i.test(userAgent)
+            ? "Linux"
+            : "Unknown OS";
+  return `${browser} on ${os}`;
+};
+
+const safeIpSummary = (ipAddress: string | null): string | null => {
+  if (!ipAddress) return null;
+  if (ipAddress.includes(":")) return "IPv6 client";
+  const parts = ipAddress.split(".");
+  return parts.length === 4 ? `${parts[0]}.${parts[1]}.x.x` : "IP client";
+};
+
+const safeDeviceLabel = (request: AuthenticatedRequestContext): string | null =>
+  request.deviceId ? "Registered device" : safeUserAgentSummary(request.userAgent);
+
+const isSessionActive = (
+  session: SessionRecord,
+  settings: Awaited<ReturnType<typeof getSessionSecuritySettings>>,
+  now = Date.now(),
+): boolean => {
+  if (session.revoked_at) return false;
+  const expiresAt = new Date(session.expires_at).getTime();
+  if (!Number.isFinite(expiresAt) || expiresAt <= now) return false;
+  if (settings.session_timeout_minutes) {
+    const createdAt = new Date(session.created_at).getTime();
+    if (Number.isFinite(createdAt) && createdAt + minutesToMs(settings.session_timeout_minutes) <= now) return false;
+  }
+  if (settings.idle_timeout_minutes) {
+    const lastActivity = new Date(session.last_seen_at ?? session.created_at).getTime();
+    if (Number.isFinite(lastActivity) && lastActivity + minutesToMs(settings.idle_timeout_minutes) <= now) return false;
+  }
+  return true;
+};
+
+const safeSession = (session: SessionRecord, currentSessionId?: string | null): SafeSessionRecord => ({
+  id: session.id,
+  current: session.id === currentSessionId,
+  device_label: session.device_label ?? null,
+  user_agent_summary: session.user_agent_summary ?? safeUserAgentSummary(session.user_agent),
+  ip_summary: session.ip_summary ?? safeIpSummary(session.ip_address),
+  created_at: session.created_at,
+  last_seen_at: session.last_seen_at,
+  expires_at: session.expires_at,
+  revoked_at: session.revoked_at,
+});
+
+const revokeInactiveSessions = async (
+  env: Env,
+  sessions: SessionRecord[],
+  settings: Awaited<ReturnType<typeof getSessionSecuritySettings>>,
+  reason: string,
+) => {
+  await Promise.all(
+    sessions
+      .filter((session) => !isSessionActive(session, settings))
+      .map((session) => authRepository.revokeSession(env, session.id, reason).catch(() => undefined)),
+  );
+};
+
+const enforceConcurrentSessionPolicy = async (
+  env: Env,
+  user: UserRecord,
+  request: AuthenticatedRequestContext,
+  settings: Awaited<ReturnType<typeof getSessionSecuritySettings>>,
+) => {
+  const sessions = await authRepository.listUnrevokedSessionsForUser(env, user.company_id, user.id);
+  await revokeInactiveSessions(env, sessions, settings, "expired_before_login");
+  const activeSessions = sessions.filter((session) => isSessionActive(session, settings));
+
+  if (activeSessions.length === 0) return;
+
+  if (settings.concurrent_session_policy === "revoke_old_session") {
+    await authRepository.revokeUserSessions(env, user.id, undefined, "replaced_by_new_login", user.id);
+    await audit(env, {
+      action: "old_sessions_revoked_by_new_login",
+      user,
+      request,
+      entityType: "session",
+      entityId: user.id,
+      reason: "Concurrent session policy replaced old sessions.",
+    });
+    return;
+  }
+
+  await audit(env, {
+    action: "login_blocked_active_session_exists",
+    user,
+    request,
+    entityType: "session",
+    entityId: user.id,
+    reason: "Concurrent session policy blocked new login.",
+  });
+  throw new AppError({
+    code: "ACTIVE_SESSION_EXISTS",
+    title: "Already signed in",
+    message: ACTIVE_SESSION_EXISTS_MESSAGE,
+    statusCode: 409,
+    retryable: false,
+  });
+};
+
+const createLoginSession = async (
+  env: Env,
+  user: UserRecord,
+  request: AuthenticatedRequestContext,
+) => {
+  const sessionSettings = await getSessionSecuritySettings(env, user.company_id);
+  await enforceConcurrentSessionPolicy(env, user, request, sessionSettings);
+  const sessionToken = await createSessionToken(env.SESSION_SECRET, sessionSettings);
+
+  await authRepository.createSession(env, {
+    id: sessionToken.id,
+    companyId: user.company_id,
+    userId: user.id,
+    tokenHash: sessionToken.tokenHash,
+    ipAddress: request.ipAddress,
+    userAgent: request.userAgent,
+    deviceId: request.deviceId,
+    expiresAt: sessionToken.expiresAt,
+    deviceLabel: sessionSettings.session_device_tracking_enabled ? safeDeviceLabel(request) : null,
+    userAgentSummary: sessionSettings.session_device_tracking_enabled ? safeUserAgentSummary(request.userAgent) : null,
+    ipSummary: sessionSettings.session_device_tracking_enabled ? safeIpSummary(request.ipAddress) : null,
+  });
+
+  return sessionToken;
+};
 
 const encodeBase32 = (bytes: Uint8Array): string => {
   let bits = "";
@@ -511,19 +666,7 @@ export const login = async (
   }
 
   await authRepository.resetFailedLogin(env, user.id);
-  const sessionSettings = await getSessionSecuritySettings(env, user.company_id);
-  const sessionToken = await createSessionToken(env.SESSION_SECRET, sessionSettings);
-
-  await authRepository.createSession(env, {
-    id: sessionToken.id,
-    companyId: user.company_id,
-    userId: user.id,
-    tokenHash: sessionToken.tokenHash,
-    ipAddress: request.ipAddress,
-    userAgent: request.userAgent,
-    deviceId: request.deviceId,
-    expiresAt: sessionToken.expiresAt,
-  });
+  const sessionToken = await createLoginSession(env, user, request);
   await audit(env, { action: "login_success", user, request });
 
   return {
@@ -588,19 +731,7 @@ export const verifyLoginTwoFactorChallenge = async (
   }
 
   await authRepository.resetFailedLogin(env, user.id);
-  const sessionSettings = await getSessionSecuritySettings(env, user.company_id);
-  const sessionToken = await createSessionToken(env.SESSION_SECRET, sessionSettings);
-
-  await authRepository.createSession(env, {
-    id: sessionToken.id,
-    companyId: user.company_id,
-    userId: user.id,
-    tokenHash: sessionToken.tokenHash,
-    ipAddress: request.ipAddress,
-    userAgent: request.userAgent,
-    deviceId: request.deviceId,
-    expiresAt: sessionToken.expiresAt,
-  });
+  const sessionToken = await createLoginSession(env, user, request);
   await audit(env, { action: backupValid ? "backup_code_used" : "login_success", user, request });
 
   return {
@@ -667,6 +798,136 @@ export const getSecuritySummary = async (env: Env, userId: string) => {
     backup_codes_remaining: backupCodes.filter((code) => !code.used_at).length,
     active_sessions_count: activeSessionsCount,
     last_login_at: user.last_login_at,
+  };
+};
+
+export const listOwnSessions = async (
+  env: Env,
+  userId: string,
+  currentSessionId?: string | null,
+): Promise<SafeSessionRecord[]> => {
+  const user = await ensureAuthenticated(env, userId);
+  const settings = await getSessionSecuritySettings(env, user.company_id);
+  const sessions = await authRepository.listUnrevokedSessionsForUser(env, user.company_id, user.id);
+  await revokeInactiveSessions(env, sessions, settings, "expired_before_session_list");
+
+  return sessions
+    .filter((session) => isSessionActive(session, settings))
+    .map((session) => safeSession(session, currentSessionId));
+};
+
+export const revokeOwnSession = async (
+  env: Env,
+  userId: string,
+  targetSessionId: string,
+  currentSessionId: string | undefined,
+  request: AuthenticatedRequestContext,
+) => {
+  const user = await ensureAuthenticated(env, userId);
+  const session = await authRepository.findSessionById(env, user.company_id, targetSessionId);
+
+  if (!session || session.user_id !== user.id) {
+    throw new NotFoundError("The requested session could not be found.");
+  }
+
+  await authRepository.revokeSession(env, session.id, "user_revoked_own_session", user.id);
+  await audit(env, {
+    action: "user_revoked_own_session",
+    user,
+    request,
+    entityType: "session",
+    entityId: session.id,
+    reason: "User revoked own active session.",
+  });
+
+  const revokingCurrentSession = session.id === currentSessionId;
+  return {
+    response: { revoked: true, current_session_revoked: revokingCurrentSession },
+    cookie: revokingCurrentSession ? buildClearSessionCookie() : undefined,
+    message: revokingCurrentSession ? "This session has been revoked." : "The session has been revoked.",
+  };
+};
+
+const assertAdminCanAccessUserSessions = async (
+  env: Env,
+  actor: AuthActor,
+  userId: string,
+): Promise<UserRecord> => {
+  const user = await authRepository.findUserById(env, userId);
+  if (!user || user.company_id !== actor.companyId || user.deleted_at) {
+    throw new NotFoundError("The requested user could not be found.");
+  }
+  return user;
+};
+
+export const listUserSessionsForAdmin = async (
+  env: Env,
+  actor: AuthActor,
+  userId: string,
+): Promise<SafeSessionRecord[]> => {
+  const user = await assertAdminCanAccessUserSessions(env, actor, userId);
+  const settings = await getSessionSecuritySettings(env, user.company_id);
+  const sessions = await authRepository.listUnrevokedSessionsForUser(env, user.company_id, user.id);
+  await revokeInactiveSessions(env, sessions, settings, "expired_before_admin_session_list");
+
+  return sessions
+    .filter((session) => isSessionActive(session, settings))
+    .map((session) => safeSession(session));
+};
+
+export const revokeUserSessionForAdmin = async (
+  env: Env,
+  actor: AuthActor,
+  userId: string,
+  targetSessionId: string,
+  reason: string,
+  request: AuthenticatedRequestContext,
+) => {
+  const user = await assertAdminCanAccessUserSessions(env, actor, userId);
+  const session = await authRepository.findSessionById(env, user.company_id, targetSessionId);
+  if (!session || session.user_id !== user.id) {
+    throw new NotFoundError("The requested session could not be found.");
+  }
+
+  await authRepository.revokeSession(env, session.id, "admin_revoked_session", actor.actorUserId);
+  await audit(env, {
+    action: "admin_revoked_session",
+    user,
+    request,
+    entityType: "session",
+    entityId: session.id,
+    actorId: actor.actorUserId,
+    reason,
+  });
+
+  return {
+    response: { revoked: true },
+    message: "The session has been revoked.",
+  };
+};
+
+export const revokeAllUserSessionsForAdmin = async (
+  env: Env,
+  actor: AuthActor,
+  userId: string,
+  reason: string,
+  request: AuthenticatedRequestContext,
+) => {
+  const user = await assertAdminCanAccessUserSessions(env, actor, userId);
+  await authRepository.revokeUserSessions(env, user.id, undefined, "admin_revoked_all_sessions", actor.actorUserId);
+  await audit(env, {
+    action: "admin_revoked_all_sessions",
+    user,
+    request,
+    entityType: "session",
+    entityId: user.id,
+    actorId: actor.actorUserId,
+    reason,
+  });
+
+  return {
+    response: { revoked: true },
+    message: "All active sessions for this user have been revoked.",
   };
 };
 

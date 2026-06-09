@@ -63,6 +63,12 @@ export const settingsPageDefinitions: Record<string, SettingsPageDefinition> = {
         fields: [
           { key: "session_timeout_minutes", label: "Session timeout minutes", type: "number" },
           { key: "idle_timeout_minutes", label: "Idle timeout minutes", type: "number" },
+          { key: "concurrent_session_policy", label: "Concurrent session policy", type: "select", options: [
+            { label: "Block new login", value: "block_new_login" },
+            { label: "Revoke old session", value: "revoke_old_session" },
+          ] },
+          { key: "allow_admin_session_override", label: "Allow admin session override", type: "switch" },
+          { key: "session_device_tracking_enabled", label: "Session device tracking enabled", type: "switch" },
           { key: "remember_me_allowed", label: "Remember-me allowed", type: "switch" },
           { key: "failed_login_limit", label: "Max failed attempts", type: "number" },
           { key: "lock_minutes", label: "Lockout duration minutes", type: "number" },

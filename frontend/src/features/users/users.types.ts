@@ -15,6 +15,18 @@ export interface AdminUser {
   updated_at?: string;
 }
 
+export interface AdminUserSession {
+  id: string;
+  current: boolean;
+  device_label: string | null;
+  user_agent_summary: string | null;
+  ip_summary: string | null;
+  created_at: string;
+  last_seen_at: string | null;
+  expires_at: string;
+  revoked_at: string | null;
+}
+
 export interface UserFilters {
   search?: string;
   role_id?: string;

@@ -18,6 +18,9 @@ const settingsMock = vi.hoisted(() => ({
   settings: {
     session_timeout_minutes: null as number | null,
     idle_timeout_minutes: null as number | null,
+    concurrent_session_policy: "block_new_login" as const,
+    allow_admin_session_override: false,
+    session_device_tracking_enabled: true,
   },
   getSessionSecuritySettings: vi.fn(async () => settingsMock.settings),
 }));
@@ -33,6 +36,9 @@ const permissionMock = vi.hoisted(() => ({
 vi.mock("../src/modules/auth/auth.repository", () => authRepoMock);
 vi.mock("../src/services/settings.service", () => settingsMock);
 vi.mock("../src/services/permission.service", () => permissionMock);
+vi.mock("../src/services/audit.service", () => ({
+  createAuditLog: vi.fn(async () => ({ created: true })),
+}));
 
 const env = {
   SESSION_SECRET: "session-timeout-test-secret",
@@ -43,6 +49,14 @@ const env = {
 const now = Date.parse("2026-06-09T10:00:00.000Z");
 const isoMinutesAgo = (minutes: number) => new Date(now - minutes * 60 * 1000).toISOString();
 const isoMinutesFromNow = (minutes: number) => new Date(now + minutes * 60 * 1000).toISOString();
+const sessionSettings = (overrides: Partial<typeof settingsMock.settings> = {}) => ({
+  session_timeout_minutes: null,
+  idle_timeout_minutes: null,
+  concurrent_session_policy: "block_new_login" as const,
+  allow_admin_session_override: false,
+  session_device_tracking_enabled: true,
+  ...overrides,
+});
 
 const baseUser = (): UserRecord => ({
   id: "user_session",
@@ -110,10 +124,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   authRepoMock.user = baseUser();
   authRepoMock.session = baseSession();
-  settingsMock.settings = {
-    session_timeout_minutes: null,
-    idle_timeout_minutes: null,
-  };
+  settingsMock.settings = sessionSettings();
 });
 
 afterEach(() => {
@@ -122,7 +133,7 @@ afterEach(() => {
 
 describe("settings-driven session timeout enforcement", () => {
   it("idle_timeout_minutes = 2 expires a session whose last_seen_at is older than 2 minutes", async () => {
-    settingsMock.settings = { session_timeout_minutes: null, idle_timeout_minutes: 2 };
+    settingsMock.settings = sessionSettings({ idle_timeout_minutes: 2 });
     authRepoMock.session = baseSession({ last_seen_at: isoMinutesAgo(3) });
 
     const response = await requestProtected();
@@ -131,12 +142,12 @@ describe("settings-driven session timeout enforcement", () => {
     expect(response.status).toBe(401);
     expect(body.error?.code).toBe("SESSION_EXPIRED");
     expect(response.headers.get("set-cookie")).toContain("Max-Age=0");
-    expect(authRepoMock.revokeSession).toHaveBeenCalledWith(env, "sess_1");
+    expect(authRepoMock.revokeSession).toHaveBeenCalledWith(env, "sess_1", "session_expired_idle_timeout");
     expect(authRepoMock.touchSession).not.toHaveBeenCalled();
   });
 
   it("idle_timeout_minutes = 2 does not expire an active session", async () => {
-    settingsMock.settings = { session_timeout_minutes: null, idle_timeout_minutes: 2 };
+    settingsMock.settings = sessionSettings({ idle_timeout_minutes: 2 });
     authRepoMock.session = baseSession({ last_seen_at: isoMinutesAgo(1) });
 
     const response = await requestProtected();
@@ -148,37 +159,36 @@ describe("settings-driven session timeout enforcement", () => {
 
   it("session_timeout_minutes = 0 does not create an immediately expired session token", async () => {
     const token = await createSessionToken("secret", {
-      session_timeout_minutes: null,
-      idle_timeout_minutes: 2,
+      ...sessionSettings({ idle_timeout_minutes: 2 }),
     });
 
     expect(new Date(token.expiresAt).getTime()).toBeGreaterThan(now);
   });
 
   it("session_timeout_minutes = 0 with idle_timeout_minutes = 2 still expires by idle timeout", async () => {
-    settingsMock.settings = { session_timeout_minutes: null, idle_timeout_minutes: 2 };
+    settingsMock.settings = sessionSettings({ idle_timeout_minutes: 2 });
     authRepoMock.session = baseSession({ created_at: isoMinutesAgo(20), last_seen_at: null });
 
     const response = await requestProtected();
 
     expect(response.status).toBe(401);
-    expect(authRepoMock.revokeSession).toHaveBeenCalledWith(env, "sess_1");
+    expect(authRepoMock.revokeSession).toHaveBeenCalledWith(env, "sess_1", "session_expired_idle_timeout");
     expect(authRepoMock.touchSession).not.toHaveBeenCalled();
   });
 
   it("session_timeout_minutes > 0 expires by created_at absolute timeout", async () => {
-    settingsMock.settings = { session_timeout_minutes: 5, idle_timeout_minutes: null };
+    settingsMock.settings = sessionSettings({ session_timeout_minutes: 5 });
     authRepoMock.session = baseSession({ created_at: isoMinutesAgo(6), last_seen_at: isoMinutesAgo(1) });
 
     const response = await requestProtected();
 
     expect(response.status).toBe(401);
-    expect(authRepoMock.revokeSession).toHaveBeenCalledWith(env, "sess_1");
+    expect(authRepoMock.revokeSession).toHaveBeenCalledWith(env, "sess_1", "session_expired_absolute_timeout");
     expect(authRepoMock.touchSession).not.toHaveBeenCalled();
   });
 
   it("background GET requests do not refresh last_seen_at", async () => {
-    settingsMock.settings = { session_timeout_minutes: null, idle_timeout_minutes: 2 };
+    settingsMock.settings = sessionSettings({ idle_timeout_minutes: 2 });
     authRepoMock.session = baseSession({ last_seen_at: isoMinutesAgo(1) });
 
     const response = await requestProtected({ "X-HRM-Background-Request": "1" });
@@ -188,7 +198,7 @@ describe("settings-driven session timeout enforcement", () => {
   });
 
   it("user-activity requests refresh last_seen_at", async () => {
-    settingsMock.settings = { session_timeout_minutes: null, idle_timeout_minutes: 2 };
+    settingsMock.settings = sessionSettings({ idle_timeout_minutes: 2 });
     authRepoMock.session = baseSession({ last_seen_at: isoMinutesAgo(1) });
 
     const response = await requestProtected({ "X-HRM-User-Activity": "1", "X-HRM-Background-Request": "1" });
@@ -198,7 +208,7 @@ describe("settings-driven session timeout enforcement", () => {
   });
 
   it("mutating requests refresh last_seen_at even without the activity header", async () => {
-    settingsMock.settings = { session_timeout_minutes: null, idle_timeout_minutes: 2 };
+    settingsMock.settings = sessionSettings({ idle_timeout_minutes: 2 });
 
     const response = await requestProtected({}, "POST");
 

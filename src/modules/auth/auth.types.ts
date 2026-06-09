@@ -46,6 +46,23 @@ export interface SessionRecord {
   revoked_at: string | null;
   created_at: string;
   last_seen_at: string | null;
+  device_label?: string | null;
+  user_agent_summary?: string | null;
+  ip_summary?: string | null;
+  revoked_reason?: string | null;
+  revoked_by?: string | null;
+}
+
+export interface SafeSessionRecord {
+  id: string;
+  current: boolean;
+  device_label: string | null;
+  user_agent_summary: string | null;
+  ip_summary: string | null;
+  created_at: string;
+  last_seen_at: string | null;
+  expires_at: string;
+  revoked_at: string | null;
 }
 
 export interface PasswordResetTokenRecord {

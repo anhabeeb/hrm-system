@@ -10,6 +10,18 @@ export interface SecuritySummary {
   last_login_at?: string | null;
 }
 
+export interface ActiveSession {
+  id: string;
+  current: boolean;
+  device_label: string | null;
+  user_agent_summary: string | null;
+  ip_summary: string | null;
+  created_at: string;
+  last_seen_at: string | null;
+  expires_at: string;
+  revoked_at: string | null;
+}
+
 export interface TwoFactorSetupResponse {
   otpauth_url: string;
   manual_key: string;
