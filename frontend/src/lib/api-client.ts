@@ -21,6 +21,8 @@ interface RequestOptions {
   headers?: Record<string, string>;
   suppressSessionExpired?: boolean;
   timeoutMs?: number;
+  background?: boolean;
+  userActivity?: boolean;
 }
 
 const DEFAULT_TIMEOUT_MS = 15_000;
@@ -194,6 +196,12 @@ const request = async <T>(
 
   if (body !== undefined) {
     headers.set("Content-Type", "application/json");
+  }
+
+  if (options.background) {
+    headers.set("X-HRM-Background-Request", "1");
+  } else if (options.userActivity !== false) {
+    headers.set("X-HRM-User-Activity", "1");
   }
 
   for (const [key, value] of Object.entries(options.headers ?? {})) {

@@ -209,8 +209,46 @@ describe("Phase 13B security hardening", () => {
     expect(apiClient).not.toContain("getAuthToken");
     expect(apiClient).not.toMatch(/Authorization["']?,\s*`Bearer/);
     expect(apiClient).toContain('credentials: "include"');
+    expect(apiClient).toContain("X-HRM-User-Activity");
+    expect(apiClient).toContain("X-HRM-Background-Request");
     expect(bootstrapApi).toMatch(/Authorization:\s*`Bearer \$\{token\}`/);
     expect(bootstrapApi).not.toMatch(/localStorage|sessionStorage|setAuthToken/);
+  });
+
+  it("settings-driven session timeouts are enforced before touching sessions", () => {
+    const authMiddleware = read("src/middleware/auth.middleware.ts");
+    const authService = read("src/modules/auth/auth.service.ts");
+    const sessionService = read("src/services/session.service.ts");
+    const settingsService = read("src/services/settings.service.ts");
+    const errorMiddleware = read("src/middleware/error.middleware.ts");
+
+    expect(settingsService).toContain("getSessionSecuritySettings");
+    expect(settingsService).toContain("session_timeout_minutes");
+    expect(settingsService).toContain("idle_timeout_minutes");
+    expect(authMiddleware).toMatch(/getSessionSecuritySettings[\s\S]*absoluteExpired[\s\S]*idleExpired[\s\S]*sessionExpired/);
+    expect(authMiddleware).toMatch(/if \(absoluteExpired \|\| idleExpired\)[\s\S]*sessionExpired/);
+    expect(authMiddleware.indexOf("if (absoluteExpired || idleExpired)")).toBeLessThan(authMiddleware.indexOf("touchSession"));
+    expect(authMiddleware).toContain("X-HRM-Background-Request".toLowerCase());
+    expect(authMiddleware).toContain("X-HRM-User-Activity".toLowerCase());
+    expect(authService).toMatch(/getSessionSecuritySettings[\s\S]*createSessionToken\(env\.SESSION_SECRET,\s*sessionSettings\)/);
+    expect(sessionService).toMatch(/session_timeout_minutes[\s\S]*SESSION_TTL_DAYS/);
+    expect(errorMiddleware).toMatch(/SESSION_EXPIRED[\s\S]*Set-Cookie[\s\S]*buildClearSessionCookie/);
+  });
+
+  it("background auth and notification polling are marked as background requests", () => {
+    const authApi = read("frontend/src/features/auth/api.ts");
+    const notificationsApi = read("frontend/src/features/notifications/notifications.api.ts");
+    const notificationBell = read("frontend/src/features/notifications/NotificationBell.tsx");
+    const apiErrors = read("frontend/src/lib/api-errors.ts");
+    const loginPage = read("frontend/src/features/auth/LoginPage.tsx");
+
+    expect(authApi).toMatch(/me:\s*\(\)\s*=>\s*api\.get<MeResult>\("\/auth\/me",\s*\{\s*background:\s*true\s*\}\)/);
+    expect(notificationsApi).toMatch(/unreadCount:[\s\S]*background:\s*true/);
+    expect(notificationsApi).toMatch(/recentUnread:[\s\S]*background:\s*true/);
+    expect(notificationBell).toContain("notificationsApi.recentUnread");
+    expect(apiErrors).toContain("Your session expired due to inactivity. Please sign in again.");
+    expect(apiErrors).toContain("/login?reason=session_expired");
+    expect(loginPage).toContain("reason\") === \"session_expired");
   });
 
   it("error logger redacts sensitive details, messages, causes, and production stacks", () => {

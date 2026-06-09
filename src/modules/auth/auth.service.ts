@@ -36,6 +36,7 @@ import {
   createSessionToken,
 } from "../../services/session.service";
 import { AppError, AuthError, LockedRecordError, NotFoundError, ValidationError } from "../../utils/errors";
+import { getSessionSecuritySettings } from "../../services/settings.service";
 import { createEntityId } from "../../utils/ids";
 import {
   base64ToBytes,
@@ -510,7 +511,8 @@ export const login = async (
   }
 
   await authRepository.resetFailedLogin(env, user.id);
-  const sessionToken = await createSessionToken(env.SESSION_SECRET);
+  const sessionSettings = await getSessionSecuritySettings(env, user.company_id);
+  const sessionToken = await createSessionToken(env.SESSION_SECRET, sessionSettings);
 
   await authRepository.createSession(env, {
     id: sessionToken.id,
@@ -586,7 +588,8 @@ export const verifyLoginTwoFactorChallenge = async (
   }
 
   await authRepository.resetFailedLogin(env, user.id);
-  const sessionToken = await createSessionToken(env.SESSION_SECRET);
+  const sessionSettings = await getSessionSecuritySettings(env, user.company_id);
+  const sessionToken = await createSessionToken(env.SESSION_SECRET, sessionSettings);
 
   await authRepository.createSession(env, {
     id: sessionToken.id,

@@ -77,6 +77,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const onSessionExpired = () => {
       applyUser(null);
       clearAuthToken();
+      setPendingTwoFactorLogin(null);
+      setRequires2FA(false);
     };
 
     window.addEventListener("hrm:session-expired", onSessionExpired);

@@ -7,7 +7,7 @@ export const authApi = {
   verifyLoginTwoFactor: (input: { challenge_id: string; code: string }) =>
     api.post<LoginResult>("/auth/2fa/verify", input, { suppressSessionExpired: true }),
   logout: () => api.post<Record<string, never>>("/auth/logout"),
-  me: () => api.get<MeResult>("/auth/me"),
+  me: () => api.get<MeResult>("/auth/me", { background: true }),
   verifyAuthenticatedTwoFactor: (code: string) => api.post<Record<string, never>>("/me/2fa/confirm", { code }),
   requestPasswordReset: (email: string) => api.post<Record<string, unknown>>("/auth/forgot-password", { email }, { suppressSessionExpired: true }),
   confirmPasswordReset: (input: { token: string; new_password: string; confirm_password: string }) =>

@@ -6,10 +6,11 @@ import { logAppError } from "../utils/error-logger";
 import { appErrorResponse } from "../utils/response";
 import { getCorsHeaders } from "./cors.middleware";
 import { getSecurityHeaders } from "./security.middleware";
+import { buildClearSessionCookie } from "../services/session.service";
 
 export const errorMiddleware = async (error: Error | unknown, c: Context<AppContext>) => {
   const requestId = c.get("requestId");
-  const headers = {
+  const headers: Record<string, string> = {
     ...getCorsHeaders(c.req.header("origin"), c.env),
     ...getSecurityHeaders(c.req.path),
   };
@@ -20,6 +21,10 @@ export const errorMiddleware = async (error: Error | unknown, c: Context<AppCont
   });
 
   await logAppError(c, appError, error);
+
+  if (appError.code === "SESSION_EXPIRED") {
+    headers["Set-Cookie"] = buildClearSessionCookie();
+  }
 
   return appErrorResponse(appError, {
     headers,

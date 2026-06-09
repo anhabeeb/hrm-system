@@ -4,10 +4,32 @@ import { SESSION_COOKIE_NAME, SESSION_EXPIRED_MESSAGE } from "../modules/auth/au
 import * as authRepository from "../modules/auth/auth.repository";
 import { ADMIN_ROLE_KEY, SUPER_ADMIN_ROLE_KEY } from "../modules/permissions/permissions.constants";
 import { getEffectivePermissions } from "../services/permission.service";
+import { getSessionSecuritySettings } from "../services/settings.service";
 import type { AppContext } from "../types/api.types";
 import { AuthError } from "../utils/errors";
 import { hashToken } from "../utils/crypto";
 import { parseCookie } from "../services/session.service";
+
+const minutesToMs = (minutes: number) => minutes * 60 * 1000;
+
+const isExpiredByMinutes = (baseIso: string | null | undefined, minutes: number, now: number) => {
+  if (!baseIso) return false;
+  const base = new Date(baseIso).getTime();
+  return Number.isFinite(base) && base + minutesToMs(minutes) <= now;
+};
+
+const shouldTouchSession = (request: { method: string; header: (name: string) => string | undefined }) => {
+  if (request.header("x-hrm-user-activity") === "1") return true;
+  if (!["GET", "HEAD", "OPTIONS"].includes(request.method.toUpperCase())) return true;
+  return request.header("x-hrm-background-request") !== "1";
+};
+
+const sessionExpired = async (env: Env, sessionId?: string): Promise<never> => {
+  if (sessionId) {
+    await authRepository.revokeSession(env, sessionId).catch(() => undefined);
+  }
+  throw new AuthError(SESSION_EXPIRED_MESSAGE, "SESSION_EXPIRED");
+};
 
 export const authMiddleware = createMiddleware<AppContext>(async (c, next) => {
   const rawToken = parseCookie(c.req.header("cookie") ?? null, SESSION_COOKIE_NAME);
@@ -18,25 +40,39 @@ export const authMiddleware = createMiddleware<AppContext>(async (c, next) => {
 
   const tokenHash = await hashToken(rawToken, c.env.SESSION_SECRET);
   const session = await authRepository.findSessionByTokenHash(c.env, tokenHash);
+  const now = Date.now();
 
-  if (
-    !session ||
-    session.revoked_at ||
-    new Date(session.expires_at).getTime() <= Date.now()
-  ) {
-    throw new AuthError(SESSION_EXPIRED_MESSAGE);
+  if (!session) {
+    return await sessionExpired(c.env);
+  }
+
+  if (session.revoked_at || new Date(session.expires_at).getTime() <= now) {
+    return await sessionExpired(c.env, session.id);
   }
 
   const user = await authRepository.findUserById(c.env, session.user_id);
 
   if (!user || user.status !== "active" || user.deleted_at) {
-    throw new AuthError(SESSION_EXPIRED_MESSAGE);
+    return await sessionExpired(c.env, session.id);
   }
 
-  const [{ roles, permissions, outletIds }] = await Promise.all([
-    getEffectivePermissions(c.env, user.company_id, user.id),
-    authRepository.touchSession(c.env, session.id),
-  ]);
+  const sessionSettings = await getSessionSecuritySettings(c.env, user.company_id);
+  const absoluteExpired =
+    sessionSettings.session_timeout_minutes !== null &&
+    isExpiredByMinutes(session.created_at, sessionSettings.session_timeout_minutes, now);
+  const idleExpired =
+    sessionSettings.idle_timeout_minutes !== null &&
+    isExpiredByMinutes(session.last_seen_at ?? session.created_at, sessionSettings.idle_timeout_minutes, now);
+
+  if (absoluteExpired || idleExpired) {
+    return await sessionExpired(c.env, session.id);
+  }
+
+  const permissionsPromise = getEffectivePermissions(c.env, user.company_id, user.id);
+  const touchPromise = shouldTouchSession(c.req)
+    ? authRepository.touchSession(c.env, session.id)
+    : Promise.resolve();
+  const [{ roles, permissions, outletIds }] = await Promise.all([permissionsPromise, touchPromise]);
   const roleKeys = roles.map((role) => role.role_key);
 
   c.set("authUser", {

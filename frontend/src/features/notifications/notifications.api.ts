@@ -4,7 +4,8 @@ import type { NotificationCount, NotificationFilters, NotificationPreference, No
 
 export const notificationsApi = {
   list: (filters: NotificationFilters = {}) => api.get<NotificationRecord[]>(`/notifications${buildQueryString(filters)}`),
-  unreadCount: () => api.get<NotificationCount>("/notifications/unread-count"),
+  recentUnread: () => api.get<NotificationRecord[]>("/notifications?unread_only=true&page_size=5", { background: true }),
+  unreadCount: () => api.get<NotificationCount>("/notifications/unread-count", { background: true }),
   get: (id: string) => api.get<{ notification: NotificationRecord }>(`/notifications/${id}`),
   markRead: (id: string) => api.post<{ notification: NotificationRecord }>(`/notifications/${id}/read`),
   markUnread: (id: string) => api.post<{ notification: NotificationRecord }>(`/notifications/${id}/unread`),

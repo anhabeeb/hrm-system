@@ -212,6 +212,24 @@ export const toDiagnosticText = (error: ApiError, heading = "HRM App Error") => 
 export const handleSessionExpired = (error: ApiError) => {
   if (error.status === 401) {
     clearAuthToken();
-    window.dispatchEvent(new CustomEvent("hrm:session-expired", { detail: error.message }));
+    const message = error.code === "SESSION_EXPIRED"
+      ? "Your session expired due to inactivity. Please sign in again."
+      : error.message;
+    window.dispatchEvent(new CustomEvent("hrm:session-expired", { detail: message }));
+    if (typeof window !== "undefined") {
+      const location = window.location as {
+        href: string;
+        pathname?: string;
+        assign?: (url: string) => void;
+      };
+      const pathname = location.pathname ?? new URL(location.href).pathname;
+      if (!pathname.startsWith("/login")) {
+        if (location.assign) {
+          location.assign("/login?reason=session_expired");
+        } else {
+          location.href = "/login?reason=session_expired";
+        }
+      }
+    }
   }
 };

@@ -138,6 +138,12 @@ vi.mock("../src/modules/auth/auth.repository", () => authRepoMock);
 vi.mock("../src/services/audit.service", () => ({
   createAuditLog: vi.fn(async () => ({ created: true, message: "Audit log recorded." })),
 }));
+vi.mock("../src/services/settings.service", () => ({
+  getSessionSecuritySettings: vi.fn(async () => ({
+    session_timeout_minutes: null,
+    idle_timeout_minutes: null,
+  })),
+}));
 
 const testRequest = {
   requestId: "req_auth_test",

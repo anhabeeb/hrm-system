@@ -26,7 +26,7 @@ export const NotificationBell = () => {
   });
   const listQuery = useQuery({
     queryKey: ["notifications", "recent-unread"],
-    queryFn: () => notificationsApi.list({ unread_only: true, page_size: 5 }),
+    queryFn: notificationsApi.recentUnread,
     enabled: canView,
     staleTime: 60_000,
   });

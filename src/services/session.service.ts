@@ -1,4 +1,5 @@
 import { SESSION_COOKIE_NAME, SESSION_TTL_DAYS } from "../modules/auth/auth.constants";
+import type { SessionSecuritySettings } from "./settings.service";
 import { createEntityId } from "../utils/ids";
 import { generateSecureToken, hashToken } from "../utils/crypto";
 
@@ -11,11 +12,18 @@ export interface NewSessionToken {
 
 export const createSessionToken = async (
   sessionSecret: string,
+  settings: SessionSecuritySettings = {
+    session_timeout_minutes: null,
+    idle_timeout_minutes: null,
+  },
 ): Promise<NewSessionToken> => {
   const token = generateSecureToken(48);
   const tokenHash = await hashToken(token, sessionSecret);
+  const ttlMs = settings.session_timeout_minutes && settings.session_timeout_minutes > 0
+    ? settings.session_timeout_minutes * 60 * 1000
+    : SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;
   const expiresAt = new Date(
-    Date.now() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000,
+    Date.now() + ttlMs,
   ).toISOString();
 
   return {

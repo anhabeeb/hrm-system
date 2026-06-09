@@ -36,11 +36,15 @@ const packageJson = read("package.json");
 const securityMiddleware = read("src/middleware/security.middleware.ts");
 const cors = read("src/middleware/cors.middleware.ts");
 const session = read("src/services/session.service.ts");
+const authMiddleware = read("src/middleware/auth.middleware.ts");
 const frontendAuthToken = read("frontend/src/lib/auth-token.ts");
 const frontendApiClient = read("frontend/src/lib/api-client.ts");
 const frontendAuthStore = read("frontend/src/features/auth/auth.store.tsx");
+const frontendAuthApi = read("frontend/src/features/auth/api.ts");
+const frontendNotificationsApi = read("frontend/src/features/notifications/notifications.api.ts");
 const authService = read("src/modules/auth/auth.service.ts");
 const authRepository = read("src/modules/auth/auth.repository.ts");
+const settingsService = read("src/services/settings.service.ts");
 const errorLogger = read("src/utils/error-logger.ts");
 const documentsController = read("src/modules/documents/documents.controller.ts");
 const reportExportsController = read("src/modules/report-exports/report-exports.controller.ts");
@@ -81,6 +85,11 @@ if (/setAuthToken|getAuthToken|localStorage|sessionStorage/.test(frontendAuthSto
   failures.push("frontend auth store: AuthProvider must rely on cookie-backed /auth/me and avoid stored auth tokens.");
 }
 assertContains("api client", frontendApiClient, 'credentials: "include"', "API client must keep cookie credentials enabled.");
+assertContains("api client", frontendApiClient, "X-HRM-User-Activity", "foreground API requests must be able to mark real user activity.");
+assertContains("api client", frontendApiClient, "X-HRM-Background-Request", "background API requests must be marked so polling cannot refresh idle sessions.");
+assertContains("auth API", frontendAuthApi, /me:\s*\(\)\s*=>\s*api\.get<MeResult>\("\/auth\/me",\s*\{\s*background:\s*true\s*\}\)/, "/auth/me refresh must be marked as background.");
+assertContains("notifications API", frontendNotificationsApi, /unreadCount:[\s\S]*background:\s*true/, "notification unread-count polling must be marked as background.");
+assertContains("notifications API", frontendNotificationsApi, /recentUnread:[\s\S]*background:\s*true/, "notification recent-unread polling must be marked as background.");
 
 assertContains("error logger", errorLogger, "sanitizeSensitivePayload", "error details must be sanitized before logging/storage.");
 assertContains("error logger", errorLogger, "sanitizeSensitiveText", "error messages and stacks must be text-sanitized.");
@@ -117,6 +126,17 @@ for (const flag of ["HttpOnly", "Secure", "SameSite=Lax", "Path=/"]) {
   assertContains("session cookie", session, flag, `${flag} cookie flag is missing.`);
 }
 assertContains("session tokens", session, /generateSecureToken\(48\)[\s\S]*hashToken\(token,\s*sessionSecret\)/, "session token must be random and hashed before storage.");
+assertContains("session settings", settingsService, "getSessionSecuritySettings", "session timeout settings must have a typed settings loader.");
+assertContains("session settings", settingsService, "session_timeout_minutes", "session_timeout_minutes must be read from security settings.");
+assertContains("session settings", settingsService, "idle_timeout_minutes", "idle_timeout_minutes must be read from security settings.");
+assertContains("session creation", authService, /getSessionSecuritySettings[\s\S]*createSessionToken\(env\.SESSION_SECRET,\s*sessionSettings\)/, "login/session creation must use configured session timeout settings.");
+assertContains("session creation", session, /session_timeout_minutes[\s\S]*SESSION_TTL_DAYS/, "session_timeout_minutes = 0/null must fall back to a safe cookie/session max instead of expiring immediately.");
+assertContains("auth middleware", authMiddleware, /getSessionSecuritySettings[\s\S]*absoluteExpired[\s\S]*idleExpired[\s\S]*sessionExpired/, "auth middleware must enforce absolute and idle session timeout settings.");
+if (authMiddleware.indexOf("if (absoluteExpired || idleExpired)") === -1 || authMiddleware.indexOf("if (absoluteExpired || idleExpired)") > authMiddleware.indexOf("touchSession")) {
+  failures.push("src/middleware/auth.middleware.ts: session timeout checks must run before touchSession updates last_seen_at.");
+}
+assertContains("auth middleware", authMiddleware, "x-hrm-background-request", "auth middleware must avoid refreshing idle sessions for marked background requests.");
+assertContains("auth middleware", authMiddleware, "x-hrm-user-activity", "auth middleware must allow explicit user activity requests to refresh idle sessions.");
 
 assertContains("auth login", authService, "LOGIN_ERROR_MESSAGE", "login errors must use generic messaging.");
 assertContains("auth login", authService, "FAILED_LOGIN_LIMIT", "failed login limit must be enforced.");
@@ -172,6 +192,8 @@ for (const phrase of [
   "API client does not attach Authorization from localStorage",
   "error logger redacts sensitive details, messages, causes, and production stacks",
   "system_error_logs stores sanitized stack values outside production",
+  "settings-driven session timeouts are enforced before touching sessions",
+  "background auth and notification polling are marked as background requests",
 ]) {
   if (!securityTests.includes(phrase)) failures.push(`tests/security-hardening.test.ts: missing coverage marker "${phrase}".`);
 }

@@ -23,6 +23,9 @@ export const LoginPage = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const sessionExpiredMessage = new URLSearchParams(location.search).get("reason") === "session_expired"
+    ? "Your session expired due to inactivity. Please sign in again."
+    : null;
   const [error, setError] = useState<{ message: string; requestId?: string } | null>(null);
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
@@ -53,7 +56,9 @@ export const LoginPage = () => {
       <Form {...form}>
         <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
           <FormError message={error?.message} requestId={error?.requestId} />
-          {(location.state as { message?: string } | null)?.message ? (
+          {sessionExpiredMessage ? (
+            <InlineAlert title={sessionExpiredMessage} variant="warning" />
+          ) : (location.state as { message?: string } | null)?.message ? (
             <InlineAlert title={(location.state as { message: string }).message} variant="warning" />
           ) : null}
           <FormField

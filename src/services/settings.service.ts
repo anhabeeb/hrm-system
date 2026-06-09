@@ -247,4 +247,31 @@ export const getSyncSettings = (
 ): Promise<Record<string, unknown>> =>
   getJsonSetting(env, companyId, "sync.default_rules", {});
 
+export interface SessionSecuritySettings {
+  session_timeout_minutes: number | null;
+  idle_timeout_minutes: number | null;
+}
+
+const positiveMinutesOrNull = (value: unknown): number | null => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+};
+
+export const getSessionSecuritySettings = async (
+  env: Env,
+  companyId: string,
+): Promise<SessionSecuritySettings> => {
+  const settings = await getJsonSetting<Record<string, unknown>>(
+    env,
+    companyId,
+    "security.default_rules",
+    {},
+  ).catch((): Record<string, unknown> => ({}));
+
+  return {
+    session_timeout_minutes: positiveMinutesOrNull(settings.session_timeout_minutes),
+    idle_timeout_minutes: positiveMinutesOrNull(settings.idle_timeout_minutes),
+  };
+};
+
 export type { FeatureSettingRecord };
