@@ -17,7 +17,7 @@ import type { z } from "zod";
 export const TwoFactorPage = () => {
   const navigate = useNavigate();
   const { verifyLoginTwoFactor, hasPendingTwoFactorLogin, clearPendingTwoFactorLogin } = useAuth();
-  const [error, setError] = useState<{ message: string; requestId?: string } | null>(null);
+  const [error, setError] = useState<ApiError | Error | null>(null);
   const form = useForm<z.infer<typeof twoFactorLoginSchema>>({ resolver: zodResolver(twoFactorLoginSchema), defaultValues: { code: "" } });
 
   if (!hasPendingTwoFactorLogin) {
@@ -30,8 +30,30 @@ export const TwoFactorPage = () => {
       await verifyLoginTwoFactor(values.code);
       navigate("/dashboard", { replace: true });
     } catch (err) {
-      if (err instanceof ApiError) setError({ message: "The verification code is invalid or has expired.", requestId: err.requestId });
-      else setError({ message: "The verification code is invalid or has expired." });
+      if (err instanceof ApiError && (err.code === "INVALID_TWO_FACTOR_CODE" || err.code === "TWO_FACTOR_SETUP_EXPIRED")) {
+        setError(new ApiError("The verification code is invalid or has expired.", {
+          code: err.code,
+          title: err.title,
+          status: err.status,
+          requestId: err.requestId,
+          retryable: err.retryable,
+          details: err.details,
+          diagnostics: err.diagnostics,
+        }));
+      } else if (err instanceof ApiError && err.code === "ACTIVE_SESSION_EXISTS") {
+        setError(new ApiError("This account is already signed in on another device. Please logout from that device or contact an administrator.", {
+          code: err.code,
+          title: "Account already signed in",
+          status: err.status,
+          requestId: err.requestId,
+          retryable: false,
+          suggestedAction: "Logout from the other device or ask an administrator to revoke the active session.",
+          details: err.details,
+          diagnostics: err.diagnostics,
+        }));
+      } else {
+        setError(err instanceof Error ? err : new Error("The verification code is invalid or has expired."));
+      }
     }
   };
 
@@ -39,7 +61,7 @@ export const TwoFactorPage = () => {
     <AuthLayout title="Two-factor verification" description="Enter the code from Google Authenticator.">
       <Form {...form}>
         <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
-          <FormError message={error?.message} requestId={error?.requestId} />
+          <FormError error={error instanceof ApiError ? error : null} message={error instanceof ApiError ? undefined : error?.message} />
           <FormField control={form.control} name="code" render={({ field }) => (
             <FormItem>
               <FormLabel>Authenticator code</FormLabel>

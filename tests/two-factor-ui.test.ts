@@ -27,6 +27,7 @@ describe("two-factor frontend integration", () => {
   it("handles login-time two-factor challenges without persisting credentials", () => {
     const storeSource = readFileSync("frontend/src/features/auth/auth.store.tsx", "utf8");
     const apiSource = readFileSync("frontend/src/features/auth/api.ts", "utf8");
+    const pageSource = readFileSync("frontend/src/features/auth/TwoFactorPage.tsx", "utf8");
 
     expect(apiSource).toContain('api.post<LoginResult>("/auth/2fa/verify"');
     expect(storeSource).toContain("TWO_FACTOR_REQUIRED");
@@ -34,5 +35,8 @@ describe("two-factor frontend integration", () => {
     expect(storeSource).toContain("authApi.verifyLoginTwoFactor");
     expect(storeSource).not.toContain("localStorage.setItem(\"pendingTwoFactor");
     expect(storeSource).not.toContain("sessionStorage.setItem(\"pendingTwoFactor");
+    expect(pageSource).toContain('err.code === "ACTIVE_SESSION_EXISTS"');
+    expect(pageSource).toContain("This account is already signed in on another device");
+    expect(pageSource).toContain("<FormError error={error instanceof ApiError ? error : null}");
   });
 });
