@@ -148,14 +148,20 @@ describe("frontend completed-phase hardening coverage", () => {
   it("routes session expiration and inline success feedback through toasts", () => {
     const toastProvider = read("frontend/src/components/feedback/ToastProvider.tsx");
     const inlineAlert = read("frontend/src/components/feedback/InlineAlert.tsx");
+    const appErrorAlert = read("frontend/src/components/feedback/AppErrorAlert.tsx");
     const apiErrors = read("frontend/src/lib/api-errors.ts");
 
     expect(apiErrors).toContain("hrm:session-expired");
     expect(toastProvider).toContain("Session expired");
     expect(toastProvider).toContain("Your session expired. Please sign in again.");
     expect(inlineAlert).toContain('variant === "success"');
+    expect(inlineAlert).toContain('variant === "error"');
     expect(inlineAlert).toContain("toast.success");
+    expect(inlineAlert).toContain("toast.error");
+    expect(inlineAlert).toContain("persistent");
     expect(inlineAlert).toContain("return null");
+    expect(appErrorAlert).toContain("persistent");
+    expect(appErrorAlert).toContain("ErrorDetailsAccordion");
   });
 
   it("keeps background polling from becoming noisy toast feedback", () => {

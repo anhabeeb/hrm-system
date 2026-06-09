@@ -24,22 +24,31 @@ export const InlineAlert = ({
   children,
   variant = "info",
   requestId,
+  persistent = false,
 }: {
   title: string;
   children?: ReactNode;
   variant?: keyof typeof variants;
   requestId?: string;
+  persistent?: boolean;
 }) => {
   const Icon = icons[variant];
   const toast = useOptionalToast();
 
   useEffect(() => {
-    if (variant === "success" && toast) {
-      toast.success(title, typeof children === "string" ? children : undefined);
-    }
-  }, [children, title, toast, variant]);
+    if (!toast || persistent) return;
+    const message = typeof children === "string" ? children : undefined;
+    const id = `inline-alert-${variant}-${requestId ?? title}`;
 
-  if (variant === "success") return null;
+    if (variant === "success") {
+      toast.success(title, message, { id });
+    }
+    if (variant === "error") {
+      toast.error(title, message, { id });
+    }
+  }, [children, persistent, requestId, title, toast, variant]);
+
+  if (!persistent && (variant === "success" || variant === "error")) return null;
 
   return (
     <div className={cn("rounded-lg border p-4 text-sm", variants[variant])}>

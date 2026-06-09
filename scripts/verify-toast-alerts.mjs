@@ -36,8 +36,16 @@ requireContains("AppProviders", "frontend/src/app/providers.tsx", [
 ]);
 requireContains("InlineAlert compatibility", "frontend/src/components/feedback/InlineAlert.tsx", [
   "variant === \"success\"",
+  "variant === \"error\"",
   "toast.success",
+  "toast.error",
+  "persistent",
   "return null",
+]);
+requireContains("Persistent AppErrorAlert", "frontend/src/components/feedback/AppErrorAlert.tsx", [
+  "persistent",
+  "ErrorDetailsAccordion",
+  "CopyDiagnosticsButton",
 ]);
 requireContains("API client background guard", "frontend/src/lib/api-client.ts", [
   "X-HRM-Background-Request",
@@ -51,6 +59,11 @@ for (const file of listSourceFiles(frontendSrc)) {
   }
 }
 
+const inlineAlert = read("frontend/src/components/feedback/InlineAlert.tsx");
+if (!/if \(!persistent && \(variant === "success" \|\| variant === "error"\)\) return null;/.test(inlineAlert)) {
+  failures.push("InlineAlert must render normal success/error feedback as toast-only.");
+}
+
 const tests = read("tests/frontend-ui-hardening.test.ts");
 for (const phrase of [
   "ToastProvider",
@@ -59,6 +72,8 @@ for (const phrase of [
   "hrm:session-expired",
   "window.alert",
   "variant === \"success\"",
+  "variant === \"error\"",
+  "persistent",
 ]) {
   if (!tests.includes(phrase)) failures.push(`Toast test coverage missing ${phrase}`);
 }

@@ -29,7 +29,7 @@ export const AppErrorAlert = ({
   }
 
   return (
-    <InlineAlert title={error.title || fallbackTitle} variant="error" requestId={error.requestId}>
+    <InlineAlert title={error.title || fallbackTitle} variant="error" requestId={error.requestId} persistent>
       <div className="space-y-3">
         <p>{error.message || fallbackMessage}</p>
         {error.suggestedAction ? <p><span className="font-medium">Suggested action:</span> {error.suggestedAction}</p> : null}
