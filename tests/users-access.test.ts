@@ -508,10 +508,16 @@ describe("Users & Access API routes", () => {
     const viteConfig = readFileSync("frontend/vite.config.ts", "utf8");
     const packageJson = readFileSync("frontend/package.json", "utf8");
     const buildScript = readFileSync("frontend/scripts/build.mjs", "utf8");
+    const typecheckScript = readFileSync("frontend/scripts/typecheck.mjs", "utf8");
 
     expect(packageJson).toContain('"build": "node ./scripts/build.mjs"');
-    expect(buildScript).toContain('await run("tsc --noEmit")');
-    expect(buildScript).toContain('await run("vite build")');
+    expect(packageJson).toContain('"typecheck": "node ./scripts/typecheck.mjs"');
+    expect(buildScript).toContain('await run("frontend typecheck"');
+    expect(buildScript).toContain('await run("vite build"');
+    expect(buildScript).toContain("shell: false");
+    expect(typecheckScript).toContain("--noEmit");
+    expect(typecheckScript).toContain("--project");
+    expect(typecheckScript).toContain("shell: false");
     expect(viteConfig).toContain("minify: false");
     expect(viteConfig).toContain("minification pass");
   });
