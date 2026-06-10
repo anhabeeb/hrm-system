@@ -42,6 +42,7 @@
     "verify:dependency-security": "node scripts/verify-dependency-security.mjs",
     "verify:security-hardening": "node scripts/verify-security-hardening.mjs && npm run verify:dependency-security",
     "verify:toast-alerts": "node scripts/verify-toast-alerts.mjs",
+    "verify:employee-login-assignment": "node scripts/verify-employee-login-assignment.mjs",
     "verify:page-layout": "node scripts/verify-page-layout.mjs",
     "verify:no-todo-tests": "node scripts/verify-no-todo-tests.mjs",
     "verify:performance-d1": "node scripts/verify-performance-d1.mjs",

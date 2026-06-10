@@ -11,6 +11,7 @@ import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/features/auth/auth.store";
+import { employeesApi } from "@/features/employees/employees.api";
 import { rolesApi } from "@/features/roles/roles.api";
 import type { Permission } from "@/features/roles/roles.types";
 import { friendlyHrmError } from "@/lib/hrm-errors";
@@ -54,6 +55,11 @@ export const UsersAccessPage = () => {
     queryKey: ["roles"],
     queryFn: () => rolesApi.list(),
     enabled: USER_ACCESS_API_CONNECTED,
+  });
+  const employeesQuery = useQuery({
+    queryKey: ["employees", "user-link-options"],
+    queryFn: () => employeesApi.list({ page_size: 100 }),
+    enabled: USER_ACCESS_API_CONNECTED && auth.hasAnyPermission(["employees.view", "employees.profile.view"]),
   });
   const permissionsQuery = useQuery({
     queryKey: ["permissions"],
@@ -160,7 +166,7 @@ export const UsersAccessPage = () => {
                 onPageSizeChange={(page_size) => setFilterValues({ page: 1, page_size })}
               />
             )}
-            <UserForm open={formOpen} roles={roles} loading={createMutation.isPending} error={createMutation.error ? friendlyHrmError(createMutation.error, "User could not be created.") : null} onOpenChange={setFormOpen} onSubmit={(payload) => createMutation.mutate(payload)} />
+            <UserForm open={formOpen} roles={roles} employees={employeesQuery.data?.data ?? []} loading={createMutation.isPending} error={createMutation.error ? friendlyHrmError(createMutation.error, "User could not be created.") : null} onOpenChange={setFormOpen} onSubmit={(payload) => createMutation.mutate(payload)} />
             <RoleAssignmentDialog user={selected} roles={roles} open={roleDialogOpen} loading={roleMutation.isPending} error={roleMutation.error ? friendlyHrmError(roleMutation.error, "Roles could not be updated.") : null} onOpenChange={setRoleDialogOpen} onSubmit={(roleIds, reason) => roleMutation.mutate({ roleIds, reason })} />
             <UserStatusDialog user={selected} action={statusAction ?? "disable"} open={Boolean(statusAction)} loading={statusMutation.isPending} error={statusMutation.error ? friendlyHrmError(statusMutation.error, "User status could not be updated.") : null} onOpenChange={(open) => !open && setStatusAction(null)} onSubmit={(reason) => statusMutation.mutate(reason)} />
             <ResetPasswordDialog user={selected} open={resetDialogOpen} loading={resetMutation.isPending} error={resetMutation.error ? friendlyHrmError(resetMutation.error, "Password reset could not be required.") : null} onOpenChange={setResetDialogOpen} onSubmit={(reason) => resetMutation.mutate(reason)} />

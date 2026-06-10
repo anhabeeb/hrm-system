@@ -15,6 +15,7 @@ import type {
   EmployeeCompensationComponentEndInput,
   EmployeeCompensationComponentInput,
   EmployeeCreateInput,
+  EmployeeLoginCreateInput,
   EmployeeListFilters,
   EmployeeNoteInput,
   EmployeeStatusInput,
@@ -26,6 +27,7 @@ import type {
   SortDirection,
 } from "./employees.types";
 import { AppError, ValidationError } from "../../utils/errors";
+import { validateNewPassword } from "../../services/password.service";
 
 const parse = <T extends z.ZodTypeAny>(schema: T, payload: unknown): z.infer<T> => {
   const result = schema.safeParse(payload);
@@ -73,6 +75,13 @@ const employeeBase = z.object({
   bank_account_masked: optionalTrimmed,
   notes: optionalTrimmed,
 });
+
+const usernameSchema = z
+  .string()
+  .trim()
+  .min(3, "Username must be at least 3 characters.")
+  .max(80, "Username must be 80 characters or fewer.")
+  .regex(/^[a-zA-Z0-9._-]+$/, "Username may contain letters, numbers, dots, underscores, and hyphens.");
 
 const asRecord = (payload: unknown): Record<string, unknown> =>
   typeof payload === "object" && payload !== null
@@ -250,6 +259,35 @@ export const validateEmployeeCreateInput = (payload: unknown): EmployeeCreateInp
           : "Starting salary",
     },
   } satisfies EmployeeCreateInput;
+};
+
+export const validateEmployeeLoginCreateInput = (payload: unknown): EmployeeLoginCreateInput => {
+  const input = parse(
+    z.object({
+      username: usernameSchema,
+      email: z.string().trim().email("Please enter a valid email address.").transform((value) => value.toLowerCase()).nullable().optional(),
+      temporary_password: z.string().min(1, "Temporary password is required."),
+      role_id: z.string().trim().min(1, "Role is required."),
+      store_ids: z.array(z.string().trim().min(1)).optional(),
+      outlet_ids: z.array(z.string().trim().min(1)).optional(),
+      force_password_change: z.boolean().default(true),
+      require_2fa: z.boolean().default(false),
+      is_active: z.boolean().default(true),
+    }),
+    payload,
+  );
+  const passwordResult = validateNewPassword(input.temporary_password, input.temporary_password);
+  if (!passwordResult.valid) {
+    throw new ValidationError(passwordResult.message, {
+      temporary_password: passwordResult.message ?? "Please choose a stronger password.",
+    });
+  }
+  return {
+    ...input,
+    email: input.email ?? null,
+    store_ids: input.store_ids ?? input.outlet_ids ?? [],
+    outlet_ids: input.outlet_ids ?? input.store_ids ?? [],
+  };
 };
 
 export const validateEmployeeUpdateInput = (payload: unknown): EmployeeUpdateInput => {

@@ -65,6 +65,7 @@ const toSafeUser = (user: UserRecord): SafeUserProfile => ({
   id: user.id,
   company_id: user.company_id,
   employee_id: user.employee_id,
+  username: user.username ?? null,
   full_name: user.full_name,
   email: user.email,
   phone: user.phone,
@@ -569,8 +570,8 @@ export const login = async (
   input: LoginInput,
   request: AuthenticatedRequestContext,
 ) => {
-  const email = normalizeEmail(input.email);
-  const user = await authRepository.findUserByEmail(env, email);
+  const loginIdentifier = normalizeEmail(input.email);
+  const user = await authRepository.findUserByLoginIdentifier(env, loginIdentifier);
 
   if (!user || !isActiveUser(user)) {
     await audit(env, { action: "login_failed", user, request });

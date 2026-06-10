@@ -37,6 +37,17 @@ export const findUserByEmail = (env: Env, email: string): Promise<UserRecord | n
     [email],
   );
 
+export const findUserByLoginIdentifier = (env: Env, identifier: string): Promise<UserRecord | null> =>
+  queryOne<UserRecord>(
+    env,
+    `SELECT *
+       FROM users
+      WHERE lower(COALESCE(email, '')) = lower(?)
+         OR lower(COALESCE(username, '')) = lower(?)
+      LIMIT 1`,
+    [identifier, identifier],
+  );
+
 export const findUserByEmailInCompany = (env: Env, companyId: string, email: string): Promise<UserRecord | null> =>
   queryOne<UserRecord>(
     env,

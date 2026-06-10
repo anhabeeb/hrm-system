@@ -32,7 +32,9 @@ interface EmployeeDetailDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onEdit?: (employee: Employee) => void;
+  onCreateLogin?: (employee: Employee) => void;
   canEdit: boolean;
+  canCreateLogin: boolean;
   canManageJobChange: boolean;
   canViewSalary: boolean;
   canEditSalary: boolean;
@@ -51,7 +53,9 @@ export const EmployeeDetailDrawer = ({
   open,
   onOpenChange,
   onEdit,
+  onCreateLogin,
   canEdit,
+  canCreateLogin,
   canManageJobChange,
   canViewSalary,
   canEditSalary,
@@ -135,6 +139,22 @@ export const EmployeeDetailDrawer = ({
         rows={[
           { label: "Phone", value: employee.phone ?? "Not available" },
           { label: "Email", value: employee.email ?? "Not available" },
+        ]}
+      />
+      <DetailSection
+        title="Login Access"
+        rows={[
+          { label: "Login status", value: employee.has_login ? "Login Assigned" : "No login assigned" },
+          ...(employee.has_login
+            ? [
+                { label: "Username", value: employee.linked_username ?? "Not available" },
+                { label: "Role", value: employee.linked_role_name ?? "Not assigned" },
+                { label: "Account status", value: employee.linked_user_active ? "Active" : "Inactive / disabled" },
+              ]
+            : []),
+          ...(!employee.has_login && canCreateLogin
+            ? [{ label: "Action", value: <Button size="sm" onClick={() => onCreateLogin?.(employee)}>Create Login</Button> }]
+            : []),
         ]}
       />
       <DetailSection

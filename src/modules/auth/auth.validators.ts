@@ -25,6 +25,13 @@ const emailSchema = z
   .trim()
   .email("Please enter a valid email address.");
 
+const loginIdentifierSchema = z
+  .string({
+    required_error: "Email or username is required.",
+  })
+  .trim()
+  .min(1, "Email or username is required.");
+
 const passwordSchema = z.string({
   required_error: "Password is required.",
 });
@@ -49,7 +56,7 @@ const parse = <T>(schema: z.ZodType<T>, payload: unknown): T => {
 export const validateLoginInput = (payload: unknown): LoginInput =>
   parse(
     z.object({
-      email: emailSchema.transform((email) => email.toLowerCase()),
+      email: loginIdentifierSchema.transform((value) => value.toLowerCase()),
       password: passwordSchema,
       totp_code: z.string().trim().optional(),
       backup_code: z.string().trim().optional(),

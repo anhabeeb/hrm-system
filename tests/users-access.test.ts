@@ -412,4 +412,39 @@ describe("Users & Access API routes", () => {
     );
   });
 
+  it("users DTOs include linked employee display fields without exposing secrets", () => {
+    const types = readFileSync("src/modules/users/users.types.ts", "utf8");
+    const repository = readFileSync("src/modules/users/users.repository.ts", "utf8");
+    const service = readFileSync("src/modules/users/users.service.ts", "utf8");
+    const frontendTypes = readFileSync("frontend/src/features/users/users.types.ts", "utf8");
+    const table = readFileSync("frontend/src/features/users/UsersTable.tsx", "utf8");
+    const drawer = readFileSync("frontend/src/features/users/UserDetailDrawer.tsx", "utf8");
+
+    expect(types).toContain("employee_id");
+    expect(types).toContain("username");
+    expect(types).toContain("employee_name");
+    expect(repository).toContain("getUserEmployeeLinks");
+    expect(service).toContain("ensureEmployeeLinkAvailable");
+    expect(frontendTypes).toContain("employee_code");
+    expect(table).toContain("Linked Employee");
+    expect(drawer).toContain("Linked Employee");
+    expect(`${table}\n${drawer}`).not.toContain("password_hash");
+  });
+
+  it("user creation supports optional linked employee while enforcing duplicate employee login", () => {
+    const validators = readFileSync("src/modules/users/users.validators.ts", "utf8");
+    const service = readFileSync("src/modules/users/users.service.ts", "utf8");
+    const repository = readFileSync("src/modules/users/users.repository.ts", "utf8");
+    const migration = readFileSync("migrations/0057_employee_login_assignment.sql", "utf8");
+    const form = readFileSync("frontend/src/features/users/UserForm.tsx", "utf8");
+
+    expect(validators).toContain("employee_id");
+    expect(validators).toContain("username");
+    expect(service).toContain("EMPLOYEE_ALREADY_HAS_LOGIN");
+    expect(repository).toContain("findUserByEmployeeId");
+    expect(migration).toContain("idx_users_company_employee_unique");
+    expect(form).toContain("Linked Employee");
+    expect(form).toContain("SelectItem");
+  });
+
 });

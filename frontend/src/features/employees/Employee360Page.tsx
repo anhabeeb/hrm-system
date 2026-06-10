@@ -140,6 +140,12 @@ export const Employee360Page = () => {
                   "Current warnings": Object.values(warnings).reduce((sum, value) => sum + Number(value ?? 0), 0),
                 })} columns={["metric", "value"]} />
                 <SimpleTable title="Emergency Contact" rows={emergencyContactRows(employee)} columns={["metric", "value"]} empty="No emergency contact recorded." />
+                <SimpleTable title="Login Access" rows={metricRows({
+                  "Login status": employee.has_login ? "Login Assigned" : "No login assigned",
+                  Username: employee.linked_username,
+                  Role: employee.linked_role_name,
+                  "Account status": employee.linked_user_active ? "Active" : employee.has_login ? "Inactive / disabled" : null,
+                })} columns={["metric", "value"]} />
               </TabsContent>
 
               <TabsContent value="attendance" className="space-y-3">

@@ -11,14 +11,16 @@ import { useAuth } from "@/features/auth/auth.store";
 import { departmentsApi } from "@/features/departments/departments.api";
 import { outletsApi } from "@/features/outlets/outlets.api";
 import { positionsApi } from "@/features/positions/positions.api";
+import { rolesApi } from "@/features/roles/roles.api";
 import { ApiError } from "@/lib/api-errors";
 import { searchParamNumber } from "@/lib/query-string";
 import { EmployeeDetailDrawer } from "./EmployeeDetailDrawer";
 import { EmployeeFilters, type EmployeeFilterValues } from "./EmployeeFilters";
 import { EmployeeForm } from "./EmployeeForm";
+import { EmployeeLoginDialog } from "./EmployeeLoginDialog";
 import { EmployeeList } from "./EmployeeList";
 import { employeesApi } from "./employees.api";
-import type { Employee, EmployeeUpdatePayload } from "./employees.types";
+import type { Employee, EmployeeLoginCreatePayload, EmployeeUpdatePayload } from "./employees.types";
 import type { EmployeeFormValues } from "./employees.schema";
 
 const listKey = (filters: Record<string, unknown>) => ["employees", filters];
@@ -32,6 +34,7 @@ export const EmployeesPage = () => {
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
+  const [loginDialogOpen, setLoginDialogOpen] = useState(false);
   const [formMode, setFormMode] = useState<"create" | "edit">("create");
   const [mutationError, setMutationError] = useState<ApiError | null>(null);
   const toast = useToast();
@@ -61,6 +64,7 @@ export const EmployeesPage = () => {
   const outletsQuery = useQuery({ queryKey: ["outlets", "options"], queryFn: () => outletsApi.list({ page_size: 100 }) });
   const departmentsQuery = useQuery({ queryKey: ["departments", "options"], queryFn: () => departmentsApi.list({ page_size: 100 }) });
   const positionsQuery = useQuery({ queryKey: ["positions", "options"], queryFn: () => positionsApi.list({ page_size: 100 }) });
+  const rolesQuery = useQuery({ queryKey: ["roles", "employee-login-options"], queryFn: () => rolesApi.list({ page_size: 100 }) });
 
   const refreshList = async () => {
     await queryClient.invalidateQueries({ queryKey: ["employees"] });
@@ -91,6 +95,22 @@ export const EmployeesPage = () => {
     onError: (error) => {
       setMutationError(error instanceof ApiError ? error : saveError());
       toastError(toast, error, "Employee could not be updated.");
+    },
+  });
+
+  const createLoginMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: EmployeeLoginCreatePayload }) => employeesApi.createLogin(id, payload),
+    onSuccess: async () => {
+      toastSuccess(toast, "Login account created for employee.");
+      setLoginDialogOpen(false);
+      await refreshList();
+      if (selectedEmployee) {
+        const refreshed = await employeesApi.get(selectedEmployee.id);
+        setSelectedEmployee(refreshed.data.employee);
+      }
+    },
+    onError: (error) => {
+      toastError(toast, error, "Login account could not be created.");
     },
   });
 
@@ -131,6 +151,7 @@ export const EmployeesPage = () => {
   const canUploadDocuments = auth.hasPermission("documents.upload") && auth.hasFeature("documents");
   const canEditDocuments = auth.hasPermission("documents.edit") && auth.hasFeature("documents");
   const canViewNotes = auth.hasPermission("employees.view");
+  const canCreateLogin = auth.hasAnyPermission(["employees.login.create", "users.create"]);
 
   return (
     <div>
@@ -175,7 +196,12 @@ export const EmployeesPage = () => {
           open={drawerOpen}
           onOpenChange={setDrawerOpen}
           onEdit={openEdit}
+          onCreateLogin={(employee) => {
+            setSelectedEmployee(employee);
+            setLoginDialogOpen(true);
+          }}
           canEdit={canEdit}
+          canCreateLogin={canCreateLogin}
           canManageJobChange={canManageJobChange}
           canViewSalary={canViewSalary}
           canEditSalary={canEditSalary}
@@ -187,6 +213,18 @@ export const EmployeesPage = () => {
           canManageStatus={canManageStatus}
           canManageOffboarding={canManageOffboarding}
           canManageContracts={canManageContracts}
+        />
+        <EmployeeLoginDialog
+          employee={selectedEmployee}
+          open={loginDialogOpen}
+          roles={rolesQuery.data?.data ?? []}
+          outlets={outletsQuery.data?.data ?? []}
+          loading={createLoginMutation.isPending}
+          onOpenChange={setLoginDialogOpen}
+          onSubmit={(payload) => {
+            if (!selectedEmployee) return;
+            createLoginMutation.mutate({ id: selectedEmployee.id, payload });
+          }}
         />
         <EmployeeForm
           open={formOpen}

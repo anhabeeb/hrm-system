@@ -4,6 +4,7 @@ export interface UserRecord {
   id: string;
   company_id: string;
   employee_id: string | null;
+  username: string | null;
   full_name: string;
   email: string | null;
   phone: string | null;
@@ -24,8 +25,12 @@ export interface UserRecord {
 
 export interface SafeUser {
   id: string;
+  employee_id: string | null;
+  username: string | null;
   full_name: string;
   email: string | null;
+  employee_name?: string | null;
+  employee_code?: string | null;
   status: string;
   roles: string[];
   role_ids: string[];
@@ -47,7 +52,9 @@ export interface UserListFilters {
 
 export interface UserCreateInput {
   full_name: string;
+  username?: string | null;
   email: string;
+  employee_id?: string | null;
   status: string;
   role_ids: string[];
   outlet_ids: string[];
@@ -55,7 +62,9 @@ export interface UserCreateInput {
 
 export interface UserUpdateInput {
   full_name?: string;
+  username?: string | null;
   email?: string;
+  employee_id?: string | null;
   status?: string;
   role_ids?: string[];
   outlet_ids?: string[];

@@ -4,6 +4,7 @@ import * as employeesService from "./employees.service";
 import * as documentsService from "../documents/documents.service";
 import {
   validateEmployeeCreateInput,
+  validateEmployeeLoginCreateInput,
   validateEmployeeListFilters,
   validateEmployeeNoteInput,
   validateEmployeeStatusInput,
@@ -127,6 +128,18 @@ export const getEmployee = async (c: Context<AppContext>) =>
   ok(
     { employee: await employeesService.getEmployee(c.env, actor(c), requiredId(c)) },
     "Employee loaded successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const createEmployeeLogin = async (c: Context<AppContext>) =>
+  created(
+    await employeesService.createEmployeeLogin(
+      c.env,
+      actor(c),
+      requiredId(c),
+      validateEmployeeLoginCreateInput(await readJson(c)),
+    ),
+    "Login account created for employee.",
     { requestId: c.get("requestId") },
   );
 

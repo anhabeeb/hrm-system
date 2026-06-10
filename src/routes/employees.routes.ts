@@ -244,6 +244,14 @@ employeesRoutes.get(
   }),
   employeesController.getEmployeeProfileTimeline,
 );
+employeesRoutes.post(
+  "/:id/login",
+  requireAnyPermissionOrError(["employees.login.create", "users.create"], {
+    code: "EMPLOYEE_LOGIN_PERMISSION_DENIED",
+    message: "You do not have permission to create login access for employees.",
+  }),
+  employeesController.createEmployeeLogin,
+);
 employeesRoutes.get("/:id", requirePermission("employees.view"), employeesController.getEmployee);
 employeesRoutes.patch("/:id", requirePermission("employees.edit"), employeesController.updateEmployee);
 employeesRoutes.post(

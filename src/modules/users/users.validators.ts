@@ -23,6 +23,7 @@ const parse = <T extends z.ZodTypeAny>(schema: T, payload: unknown): z.infer<T> 
 const safeIdArray = z.array(z.string().trim().min(1)).default([]);
 const reason = z.string().trim().min(3, "A reason is required for this action.");
 const email = z.string().trim().email("A valid email is required.").transform((value) => value.toLowerCase());
+const username = z.string().trim().min(3, "Username must be at least 3 characters.").max(80, "Username must be 80 characters or fewer.").regex(/^[a-zA-Z0-9._-]+$/, "Username may contain letters, numbers, dots, underscores, and hyphens.");
 const userStatus = z.enum(["active", "inactive", "disabled", "invite_pending", "password_reset_required"]);
 
 const assertNoSensitiveFields = (payload: unknown) => {
@@ -66,7 +67,9 @@ export const validateUserCreateInput = (payload: unknown): UserCreateInput => {
   return parse(
     z.object({
       full_name: z.string().trim().min(1, "Full name is required."),
+      username: username.nullable().optional(),
       email,
+      employee_id: z.string().trim().min(1).nullable().optional(),
       status: userStatus.default("active"),
       role_ids: safeIdArray,
       outlet_ids: safeIdArray,
@@ -80,7 +83,9 @@ export const validateUserUpdateInput = (payload: unknown): UserUpdateInput => {
   return parse(
     z.object({
       full_name: z.string().trim().min(1, "Full name is required.").optional(),
+      username: username.nullable().optional(),
       email: email.optional(),
+      employee_id: z.string().trim().min(1).nullable().optional(),
       status: userStatus.optional(),
       role_ids: safeIdArray.optional(),
       outlet_ids: safeIdArray.optional(),

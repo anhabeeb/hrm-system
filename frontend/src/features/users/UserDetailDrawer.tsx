@@ -40,8 +40,12 @@ export const UserDetailDrawer = ({ user, open, onOpenChange }: { user: AdminUser
     <DetailDrawer open={open} onOpenChange={onOpenChange} title={userDisplayName(user)} subtitle="Account access overview">
       <DetailSection title="Account" rows={[
         { label: "Name", value: userDisplayName(user) },
+        { label: "Username", value: user.username ?? "Not assigned" },
         { label: "Email", value: user.email ?? "Not available" },
         { label: "Status", value: <StatusBadge status={user.status ?? "neutral"} /> },
+      ]} />
+      <DetailSection title="Linked Employee" rows={[
+        { label: "Employee", value: user.employee_name ? `${user.employee_name} (${user.employee_code ?? user.employee_id ?? "No code"})` : "Not linked" },
       ]} />
       <DetailSection title="Roles" rows={[{ label: "Assigned roles", value: roleList(user.roles) }]} />
       <DetailSection title="Outlet Access" rows={[{ label: "Outlets", value: user.outlet_ids?.length ? user.outlet_ids.join(", ") : "Not assigned" }]} />

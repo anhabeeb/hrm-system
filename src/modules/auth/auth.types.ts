@@ -2,6 +2,7 @@ export interface UserRecord {
   id: string;
   company_id: string;
   employee_id: string | null;
+  username?: string | null;
   full_name: string;
   email: string | null;
   phone: string | null;
@@ -24,6 +25,7 @@ export interface SafeUserProfile {
   id: string;
   company_id: string;
   employee_id: string | null;
+  username: string | null;
   full_name: string;
   email: string | null;
   phone: string | null;

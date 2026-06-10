@@ -74,6 +74,11 @@ const employeeSelect = `SELECT e.*,
   o.name AS primary_outlet_name,
   d.name AS department_name,
   p.title AS position_title,
+  CASE WHEN lu.id IS NULL THEN 0 ELSE 1 END AS has_login,
+  lu.id AS linked_user_id,
+  COALESCE(lu.username, lu.email, lu.full_name) AS linked_username,
+  CASE WHEN lu.status = 'active' THEN 1 ELSE 0 END AS linked_user_active,
+  MIN(lr.role_name) AS linked_role_name,
   CASE
     WHEN MIN(ed.expiry_date) IS NULL THEN NULL
     WHEN MIN(ed.expiry_date) <= date('now', '+30 day') THEN 'expiring_soon'
@@ -83,6 +88,9 @@ FROM employees e
 LEFT JOIN outlets o ON o.id = e.primary_outlet_id
 LEFT JOIN departments d ON d.id = e.department_id
 LEFT JOIN positions p ON p.id = e.position_id
+LEFT JOIN users lu ON lu.company_id = e.company_id AND lu.employee_id = e.id AND lu.deleted_at IS NULL
+LEFT JOIN user_roles lur ON lur.company_id = lu.company_id AND lur.user_id = lu.id
+LEFT JOIN roles lr ON lr.company_id = lur.company_id AND lr.id = lur.role_id AND lr.is_active = 1
 LEFT JOIN employee_documents ed ON ed.employee_id = e.id AND ed.deleted_at IS NULL`;
 
 const buildEmployeeFilters = (

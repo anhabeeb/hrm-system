@@ -19,8 +19,8 @@ const buildWhere = (companyId: string, filters: UserListFilters) => {
   const values: unknown[] = [companyId];
 
   if (filters.search) {
-    clauses.push("(lower(u.full_name) LIKE lower(?) OR lower(COALESCE(u.email, '')) LIKE lower(?))");
-    values.push(`%${filters.search}%`, `%${filters.search}%`);
+    clauses.push("(lower(u.full_name) LIKE lower(?) OR lower(COALESCE(u.email, '')) LIKE lower(?) OR lower(COALESCE(u.username, '')) LIKE lower(?))");
+    values.push(`%${filters.search}%`, `%${filters.search}%`, `%${filters.search}%`);
   }
   if (filters.status) {
     clauses.push("u.status = ?");
@@ -48,7 +48,7 @@ export const listUsers = (env: Env, companyId: string, filters: UserListFilters)
   const built = buildWhere(companyId, filters);
   return many<UserRecord>(
     env,
-    `SELECT u.id, u.company_id, u.employee_id, u.full_name, u.email, u.phone,
+    `SELECT u.id, u.company_id, u.employee_id, u.username, u.full_name, u.email, u.phone,
             u.password_updated_at, u.password_reset_required, u.failed_login_attempts,
             u.locked_until, u.last_password_reset_at, u.two_factor_enabled, u.status,
             u.last_login_at, u.created_at, u.updated_at, u.deleted_at
@@ -63,7 +63,7 @@ export const listUsers = (env: Env, companyId: string, filters: UserListFilters)
 export const findUserById = (env: Env, companyId: string, id: string): Promise<UserRecord | null> =>
   one<UserRecord>(
     env,
-    `SELECT id, company_id, employee_id, full_name, email, phone,
+    `SELECT id, company_id, employee_id, username, full_name, email, phone,
             password_updated_at, password_reset_required, failed_login_attempts,
             locked_until, last_password_reset_at, two_factor_enabled, status,
             last_login_at, created_at, updated_at, deleted_at
@@ -80,18 +80,112 @@ export const findUserByEmail = (env: Env, companyId: string, email: string): Pro
     [companyId, email],
   );
 
-export const createUser = (env: Env, input: { id: string; companyId: string; fullName: string; email: string; status: string }) => {
+export const findUserByUsername = (env: Env, companyId: string, username: string): Promise<UserRecord | null> =>
+  one<UserRecord>(
+    env,
+    "SELECT * FROM users WHERE company_id = ? AND lower(username) = lower(?) AND deleted_at IS NULL LIMIT 1",
+    [companyId, username],
+  );
+
+export const findUserByEmployeeId = (env: Env, companyId: string, employeeId: string): Promise<UserRecord | null> =>
+  one<UserRecord>(
+    env,
+    "SELECT * FROM users WHERE company_id = ? AND employee_id = ? AND deleted_at IS NULL LIMIT 1",
+    [companyId, employeeId],
+  );
+
+export const findEmployeeSummary = (
+  env: Env,
+  companyId: string,
+  employeeId: string,
+): Promise<{ id: string; employee_code: string; full_name: string; primary_outlet_id: string | null; deleted_at: string | null; employment_status: string } | null> =>
+  one(
+    env,
+    `SELECT id, employee_code, full_name, primary_outlet_id, deleted_at, employment_status
+       FROM employees
+      WHERE company_id = ? AND id = ?
+      LIMIT 1`,
+    [companyId, employeeId],
+  );
+
+export const getUserEmployeeLinks = (env: Env, companyId: string, userIds: string[]) => {
+  if (userIds.length === 0) return Promise.resolve([]);
+  const placeholders = userIds.map(() => "?").join(", ");
+  return many<{ user_id: string; employee_id: string; employee_code: string; employee_name: string }>(
+    env,
+    `SELECT u.id AS user_id, e.id AS employee_id, e.employee_code, e.full_name AS employee_name
+       FROM users u
+       JOIN employees e ON e.company_id = u.company_id AND e.id = u.employee_id AND e.deleted_at IS NULL
+      WHERE u.company_id = ? AND u.id IN (${placeholders})`,
+    [companyId, ...userIds],
+  );
+};
+
+export const createUser = (env: Env, input: { id: string; companyId: string; fullName: string; username?: string | null; email: string; employeeId?: string | null; status: string }) => {
   const now = new Date().toISOString();
   return run(
     env,
     `INSERT INTO users (
-      id, company_id, employee_id, full_name, email, phone, password_hash,
+      id, company_id, employee_id, username, full_name, email, phone, password_hash,
       password_algo, password_updated_at, password_reset_required,
       failed_login_attempts, locked_until, last_password_reset_at,
       two_factor_enabled, status, last_login_at, created_at, updated_at, deleted_at
-    ) VALUES (?, ?, NULL, ?, ?, NULL, NULL, 'pbkdf2_sha256', NULL, 1, 0, NULL, NULL, 0, ?, NULL, ?, ?, NULL)`,
-    [input.id, input.companyId, input.fullName, input.email, input.status, now, now],
+    ) VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, 'pbkdf2_sha256', NULL, 1, 0, NULL, NULL, 0, ?, NULL, ?, ?, NULL)`,
+    [input.id, input.companyId, input.employeeId ?? null, input.username ?? null, input.fullName, input.email, input.status, now, now],
   );
+};
+
+export const createEmployeeLoginUser = async (
+  env: Env,
+  input: {
+    id: string;
+    companyId: string;
+    employeeId: string;
+    fullName: string;
+    username: string;
+    email: string | null;
+    passwordHash: string;
+    passwordAlgo: string;
+    forcePasswordChange: boolean;
+    require2fa: boolean;
+    status: string;
+    roleId: string;
+    outletIds: string[];
+  },
+) => {
+  const now = new Date().toISOString();
+  const statements = [
+    env.DB.prepare(
+      `INSERT INTO users (
+        id, company_id, employee_id, username, full_name, email, phone, password_hash,
+        password_algo, password_updated_at, password_reset_required,
+        failed_login_attempts, locked_until, last_password_reset_at,
+        two_factor_enabled, status, last_login_at, created_at, updated_at, deleted_at
+      ) VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, 0, NULL, NULL, ?, ?, NULL, ?, ?, NULL)`,
+    ).bind(
+      input.id,
+      input.companyId,
+      input.employeeId,
+      input.username,
+      input.fullName,
+      input.email,
+      input.passwordHash,
+      input.passwordAlgo,
+      now,
+      input.forcePasswordChange ? 1 : 0,
+      0,
+      input.status,
+      now,
+      now,
+    ),
+    env.DB.prepare("INSERT INTO user_roles (id, company_id, user_id, role_id, created_at) VALUES (?, ?, ?, ?, ?)")
+      .bind(crypto.randomUUID(), input.companyId, input.id, input.roleId, now),
+    ...input.outletIds.map((outletId) =>
+      env.DB.prepare("INSERT INTO user_outlets (id, company_id, user_id, outlet_id, access_level, starts_at, ends_at, created_at) VALUES (?, ?, ?, ?, 'view_only', NULL, NULL, ?)")
+        .bind(crypto.randomUUID(), input.companyId, input.id, outletId, now),
+    ),
+  ];
+  await env.DB.batch(statements);
 };
 
 export const updateUser = (
@@ -104,6 +198,18 @@ export const updateUser = (
     env,
     "UPDATE users SET full_name = ?, email = ?, status = ?, updated_at = ? WHERE company_id = ? AND id = ?",
     [input.full_name, input.email, input.status, new Date().toISOString(), companyId, id],
+  );
+
+export const updateUserIdentity = (
+  env: Env,
+  companyId: string,
+  id: string,
+  input: { full_name: string; username: string | null; email: string | null; employee_id: string | null; status: string },
+) =>
+  run(
+    env,
+    "UPDATE users SET full_name = ?, username = ?, email = ?, employee_id = ?, status = ?, updated_at = ? WHERE company_id = ? AND id = ?",
+    [input.full_name, input.username, input.email, input.employee_id, input.status, new Date().toISOString(), companyId, id],
   );
 
 export const setPasswordResetRequired = (env: Env, companyId: string, id: string) =>

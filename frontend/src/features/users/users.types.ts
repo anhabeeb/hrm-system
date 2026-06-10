@@ -2,9 +2,13 @@ import type { Pagination } from "@/types/api";
 
 export interface AdminUser {
   id: string;
+  employee_id?: string | null;
+  username?: string | null;
   full_name?: string | null;
   name?: string | null;
   email?: string | null;
+  employee_name?: string | null;
+  employee_code?: string | null;
   status?: string | null;
   roles?: string[];
   role_ids?: string[];
@@ -38,7 +42,9 @@ export interface UserFilters {
 
 export interface UserPayload {
   full_name: string;
+  username?: string | null;
   email: string;
+  employee_id?: string | null;
   role_ids?: string[];
   outlet_ids?: string[];
   status?: string;

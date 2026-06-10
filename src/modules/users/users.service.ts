@@ -8,6 +8,7 @@ import type {
 } from "./users.types";
 import * as usersRepository from "./users.repository";
 import { createAuditLog } from "../../services/audit.service";
+import * as permissionService from "../../services/permission.service";
 import type { AuthActor } from "../../types/api.types";
 import { AppError, ConflictError } from "../../utils/errors";
 import { createPrefixedId } from "../../utils/ids";
@@ -50,18 +51,24 @@ const audit = async (
 
 const attachAccess = async (env: Env, companyId: string, users: UserRecord[]): Promise<SafeUser[]> => {
   const ids = users.map((user) => user.id);
-  const [roleRows, outletRows] = await Promise.all([
+  const [roleRows, outletRows, employeeRows] = await Promise.all([
     usersRepository.getUserRoles(env, companyId, ids),
     usersRepository.getUserOutlets(env, companyId, ids),
+    usersRepository.getUserEmployeeLinks(env, companyId, ids),
   ]);
 
   return users.map((user) => {
     const roles = roleRows.filter((row) => row.user_id === user.id);
     const outlets = outletRows.filter((row) => row.user_id === user.id);
+    const linkedEmployee = employeeRows.find((row) => row.user_id === user.id);
     return {
       id: user.id,
+      employee_id: user.employee_id,
+      username: user.username,
       full_name: user.full_name,
       email: user.email,
+      employee_name: linkedEmployee?.employee_name ?? null,
+      employee_code: linkedEmployee?.employee_code ?? null,
       status: user.status,
       roles: roles.map((row) => row.role_name),
       role_ids: roles.map((row) => row.role_id),
@@ -98,6 +105,55 @@ const ensureUniqueEmail = async (env: Env, companyId: string, email: string, cur
       retryable: false,
     });
   }
+};
+
+const ensureUniqueUsername = async (env: Env, companyId: string, username: string | null | undefined, currentUserId?: string) => {
+  if (!username) return;
+  const existing = await usersRepository.findUserByUsername(env, companyId, username);
+  if (existing && existing.id !== currentUserId) {
+    throw new AppError({
+      code: "DUPLICATE_USERNAME",
+      message: "A user with this username already exists.",
+      statusCode: 409,
+      retryable: false,
+    });
+  }
+};
+
+const ensureEmployeeLinkAvailable = async (
+  env: Env,
+  context: AuthActor,
+  employeeId: string | null | undefined,
+  currentUserId?: string,
+) => {
+  if (!employeeId) return null;
+  const employee = await usersRepository.findEmployeeSummary(env, context.companyId, employeeId);
+  if (!employee || employee.deleted_at || employee.employment_status === "archived") {
+    throw new AppError({
+      code: "EMPLOYEE_NOT_FOUND",
+      message: "The selected employee could not be found.",
+      statusCode: 404,
+      retryable: false,
+    });
+  }
+  if (!permissionService.hasOutletAccess(context, employee.primary_outlet_id)) {
+    throw new AppError({
+      code: "OUTLET_ACCESS_DENIED",
+      message: "You do not have access to this employee's outlet.",
+      statusCode: 403,
+      retryable: false,
+    });
+  }
+  const linkedUser = await usersRepository.findUserByEmployeeId(env, context.companyId, employeeId);
+  if (linkedUser && linkedUser.id !== currentUserId) {
+    throw new AppError({
+      code: "EMPLOYEE_ALREADY_HAS_LOGIN",
+      message: "This employee already has a linked login account.",
+      statusCode: 409,
+      retryable: false,
+    });
+  }
+  return employee;
 };
 
 const ensureRolesExist = async (env: Env, companyId: string, roleIds: string[]) => {
@@ -174,6 +230,8 @@ export const getUser = async (env: Env, context: AuthActor, id: string) => {
 
 export const createUser = async (env: Env, context: AuthActor, input: UserCreateInput) => {
   await ensureUniqueEmail(env, context.companyId, input.email);
+  await ensureUniqueUsername(env, context.companyId, input.username);
+  await ensureEmployeeLinkAvailable(env, context, input.employee_id);
   const roleIds = [...new Set(input.role_ids)];
   const outletIds = await ensureOutletsExist(env, context.companyId, input.outlet_ids);
   await ensureRolesExist(env, context.companyId, roleIds);
@@ -183,7 +241,9 @@ export const createUser = async (env: Env, context: AuthActor, input: UserCreate
     id,
     companyId: context.companyId,
     fullName: input.full_name,
+    username: input.username ?? null,
     email: input.email,
+    employeeId: input.employee_id ?? null,
     status: input.status,
   });
   if (roleIds.length > 0) await usersRepository.replaceUserRoles(env, context.companyId, id, roleIds);
@@ -196,16 +256,22 @@ export const createUser = async (env: Env, context: AuthActor, input: UserCreate
 export const updateUser = async (env: Env, context: AuthActor, id: string, input: UserUpdateInput) => {
   const existing = await ensureUser(env, context, id);
   const nextEmail = input.email ?? existing.email;
+  const nextUsername = input.username !== undefined ? input.username : existing.username;
+  const nextEmployeeId = input.employee_id !== undefined ? input.employee_id : existing.employee_id;
   const emailChanged = input.email !== undefined && input.email !== existing.email;
   if (nextEmail) await ensureUniqueEmail(env, context.companyId, nextEmail, id);
+  await ensureUniqueUsername(env, context.companyId, nextUsername, id);
+  await ensureEmployeeLinkAvailable(env, context, nextEmployeeId, id);
   if (input.status && disablingStatuses.has(input.status) && id === context.actorUserId) {
     throw new ConflictError("You cannot disable your own account.");
   }
   await assertCanLoseSuperAdminAccess(env, context.companyId, existing, input.role_ids, input.status);
 
-  await usersRepository.updateUser(env, context.companyId, id, {
+  await usersRepository.updateUserIdentity(env, context.companyId, id, {
     full_name: input.full_name ?? existing.full_name,
+    username: nextUsername ?? null,
     email: nextEmail,
+    employee_id: nextEmployeeId ?? null,
     status: input.status ?? existing.status,
   });
   if (input.role_ids) {

@@ -47,7 +47,9 @@ export const UsersTable = ({
     emptyTitle="No users found."
     columns={[
       { key: "name", header: "Name", cell: userDisplayName },
+      { key: "username", header: "Username", cell: (row) => row.username ?? "Not assigned" },
       { key: "email", header: "Email", cell: (row) => row.email ?? "Not available" },
+      { key: "employee", header: "Linked Employee", cell: (row) => row.employee_name ? `${row.employee_name} (${row.employee_code ?? row.employee_id ?? "No code"})` : "Not linked" },
       { key: "roles", header: "Roles", cell: (row) => roleList(row.roles) },
       { key: "status", header: "Status", cell: (row) => <StatusBadge status={row.status ?? "neutral"} /> },
       { key: "two_factor_enabled", header: "2FA Status", cell: (row) => row.two_factor_enabled ? "Enabled" : "Not enabled" },

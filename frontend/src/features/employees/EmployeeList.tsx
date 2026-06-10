@@ -51,6 +51,7 @@ export const EmployeeList = ({
       { key: "department_name", header: "Department", cell: (row) => row.department_name ?? "Not assigned" },
       { key: "position_title", header: "Position", cell: (row) => row.position_title ?? "Not assigned" },
       { key: "employment_status", header: "Employment Status", cell: (row) => <EmployeeStatusBadge status={row.employment_status} /> },
+      { key: "has_login", header: "Login", cell: (row) => row.has_login ? "Login Assigned" : "No login" },
       { key: "joined_at", header: "Joined Date", cell: (row) => displayDate(row.joined_at) },
     ]}
     rowActions={(row) => (

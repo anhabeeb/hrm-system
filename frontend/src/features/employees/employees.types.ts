@@ -41,6 +41,11 @@ export interface Employee {
   joined_at?: string | null;
   contract_type?: string | null;
   document_expiry_status?: string | null;
+  has_login?: boolean | number | null;
+  linked_user_id?: string | null;
+  linked_username?: string | null;
+  linked_user_active?: boolean | number | null;
+  linked_role_name?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -86,6 +91,29 @@ export interface EmployeePayload {
 }
 
 export type EmployeeUpdatePayload = Partial<Omit<EmployeePayload, "primary_outlet_id" | "employment_status" | "starting_salary">>;
+
+export interface EmployeeLoginCreatePayload {
+  username: string;
+  email?: string | null;
+  temporary_password: string;
+  role_id: string;
+  store_ids?: string[];
+  outlet_ids?: string[];
+  force_password_change?: boolean;
+  require_2fa?: boolean;
+  is_active?: boolean;
+}
+
+export interface EmployeeLoginCreateResponse {
+  user_id: string;
+  employee_id: string;
+  username: string;
+  email: string | null;
+  role_id: string;
+  is_active: boolean;
+  force_password_change: boolean;
+  require_2fa: boolean;
+}
 
 export interface EmployeeStatusHistoryRow {
   id: string;

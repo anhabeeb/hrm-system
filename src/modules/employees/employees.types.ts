@@ -74,6 +74,23 @@ export interface EmployeeListRow extends EmployeeRecord {
   department_name: string | null;
   position_title: string | null;
   document_expiry_status: string | null;
+  has_login?: number | boolean | null;
+  linked_user_id?: string | null;
+  linked_username?: string | null;
+  linked_user_active?: number | boolean | null;
+  linked_role_name?: string | null;
+}
+
+export interface EmployeeLoginCreateInput {
+  username: string;
+  email?: string | null;
+  temporary_password: string;
+  role_id: string;
+  store_ids?: string[];
+  outlet_ids?: string[];
+  force_password_change: boolean;
+  require_2fa: boolean;
+  is_active: boolean;
 }
 
 export interface EmployeeWriteInput {

@@ -1,6 +1,7 @@
 import type {
   DocumentMetadataInput,
   EmployeeCreateInput,
+  EmployeeLoginCreateInput,
   EmployeeListFilters,
   EmployeeListRow,
   EmployeePersistInput,
@@ -24,6 +25,7 @@ import type {
   SalaryHistoryInput,
 } from "./employees.types";
 import * as employeesRepository from "./employees.repository";
+import * as usersRepository from "../users/users.repository";
 import {
   EMPLOYEE_EXIT_STATUSES,
   EMPLOYEE_PAYROLL_ELIGIBLE_STATUSES,
@@ -31,6 +33,8 @@ import {
   EMPLOYMENT_STATUSES,
 } from "./employees.constants";
 import { createAuditLog } from "../../services/audit.service";
+import { hashPassword } from "../../services/password.service";
+import { PASSWORD_HASH_ALGORITHM } from "../auth/auth.constants";
 import { broadcastEvent } from "../../services/realtime.service";
 import * as permissionService from "../../services/permission.service";
 import * as settingsService from "../../services/settings.service";
@@ -794,6 +798,132 @@ export const getEmployee = async (
   context: AuthActor,
   employeeId: string,
 ) => maskEmployee(await ensureEmployeeAccess(env, context, employeeId), hasSensitivePermission(context));
+
+export const createEmployeeLogin = async (
+  env: Env,
+  context: AuthActor,
+  employeeId: string,
+  input: EmployeeLoginCreateInput,
+) => {
+  const employee = await ensureEmployeeAccess(env, context, employeeId);
+  if (employee.deleted_at || employee.employment_status === "archived") {
+    throw new AppError({
+      code: "EMPLOYEE_NOT_FOUND",
+      message: "The selected employee could not be found.",
+      statusCode: 404,
+      retryable: false,
+    });
+  }
+
+  const existingLogin = await usersRepository.findUserByEmployeeId(env, context.companyId, employeeId);
+  if (existingLogin) {
+    throw new AppError({
+      code: "EMPLOYEE_ALREADY_HAS_LOGIN",
+      title: "Login already assigned",
+      message: "This employee already has a linked login account.",
+      statusCode: 409,
+      retryable: false,
+    });
+  }
+
+  const existingUsername = await usersRepository.findUserByUsername(env, context.companyId, input.username);
+  if (existingUsername) {
+    throw new AppError({
+      code: "DUPLICATE_USERNAME",
+      message: "A user with this username already exists.",
+      statusCode: 409,
+      retryable: false,
+    });
+  }
+
+  if (input.email) {
+    const existingEmail = await usersRepository.findUserByEmail(env, context.companyId, input.email);
+    if (existingEmail) {
+      throw new AppError({
+        code: "DUPLICATE_USER_EMAIL",
+        message: "A user with this email already exists.",
+        statusCode: 409,
+        retryable: false,
+      });
+    }
+  }
+
+  const roles = await usersRepository.findRolesByIds(env, context.companyId, [input.role_id]);
+  if (roles.length !== 1) {
+    throw new AppError({
+      code: "ROLE_NOT_FOUND",
+      message: "Please choose a valid role.",
+      statusCode: 404,
+      retryable: false,
+    });
+  }
+
+  const requestedOutletIds = [...new Set(input.store_ids ?? input.outlet_ids ?? [])];
+  const defaultOutletIds = employee.primary_outlet_id ? [employee.primary_outlet_id] : [];
+  const outletIds = requestedOutletIds.length > 0 ? requestedOutletIds : defaultOutletIds;
+  if (outletIds.some((outletId) => !permissionService.hasOutletAccess(context, outletId))) {
+    throw new OutletAccessError("You cannot assign login access outside your outlet scope.");
+  }
+  if (outletIds.length > 0) {
+    const outlets = await usersRepository.findOutletsByIds(env, context.companyId, outletIds);
+    if (outlets.length !== outletIds.length) {
+      throw new AppError({
+        code: "OUTLET_NOT_FOUND",
+        message: "One or more selected outlets could not be found.",
+        statusCode: 404,
+        retryable: false,
+      });
+    }
+  }
+
+  const userId = createPrefixedId("user");
+  const passwordHash = await hashPassword(input.temporary_password, env.PASSWORD_PEPPER, env);
+  await usersRepository.createEmployeeLoginUser(env, {
+    id: userId,
+    companyId: context.companyId,
+    employeeId,
+    fullName: employee.full_name,
+    username: input.username,
+    email: input.email ?? null,
+    passwordHash,
+    passwordAlgo: PASSWORD_HASH_ALGORITHM,
+    forcePasswordChange: input.force_password_change,
+    require2fa: input.require_2fa,
+    status: input.is_active ? "active" : "disabled",
+    roleId: input.role_id,
+    outletIds,
+  });
+
+  await ensureAudit(env, context, {
+    action: "employee_login_created",
+    entityType: "user",
+    entityId: userId,
+    employeeId,
+    outletId: employee.primary_outlet_id,
+    newValue: {
+      user_id: userId,
+      employee_id: employeeId,
+      username: input.username,
+      email: input.email ?? null,
+      role_id: input.role_id,
+      outlet_ids: outletIds,
+      force_password_change: input.force_password_change,
+      require_2fa: false,
+      is_active: input.is_active,
+    },
+  });
+
+  return {
+    user_id: userId,
+    employee_id: employeeId,
+    username: input.username,
+    email: input.email ?? null,
+    role_id: input.role_id,
+    is_active: input.is_active,
+    force_password_change: input.force_password_change,
+    require_2fa: false,
+  };
+};
 
 const profileLimit = (limit?: number) => Math.min(Math.max(limit ?? 25, 1), 100);
 

@@ -37,6 +37,12 @@ const authRepoMock = vi.hoisted(() => {
       const normalized = email.toLowerCase();
       return [...state.users.values()].find((user) => user.email?.toLowerCase() === normalized) ?? null;
     }),
+    findUserByLoginIdentifier: vi.fn(async (_env: Env, identifier: string) => {
+      const normalized = identifier.toLowerCase();
+      return [...state.users.values()].find((user) =>
+        user.email?.toLowerCase() === normalized || user.username?.toLowerCase() === normalized,
+      ) ?? null;
+    }),
     findUserByEmailInCompany: vi.fn(async (_env: Env, companyId: string, email: string) => {
       const normalized = email.toLowerCase();
       return [...state.users.values()].find((user) => user.company_id === companyId && user.email?.toLowerCase() === normalized && !user.deleted_at) ?? null;

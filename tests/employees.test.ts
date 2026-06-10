@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 
 import {
   validateEmployeeCreateInput,
+  validateEmployeeLoginCreateInput,
   validateEmployeeUpdateInput,
   validateSalaryHistoryInput,
 } from "../src/modules/employees/employees.validators";
@@ -430,6 +431,71 @@ describe("employee emergency contact wiring", () => {
     expect(profile).toContain("No emergency contact recorded.");
     expect(drawer).not.toContain("dark:");
     expect(profile).not.toContain("dark:");
+  });
+});
+
+describe("employee login assignment wiring", () => {
+  it("create login for employee validates username, role, and password policy", () => {
+    const input = validateEmployeeLoginCreateInput({
+      username: "ahmed.ali",
+      email: "AHMED@example.com",
+      temporary_password: "StrongPass123",
+      role_id: "role_employee",
+      store_ids: ["outlet_1"],
+    });
+
+    expect(input.username).toBe("ahmed.ali");
+    expect(input.email).toBe("ahmed@example.com");
+    expect(input.force_password_change).toBe(true);
+    expect(input.store_ids).toEqual(["outlet_1"]);
+  });
+
+  it("rejects weak temporary password before user creation", () => {
+    expect(() =>
+      validateEmployeeLoginCreateInput({
+        username: "weak.user",
+        temporary_password: "password",
+        role_id: "role_employee",
+      }),
+    ).toThrow(AppError);
+  });
+
+  it("employee login backend creates a linked user, password is hashed, and duplicate login is blocked", () => {
+    const migration = source("migrations/0057_employee_login_assignment.sql");
+    const routes = source("src/routes/employees.routes.ts");
+    const service = source("src/modules/employees/employees.service.ts");
+    const repository = source("src/modules/users/users.repository.ts");
+
+    expect(migration).toContain("idx_users_company_employee_unique");
+    expect(routes).toContain('"/:id/login"');
+    expect(routes).toContain("employees.login.create");
+    expect(service).toContain("EMPLOYEE_ALREADY_HAS_LOGIN");
+    expect(service).toContain("findUserByEmployeeId");
+    expect(service).toContain("hashPassword(input.temporary_password");
+    expect(service).toContain("employee_login_created");
+    expect(repository).toContain("createEmployeeLoginUser");
+    expect(repository).toContain("password_hash");
+    expect(service).not.toMatch(/temporary_password[\s\S]{0,120}ensureAudit/);
+  });
+
+  it("employee detail, Employee 360, and list expose Login Access status without inline alert workflow", () => {
+    const drawer = source("frontend/src/features/employees/EmployeeDetailDrawer.tsx");
+    const profile = source("frontend/src/features/employees/Employee360Page.tsx");
+    const list = source("frontend/src/features/employees/EmployeeList.tsx");
+    const dialog = source("frontend/src/features/employees/EmployeeLoginDialog.tsx");
+    const page = source("frontend/src/features/employees/EmployeesPage.tsx");
+
+    expect(drawer).toContain("Login Access");
+    expect(drawer).toContain("Create Login");
+    expect(drawer).toContain("Login Assigned");
+    expect(profile).toContain("Login Access");
+    expect(list).toContain("Login Assigned");
+    expect(dialog).toContain("Create Login for Employee");
+    expect(dialog).toContain("temporary_password");
+    expect(dialog).toContain("confirm_password");
+    expect(dialog).not.toContain("InlineAlert");
+    expect(page).toContain("toastSuccess");
+    expect(page).toContain("toastError");
   });
 });
 
