@@ -495,3 +495,17 @@ INSERT OR IGNORE INTO permissions (id, permission_key, module, action, descripti
 ('perm_shift_templates_manage', 'shift_templates.manage', 'roster', 'shift_templates_manage', 'Manage shift templates.', '2026-01-01T00:00:00Z'),
 ('perm_profile_updates_view_alias', 'profile_updates.view', 'profile_update_requests', 'view_alias', 'View profile update requests.', '2026-01-01T00:00:00Z'),
 ('perm_profile_updates_review_alias', 'profile_updates.review', 'profile_update_requests', 'review_alias', 'Review profile update requests.', '2026-01-01T00:00:00Z');
+
+-- Employee structure foundation permissions. Levels suggest defaults only; roles and
+-- permissions remain the final authority for system access.
+INSERT OR IGNORE INTO permissions (id, permission_key, module, action, description, created_at) VALUES
+('perm_org_departments_view', 'organization.departments.view', 'organization', 'departments_view', 'View organization departments.', '2026-01-01T00:00:00Z'),
+('perm_org_departments_manage', 'organization.departments.manage', 'organization', 'departments_manage', 'Manage organization departments.', '2026-01-01T00:00:00Z'),
+('perm_org_positions_view', 'organization.positions.view', 'organization', 'positions_view', 'View organization positions and titles.', '2026-01-01T00:00:00Z'),
+('perm_org_positions_manage', 'organization.positions.manage', 'organization', 'positions_manage', 'Manage organization positions and titles.', '2026-01-01T00:00:00Z'),
+('perm_org_levels_view', 'organization.levels.view', 'organization', 'levels_view', 'View access levels.', '2026-01-01T00:00:00Z'),
+('perm_org_levels_manage', 'organization.levels.manage', 'organization', 'levels_manage', 'Manage access level metadata.', '2026-01-01T00:00:00Z'),
+('perm_org_level_role_templates_view', 'organization.levelRoleTemplates.view', 'organization', 'level_role_templates_view', 'View level role templates.', '2026-01-01T00:00:00Z'),
+('perm_org_level_role_templates_manage', 'organization.levelRoleTemplates.manage', 'organization', 'level_role_templates_manage', 'Manage level role templates.', '2026-01-01T00:00:00Z'),
+('perm_employees_structure_view', 'employees.structure.view', 'employees', 'structure_view', 'View employee department, position, and level structure.', '2026-01-01T00:00:00Z'),
+('perm_employees_structure_manage', 'employees.structure.manage', 'employees', 'structure_manage', 'Manage employee department, position, and level structure.', '2026-01-01T00:00:00Z');

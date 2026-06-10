@@ -54,6 +54,9 @@ export interface EmployeeRecord {
   primary_outlet_id: string | null;
   department_id: string | null;
   position_id: string | null;
+  level?: number | null;
+  structure_updated_at?: string | null;
+  structure_updated_by?: string | null;
   contract_type: string | null;
   employment_status: EmploymentStatus;
   joined_at: string | null;
@@ -73,6 +76,7 @@ export interface EmployeeListRow extends EmployeeRecord {
   primary_outlet_name: string | null;
   department_name: string | null;
   position_title: string | null;
+  level?: number | null;
   document_expiry_status: string | null;
   has_login?: number | boolean | null;
   linked_user_id?: string | null;
@@ -154,6 +158,7 @@ export interface EmployeeLoginDetails {
   two_factor_enabled: boolean;
   two_factor_status: "enabled" | "available_after_first_login";
   last_login_at: string | null;
+  suggested_roles?: Array<{ role_id: string; role_name: string | null; role_key?: string | null; source: string }>;
 }
 
 export interface EmployeeWriteInput {
@@ -197,7 +202,7 @@ export type EmployeeUpdateInput = Partial<
   Omit<EmployeeWriteInput, "primary_outlet_id" | "employment_status">
 >;
 
-export type EmployeePersistInput = EmployeeWriteInput & { employee_code: string };
+export type EmployeePersistInput = EmployeeWriteInput & { employee_code: string; level?: number | null };
 
 export interface EmployeeAccessibleOutletScope {
   isSuperAdmin: boolean;

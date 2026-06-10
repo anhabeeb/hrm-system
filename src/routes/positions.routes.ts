@@ -14,6 +14,9 @@ positionsRoutes.get("/", requirePermission("positions.view"), controller.listPos
 positionsRoutes.post("/", requirePermission("positions.create"), controller.createPosition);
 positionsRoutes.get("/:id", requirePermission("positions.view"), controller.getPosition);
 positionsRoutes.patch("/:id", requirePermission("positions.edit"), controller.updatePosition);
+positionsRoutes.post("/:id/disable", requirePermission("positions.edit"), requireReason(), controller.disablePosition);
+positionsRoutes.post("/:id/enable", requirePermission("positions.edit"), requireReason(), controller.enablePosition);
+positionsRoutes.post("/:id/archive", requirePermission("positions.delete"), requireReason(), controller.archivePosition);
 positionsRoutes.delete("/:id", requirePermission("positions.delete"), requireReason(), controller.deletePosition);
 
 export { positionsRoutes };

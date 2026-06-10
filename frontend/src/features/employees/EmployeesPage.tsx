@@ -3,7 +3,6 @@ import { useCallback, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { UserPlus } from "lucide-react";
 
-import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { toastError, toastSuccess } from "@/components/feedback/toast-helpers";
 import { useToast } from "@/components/feedback/useToast";
 import { Button } from "@/components/ui/button";
@@ -19,8 +18,9 @@ import { EmployeeFilters, type EmployeeFilterValues } from "./EmployeeFilters";
 import { EmployeeForm } from "./EmployeeForm";
 import { EmployeeLoginDialog, type EmployeeLoginDialogMode } from "./EmployeeLoginDialog";
 import { EmployeeList } from "./EmployeeList";
+import { EmployeeStructureDialog } from "./EmployeeStructureDialog";
 import { employeesApi } from "./employees.api";
-import type { Employee, EmployeeLoginCreatePayload, EmployeeLoginLinkExistingPayload, EmployeeLoginResetPasswordPayload, EmployeeLoginUpdatePayload, EmployeeUpdatePayload } from "./employees.types";
+import type { Employee, EmployeeLoginCreatePayload, EmployeeLoginLinkExistingPayload, EmployeeLoginResetPasswordPayload, EmployeeLoginUpdatePayload, EmployeeStructurePayload, EmployeeUpdatePayload } from "./employees.types";
 import type { EmployeeFormValues } from "./employees.schema";
 
 const listKey = (filters: Record<string, unknown>) => ["employees", filters];
@@ -35,6 +35,7 @@ export const EmployeesPage = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
+  const [structureDialogOpen, setStructureDialogOpen] = useState(false);
   const [loginDialogMode, setLoginDialogMode] = useState<EmployeeLoginDialogMode>("create");
   const [formMode, setFormMode] = useState<"create" | "edit">("create");
   const [mutationError, setMutationError] = useState<ApiError | null>(null);
@@ -187,6 +188,37 @@ export const EmployeesPage = () => {
     onError: (error) => toastError(toast, error, "Employee login could not be enabled."),
   });
 
+  const updateStructureMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: EmployeeStructurePayload }) => employeesApi.updateStructure(id, payload),
+    onSuccess: async () => {
+      toastSuccess(toast, "Employee structure updated.");
+      setMutationError(null);
+      setStructureDialogOpen(false);
+      await refreshList();
+      if (selectedEmployee) {
+        const refreshed = await employeesApi.get(selectedEmployee.id);
+        setSelectedEmployee(refreshed.data.employee);
+      }
+    },
+    onError: (error) => {
+      setMutationError(error instanceof ApiError ? error : saveError());
+      toastError(toast, error, "Employee structure could not be updated.");
+    },
+  });
+
+  const applyTemplateMutation = useMutation({
+    mutationFn: (id: string) => employeesApi.applyLevelRoleTemplate(id),
+    onSuccess: async (result) => {
+      toastSuccess(toast, `Level role template applied. ${result.data.added.length} role(s) added.`);
+      await refreshList();
+      if (selectedEmployee) {
+        const refreshed = await employeesApi.get(selectedEmployee.id);
+        setSelectedEmployee(refreshed.data.employee);
+      }
+    },
+    onError: (error) => toastError(toast, error, "Level role template could not be applied."),
+  });
+
   const openCreate = () => {
     setMutationError(null);
     setSelectedEmployee(null);
@@ -230,11 +262,13 @@ export const EmployeesPage = () => {
   const canEnableLogin = auth.hasAnyPermission(["employees.login.link", "users.enable", "users.edit"]);
   const canResetLoginPassword = auth.hasAnyPermission(["employees.login.revoke", "users.reset_password", "users.edit"]);
   const canLinkExistingLogin = auth.hasAnyPermission(["employees.login.link", "users.edit"]);
+  const canManageStructure = auth.hasAnyPermission(["employees.structure.manage"]);
+  const canApplyLevelRoleTemplate = auth.hasAnyPermission(["employees.structure.manage"]) && auth.hasAnyPermission(["users.edit", "roles.edit"]);
 
   return (
     <div>
       <div className="space-y-4 p-4 md:p-6">
-        {employeesQuery.isError ? <InlineAlert title="Employees could not be loaded." variant="error">Please adjust filters or try again.</InlineAlert> : null}
+        {employeesQuery.isError ? <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">Employees could not be loaded. Please adjust filters or try again.</div> : null}
         <div className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-base font-semibold">Employee Directory</h2>
@@ -302,6 +336,15 @@ export const EmployeesPage = () => {
             setLoginDialogMode("link");
             setLoginDialogOpen(true);
           }}
+          onManageStructure={(employee) => {
+            setSelectedEmployee(employee);
+            setMutationError(null);
+            setStructureDialogOpen(true);
+          }}
+          onApplyLevelRoleTemplate={(employee) => {
+            setSelectedEmployee(employee);
+            applyTemplateMutation.mutate(employee.id);
+          }}
           canEdit={canEdit}
           canCreateLogin={canCreateLogin}
           canEditLogin={canEditLogin}
@@ -309,6 +352,8 @@ export const EmployeesPage = () => {
           canEnableLogin={canEnableLogin}
           canResetLoginPassword={canResetLoginPassword}
           canLinkExistingLogin={canLinkExistingLogin}
+          canManageStructure={canManageStructure}
+          canApplyLevelRoleTemplate={canApplyLevelRoleTemplate}
           canManageJobChange={canManageJobChange}
           canViewSalary={canViewSalary}
           canEditSalary={canEditSalary}
@@ -343,6 +388,22 @@ export const EmployeesPage = () => {
             } else {
               createLoginMutation.mutate({ id: selectedEmployee.id, payload: payload as EmployeeLoginCreatePayload });
             }
+          }}
+        />
+        <EmployeeStructureDialog
+          open={structureDialogOpen}
+          employee={selectedEmployee}
+          departments={departmentsQuery.data?.data ?? []}
+          positions={positionsQuery.data?.data ?? []}
+          error={mutationError}
+          loading={updateStructureMutation.isPending}
+          onOpenChange={(open) => {
+            setStructureDialogOpen(open);
+            if (!open) setMutationError(null);
+          }}
+          onSubmit={(payload) => {
+            if (!selectedEmployee) return;
+            updateStructureMutation.mutate({ id: selectedEmployee.id, payload });
           }}
         />
         <EmployeeForm

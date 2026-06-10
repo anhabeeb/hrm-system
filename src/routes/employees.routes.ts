@@ -5,6 +5,7 @@ import { requireFeature } from "../middleware/feature.middleware";
 import { requireAnyPermission, requireAnyPermissionOrError, requirePermission } from "../middleware/permission.middleware";
 import { requireReason } from "../middleware/reason-required.middleware";
 import * as employeesController from "../modules/employees/employees.controller";
+import * as structureController from "../modules/employee-structure/employee-structure.controller";
 import * as contractsController from "../modules/employee-contracts/employee-contracts.controller";
 import * as offboardingController from "../modules/offboarding/offboarding.controller";
 import * as payslipsController from "../modules/payslips/payslips.controller";
@@ -307,6 +308,42 @@ employeesRoutes.post(
     message: "You do not have permission to link existing users to employees.",
   }),
   employeesController.linkExistingUserToEmployee,
+);
+employeesRoutes.get(
+  "/:id/structure",
+  requireAnyPermissionOrError(["employees.structure.view", "employees.view"], {
+    code: "EMPLOYEE_STRUCTURE_PERMISSION_DENIED",
+    message: "You do not have permission to view employee structure.",
+  }),
+  structureController.getEmployeeStructure,
+);
+employeesRoutes.patch(
+  "/:id/structure",
+  requireAnyPermissionOrError(["employees.structure.manage"], {
+    code: "EMPLOYEE_STRUCTURE_PERMISSION_DENIED",
+    message: "You do not have permission to manage employee structure.",
+  }),
+  structureController.updateEmployeeStructure,
+);
+employeesRoutes.get(
+  "/:id/structure-history",
+  requireAnyPermissionOrError(["employees.structure.view", "employees.view"], {
+    code: "EMPLOYEE_STRUCTURE_PERMISSION_DENIED",
+    message: "You do not have permission to view employee structure history.",
+  }),
+  structureController.listEmployeeStructureHistory,
+);
+employeesRoutes.post(
+  "/:id/apply-level-role-template",
+  requireAnyPermissionOrError(["employees.structure.manage"], {
+    code: "EMPLOYEE_STRUCTURE_PERMISSION_DENIED",
+    message: "You do not have permission to apply employee structure templates.",
+  }),
+  requireAnyPermissionOrError(["users.edit", "roles.edit"], {
+    code: "EMPLOYEE_STRUCTURE_PERMISSION_DENIED",
+    message: "You do not have permission to assign user roles.",
+  }),
+  structureController.applyLevelRoleTemplate,
 );
 employeesRoutes.get("/:id", requirePermission("employees.view"), employeesController.getEmployee);
 employeesRoutes.patch("/:id", requirePermission("employees.edit"), employeesController.updateEmployee);

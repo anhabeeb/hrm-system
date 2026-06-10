@@ -12,6 +12,9 @@ const parse = <T extends z.ZodTypeAny>(schema: T, payload: unknown): z.infer<T> 
 const writeSchema = z.object({
   name: z.string().trim().min(1, "Department name is required."),
   code: z.string().trim().nullable().optional(),
+  description: z.string().trim().max(500, "Description must be 500 characters or fewer.").nullable().optional(),
+  head_employee_id: z.string().trim().nullable().optional(),
+  day_to_day_management_min_level: z.coerce.number().int().min(1).max(4).default(3),
   status: z.enum(DEPARTMENT_STATUSES).default("active"),
 });
 export const validateDepartmentFilters = (query: Record<string, string | undefined>): DepartmentFilters =>

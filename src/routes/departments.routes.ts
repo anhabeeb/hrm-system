@@ -14,6 +14,9 @@ departmentsRoutes.get("/", requirePermission("departments.view"), controller.lis
 departmentsRoutes.post("/", requirePermission("departments.create"), controller.createDepartment);
 departmentsRoutes.get("/:id", requirePermission("departments.view"), controller.getDepartment);
 departmentsRoutes.patch("/:id", requirePermission("departments.edit"), controller.updateDepartment);
+departmentsRoutes.post("/:id/disable", requirePermission("departments.edit"), requireReason(), controller.disableDepartment);
+departmentsRoutes.post("/:id/enable", requirePermission("departments.edit"), requireReason(), controller.enableDepartment);
+departmentsRoutes.post("/:id/archive", requirePermission("departments.delete"), requireReason(), controller.archiveDepartment);
 departmentsRoutes.delete("/:id", requirePermission("departments.delete"), requireReason(), controller.deleteDepartment);
 
 export { departmentsRoutes };

@@ -57,8 +57,14 @@ export const navigationGroups: NavGroup[] = [
       { label: "Contracts", path: "/contracts", icon: FileSignature, requiredFeature: "employee_management", requiredPermissionsAny: ["contracts.view", "employees.contracts.view", "employees.view"] },
       { label: "Offboarding", path: "/offboarding", icon: FileCheck2, requiredFeature: "employee_management", requiredPermissionsAny: ["employees.offboarding.view", "employees.view"] },
       { label: "Outlets", path: "/outlets", icon: Building2, requiredFeature: "employee_management", requiredPermission: "outlets.view" },
-      { label: "Departments", path: "/departments", icon: BriefcaseBusiness, requiredFeature: "employee_management", requiredPermission: "departments.view" },
-      { label: "Positions", path: "/positions", icon: BadgeCheck, requiredFeature: "employee_management", requiredPermission: "positions.view" },
+    ],
+  },
+  {
+    label: "Organization",
+    items: [
+      { label: "Departments", path: "/departments", icon: BriefcaseBusiness, requiredFeature: "employee_management", requiredPermissionsAny: ["organization.departments.view", "departments.view"] },
+      { label: "Positions / Titles", path: "/positions", icon: BadgeCheck, requiredFeature: "employee_management", requiredPermissionsAny: ["organization.positions.view", "positions.view"] },
+      { label: "Level Role Templates", path: "/organization/level-role-templates", icon: ShieldCheck, requiredFeature: "employee_management", requiredPermissionsAny: ["organization.levelRoleTemplates.view", "organization.levelRoleTemplates.manage"] },
     ],
   },
   {

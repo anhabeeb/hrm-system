@@ -328,10 +328,10 @@ export const findPosition = (
   env: Env,
   companyId: string,
   positionId: string,
-): Promise<{ id: string; department_id?: string | null; title?: string | null; status: string } | null> =>
+): Promise<{ id: string; department_id?: string | null; title?: string | null; status: string; level?: number | null } | null> =>
   queryOne(
     env,
-    "SELECT id, department_id, title, status FROM positions WHERE company_id = ? AND id = ? AND deleted_at IS NULL LIMIT 1",
+    "SELECT id, department_id, title, status, level FROM positions WHERE company_id = ? AND id = ? AND deleted_at IS NULL LIMIT 1",
     [companyId, positionId],
   );
 
@@ -348,10 +348,10 @@ export const createEmployee = (
       id, company_id, employee_code, full_name, employee_type, nationality,
       id_card_number, passport_number, passport_expiry_date,
       work_permit_number, work_permit_expiry_date, phone, emergency_contact_name,
-      emergency_contact_phone, emergency_contact_relation, primary_outlet_id, department_id, position_id,
+      emergency_contact_phone, emergency_contact_relation, primary_outlet_id, department_id, position_id, level,
       contract_type, employment_status, joined_at, bank_name, bank_account_masked,
-      notes, created_by, updated_by, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      notes, structure_updated_at, structure_updated_by, created_by, updated_by, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       companyId,
@@ -371,12 +371,15 @@ export const createEmployee = (
       input.primary_outlet_id,
       input.department_id ?? null,
       input.position_id ?? null,
+      input.level ?? null,
       input.contract_type ?? null,
       input.employment_status,
       input.joined_at ?? null,
       input.bank_name ?? null,
       input.bank_account_masked ?? null,
       input.notes ?? null,
+      input.department_id || input.position_id ? new Date().toISOString() : null,
+      input.department_id || input.position_id ? actorUserId : null,
       actorUserId,
       actorUserId,
       new Date().toISOString(),
@@ -406,10 +409,10 @@ export const createEmployeeOnboardingRecords = (
         id, company_id, employee_code, full_name, employee_type, nationality,
         id_card_number, passport_number, passport_expiry_date,
         work_permit_number, work_permit_expiry_date, phone, emergency_contact_name,
-        emergency_contact_phone, emergency_contact_relation, primary_outlet_id, department_id, position_id,
+        emergency_contact_phone, emergency_contact_relation, primary_outlet_id, department_id, position_id, level,
         contract_type, employment_status, joined_at, bank_name, bank_account_masked,
-        notes, created_by, updated_by, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        notes, structure_updated_at, structure_updated_by, created_by, updated_by, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).bind(
       input.employeeId,
       input.companyId,
@@ -429,12 +432,15 @@ export const createEmployeeOnboardingRecords = (
       input.employee.primary_outlet_id,
       input.employee.department_id ?? null,
       input.employee.position_id ?? null,
+      input.employee.level ?? null,
       input.employee.contract_type ?? null,
       input.employee.employment_status,
       input.employee.joined_at ?? null,
       input.employee.bank_name ?? null,
       input.employee.bank_account_masked ?? null,
       input.employee.notes ?? null,
+      input.employee.department_id || input.employee.position_id ? timestamp : null,
+      input.employee.department_id || input.employee.position_id ? input.actorUserId : null,
       input.actorUserId,
       input.actorUserId,
       timestamp,
@@ -521,7 +527,7 @@ export const updateEmployee = (
       id_card_number = ?, passport_number = ?, passport_expiry_date = ?,
       work_permit_number = ?, work_permit_expiry_date = ?, phone = ?, emergency_contact_name = ?,
       emergency_contact_phone = ?, emergency_contact_relation = ?, primary_outlet_id = ?, department_id = ?,
-      position_id = ?, contract_type = ?, employment_status = ?, joined_at = ?,
+      position_id = ?, level = ?, structure_updated_at = ?, structure_updated_by = ?, contract_type = ?, employment_status = ?, joined_at = ?,
       resigned_at = ?, terminated_at = ?, bank_name = ?, bank_account_masked = ?,
       notes = ?, updated_by = ?, updated_at = ?, deleted_at = ?
      WHERE company_id = ? AND id = ?`,
@@ -542,6 +548,9 @@ export const updateEmployee = (
       input.primary_outlet_id,
       input.department_id ?? null,
       input.position_id ?? null,
+      input.level ?? null,
+      input.department_id || input.position_id ? new Date().toISOString() : null,
+      input.department_id || input.position_id ? actorUserId : null,
       input.contract_type ?? null,
       input.employment_status,
       input.joined_at ?? null,
@@ -604,6 +613,55 @@ export const createJobHistory = (
       input.effectiveFrom,
       input.reason ?? null,
       input.createdBy,
+      new Date().toISOString(),
+    ],
+  );
+
+export const closeOpenStructureHistory = (env: Env, companyId: string, employeeId: string, effectiveTo: string) =>
+  execute(
+    env,
+    `UPDATE employee_structure_history
+        SET effective_to = ?
+      WHERE company_id = ? AND employee_id = ? AND effective_to IS NULL`,
+    [effectiveTo, companyId, employeeId],
+  );
+
+export const createStructureHistory = (
+  env: Env,
+  input: {
+    id: string;
+    companyId: string;
+    employeeId: string;
+    previousDepartmentId?: string | null;
+    previousPositionId?: string | null;
+    previousLevel?: number | null;
+    newDepartmentId: string;
+    newPositionId: string;
+    newLevel: number;
+    reason?: string | null;
+    effectiveFrom: string;
+    changedBy: string;
+  },
+) =>
+  execute(
+    env,
+    `INSERT INTO employee_structure_history (
+      id, company_id, employee_id, previous_department_id, previous_position_id, previous_level,
+      new_department_id, new_position_id, new_level, reason, effective_from, effective_to, changed_by, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
+    [
+      input.id,
+      input.companyId,
+      input.employeeId,
+      input.previousDepartmentId ?? null,
+      input.previousPositionId ?? null,
+      input.previousLevel ?? null,
+      input.newDepartmentId,
+      input.newPositionId,
+      input.newLevel,
+      input.reason ?? null,
+      input.effectiveFrom,
+      input.changedBy,
       new Date().toISOString(),
     ],
   );

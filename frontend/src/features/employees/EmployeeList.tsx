@@ -50,6 +50,7 @@ export const EmployeeList = ({
       { key: "primary_outlet_name", header: "Outlet", cell: (row) => row.primary_outlet_name ?? "Not assigned" },
       { key: "department_name", header: "Department", cell: (row) => row.department_name ?? "Not assigned" },
       { key: "position_title", header: "Position", cell: (row) => row.position_title ?? "Not assigned" },
+      { key: "level", header: "Level", cell: (row) => row.level ? `Level ${row.level}` : "Unassigned" },
       { key: "employment_status", header: "Employment Status", cell: (row) => <EmployeeStatusBadge status={row.employment_status} /> },
       { key: "has_login", header: "Login", cell: (row) => row.has_login ? "Login Assigned" : "No login" },
       { key: "joined_at", header: "Joined Date", cell: (row) => displayDate(row.joined_at) },

@@ -24,6 +24,7 @@ const UsersAccessPage = lazyNamed(() => import("@/features/users/UsersAccessPage
 const OutletsPage = lazyNamed(() => import("@/features/outlets/OutletsPage"), "OutletsPage");
 const DepartmentsPage = lazyNamed(() => import("@/features/departments/DepartmentsPage"), "DepartmentsPage");
 const PositionsPage = lazyNamed(() => import("@/features/positions/PositionsPage"), "PositionsPage");
+const LevelRoleTemplatesPage = lazyNamed(() => import("@/features/organization/LevelRoleTemplatesPage"), "LevelRoleTemplatesPage");
 const EmployeesPage = lazyNamed(() => import("@/features/employees/EmployeesPage"), "EmployeesPage");
 const Employee360Page = lazyNamed(() => import("@/features/employees/Employee360Page"), "Employee360Page");
 const ContractsPage = lazyNamed(() => import("@/features/contracts/ContractsPage"), "ContractsPage");
@@ -117,8 +118,9 @@ export const AppRouter = () => (
         <Route path="/offboarding" element={guarded(<OffboardingPage />, { permissionsAny: ["employees.offboarding.view", "employees.view"], feature: "employee_management" })} />
         <Route path="/users-access" element={guarded(<UsersAccessPage />, { permission: "users.view", feature: "user_management" })} />
         <Route path="/outlets" element={guarded(<OutletsPage />, { permission: "outlets.view", feature: "employee_management" })} />
-        <Route path="/departments" element={guarded(<DepartmentsPage />, { permission: "departments.view", feature: "employee_management" })} />
-        <Route path="/positions" element={guarded(<PositionsPage />, { permission: "positions.view", feature: "employee_management" })} />
+        <Route path="/departments" element={guarded(<DepartmentsPage />, { permissionsAny: ["organization.departments.view", "departments.view"], feature: "employee_management" })} />
+        <Route path="/positions" element={guarded(<PositionsPage />, { permissionsAny: ["organization.positions.view", "positions.view"], feature: "employee_management" })} />
+        <Route path="/organization/level-role-templates" element={guarded(<LevelRoleTemplatesPage />, { permissionsAny: ["organization.levelRoleTemplates.view", "organization.levelRoleTemplates.manage"], feature: "employee_management" })} />
         <Route path="/attendance" element={guarded(<AttendancePage />, { permission: "attendance.view", feature: "attendance" })} />
         <Route path="/attendance/corrections" element={guarded(<AttendanceCorrectionsPage />, { permission: "attendance.view", feature: "attendance" })} />
         <Route path="/attendance/reports" element={guarded(<AttendanceReportsPage />, { permission: "attendance.reports.view", feature: "attendance" })} />

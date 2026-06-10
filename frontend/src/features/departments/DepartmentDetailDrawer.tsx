@@ -17,6 +17,11 @@ export const DepartmentDetailDrawer = ({ department, open, canEdit, onOpenChange
       <DetailSection title="Department Information" rows={[
         { label: "Name", value: department.name },
         { label: "Code", value: department.code ?? "Not set" },
+        { label: "Description", value: department.description ?? "Not recorded" },
+        { label: "Head employee", value: department.head_employee_name ?? "Not assigned" },
+        { label: "Management min level", value: `Level ${department.day_to_day_management_min_level ?? 3}` },
+        { label: "Employees", value: department.employee_count ?? 0 },
+        { label: "Positions", value: department.position_count ?? 0 },
         { label: "Status", value: <StatusBadge status={department.status} /> },
       ]} />
     </DetailDrawer>

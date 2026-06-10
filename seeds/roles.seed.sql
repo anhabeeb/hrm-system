@@ -93,13 +93,38 @@ WHERE permission_key IN (
   'employees.view', 'employees.create', 'employees.edit', 'employees.export',
   'my_profile.view', 'my_profile.change_password', 'my_profile.manage_own_2fa',
   'my_profile.submit_kyc_update', 'profile_update_requests.view',
-  'outlets.view', 'departments.view', 'positions.view', 'attendance.view',
+  'outlets.view', 'departments.view', 'positions.view',
+  'organization.departments.view', 'organization.positions.view', 'organization.levels.view',
+  'organization.levelRoleTemplates.view', 'employees.structure.view',
+  'attendance.view',
   'attendance.manual_entry', 'leave.view', 'leave.create', 'leave.edit',
   'long_leave.view', 'documents.view', 'documents.upload', 'documents.download',
   'documents.view_expiring', 'documents.view_missing', 'uniforms.view', 'uniforms.issue',
   'assets.view', 'dashboard.view', 'dashboard.view_outlet', 'dashboard.attendance.view',
   'dashboard.leave.view', 'dashboard.long_leave.view', 'dashboard.expiry_alerts.view',
   'reports.view', 'notifications.view', 'expiry_alerts.view', 'expiry_alerts.acknowledge'
+);
+
+INSERT OR IGNORE INTO role_permissions (id, company_id, role_id, permission_key, created_at)
+SELECT 'rp_admin_employee_structure_' || replace(permission_key, '.', '_'), 'company_seed_default', 'role_admin', permission_key, '2026-01-01T00:00:00Z'
+FROM permissions
+WHERE permission_key IN (
+  'organization.departments.view', 'organization.departments.manage',
+  'organization.positions.view', 'organization.positions.manage',
+  'organization.levels.view',
+  'organization.levelRoleTemplates.view', 'organization.levelRoleTemplates.manage',
+  'employees.structure.view', 'employees.structure.manage'
+);
+
+INSERT OR IGNORE INTO role_permissions (id, company_id, role_id, permission_key, created_at)
+SELECT 'rp_hr_employee_structure_' || replace(permission_key, '.', '_'), 'company_seed_default', 'role_hr_officer', permission_key, '2026-01-01T00:00:00Z'
+FROM permissions
+WHERE permission_key IN (
+  'organization.departments.view', 'organization.departments.manage',
+  'organization.positions.view', 'organization.positions.manage',
+  'organization.levels.view',
+  'organization.levelRoleTemplates.view', 'organization.levelRoleTemplates.manage',
+  'employees.structure.view', 'employees.structure.manage'
 );
 
 INSERT OR IGNORE INTO role_permissions (id, company_id, role_id, permission_key, created_at)

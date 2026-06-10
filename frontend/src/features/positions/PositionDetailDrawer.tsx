@@ -19,6 +19,11 @@ export const PositionDetailDrawer = ({ position, open, canEdit, onOpenChange, on
         { label: "Name", value: position.title },
         { label: "Code", value: position.code ?? "Not set" },
         { label: "Department", value: position.department_name ?? position.department_id ?? "Not assigned" },
+        { label: "Level", value: `Level ${position.level ?? 1}` },
+        { label: "Default role", value: position.default_role_name ?? "Manual assignment" },
+        { label: "Lower-level management", value: position.can_manage_lower_levels ? "Allowed" : "Not allowed" },
+        { label: "Department approver candidate", value: position.can_act_as_department_approver ? "Yes" : "No" },
+        { label: "Description", value: position.description ?? "Not recorded" },
         { label: "Default salary", value: displayMoney(position.default_salary_amount) },
         { label: "Status", value: <StatusBadge status={position.status} /> },
       ]} />

@@ -11,8 +11,13 @@ const parse = <T extends z.ZodTypeAny>(schema: T, payload: unknown): z.infer<T> 
 };
 const writeSchema = z.object({
   title: z.string().trim().min(1, "Position title is required."),
-  department_id: z.string().trim().nullable().optional(),
+  department_id: z.string().trim().min(1, "Department is required."),
   code: z.string().trim().nullable().optional(),
+  description: z.string().trim().max(500, "Description must be 500 characters or fewer.").nullable().optional(),
+  level: z.coerce.number().int().min(1, "Level must be between 1 and 4.").max(4, "Level must be between 1 and 4.").default(1),
+  default_role_id: z.string().trim().nullable().optional(),
+  can_manage_lower_levels: z.coerce.boolean().default(false),
+  can_act_as_department_approver: z.coerce.boolean().default(false),
   default_salary_amount: z.number().int("Default salary must be stored as integer minor units.").nullable().optional(),
   status: z.enum(POSITION_STATUSES).default("active"),
 });
@@ -21,6 +26,7 @@ export const validatePositionFilters = (query: Record<string, string | undefined
     z.object({
       search: z.string().trim().optional(),
       department_id: z.string().trim().optional(),
+      level: z.coerce.number().int().min(1).max(4).optional(),
       status: z.enum(POSITION_STATUSES).optional(),
       page: z.coerce.number().int().min(1).default(1),
       page_size: z.coerce.number().int().min(1).max(100).default(25),

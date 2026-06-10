@@ -37,6 +37,9 @@ export interface Employee {
   department_name?: string | null;
   position_id?: string | null;
   position_title?: string | null;
+  level?: number | null;
+  structure_updated_at?: string | null;
+  structure_updated_by?: string | null;
   employment_status: EmploymentStatus;
   joined_at?: string | null;
   contract_type?: string | null;
@@ -126,6 +129,53 @@ export interface EmployeeLoginDetails {
   two_factor_enabled: boolean;
   two_factor_status: "enabled" | "available_after_first_login";
   last_login_at: string | null;
+}
+
+export interface EmployeeStructure {
+  employee_id: string;
+  employee_code: string;
+  full_name: string;
+  department_id: string | null;
+  department_name: string | null;
+  position_id: string | null;
+  position_title: string | null;
+  level: number | null;
+  structure_updated_at?: string | null;
+  structure_updated_by?: string | null;
+  linked_user_id?: string | null;
+}
+
+export interface EmployeeStructurePayload {
+  department_id: string;
+  position_id: string;
+  reason?: string | null;
+  effective_from?: string | null;
+}
+
+export interface EmployeeStructureHistoryRow {
+  id: string;
+  previous_department_id: string | null;
+  previous_department_name?: string | null;
+  previous_position_id: string | null;
+  previous_position_title?: string | null;
+  previous_level: number | null;
+  new_department_id: string;
+  new_department_name?: string | null;
+  new_position_id: string;
+  new_position_title?: string | null;
+  new_level: number;
+  reason?: string | null;
+  effective_from: string;
+  effective_to?: string | null;
+  changed_by: string;
+  created_at: string;
+}
+
+export interface ApplyLevelRoleTemplateResult {
+  employee_id: string;
+  linked_user_id: string | null;
+  added: Array<{ role_id: string; role_name: string | null }>;
+  skipped: Array<{ role_id: string; role_name: string | null; reason: string }>;
 }
 
 export type EmployeeLoginCreateResponse = EmployeeLoginDetails;

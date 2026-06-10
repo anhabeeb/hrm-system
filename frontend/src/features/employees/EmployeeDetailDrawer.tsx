@@ -38,6 +38,8 @@ interface EmployeeDetailDrawerProps {
   onDisableLogin?: (employee: Employee) => void;
   onResetLoginPassword?: (employee: Employee) => void;
   onLinkExistingLogin?: (employee: Employee) => void;
+  onManageStructure?: (employee: Employee) => void;
+  onApplyLevelRoleTemplate?: (employee: Employee) => void;
   canEdit: boolean;
   canCreateLogin: boolean;
   canEditLogin: boolean;
@@ -45,6 +47,8 @@ interface EmployeeDetailDrawerProps {
   canEnableLogin: boolean;
   canResetLoginPassword: boolean;
   canLinkExistingLogin: boolean;
+  canManageStructure: boolean;
+  canApplyLevelRoleTemplate: boolean;
   canManageJobChange: boolean;
   canViewSalary: boolean;
   canEditSalary: boolean;
@@ -69,6 +73,8 @@ export const EmployeeDetailDrawer = ({
   onDisableLogin,
   onResetLoginPassword,
   onLinkExistingLogin,
+  onManageStructure,
+  onApplyLevelRoleTemplate,
   canEdit,
   canCreateLogin,
   canEditLogin,
@@ -76,6 +82,8 @@ export const EmployeeDetailDrawer = ({
   canEnableLogin,
   canResetLoginPassword,
   canLinkExistingLogin,
+  canManageStructure,
+  canApplyLevelRoleTemplate,
   canManageJobChange,
   canViewSalary,
   canEditSalary,
@@ -129,6 +137,19 @@ export const EmployeeDetailDrawer = ({
           { label: "Outlet", value: employee.primary_outlet_name ?? employee.primary_outlet_id ?? "Not assigned" },
           { label: "Department", value: employee.department_name ?? "Not assigned" },
           { label: "Position", value: employee.position_title ?? "Not assigned" },
+          { label: "Level", value: employee.level ? `Level ${employee.level}` : "Unassigned" },
+          { label: "Structure updated", value: displayDate(employee.structure_updated_at) },
+          ...(canManageStructure || (employee.has_login && canApplyLevelRoleTemplate)
+            ? [{
+                label: "Structure actions",
+                value: (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {canManageStructure ? <Button size="sm" variant="outline" onClick={() => onManageStructure?.(employee)}>Edit structure</Button> : null}
+                    {employee.has_login && canApplyLevelRoleTemplate ? <Button size="sm" variant="outline" onClick={() => onApplyLevelRoleTemplate?.(employee)}>Apply level roles</Button> : null}
+                  </div>
+                ),
+              }]
+            : []),
           { label: "Joined date", value: displayDate(employee.joined_at) },
           { label: "Contract type", value: employee.contract_type ?? "Not available" },
         ]}

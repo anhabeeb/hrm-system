@@ -411,7 +411,10 @@ const normalizeEmployeeForPersist = (input: EmployeePersistInput): EmployeePersi
     normalized.nationality = "Maldives";
   }
 
-  return normalized;
+  return {
+    ...normalized,
+    level: input.level ?? null,
+  };
 };
 
 const ensureIdentityRequirements = (input: EmployeePersistInput) => {
@@ -659,7 +662,7 @@ const ensureReferenceData = async (
   env: Env,
   context: AuthActor,
   input: Pick<EmployeeWriteInput, "primary_outlet_id" | "department_id" | "position_id">,
-) => {
+): Promise<{ position: Awaited<ReturnType<typeof employeesRepository.findPosition>> | null }> => {
   const outlet = await employeesRepository.findActiveOutlet(
     env,
     context.companyId,
@@ -686,8 +689,10 @@ const ensureReferenceData = async (
     }
   }
 
+  let position: Awaited<ReturnType<typeof employeesRepository.findPosition>> | null = null;
+
   if (input.position_id) {
-    const position = await employeesRepository.findPosition(
+    position = await employeesRepository.findPosition(
       env,
       context.companyId,
       input.position_id,
@@ -696,7 +701,15 @@ const ensureReferenceData = async (
     if (!position || position.status !== "active") {
       throw new ValidationError("Please choose an active position.");
     }
+
+    if (input.department_id && position.department_id && position.department_id !== input.department_id) {
+      throw new ValidationError("Choose a position that belongs to the selected department.", {
+        position_id: "Choose a position that belongs to the selected department.",
+      });
+    }
   }
+
+  return { position };
 };
 
 const mergeEmployee = (
@@ -1537,7 +1550,8 @@ export const createEmployee = async (
   });
 
   ensureIdentityRequirements(generatedInput);
-  await ensureReferenceData(env, context, generatedInput);
+  const { position } = await ensureReferenceData(env, context, generatedInput);
+  generatedInput.level = position?.level ?? null;
   await ensureUniqueIdentity(env, context.companyId, generatedInput);
 
   const employeeId = createEntityId("emp");
@@ -1563,6 +1577,22 @@ export const createEmployee = async (
       statusCode: 500,
       retryable: true,
       cause: error,
+    });
+  }
+  if (generatedInput.department_id && generatedInput.position_id && generatedInput.level) {
+    await employeesRepository.createStructureHistory(env, {
+      id: createPrefixedId("emp_struct_hist"),
+      companyId: context.companyId,
+      employeeId,
+      previousDepartmentId: null,
+      previousPositionId: null,
+      previousLevel: null,
+      newDepartmentId: generatedInput.department_id,
+      newPositionId: generatedInput.position_id,
+      newLevel: generatedInput.level,
+      reason: "Employee created",
+      effectiveFrom: generatedInput.joined_at ?? nowIso().slice(0, 10),
+      changedBy: context.actorUserId,
     });
   }
   await ensureAudit(env, context, {
@@ -1622,7 +1652,8 @@ export const updateEmployee = async (
 
   const merged = normalizeEmployeeForPersist(mergeEmployee(existing, normalizeEmployeeInput(input)));
   ensureIdentityRequirements(merged);
-  await ensureReferenceData(env, context, merged);
+  const { position } = await ensureReferenceData(env, context, merged);
+  merged.level = position?.level ?? null;
   await ensureUniqueIdentity(env, context.companyId, merged, employeeId);
 
   const sensitiveFieldsChanged =
@@ -1662,6 +1693,32 @@ export const updateEmployee = async (
       effectiveFrom: nowIso().slice(0, 10),
       reason: "Employee updated",
       createdBy: context.actorUserId,
+    });
+  }
+
+  if (
+    merged.department_id &&
+    merged.position_id &&
+    merged.level &&
+    (merged.department_id !== existing.department_id ||
+      merged.position_id !== existing.position_id ||
+      merged.level !== existing.level)
+  ) {
+    const effectiveFrom = nowIso().slice(0, 10);
+    await employeesRepository.closeOpenStructureHistory(env, context.companyId, employeeId, effectiveFrom);
+    await employeesRepository.createStructureHistory(env, {
+      id: createPrefixedId("emp_struct_hist"),
+      companyId: context.companyId,
+      employeeId,
+      previousDepartmentId: existing.department_id,
+      previousPositionId: existing.position_id,
+      previousLevel: existing.level,
+      newDepartmentId: merged.department_id,
+      newPositionId: merged.position_id,
+      newLevel: merged.level,
+      reason: "Employee updated",
+      effectiveFrom,
+      changedBy: context.actorUserId,
     });
   }
 

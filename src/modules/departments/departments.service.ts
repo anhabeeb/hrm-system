@@ -30,13 +30,26 @@ const ensure = async (env: Env, companyId: string, id: string) => {
 const merge = (existing: DepartmentRecord, input: Partial<DepartmentWriteInput>): DepartmentWriteInput & { deleted_at?: string | null } => ({
   name: input.name ?? existing.name,
   code: input.code !== undefined ? input.code : existing.code,
+  description: input.description !== undefined ? input.description : existing.description ?? null,
+  head_employee_id: input.head_employee_id !== undefined ? input.head_employee_id : existing.head_employee_id ?? null,
+  day_to_day_management_min_level: input.day_to_day_management_min_level ?? existing.day_to_day_management_min_level ?? 3,
   status: input.status ?? existing.status,
+  archived_at: existing.archived_at ?? null,
   deleted_at: existing.deleted_at,
 });
 const unique = async (env: Env, companyId: string, code?: string | null, currentId?: string) => {
   if (!code) return;
   const existing = await departmentsRepository.findDepartmentByCode(env, companyId, code);
   if (existing && existing.id !== currentId) throw new ConflictError("This department code is already in use.");
+};
+const uniqueName = async (env: Env, companyId: string, name: string, currentId?: string) => {
+  const existing = await departmentsRepository.findDepartmentByName(env, companyId, name);
+  if (existing && existing.id !== currentId) throw new ConflictError("This department name is already in use.");
+};
+const validateHeadEmployee = async (env: Env, companyId: string, employeeId?: string | null) => {
+  if (!employeeId) return;
+  const employee = await departmentsRepository.findHeadEmployee(env, companyId, employeeId);
+  if (!employee) throw new ValidationError("Department head must be an employee in the same company.");
 };
 export const listDepartments = async (env: Env, context: AuthActor, filters: DepartmentFilters) => {
   const [total, rows] = await Promise.all([
@@ -49,8 +62,14 @@ export const listDepartments = async (env: Env, context: AuthActor, filters: Dep
 export const getDepartment = (env: Env, context: AuthActor, id: string) => ensure(env, context.companyId, id);
 export const createDepartment = async (env: Env, context: AuthActor, input: DepartmentWriteInput) => {
   await unique(env, context.companyId, input.code);
+  await uniqueName(env, context.companyId, input.name);
+  await validateHeadEmployee(env, context.companyId, input.head_employee_id);
   const id = createPrefixedId("dept");
-  await departmentsRepository.createDepartment(env, id, context.companyId, input);
+  await departmentsRepository.createDepartment(env, id, context.companyId, {
+    ...input,
+    created_by: context.actorUserId,
+    updated_by: context.actorUserId,
+  });
   await audit(env, context, "department_created", id, undefined, input);
   return { department: await ensure(env, context.companyId, id) };
 };
@@ -58,17 +77,39 @@ export const updateDepartment = async (env: Env, context: AuthActor, id: string,
   const existing = await ensure(env, context.companyId, id);
   const merged = merge(existing, input);
   await unique(env, context.companyId, merged.code, id);
-  await departmentsRepository.updateDepartment(env, context.companyId, id, merged);
+  await uniqueName(env, context.companyId, merged.name, id);
+  await validateHeadEmployee(env, context.companyId, merged.head_employee_id);
+  await departmentsRepository.updateDepartment(env, context.companyId, id, {
+    ...merged,
+    updated_by: context.actorUserId,
+  });
   await audit(env, context, "department_updated", id, existing, merged);
+  return { department: await ensure(env, context.companyId, id) };
+};
+export const setDepartmentStatus = async (env: Env, context: AuthActor, id: string, status: "active" | "disabled", reason?: string) => {
+  const existing = await ensure(env, context.companyId, id);
+  const merged = merge(existing, { status });
+  await departmentsRepository.updateDepartment(env, context.companyId, id, {
+    ...merged,
+    updated_by: context.actorUserId,
+  });
+  await audit(env, context, status === "active" ? "department_enabled" : "department_disabled", id, existing, merged, reason);
   return { department: await ensure(env, context.companyId, id) };
 };
 export const deleteDepartment = async (env: Env, context: AuthActor, id: string, reason: string) => {
   const existing = await ensure(env, context.companyId, id);
-  const assigned = await departmentsRepository.countAssignedEmployees(env, context.companyId, id);
-  if (assigned > 0) throw new ValidationError("This department has active employees assigned. Please reassign them before deleting it.");
+  const [assigned, positions] = await Promise.all([
+    departmentsRepository.countAssignedEmployees(env, context.companyId, id),
+    departmentsRepository.countAssignedPositions(env, context.companyId, id),
+  ]);
+  if (assigned > 0 || positions > 0) throw new ValidationError("This department has active employees or positions assigned. Please reassign them before archiving it.");
   const merged = merge(existing, { status: "disabled" });
   merged.deleted_at = new Date().toISOString();
-  await departmentsRepository.updateDepartment(env, context.companyId, id, merged);
-  await audit(env, context, "department_deleted", id, existing, merged, reason);
-  return { deleted: true };
+  merged.archived_at = merged.deleted_at;
+  await departmentsRepository.updateDepartment(env, context.companyId, id, {
+    ...merged,
+    updated_by: context.actorUserId,
+  });
+  await audit(env, context, "department_archived", id, existing, merged, reason);
+  return { archived: true };
 };
