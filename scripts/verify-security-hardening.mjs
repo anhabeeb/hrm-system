@@ -30,6 +30,25 @@ const assertContains = (label, text, pattern, hint) => {
   }
 };
 
+const extractFunctionBody = (text, functionName) => {
+  const start = text.indexOf(`const ${functionName} = async`);
+  if (start === -1) return "";
+  const arrow = text.indexOf("=>", start);
+  const bodyStart = text.indexOf("{", arrow);
+  if (arrow === -1 || bodyStart === -1) return "";
+
+  let depth = 0;
+  for (let index = bodyStart; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === "{") depth += 1;
+    if (char === "}") {
+      depth -= 1;
+      if (depth === 0) return text.slice(bodyStart, index + 1);
+    }
+  }
+  return "";
+};
+
 const app = read("src/app.ts");
 const workerEntrypoint = read("src/index.ts");
 const packageJson = read("package.json");
@@ -59,6 +78,10 @@ const notificationsSafety = read("src/modules/notifications/notification-safety.
 const auditLogs = read("src/modules/audit-logs/audit-logs.service.ts");
 const securityTests = exists("tests/security-hardening.test.ts") ? read("tests/security-hardening.test.ts") : "";
 const authTests = exists("tests/auth.test.ts") ? read("tests/auth.test.ts") : "";
+const createLoginSessionBody = extractFunctionBody(authService, "createLoginSession");
+const authServiceOutsideCreateLoginSession = createLoginSessionBody
+  ? authService.replace(createLoginSessionBody, "")
+  : authService;
 
 assertContains("app", app, "securityHeadersMiddleware", "security headers middleware must be mounted.");
 assertContains("app", app, "unsafeRequestGuardMiddleware", "unsafe request guard middleware must be mounted.");
@@ -136,10 +159,13 @@ assertContains("session settings", settingsService, "concurrent_session_policy",
 assertContains("session settings", settingsService, "block_new_login", "block_new_login must be the safe default concurrent session policy.");
 assertContains(
   "session creation",
-  authService,
-  /const createLoginSession[\s\S]*getSessionSecuritySettings\(env,\s*user\.company_id\)[\s\S]*enforceConcurrentSessionPolicy\(env,\s*user,\s*request,\s*sessionSettings\)[\s\S]*createSessionToken\(env\.SESSION_SECRET,\s*sessionSettings,\s*\{[\s\S]*rememberMe:\s*options\.rememberMe === true && sessionSettings\.remember_me_allowed[\s\S]*authRepository\.createSession/,
+  createLoginSessionBody,
+  /getSessionSecuritySettings\(env,\s*user\.company_id\)[\s\S]*enforceConcurrentSessionPolicy\(env,\s*user,\s*request,\s*sessionSettings\)[\s\S]*createSessionToken\(env\.SESSION_SECRET,\s*sessionSettings,\s*\{[\s\S]*rememberMe:\s*options\.rememberMe === true && sessionSettings\.remember_me_allowed[\s\S]*authRepository\.createSession/,
   "login/session creation must go through the concurrent-policy helper and use configured timeout/remember-me settings.",
 );
+if (authServiceOutsideCreateLoginSession.includes("authRepository.createSession")) {
+  failures.push("src/modules/auth/auth.service.ts: authRepository.createSession must only be called inside createLoginSession.");
+}
 assertContains("session creation", session, /session_timeout_minutes[\s\S]*SESSION_TTL_DAYS/, "session_timeout_minutes = 0/null must fall back to a safe cookie/session max instead of expiring immediately.");
 assertContains("auth middleware", authMiddleware, /getSessionSecuritySettings[\s\S]*absoluteExpired[\s\S]*idleExpired[\s\S]*sessionExpired/, "auth middleware must enforce absolute and idle session timeout settings.");
 assertContains("auth middleware", authMiddleware, /createAuditLog[\s\S]*session_expired_idle_timeout/, "idle session expiry must be audited safely.");
@@ -157,8 +183,8 @@ assertContains("auth login concurrent sessions", authService, "ACTIVE_SESSION_EX
 assertContains("auth login concurrent sessions", authService, "enforceConcurrentSessionPolicy", "login must enforce concurrent session policy before session creation.");
 assertContains("auth login concurrent sessions", authService, /listUnrevokedSessionsForUser[\s\S]*isSessionActive[\s\S]*concurrent_session_policy/, "active session check must use stored sessions, timeout logic, and configured policy.");
 assertContains("auth login concurrent sessions", authService, /revoke_old_session[\s\S]*revokeUserSessions/, "revoke_old_session policy must revoke previous active sessions.");
-assertContains("auth login concurrent sessions", authService, /const sessionToken = await createLoginSession\(env,\s*user,\s*request,\s*\{ rememberMe: input\.remember_me === true \}\)/, "normal login must create sessions only through the concurrent-policy helper.");
-assertContains("auth login concurrent sessions", authService, /const sessionToken = await createLoginSession\(env,\s*user,\s*request,\s*\{ rememberMe: challenge\.remember_me \}\)/, "2FA completion must create sessions only through the concurrent-policy helper.");
+assertContains("auth login concurrent sessions", authService, /createLoginSession\(env,\s*user,\s*request,\s*\{\s*rememberMe:\s*input\.remember_me === true\s*\}\)/, "normal login must create sessions only through the concurrent-policy helper with remember-me context.");
+assertContains("auth login concurrent sessions", authService, /createLoginSession\(env,\s*user,\s*request,\s*\{\s*rememberMe:\s*challenge\.remember_me\s*\}\)/, "2FA completion must create sessions only through the concurrent-policy helper with remembered challenge context.");
 assertContains("auth sessions routes", authRoutes, /\/auth\/sessions[\s\S]*auth\.sessions\.view_own[\s\S]*\/auth\/sessions\/:id\/revoke[\s\S]*auth\.sessions\.revoke_own/, "own session APIs must have explicit permissions.");
 assertContains("user session routes", usersRoutes, /\/:id\/sessions[\s\S]*users\.sessions\.view[\s\S]*\/:id\/sessions\/:sessionId\/revoke[\s\S]*users\.sessions\.revoke[\s\S]*\/:id\/sessions\/revoke-all[\s\S]*users\.sessions\.revoke_all/, "admin session APIs must have explicit user-session permissions.");
 assertContains("session repository", authRepository, /listUnrevokedSessionsForUser[\s\S]*WHERE company_id = \? AND user_id = \? AND revoked_at IS NULL/, "session list queries must be company/user scoped and unrevoked.");
