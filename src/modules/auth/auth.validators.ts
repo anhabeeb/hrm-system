@@ -43,7 +43,7 @@ const totpCodeSchema = z
   .trim()
   .regex(/^\d{6}$/, "Please enter the 6-digit Google Authenticator code.");
 
-const parse = <T>(schema: z.ZodType<T>, payload: unknown): T => {
+const parse = <T>(schema: z.ZodType<T, z.ZodTypeDef, unknown>, payload: unknown): T => {
   const result = schema.safeParse(payload);
 
   if (!result.success) {
@@ -60,6 +60,8 @@ export const validateLoginInput = (payload: unknown): LoginInput =>
         identifier: loginIdentifierSchema.optional(),
         email: loginIdentifierSchema.optional(),
         password: passwordSchema,
+        remember_me: z.boolean().optional(),
+        rememberMe: z.boolean().optional(),
         totp_code: z.string().trim().optional(),
         backup_code: z.string().trim().optional(),
       })
@@ -69,6 +71,7 @@ export const validateLoginInput = (payload: unknown): LoginInput =>
           identifier,
           email: value.email?.trim().toLowerCase(),
           password: value.password,
+          remember_me: value.remember_me ?? value.rememberMe ?? false,
           totp_code: value.totp_code,
           backup_code: value.backup_code,
         };

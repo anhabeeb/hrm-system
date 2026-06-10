@@ -70,6 +70,7 @@ export const settingsPageDefinitions: Record<string, SettingsPageDefinition> = {
           { key: "allow_admin_session_override", label: "Allow admin session override", type: "switch" },
           { key: "session_device_tracking_enabled", label: "Session device tracking enabled", type: "switch" },
           { key: "remember_me_allowed", label: "Remember-me allowed", type: "switch" },
+          { key: "remember_me_session_days", label: "Remember-me session days", type: "number" },
           { key: "failed_login_limit", label: "Max failed attempts", type: "number" },
           { key: "lock_minutes", label: "Lockout duration minutes", type: "number" },
           { key: "reset_token_expiry_minutes", label: "Reset token expiry minutes", type: "number" },

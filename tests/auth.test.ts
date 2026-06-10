@@ -12,6 +12,8 @@ const defaultSessionSettings = () => ({
   concurrent_session_policy: "block_new_login" as "block_new_login" | "revoke_old_session",
   allow_admin_session_override: false,
   session_device_tracking_enabled: true,
+  remember_me_allowed: false,
+  remember_me_session_days: null as number | null,
 });
 
 const authRepoMock = vi.hoisted(() => {
@@ -94,6 +96,7 @@ const authRepoMock = vi.hoisted(() => {
       userAgent: string | null;
       deviceId: string | null;
       expiresAt: string;
+      rememberMe?: boolean;
       deviceLabel?: string | null;
       userAgentSummary?: string | null;
       ipSummary?: string | null;
@@ -107,6 +110,7 @@ const authRepoMock = vi.hoisted(() => {
         user_agent: session.userAgent,
         device_id: session.deviceId,
         expires_at: session.expiresAt,
+        remember_me: session.rememberMe ? 1 : 0,
         revoked_at: null,
         created_at: new Date().toISOString(),
         last_seen_at: new Date().toISOString(),
@@ -223,6 +227,8 @@ const settingsServiceMock = vi.hoisted(() => ({
     concurrent_session_policy: "block_new_login" as "block_new_login" | "revoke_old_session",
     allow_admin_session_override: false,
     session_device_tracking_enabled: true,
+    remember_me_allowed: false,
+    remember_me_session_days: null as number | null,
   },
   getSessionSecuritySettings: vi.fn(async () => settingsServiceMock.settings),
 }));
@@ -275,6 +281,7 @@ const createSessionRecord = (overrides: Partial<SessionRecord> = {}): SessionRec
   user_agent: "Mozilla/5.0 Chrome/120.0 device details",
   device_id: null,
   expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+  remember_me: 0,
   revoked_at: null,
   created_at: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
   last_seen_at: new Date(Date.now() - 60 * 1000).toISOString(),
@@ -548,6 +555,68 @@ describe("single active session policy", () => {
     });
   });
 
+  it("remember_me is ignored when the company setting is disabled", async () => {
+    const authService = await import("../src/modules/auth/auth.service");
+    settingsServiceMock.settings = {
+      ...defaultSessionSettings(),
+      session_timeout_minutes: 5,
+      remember_me_allowed: false,
+      remember_me_session_days: 30,
+    };
+
+    await authService.login(
+      testEnv,
+      { email: "twofactor@example.com", password: "SecurePass123", remember_me: true },
+      testRequest,
+    );
+
+    const expiresAt = Date.parse(authRepoMock.state.sessions[0]?.expires_at ?? "");
+    expect(expiresAt).toBeGreaterThan(Date.now() + 4 * 60 * 1000);
+    expect(expiresAt).toBeLessThan(Date.now() + 10 * 60 * 1000);
+    expect(authRepoMock.state.sessions[0]?.remember_me).toBe(0);
+  });
+
+  it("remember_me=false uses normal session timeout even when remember me is enabled", async () => {
+    const authService = await import("../src/modules/auth/auth.service");
+    settingsServiceMock.settings = {
+      ...defaultSessionSettings(),
+      session_timeout_minutes: 5,
+      remember_me_allowed: true,
+      remember_me_session_days: 30,
+    };
+
+    await authService.login(
+      testEnv,
+      { email: "twofactor@example.com", password: "SecurePass123", remember_me: false },
+      testRequest,
+    );
+
+    const expiresAt = Date.parse(authRepoMock.state.sessions[0]?.expires_at ?? "");
+    expect(expiresAt).toBeGreaterThan(Date.now() + 4 * 60 * 1000);
+    expect(expiresAt).toBeLessThan(Date.now() + 10 * 60 * 1000);
+    expect(authRepoMock.state.sessions[0]?.remember_me).toBe(0);
+  });
+
+  it("remember_me=true creates a longer backend-controlled session when enabled", async () => {
+    const authService = await import("../src/modules/auth/auth.service");
+    settingsServiceMock.settings = {
+      ...defaultSessionSettings(),
+      session_timeout_minutes: 5,
+      remember_me_allowed: true,
+      remember_me_session_days: 30,
+    };
+
+    await authService.login(
+      testEnv,
+      { email: "twofactor@example.com", password: "SecurePass123", remember_me: true },
+      testRequest,
+    );
+
+    const expiresAt = Date.parse(authRepoMock.state.sessions[0]?.expires_at ?? "");
+    expect(expiresAt).toBeGreaterThan(Date.now() + 29 * 24 * 60 * 60 * 1000);
+    expect(authRepoMock.state.sessions[0]?.remember_me).toBe(1);
+  });
+
   it("blocks a second login when concurrent_session_policy is block_new_login", async () => {
     const authService = await import("../src/modules/auth/auth.service");
     authRepoMock.state.sessions.push(createSessionRecord({ id: "sess_existing" }));
@@ -797,6 +866,36 @@ describe("auth two-factor setup and login challenge", () => {
     expect(JSON.stringify(result.response.user)).not.toContain("secret");
     expect(result.cookie).toContain("session=");
     expect(authRepoMock.state.sessions).toHaveLength(1);
+  });
+
+  it("creates a remembered session after a valid 2FA challenge when remember_me is enabled", async () => {
+    const authService = await import("../src/modules/auth/auth.service");
+    settingsServiceMock.settings = {
+      ...defaultSessionSettings(),
+      session_timeout_minutes: 5,
+      remember_me_allowed: true,
+      remember_me_session_days: 30,
+    };
+
+    const setup = await authService.setupTwoFactor(testEnv, "user_2fa", testRequest);
+    const setupCode = await authService.generateTotpCodeForSecret(setup.response.manual_setup_key);
+    await authService.verifyTwoFactor(testEnv, "user_2fa", { code: setupCode }, testRequest);
+    const challenge = await authService.login(
+      testEnv,
+      { email: "twofactor@example.com", password: "SecurePass123", remember_me: true },
+      testRequest,
+    );
+    const loginCode = await authService.generateTotpCodeForSecret(setup.response.manual_setup_key);
+
+    await authService.verifyLoginTwoFactorChallenge(
+      testEnv,
+      { challenge_id: challenge.response.challenge_id as string, code: loginCode },
+      testRequest,
+    );
+
+    expect(authRepoMock.state.sessions).toHaveLength(1);
+    expect(authRepoMock.state.sessions[0]?.remember_me).toBe(1);
+    expect(Date.parse(authRepoMock.state.sessions[0]?.expires_at ?? "")).toBeGreaterThan(Date.now() + 29 * 24 * 60 * 60 * 1000);
   });
 
   it("rejects invalid setup confirmation codes with a user-friendly code", async () => {

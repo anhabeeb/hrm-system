@@ -27,6 +27,7 @@ export interface BootstrapInitializeInput {
 
 export interface BootstrapStatus {
   setup_required: boolean;
+  remember_me_allowed?: boolean;
 }
 
 export interface SystemBootstrapRow {

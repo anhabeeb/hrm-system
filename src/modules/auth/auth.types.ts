@@ -45,6 +45,7 @@ export interface SessionRecord {
   user_agent: string | null;
   device_id: string | null;
   expires_at: string;
+  remember_me: number;
   revoked_at: string | null;
   created_at: string;
   last_seen_at: string | null;
@@ -64,6 +65,7 @@ export interface SafeSessionRecord {
   created_at: string;
   last_seen_at: string | null;
   expires_at: string;
+  remember_me?: boolean;
   revoked_at: string | null;
 }
 
@@ -99,6 +101,7 @@ export interface LoginInput {
   identifier?: string;
   email?: string;
   password: string;
+  remember_me?: boolean;
   totp_code?: string;
   backup_code?: string;
 }

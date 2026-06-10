@@ -137,6 +137,9 @@ describe("frontend completed-phase hardening coverage", () => {
     expect(toastProvider).toContain("showToast");
     expect(toastProvider).toContain("dismissToast");
     expect(toastProvider).toContain("window.setTimeout");
+    expect(toastProvider).toContain("useLocation");
+    expect(toastProvider).toContain("location.pathname");
+    expect(toastProvider).toContain('toast.persistent && toast.type !== "loading"');
     expect(toastViewport).toContain("aria-live");
     expect(toastViewport).toContain("Dismiss notification");
     expect(useToast).toContain("success: 3000");
@@ -178,8 +181,12 @@ describe("frontend completed-phase hardening coverage", () => {
     const authStore = read("frontend/src/features/auth/auth.store.tsx");
 
     expect(loginPage).toContain('name="identifier"');
+    expect(loginPage).toContain('name="remember_me"');
     expect(loginPage).toContain("Username or email");
     expect(loginPage).toContain("Enter your username or email");
+    expect(loginPage).toContain("Remember me");
+    expect(loginPage).toContain("rememberMeAllowed && values.remember_me === true");
+    expect(loginPage).toContain("bootstrapApi.status");
     expect(loginPage).toContain("identifier: values.identifier.trim()");
     expect(loginPage).not.toContain('name="email"');
     expect(loginSchema).toContain("identifier:");
@@ -187,6 +194,7 @@ describe("frontend completed-phase hardening coverage", () => {
     expect(loginSchema).not.toContain(".email(");
     expect(authTypes).toContain("identifier: string");
     expect(authStore).toContain("identifier: input.identifier");
+    expect(authStore).toContain("remember_me: input.remember_me");
     expect(authStore).not.toContain("email: input.email");
   });
 
@@ -201,10 +209,11 @@ describe("frontend completed-phase hardening coverage", () => {
   });
 
   it("removes browser alert usage while preserving persistent blocking alert components", () => {
-    const offenders = frontendFiles().filter(({ text }) => /window\.alert\s*\(|\balert\s*\(/.test(text));
+    const offenders = frontendFiles().filter(({ text }) => /window\.alert\s*\(|\balert\s*\(|window\.confirm\s*\(|\bconfirm\s*\(/.test(text));
 
     expect(offenders.map((file) => file.relative)).toEqual([]);
     expect("window.alert").toBe("window.alert");
+    expect("window.confirm").toBe("window.confirm");
     expect(read("frontend/src/components/feedback/AppErrorAlert.tsx")).toContain("AppErrorAlert");
     expect(read("frontend/src/components/feedback/InlineAlert.tsx")).toContain("InlineAlert");
   });

@@ -210,7 +210,7 @@ const isSessionActive = (
   if (session.revoked_at) return false;
   const expiresAt = new Date(session.expires_at).getTime();
   if (!Number.isFinite(expiresAt) || expiresAt <= now) return false;
-  if (settings.session_timeout_minutes) {
+  if (session.remember_me !== 1 && settings.session_timeout_minutes) {
     const createdAt = new Date(session.created_at).getTime();
     if (Number.isFinite(createdAt) && createdAt + minutesToMs(settings.session_timeout_minutes) <= now) return false;
   }
@@ -230,6 +230,7 @@ const safeSession = (session: SessionRecord, currentSessionId?: string | null): 
   created_at: session.created_at,
   last_seen_at: session.last_seen_at,
   expires_at: session.expires_at,
+  remember_me: session.remember_me === 1,
   revoked_at: session.revoked_at,
 });
 
@@ -292,10 +293,13 @@ const createLoginSession = async (
   env: Env,
   user: UserRecord,
   request: AuthenticatedRequestContext,
+  options: { rememberMe?: boolean } = {},
 ) => {
   const sessionSettings = await getSessionSecuritySettings(env, user.company_id);
   await enforceConcurrentSessionPolicy(env, user, request, sessionSettings);
-  const sessionToken = await createSessionToken(env.SESSION_SECRET, sessionSettings);
+  const sessionToken = await createSessionToken(env.SESSION_SECRET, sessionSettings, {
+    rememberMe: options.rememberMe === true && sessionSettings.remember_me_allowed,
+  });
 
   await authRepository.createSession(env, {
     id: sessionToken.id,
@@ -306,6 +310,7 @@ const createLoginSession = async (
     userAgent: request.userAgent,
     deviceId: request.deviceId,
     expiresAt: sessionToken.expiresAt,
+    rememberMe: sessionToken.rememberMe,
     deviceLabel: sessionSettings.session_device_tracking_enabled ? safeDeviceLabel(request) : null,
     userAgentSummary: sessionSettings.session_device_tracking_enabled ? safeUserAgentSummary(request.userAgent) : null,
     ipSummary: sessionSettings.session_device_tracking_enabled ? safeIpSummary(request.ipAddress) : null,
@@ -344,10 +349,11 @@ const signChallengePayload = async (payload: string, secret: string): Promise<st
   return bytesToBase64(signature).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 };
 
-const createTwoFactorChallenge = async (env: Env, user: UserRecord): Promise<string> => {
+const createTwoFactorChallenge = async (env: Env, user: UserRecord, rememberMe = false): Promise<string> => {
   const payload = base64UrlEncode(JSON.stringify({
     user_id: user.id,
     company_id: user.company_id,
+    remember_me: rememberMe,
     exp: Math.floor(Date.now() / 1000) + TWO_FACTOR_CHALLENGE_TTL_SECONDS,
     nonce: bytesToBase64(randomBytes(12)),
   }));
@@ -355,7 +361,7 @@ const createTwoFactorChallenge = async (env: Env, user: UserRecord): Promise<str
   return `${payload}.${signature}`;
 };
 
-const verifyTwoFactorChallenge = async (env: Env, challengeId: string): Promise<{ user_id: string; company_id: string }> => {
+const verifyTwoFactorChallenge = async (env: Env, challengeId: string): Promise<{ user_id: string; company_id: string; remember_me: boolean }> => {
   const [payload, signature] = challengeId.split(".");
   if (!payload || !signature) {
     throw new AppError({
@@ -376,7 +382,7 @@ const verifyTwoFactorChallenge = async (env: Env, challengeId: string): Promise<
       retryable: false,
     });
   }
-  const parsed = JSON.parse(base64UrlDecode(payload)) as { user_id?: string; company_id?: string; exp?: number };
+  const parsed = JSON.parse(base64UrlDecode(payload)) as { user_id?: string; company_id?: string; exp?: number; remember_me?: boolean };
   if (!parsed.user_id || !parsed.company_id || !parsed.exp || parsed.exp <= Math.floor(Date.now() / 1000)) {
     throw new AppError({
       code: "TWO_FACTOR_SETUP_EXPIRED",
@@ -386,7 +392,7 @@ const verifyTwoFactorChallenge = async (env: Env, challengeId: string): Promise<
       retryable: false,
     });
   }
-  return { user_id: parsed.user_id, company_id: parsed.company_id };
+  return { user_id: parsed.user_id, company_id: parsed.company_id, remember_me: parsed.remember_me === true };
 };
 
 const decodeBase32 = (value: string): Uint8Array => {
@@ -634,7 +640,8 @@ export const login = async (
     }
 
     if (!input.totp_code && !input.backup_code) {
-      const challengeId = await createTwoFactorChallenge(env, user);
+      const sessionSettings = await getSessionSecuritySettings(env, user.company_id);
+      const challengeId = await createTwoFactorChallenge(env, user, input.remember_me === true && sessionSettings.remember_me_allowed);
       return {
         response: {
           two_factor_required: true,
@@ -673,7 +680,7 @@ export const login = async (
   }
 
   await authRepository.resetFailedLogin(env, user.id);
-  const sessionToken = await createLoginSession(env, user, request);
+  const sessionToken = await createLoginSession(env, user, request, { rememberMe: input.remember_me === true });
   await audit(env, { action: "login_success", user, request });
 
   return {
@@ -738,7 +745,7 @@ export const verifyLoginTwoFactorChallenge = async (
   }
 
   await authRepository.resetFailedLogin(env, user.id);
-  const sessionToken = await createLoginSession(env, user, request);
+  const sessionToken = await createLoginSession(env, user, request, { rememberMe: challenge.remember_me });
   await audit(env, { action: backupValid ? "backup_code_used" : "login_success", user, request });
 
   return {

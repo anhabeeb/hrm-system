@@ -184,6 +184,7 @@ export const createSession = (
     userAgent: string | null;
     deviceId: string | null;
     expiresAt: string;
+    rememberMe?: boolean;
     deviceLabel?: string | null;
     userAgentSummary?: string | null;
     ipSummary?: string | null;
@@ -193,9 +194,9 @@ export const createSession = (
     env,
     `INSERT INTO sessions (
       id, company_id, user_id, session_token_hash, ip_address, user_agent,
-      device_id, expires_at, revoked_at, created_at, last_seen_at,
+      device_id, expires_at, remember_me, revoked_at, created_at, last_seen_at,
       device_label, user_agent_summary, ip_summary
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?)`,
     [
       session.id,
       session.companyId,
@@ -205,6 +206,7 @@ export const createSession = (
       session.userAgent,
       session.deviceId,
       session.expiresAt,
+      session.rememberMe ? 1 : 0,
       new Date().toISOString(),
       new Date().toISOString(),
       session.deviceLabel ?? null,
@@ -261,7 +263,7 @@ export const listUnrevokedSessionsForUser = (
   queryMany<SessionRecord>(
     env,
     `SELECT id, company_id, user_id, session_token_hash, ip_address, user_agent,
-            device_id, expires_at, revoked_at, created_at, last_seen_at,
+            device_id, expires_at, remember_me, revoked_at, created_at, last_seen_at,
             device_label, user_agent_summary, ip_summary, revoked_reason, revoked_by
        FROM sessions
       WHERE company_id = ? AND user_id = ? AND revoked_at IS NULL
@@ -278,7 +280,7 @@ export const findSessionById = (
   queryOne<SessionRecord>(
     env,
     `SELECT id, company_id, user_id, session_token_hash, ip_address, user_agent,
-            device_id, expires_at, revoked_at, created_at, last_seen_at,
+            device_id, expires_at, remember_me, revoked_at, created_at, last_seen_at,
             device_label, user_agent_summary, ip_summary, revoked_reason, revoked_by
        FROM sessions
       WHERE company_id = ? AND id = ?

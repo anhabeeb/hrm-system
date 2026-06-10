@@ -8,6 +8,7 @@ export interface NewSessionToken {
   token: string;
   tokenHash: string;
   expiresAt: string;
+  rememberMe: boolean;
 }
 
 export const createSessionToken = async (
@@ -18,13 +19,22 @@ export const createSessionToken = async (
     concurrent_session_policy: "block_new_login",
     allow_admin_session_override: false,
     session_device_tracking_enabled: true,
+    remember_me_allowed: false,
+    remember_me_session_days: null,
   },
+  options: { rememberMe?: boolean } = {},
 ): Promise<NewSessionToken> => {
   const token = generateSecureToken(48);
   const tokenHash = await hashToken(token, sessionSecret);
-  const ttlMs = settings.session_timeout_minutes && settings.session_timeout_minutes > 0
-    ? settings.session_timeout_minutes * 60 * 1000
-    : SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;
+  const rememberMe = settings.remember_me_allowed === true && options.rememberMe === true;
+  const rememberDays = rememberMe
+    ? settings.remember_me_session_days ?? 30
+    : null;
+  const ttlMs = rememberDays && rememberDays > 0
+    ? rememberDays * 24 * 60 * 60 * 1000
+    : settings.session_timeout_minutes && settings.session_timeout_minutes > 0
+      ? settings.session_timeout_minutes * 60 * 1000
+      : SESSION_TTL_DAYS * 24 * 60 * 60 * 1000;
   const expiresAt = new Date(
     Date.now() + ttlMs,
   ).toISOString();
@@ -34,6 +44,7 @@ export const createSessionToken = async (
     token,
     tokenHash,
     expiresAt,
+    rememberMe,
   };
 };
 

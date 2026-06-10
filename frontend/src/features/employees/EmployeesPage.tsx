@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { UserPlus } from "lucide-react";
 
@@ -70,6 +70,11 @@ export const EmployeesPage = () => {
     await queryClient.invalidateQueries({ queryKey: ["employees"] });
   };
 
+  const closeLoginDialog = useCallback(() => {
+    setLoginDialogOpen(false);
+    setLoginDialogMode("create");
+  }, []);
+
   const createMutation = useMutation({
     mutationFn: employeesApi.create,
     onSuccess: async () => {
@@ -102,7 +107,7 @@ export const EmployeesPage = () => {
     mutationFn: ({ id, payload }: { id: string; payload: EmployeeLoginCreatePayload }) => employeesApi.createLogin(id, payload),
     onSuccess: async () => {
       toastSuccess(toast, "Login account created for employee.");
-      setLoginDialogOpen(false);
+      closeLoginDialog();
       await refreshList();
       if (selectedEmployee) {
         const refreshed = await employeesApi.get(selectedEmployee.id);
@@ -118,7 +123,7 @@ export const EmployeesPage = () => {
     mutationFn: ({ id, payload }: { id: string; payload: EmployeeLoginUpdatePayload }) => employeesApi.updateLogin(id, payload),
     onSuccess: async () => {
       toastSuccess(toast, "Employee login access updated.");
-      setLoginDialogOpen(false);
+      closeLoginDialog();
       await refreshList();
       if (selectedEmployee) {
         const refreshed = await employeesApi.get(selectedEmployee.id);
@@ -132,7 +137,7 @@ export const EmployeesPage = () => {
     mutationFn: ({ id, payload }: { id: string; payload: EmployeeLoginResetPasswordPayload }) => employeesApi.resetLoginPassword(id, payload),
     onSuccess: async () => {
       toastSuccess(toast, "Temporary password reset for employee login.");
-      setLoginDialogOpen(false);
+      closeLoginDialog();
       await refreshList();
       if (selectedEmployee) {
         const refreshed = await employeesApi.get(selectedEmployee.id);
@@ -146,7 +151,7 @@ export const EmployeesPage = () => {
     mutationFn: ({ id, payload }: { id: string; payload: EmployeeLoginLinkExistingPayload }) => employeesApi.linkExistingLogin(id, payload),
     onSuccess: async () => {
       toastSuccess(toast, "Existing user linked to employee.");
-      setLoginDialogOpen(false);
+      closeLoginDialog();
       await refreshList();
       if (selectedEmployee) {
         const refreshed = await employeesApi.get(selectedEmployee.id);
@@ -323,7 +328,10 @@ export const EmployeesPage = () => {
           roles={rolesQuery.data?.data ?? []}
           outlets={outletsQuery.data?.data ?? []}
           loading={createLoginMutation.isPending || updateLoginMutation.isPending || resetLoginPasswordMutation.isPending || linkExistingLoginMutation.isPending}
-          onOpenChange={setLoginDialogOpen}
+          onOpenChange={(open) => {
+            if (open) setLoginDialogOpen(true);
+            else closeLoginDialog();
+          }}
           onSubmit={(payload) => {
             if (!selectedEmployee) return;
             if (loginDialogMode === "edit") {

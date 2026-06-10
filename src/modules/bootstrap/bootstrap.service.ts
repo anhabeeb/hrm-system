@@ -37,11 +37,15 @@ export const getBootstrapStatus = async (env: Env): Promise<BootstrapStatus> => 
   if (bootstrapState?.is_initialized === 1) {
     return {
       setup_required: false,
+      remember_me_allowed: bootstrapState.company_id
+        ? await repository.getRememberMeAllowed(env, bootstrapState.company_id).catch(() => false)
+        : false,
     };
   }
 
   return {
     setup_required: userCount === 0 && superAdminCount === 0 && companyCount === 0,
+    remember_me_allowed: false,
   };
 };
 

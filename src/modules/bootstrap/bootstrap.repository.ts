@@ -95,6 +95,23 @@ export const findSystemBootstrap = async (env: Env): Promise<SystemBootstrapRow 
   }
 };
 
+export const getRememberMeAllowed = async (env: Env, companyId: string): Promise<boolean> => {
+  const row = await one<{ setting_value_json: string | null }>(
+    env,
+    "SELECT setting_value_json FROM company_settings WHERE company_id = ? AND setting_key = 'security.default_rules' LIMIT 1",
+    [companyId],
+  );
+
+  if (!row?.setting_value_json) return false;
+
+  try {
+    const settings = JSON.parse(row.setting_value_json) as { remember_me_allowed?: unknown };
+    return settings.remember_me_allowed === true;
+  } catch {
+    return false;
+  }
+};
+
 export const markSystemBootstrapInitialized = async (
   env: Env,
   input: {

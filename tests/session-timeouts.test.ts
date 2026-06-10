@@ -21,6 +21,8 @@ const settingsMock = vi.hoisted(() => ({
     concurrent_session_policy: "block_new_login" as const,
     allow_admin_session_override: false,
     session_device_tracking_enabled: true,
+    remember_me_allowed: false,
+    remember_me_session_days: null as number | null,
   },
   getSessionSecuritySettings: vi.fn(async () => settingsMock.settings),
 }));
@@ -55,6 +57,8 @@ const sessionSettings = (overrides: Partial<typeof settingsMock.settings> = {}) 
   concurrent_session_policy: "block_new_login" as const,
   allow_admin_session_override: false,
   session_device_tracking_enabled: true,
+  remember_me_allowed: false,
+  remember_me_session_days: null,
   ...overrides,
 });
 
@@ -89,6 +93,7 @@ const baseSession = (overrides: Partial<SessionRecord> = {}): SessionRecord => (
   user_agent: "vitest",
   device_id: null,
   expires_at: isoMinutesFromNow(60),
+  remember_me: 0,
   revoked_at: null,
   created_at: isoMinutesAgo(10),
   last_seen_at: isoMinutesAgo(1),
@@ -165,6 +170,18 @@ describe("settings-driven session timeout enforcement", () => {
     expect(new Date(token.expiresAt).getTime()).toBeGreaterThan(now);
   });
 
+  it("remember_me extends cookie expiry only when company settings allow it", async () => {
+    const normalToken = await createSessionToken("secret", {
+      ...sessionSettings({ session_timeout_minutes: 5, remember_me_allowed: false, remember_me_session_days: 30 }),
+    }, { rememberMe: true });
+    const rememberedToken = await createSessionToken("secret", {
+      ...sessionSettings({ session_timeout_minutes: 5, remember_me_allowed: true, remember_me_session_days: 30 }),
+    }, { rememberMe: true });
+
+    expect(new Date(normalToken.expiresAt).getTime()).toBeLessThan(now + 10 * 60 * 1000);
+    expect(new Date(rememberedToken.expiresAt).getTime()).toBeGreaterThan(now + 29 * 24 * 60 * 60 * 1000);
+  });
+
   it("session_timeout_minutes = 0 with idle_timeout_minutes = 2 still expires by idle timeout", async () => {
     settingsMock.settings = sessionSettings({ idle_timeout_minutes: 2 });
     authRepoMock.session = baseSession({ created_at: isoMinutesAgo(20), last_seen_at: null });
@@ -184,6 +201,71 @@ describe("settings-driven session timeout enforcement", () => {
 
     expect(response.status).toBe(401);
     expect(authRepoMock.revokeSession).toHaveBeenCalledWith(env, "sess_1", "session_expired_absolute_timeout");
+    expect(authRepoMock.touchSession).not.toHaveBeenCalled();
+  });
+
+  it("remember_me=false with session_timeout_minutes = 5 expires after normal timeout", async () => {
+    settingsMock.settings = sessionSettings({ session_timeout_minutes: 5, remember_me_allowed: true, remember_me_session_days: 30 });
+    authRepoMock.session = baseSession({
+      remember_me: 0,
+      created_at: isoMinutesAgo(6),
+      last_seen_at: isoMinutesAgo(1),
+      expires_at: isoMinutesFromNow(30 * 24 * 60),
+    });
+
+    const response = await requestProtected();
+
+    expect(response.status).toBe(401);
+    expect(authRepoMock.revokeSession).toHaveBeenCalledWith(env, "sess_1", "session_expired_absolute_timeout");
+    expect(authRepoMock.touchSession).not.toHaveBeenCalled();
+  });
+
+  it("remember_me=true from a disabled setting is stored as normal and still expires after normal timeout", async () => {
+    settingsMock.settings = sessionSettings({ session_timeout_minutes: 5, remember_me_allowed: false, remember_me_session_days: 30 });
+    const token = await createSessionToken("secret", settingsMock.settings, { rememberMe: true });
+    authRepoMock.session = baseSession({
+      remember_me: token.rememberMe ? 1 : 0,
+      created_at: isoMinutesAgo(6),
+      last_seen_at: isoMinutesAgo(1),
+      expires_at: isoMinutesFromNow(60),
+    });
+
+    const response = await requestProtected();
+
+    expect(token.rememberMe).toBe(false);
+    expect(response.status).toBe(401);
+    expect(authRepoMock.revokeSession).toHaveBeenCalledWith(env, "sess_1", "session_expired_absolute_timeout");
+  });
+
+  it("remember_me=true with enabled setting does not expire at the normal absolute timeout", async () => {
+    settingsMock.settings = sessionSettings({ session_timeout_minutes: 5, remember_me_allowed: true, remember_me_session_days: 30 });
+    authRepoMock.session = baseSession({
+      remember_me: 1,
+      created_at: isoMinutesAgo(6),
+      last_seen_at: isoMinutesAgo(1),
+      expires_at: isoMinutesFromNow(30 * 24 * 60),
+    });
+
+    const response = await requestProtected();
+
+    expect(response.status).toBe(200);
+    expect(authRepoMock.revokeSession).not.toHaveBeenCalled();
+    expect(authRepoMock.touchSession).toHaveBeenCalledWith(env, "sess_1");
+  });
+
+  it("remember_me=true with enabled setting still expires when expires_at is reached", async () => {
+    settingsMock.settings = sessionSettings({ session_timeout_minutes: 5, remember_me_allowed: true, remember_me_session_days: 30 });
+    authRepoMock.session = baseSession({
+      remember_me: 1,
+      created_at: isoMinutesAgo(6),
+      last_seen_at: isoMinutesAgo(1),
+      expires_at: isoMinutesAgo(1),
+    });
+
+    const response = await requestProtected();
+
+    expect(response.status).toBe(401);
+    expect(authRepoMock.revokeSession).toHaveBeenCalledWith(env, "sess_1", "session_expired");
     expect(authRepoMock.touchSession).not.toHaveBeenCalled();
   });
 

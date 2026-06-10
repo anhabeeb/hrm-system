@@ -3,6 +3,7 @@ import type { BootstrapInitializePayload } from "./setup.types";
 
 export interface BootstrapStatus {
   setup_required: boolean;
+  remember_me_allowed?: boolean;
 }
 
 export interface ApiHealthStatus {

@@ -230,7 +230,8 @@ describe("Phase 13B security hardening", () => {
     expect(authMiddleware.indexOf("if (absoluteExpired || idleExpired)")).toBeLessThan(authMiddleware.indexOf("touchSession"));
     expect(authMiddleware).toContain("X-HRM-Background-Request".toLowerCase());
     expect(authMiddleware).toContain("X-HRM-User-Activity".toLowerCase());
-    expect(authService).toMatch(/getSessionSecuritySettings[\s\S]*createSessionToken\(env\.SESSION_SECRET,\s*sessionSettings\)/);
+    expect(authService).toMatch(/getSessionSecuritySettings[\s\S]*createSessionToken\(env\.SESSION_SECRET,\s*sessionSettings,\s*\{/);
+    expect(authService).toContain("rememberMe: options.rememberMe === true && sessionSettings.remember_me_allowed");
     expect(sessionService).toMatch(/session_timeout_minutes[\s\S]*SESSION_TTL_DAYS/);
     expect(errorMiddleware).toMatch(/SESSION_EXPIRED[\s\S]*Set-Cookie[\s\S]*buildClearSessionCookie/);
   });

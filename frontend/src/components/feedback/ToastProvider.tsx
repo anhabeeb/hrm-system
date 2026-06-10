@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import { useLocation } from "react-router-dom";
 
 import { ToastViewport } from "./ToastViewport";
 import { ToastContext, toastDurations } from "./useToast";
@@ -28,6 +29,7 @@ const normalizeToast = (toast: ToastInput): ToastRecord => {
 
 export const ToastProvider = ({ children }: { children: ReactNode }) => {
   const [toasts, setToasts] = useState<ToastRecord[]>([]);
+  const location = useLocation();
 
   const dismissToast = useCallback((id: string) => {
     setToasts((current) => current.filter((toast) => toast.id !== id));
@@ -71,6 +73,10 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
       );
     return () => timers.forEach((timer) => window.clearTimeout(timer));
   }, [dismissToast, toasts]);
+
+  useEffect(() => {
+    setToasts((current) => current.filter((toast) => toast.persistent && toast.type !== "loading"));
+  }, [location.pathname, location.search]);
 
   const value = useMemo(
     () => ({

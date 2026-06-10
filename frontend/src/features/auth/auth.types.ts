@@ -4,6 +4,7 @@ export interface LoginInput {
   identifier: string;
   email?: string;
   password: string;
+  remember_me?: boolean;
   totp_code?: string;
   backup_code?: string;
 }

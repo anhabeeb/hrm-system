@@ -170,7 +170,7 @@ describe("bootstrap validators", () => {
       },
     } as unknown as Env;
 
-    await expect(getBootstrapStatus(env)).resolves.toEqual({ setup_required: true });
+    await expect(getBootstrapStatus(env)).resolves.toEqual({ setup_required: true, remember_me_allowed: false });
   });
 
   it("initialized system bootstrap row marks setup as completed", async () => {
@@ -198,7 +198,7 @@ describe("bootstrap validators", () => {
       },
     } as unknown as Env;
 
-    await expect(getBootstrapStatus(env)).resolves.toEqual({ setup_required: false });
+    await expect(getBootstrapStatus(env)).resolves.toEqual({ setup_required: false, remember_me_allowed: false });
   });
 
   it("does not fail bootstrap default cloning when optional defaults are unavailable", async () => {

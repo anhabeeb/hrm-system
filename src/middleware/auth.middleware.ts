@@ -98,7 +98,10 @@ export const authMiddleware = createMiddleware<AppContext>(async (c, next) => {
   }
 
   const sessionSettings = await getSessionSecuritySettings(c.env, user.company_id);
+  // Remembered sessions use their backend-issued expires_at as the absolute cap.
+  // Idle timeout still applies, so background polling cannot keep them alive forever.
   const absoluteExpired =
+    session.remember_me !== 1 &&
     sessionSettings.session_timeout_minutes !== null &&
     isExpiredByMinutes(session.created_at, sessionSettings.session_timeout_minutes, now);
   const idleExpired =

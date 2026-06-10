@@ -24,6 +24,9 @@ requireContains("ToastProvider", "frontend/src/components/feedback/ToastProvider
   "hrm:session-expired",
   "durationMs",
   "setTimeout",
+  "useLocation",
+  "location.pathname",
+  "toast.persistent && toast.type !== \"loading\"",
 ]);
 requireContains("ToastViewport", "frontend/src/components/feedback/ToastViewport.tsx", [
   "aria-live",
@@ -63,6 +66,9 @@ for (const file of listSourceFiles(frontendSrc)) {
   if (/window\.alert\s*\(/.test(text) || /\balert\s*\(/.test(text)) {
     failures.push(`Browser alert usage found in ${relative(process.cwd(), file).replace(/\\/g, "/")}`);
   }
+  if (/window\.confirm\s*\(/.test(text) || /\bconfirm\s*\(/.test(text)) {
+    failures.push(`Browser confirm usage found in ${relative(process.cwd(), file).replace(/\\/g, "/")}`);
+  }
 }
 
 const inlineAlert = read("frontend/src/components/feedback/InlineAlert.tsx");
@@ -82,6 +88,8 @@ for (const phrase of [
   "toastDurations",
   "hrm:session-expired",
   "window.alert",
+  "window.confirm",
+  "location.pathname",
   "variant === \"success\"",
   "variant === \"error\"",
   "persistent",

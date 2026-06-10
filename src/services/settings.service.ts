@@ -253,9 +253,16 @@ export interface SessionSecuritySettings {
   concurrent_session_policy: "block_new_login" | "revoke_old_session";
   allow_admin_session_override: boolean;
   session_device_tracking_enabled: boolean;
+  remember_me_allowed: boolean;
+  remember_me_session_days: number | null;
 }
 
 const positiveMinutesOrNull = (value: unknown): number | null => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+};
+
+const positiveDaysOrNull = (value: unknown): number | null => {
   const numeric = Number(value);
   return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
 };
@@ -280,6 +287,8 @@ export const getSessionSecuritySettings = async (
         : "block_new_login",
     allow_admin_session_override: settings.allow_admin_session_override === true,
     session_device_tracking_enabled: settings.session_device_tracking_enabled !== false,
+    remember_me_allowed: settings.remember_me_allowed === true,
+    remember_me_session_days: positiveDaysOrNull(settings.remember_me_session_days),
   };
 };
 
