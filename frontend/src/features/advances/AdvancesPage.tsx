@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 
 import { InlineAlert } from "@/components/feedback/InlineAlert";
-import { PageHeader } from "@/components/layout/PageHeader";
+import { PageActionBar } from "@/components/layout/PageActionBar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/auth.store";
 import { friendlyHrmError } from "@/lib/hrm-errors";
@@ -52,7 +52,7 @@ export const AdvancesPage = () => {
   const error = listQuery.error ?? createMutation.error ?? actionMutation.error;
   return (
     <div>
-      <PageHeader title="Advances" description="Create, approve, and reject salary advances used by payroll deductions." actions={auth.hasPermission("advances.create") ? <Button onClick={() => setFormOpen(true)}><Plus className="h-4 w-4" />New advance</Button> : null} />
+      {auth.hasPermission("advances.create") ? <PageActionBar label="Advances page actions"><Button onClick={() => setFormOpen(true)}><Plus className="h-4 w-4" />New advance</Button></PageActionBar> : null}
       <div className="space-y-4 p-4 md:p-6">
         {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
         {error ? <InlineAlert title={friendlyHrmError(error, "Advance action could not be completed.", "payroll")} variant="error" /> : null}

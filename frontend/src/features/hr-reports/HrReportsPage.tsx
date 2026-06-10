@@ -8,7 +8,6 @@ import { EmptyState } from "@/components/data/EmptyState";
 import { RowActions } from "@/components/data/RowActions";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { EmployeeCombobox, OutletCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -90,7 +89,6 @@ export const HrReportsPage = () => {
 
   return (
     <div>
-      <PageHeader title="HR Reports" description="People, compliance, documents, leave, long leave, lifecycle, and HR operational reports." />
       <div className="space-y-4 p-4 md:p-6">
         {error ? <InlineAlert title={friendlyHrmError(error, "HR reports could not be loaded.")} variant="error" /> : null}
 

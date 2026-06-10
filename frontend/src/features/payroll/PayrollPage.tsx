@@ -5,7 +5,7 @@ import { Calculator } from "lucide-react";
 
 import { EmptyState } from "@/components/data/EmptyState";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
-import { PageHeader } from "@/components/layout/PageHeader";
+import { PageActionBar } from "@/components/layout/PageActionBar";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/features/auth/auth.store";
@@ -121,11 +121,7 @@ export const PayrollPage = () => {
 
   return (
     <div>
-      <PageHeader
-        title="Payroll"
-        description="Calculate draft payroll, review exceptions, approve, finalize, and safely protect company-wide runs."
-        actions={canCalculate ? <Button onClick={() => setFormOpen(true)}><Calculator className="h-4 w-4" />Calculate draft</Button> : null}
-      />
+      {canCalculate ? <PageActionBar label="Payroll page actions"><Button onClick={() => setFormOpen(true)}><Calculator className="h-4 w-4" />Calculate draft</Button></PageActionBar> : null}
       <div className="space-y-4 p-4 md:p-6">
         {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
         {error ? <InlineAlert title={friendlyHrmError(error, "Payroll action could not be completed.", "payroll")} variant="error" /> : null}

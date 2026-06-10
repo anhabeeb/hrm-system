@@ -7,7 +7,6 @@ import { EmptyState } from "@/components/data/EmptyState";
 import { LoadingState } from "@/components/data/LoadingState";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/auth.store";
 import { ApiError } from "@/lib/api-errors";
@@ -32,7 +31,6 @@ export const DashboardPage = () => {
 
   return (
     <div>
-      <PageHeader title="Dashboard" description="Today’s HR control center: attention queues, approvals, alerts, devices, and payroll readiness." />
       <div className="space-y-4 p-4 md:p-6">
         {summaryQuery.isLoading ? (
           <LoadingState rows={8} />

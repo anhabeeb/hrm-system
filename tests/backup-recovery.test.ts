@@ -424,7 +424,10 @@ describe("Phase 12B Backup / Restore hardening", () => {
 
   it("Backup & Restore frontend/static wiring exists without unsafe raw display", () => {
     const page = readFileSync("frontend/src/features/backup-recovery/BackupRecoveryPage.tsx", "utf8");
-    expect(page).toContain("Backup & Restore");
+    expect(page).toContain("PageActionBar");
+    expect(page).toContain("Backup and restore page actions");
+    expect(page).toContain("Create backup");
+    expect(page).toContain("Create restore job");
     expect(page).toContain("Backup Jobs");
     expect(page).toContain("Restore Jobs");
     expect(page).toContain("Validate/Preview");

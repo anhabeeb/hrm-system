@@ -7,7 +7,7 @@ import { DataTable } from "@/components/data/DataTable";
 import { RowActions } from "@/components/data/RowActions";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
-import { PageHeader } from "@/components/layout/PageHeader";
+import { PageActionBar } from "@/components/layout/PageActionBar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -120,11 +120,7 @@ export const ExpiryAlertsPage = () => {
 
   return (
     <div>
-      <PageHeader
-        title="Expiry Alerts"
-        description="Scan, review, and resolve expiring employee documents, identity dates, contracts, probation dates, and long-leave return dates."
-        actions={<Button disabled={!canScan || runMutation.isPending} onClick={() => runMutation.mutate(scan)}><RefreshCw className="h-4 w-4" />Run scan</Button>}
-      />
+      <PageActionBar label="Expiry alerts page actions"><Button disabled={!canScan || runMutation.isPending} onClick={() => runMutation.mutate(scan)}><RefreshCw className="h-4 w-4" />Run scan</Button></PageActionBar>
       <div className="space-y-4 p-4 md:p-6">
         {success ? <InlineAlert variant="success" title={success} /> : null}
         {errors ? <InlineAlert variant="error" title={friendlyHrmError(errors, "Expiry alerts could not be updated.")} /> : null}

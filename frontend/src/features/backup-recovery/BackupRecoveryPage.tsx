@@ -12,7 +12,7 @@ import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { ReasonDialog } from "@/components/forms/ReasonDialog";
 import { LoadingButton } from "@/components/forms/LoadingButton";
-import { PageHeader } from "@/components/layout/PageHeader";
+import { PageActionBar } from "@/components/layout/PageActionBar";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -117,7 +117,7 @@ export const BackupRecoveryPage = () => {
   const mutationError = createBackupMutation.error ?? createRestoreMutation.error ?? retentionMutation.error ?? settingsMutation.error ?? downloadMutation.error ?? reasonMutation.error;
   return (
     <div>
-      <PageHeader title="Backup & Restore" description="Create verified company-scoped backups and run read-only restore previews before confirmed apply." actions={<div className="flex gap-2">{has("backup.create") || has("backup_recovery.backup.create") ? <Button onClick={() => setBackupOpen(true)}><DatabaseBackup className="h-4 w-4" />Create backup</Button> : null}{canViewRestoreJobs ? <Button variant="outline" onClick={() => setRestoreOpen(true)}><ShieldAlert className="h-4 w-4" />Create restore job</Button> : null}</div>} />
+      <PageActionBar label="Backup and restore page actions"><div className="flex flex-wrap items-center justify-end gap-2">{has("backup.create") || has("backup_recovery.backup.create") ? <Button onClick={() => setBackupOpen(true)}><DatabaseBackup className="h-4 w-4" />Create backup</Button> : null}{canViewRestoreJobs ? <Button variant="outline" onClick={() => setRestoreOpen(true)}><ShieldAlert className="h-4 w-4" />Create restore job</Button> : null}</div></PageActionBar>
       <div className="space-y-4 p-4 md:p-6">
         {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
         {(activeError || mutationError) ? <InlineAlert title={friendlyHrmError(activeError ?? mutationError, "Backup data could not be loaded.")} variant="error" /> : null}

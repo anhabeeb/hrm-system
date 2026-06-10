@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 
 import { DetailSection } from "@/components/data/DetailSection";
 import { StatusBadge } from "@/components/data/StatusBadge";
-import { PageHeader } from "@/components/layout/PageHeader";
+import { PageActionBar } from "@/components/layout/PageActionBar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/auth.store";
 
@@ -11,16 +11,10 @@ export const ProfilePage = () => {
 
   return (
     <div>
-      <PageHeader
-        title="My Profile"
-        description="Your official profile information is read-only. Submit a request for reviewed changes."
-        actions={
-          <>
-            <Button asChild variant="outline"><Link to="/profile/security">Change password</Link></Button>
-            <Button asChild><Link to="/profile/kyc-update">Request profile update</Link></Button>
-          </>
-        }
-      />
+      <PageActionBar label="Profile page actions">
+        <Button asChild variant="outline"><Link to="/profile/security">Change password</Link></Button>
+        <Button asChild><Link to="/profile/kyc-update">Request profile update</Link></Button>
+      </PageActionBar>
       <div className="space-y-4 p-4 md:p-6">
         <DetailSection
           title="Account details"

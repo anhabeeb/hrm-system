@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { LoadingButton } from "@/components/forms/LoadingButton";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -144,7 +143,6 @@ export const DataRetentionPage = () => {
 
   return (
     <div className="space-y-5">
-      <PageHeader title="Data Retention" description="Preview, archive, and restore old operational records without deleting production data." />
       <InlineAlert title="Archive-only mode is active." variant="warning">
         Purge is disabled by default in Phase 12C. Preview is read-only, apply requires typed confirmation, and archived records remain available for historical review where allowed.
       </InlineAlert>

@@ -4,7 +4,6 @@ import { useSearchParams } from "react-router-dom";
 
 import { DataTable } from "@/components/data/DataTable";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -39,7 +38,6 @@ export const OffboardingPage = () => {
 
   return (
     <div>
-      <PageHeader title="Offboarding" description="Track employee clearance, pending assets, user access, and final settlement preparation." />
       <div className="space-y-4 p-4 md:p-6">
         {listQuery.error ? <InlineAlert variant="error" title={friendlyHrmError(listQuery.error, "Offboarding cases could not be loaded.")} /> : null}
         <div className="grid gap-3 rounded-lg border bg-card p-4 md:grid-cols-4">

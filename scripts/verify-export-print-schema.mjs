@@ -114,7 +114,7 @@ mustInclude(repository, [
 
 mustInclude(router, ["/reports/print/:reportKey", "/employees/:employeeId/print", "/report-exports"], "frontend export routes");
 mustInclude(nav, ["Export History", "/report-exports"], "frontend navigation");
-mustInclude(historyPage, ["Export History", "sensitive_export", "redaction_level"], "export history page");
+mustInclude(historyPage, ["Export history page actions", "sensitive_export", "redaction_level"], "export history page");
 mustInclude(printPage, ["@media print", "no-print", "HRM System", "Filters:", "Generated at", "window.print"], "print page");
 mustInclude(actions, ["report_exports.create", "report_exports.download", "report_exports.print", "report_exports.sensitive"], "export actions");
 mustInclude(hrPage, ["ReportExportActions", "hr:"], "HR report export integration");

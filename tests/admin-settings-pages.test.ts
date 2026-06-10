@@ -84,7 +84,10 @@ describe("settings and administration frontend pages", () => {
     const settingsHub = read("frontend/src/features/settings/SettingsPage.tsx");
     const structuredPanel = read("frontend/src/features/settings/StructuredSettingsPanel.tsx");
 
-    expect(settingsHub).toContain("Structured company administration settings");
+    expect(settingsHub).toContain("settingsLinks");
+    expect(settingsHub).toContain("Open settings");
+    expect(settingsHub).toContain("Company Information");
+    expect(settingsHub).toContain("Backup & Recovery");
     expect(structuredPanel).toContain("Reason for change");
     expect(structuredPanel).toContain("Save changes");
     expect(structuredPanel).not.toContain("Editable structured forms for this section will be expanded");

@@ -3,7 +3,6 @@ import { useState } from "react";
 
 import { DataTable } from "@/components/data/DataTable";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +19,6 @@ export const AuditLogsPage = () => {
 
   return (
     <div>
-      <PageHeader title="Audit Logs" description="Company-scoped activity history with sensitive values masked." />
       <div className="space-y-4 p-4 md:p-6">
         {query.isError ? <InlineAlert title="Audit logs could not be loaded." variant="error" /> : null}
         <div className="grid gap-3 rounded-lg border bg-card p-4 md:grid-cols-4">

@@ -8,7 +8,6 @@ import { EmptyState } from "@/components/data/EmptyState";
 import { RowActions } from "@/components/data/RowActions";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { EmployeeCombobox, OutletCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -105,7 +104,6 @@ export const PayrollReportsPage = () => {
 
   return (
     <div>
-      <PageHeader title="Payroll / Finance Reports" description="Salary, deductions, advances, loans, overtime, long-leave deductions, payslips, approvals, and finance payroll summaries." />
       <div className="space-y-4 p-4 md:p-6">
         {error ? <InlineAlert title={friendlyHrmError(error, "Payroll reports could not be loaded.")} variant="error" /> : null}
         {result?.meta.restricted ? (

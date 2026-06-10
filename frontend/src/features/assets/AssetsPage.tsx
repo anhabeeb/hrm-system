@@ -5,7 +5,7 @@ import { Plus } from "lucide-react";
 
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { ReasonDialog } from "@/components/forms/ReasonDialog";
-import { PageHeader } from "@/components/layout/PageHeader";
+import { PageActionBar } from "@/components/layout/PageActionBar";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/features/auth/auth.store";
@@ -106,7 +106,7 @@ export const AssetsPage = () => {
 
   return (
     <div>
-      <PageHeader title="Assets" description="Manage employee assets, assignments, returns, and deductions." actions={has("assets.create") ? <Button onClick={() => { setEditing(null); setFormOpen(true); }}><Plus className="h-4 w-4" />Create asset</Button> : null} />
+      {has("assets.create") ? <PageActionBar label="Assets page actions"><Button onClick={() => { setEditing(null); setFormOpen(true); }}><Plus className="h-4 w-4" />Create asset</Button></PageActionBar> : null}
       <div className="space-y-4 p-4 md:p-6">
         {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
         {error ? <InlineAlert title={friendlyHrmError(error, "Asset action could not be completed.", "deduction")} variant="error" /> : null}

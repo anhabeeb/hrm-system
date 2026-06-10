@@ -6,7 +6,7 @@ import { Upload } from "lucide-react";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { toastError, toastSuccess } from "@/components/feedback/toast-helpers";
 import { useToast } from "@/components/feedback/useToast";
-import { PageHeader } from "@/components/layout/PageHeader";
+import { PageActionBar } from "@/components/layout/PageActionBar";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/features/auth/auth.store";
@@ -101,7 +101,7 @@ export const DocumentsPage = () => {
 
   return (
     <div>
-      <PageHeader title="Documents" description="Manage employee documents, expiry tracking, and missing document compliance." actions={has("documents.upload") ? <Button onClick={() => setUploadOpen(true)}><Upload className="h-4 w-4" />Upload document</Button> : null} />
+      {has("documents.upload") ? <PageActionBar label="Documents page actions"><Button onClick={() => setUploadOpen(true)}><Upload className="h-4 w-4" />Upload document</Button></PageActionBar> : null}
       <div className="space-y-4 p-4 md:p-6">
         {error ? <InlineAlert title={friendlyHrmError(error, "Document action could not be completed.")} variant="error" /> : null}
         <DocumentFilters filters={filters} onChange={updateFilters} onClear={() => setSearchParams(new URLSearchParams({ page: "1", page_size: String(filters.page_size), tab: activeTab }))} />

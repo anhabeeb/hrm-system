@@ -6,7 +6,7 @@ import { Plus } from "lucide-react";
 import { DataTable } from "@/components/data/DataTable";
 import { RowActions } from "@/components/data/RowActions";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
-import { PageHeader } from "@/components/layout/PageHeader";
+import { PageActionBar } from "@/components/layout/PageActionBar";
 import { DepartmentCombobox, EmployeeCombobox, OutletCombobox, PositionCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -232,11 +232,7 @@ export const RostersPage = () => {
 
   return (
     <div>
-      <PageHeader
-        title="Duty Rosters"
-        description="Plan weekly and monthly schedules by outlet, department, employee, and shift template."
-        actions={<div className="flex flex-wrap gap-2"><Button onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4" /> Create shift</Button><Button variant="outline" onClick={() => setBulkOpen(true)}>Bulk create</Button><Button variant="outline" onClick={() => setTemplateOpen(true)}>New template</Button></div>}
-      />
+      <PageActionBar label="Duty rosters page actions"><div className="flex flex-wrap items-center justify-end gap-2"><Button onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4" /> Create shift</Button><Button variant="outline" onClick={() => setBulkOpen(true)}>Bulk create</Button><Button variant="outline" onClick={() => setTemplateOpen(true)}>New template</Button></div></PageActionBar>
       <div className="space-y-4 p-4 md:p-6">
         {success ? <InlineAlert variant="success" title={success} /> : null}
         {(rostersQuery.error || templatesQuery.error || conflictsQuery.error) ? (

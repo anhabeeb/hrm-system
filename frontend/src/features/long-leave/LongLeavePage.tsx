@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 
 import { InlineAlert } from "@/components/feedback/InlineAlert";
-import { PageHeader } from "@/components/layout/PageHeader";
+import { PageActionBar } from "@/components/layout/PageActionBar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/auth.store";
 import { friendlyHrmError } from "@/lib/hrm-errors";
@@ -119,11 +119,7 @@ export const LongLeavePage = () => {
 
   return (
     <div>
-      <PageHeader
-        title="Long Leave"
-        description="Review long leave records, month-by-month salary impact, and return-to-work confirmations."
-        actions={canCreate ? <Button onClick={() => setFormOpen(true)}><Plus className="h-4 w-4" />New long leave</Button> : null}
-      />
+      {canCreate ? <PageActionBar label="Long leave page actions"><Button onClick={() => setFormOpen(true)}><Plus className="h-4 w-4" />New long leave</Button></PageActionBar> : null}
       <div className="space-y-4 p-4 md:p-6">
         {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
         {error ? <InlineAlert title={friendlyHrmError(error, "Long leave action could not be completed.", "long_leave")} variant="error" /> : null}

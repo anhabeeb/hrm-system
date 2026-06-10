@@ -9,7 +9,6 @@ import { DetailSection } from "@/components/data/DetailSection";
 import { RowActions } from "@/components/data/RowActions";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/features/auth/auth.store";
@@ -147,7 +146,6 @@ export const AttendancePage = () => {
 
   return (
     <div>
-      <PageHeader title="Attendance" description="Review daily attendance, raw events, and conflicts. Time corrections now have a dedicated workspace." />
       <div className="space-y-4 p-4 md:p-6">
         {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
         {(summaryQuery.isError || eventsQuery.isError || conflictsQuery.isError) ? (

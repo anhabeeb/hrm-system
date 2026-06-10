@@ -3,7 +3,6 @@ import { useMemo, useState } from "react";
 
 import { DataTable } from "@/components/data/DataTable";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,7 +55,6 @@ export const ProfileUpdateRequestsPage = () => {
 
   return (
     <div>
-      <PageHeader title="Profile Update Requests" description="Review employee profile, KYC, document, and email update requests before they are applied." />
       <div className="space-y-4 p-4 md:p-6">
         {query.isError ? <InlineAlert title="Profile update requests could not be loaded." variant="error" /> : null}
         {approve.isError || reject.isError ? (

@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DetailSection } from "@/components/data/DetailSection";
 import { LoadingState } from "@/components/data/LoadingState";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/format";
 
@@ -34,7 +33,6 @@ export const SecurityPage = () => {
 
   return (
     <div>
-      <PageHeader title="Security" description="Manage your password and two-factor authentication." />
       <div className="space-y-4 p-4 md:p-6">
         {securityQuery.isLoading ? <LoadingState rows={4} /> : null}
         {securityQuery.isError ? <InlineAlert title="Security details could not be loaded." variant="warning" /> : null}

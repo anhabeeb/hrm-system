@@ -4,7 +4,6 @@ import { useSearchParams } from "react-router-dom";
 import { TabletSmartphone } from "lucide-react";
 
 import { InlineAlert } from "@/components/feedback/InlineAlert";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/auth.store";
 import { searchParamNumber } from "@/lib/query-string";
@@ -92,7 +91,6 @@ export const KioskDevicesPage = () => {
 
   return (
     <div>
-      <PageHeader title="Kiosk Devices" description="Manage attendance kiosk and offline sync devices with health-aware operations." />
       <div className="space-y-4 p-4 md:p-6">
         {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
         {devicesQuery.isError ? <InlineAlert title="Device records could not be loaded." variant="error">Please adjust filters or try again.</InlineAlert> : null}

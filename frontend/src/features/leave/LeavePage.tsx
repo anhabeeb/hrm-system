@@ -5,7 +5,7 @@ import { Plus } from "lucide-react";
 
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { ReasonDialog } from "@/components/forms/ReasonDialog";
-import { PageHeader } from "@/components/layout/PageHeader";
+import { PageActionBar } from "@/components/layout/PageActionBar";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/features/auth/auth.store";
@@ -208,15 +208,11 @@ export const LeavePage = () => {
 
   return (
     <div>
-      <PageHeader title="Leave" description="Manage leave requests, balances, approvals, and leave policies." />
+      {canCreate ? <PageActionBar label="Leave page actions"><Button onClick={() => setFormOpen(true)}><Plus className="h-4 w-4" />New request</Button></PageActionBar> : null}
       <div className="space-y-4 p-4 md:p-6">
         {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
         {actionError ? <InlineAlert title={friendlyHrmError(actionError, "Leave action could not be completed.", "leave")} variant="error" /> : null}
         {(requestsQuery.isError || balancesQuery.isError) ? <InlineAlert title="Leave data could not be loaded." variant="error" /> : null}
-        <div className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
-          <div><h2 className="text-base font-semibold">Leave operations</h2><p className="text-sm text-muted-foreground">Backend-paginated lists with reason-based HR actions.</p></div>
-          {canCreate ? <Button onClick={() => setFormOpen(true)}><Plus className="h-4 w-4" />New request</Button> : null}
-        </div>
         <LeaveFilters filters={filters} onChange={updateFilters} onClear={() => setSearchParams(new URLSearchParams({ page: "1", page_size: String(filters.page_size), tab }))} />
         <Tabs value={tab} onValueChange={setActiveTab}>
           <TabsList><TabsTrigger value="requests">Requests</TabsTrigger><TabsTrigger value="approvals">Approvals</TabsTrigger><TabsTrigger value="approval-history">Approval History</TabsTrigger><TabsTrigger value="balances">Balances</TabsTrigger><TabsTrigger value="accrual">Accrual</TabsTrigger><TabsTrigger value="calendar">Calendar</TabsTrigger><TabsTrigger value="types">Leave Types / Policies</TabsTrigger><TabsTrigger value="approval-settings">Approval Settings</TabsTrigger></TabsList>

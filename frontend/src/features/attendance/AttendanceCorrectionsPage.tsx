@@ -9,7 +9,7 @@ import { DetailSection } from "@/components/data/DetailSection";
 import { RowActions } from "@/components/data/RowActions";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
-import { PageHeader } from "@/components/layout/PageHeader";
+import { PageActionBar } from "@/components/layout/PageActionBar";
 import { EmployeeCombobox, OutletCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -101,11 +101,7 @@ export const AttendanceCorrectionsPage = () => {
 
   return (
     <div>
-      <PageHeader
-        title="Time Corrections"
-        description="Review attendance correction requests and submit time amendments."
-        actions={canRequest ? <Button onClick={() => setRequestOpen(true)}><Plus className="h-4 w-4" />Add correction request</Button> : null}
-      />
+      {canRequest ? <PageActionBar label="Time corrections page actions"><Button onClick={() => setRequestOpen(true)}><Plus className="h-4 w-4" />Add correction request</Button></PageActionBar> : null}
       <div className="space-y-4 p-4 md:p-6">
         {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
         {(correctionsQuery.isError || actionError) ? <InlineAlert title={friendlyOperationalError(correctionsQuery.error ?? actionError, "Attendance corrections could not be loaded.")} variant="error" /> : null}

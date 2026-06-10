@@ -251,7 +251,7 @@ mustInclude(page, [
   "Import History",
   "Template CSV",
   "Preview only",
-  "row-level errors",
+  "Errors",
   "Apply is disabled until blocking row errors are fixed",
   "imports.apply",
   "imports.sensitive.manage",

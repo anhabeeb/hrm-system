@@ -148,7 +148,7 @@ const api = read("frontend/src/features/expiry-alerts/expiry-alerts.api.ts");
 const router = read("frontend/src/app/router.tsx");
 const nav = read("frontend/src/lib/navigation.ts");
 for (const token of [
-  "Expiry Alerts",
+  "Expiry alerts page actions",
   "Run scan",
   "Preview",
   "Settings",

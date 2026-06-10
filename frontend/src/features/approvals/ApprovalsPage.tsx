@@ -5,7 +5,6 @@ import { useSearchParams } from "react-router-dom";
 
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { ReasonDialog } from "@/components/forms/ReasonDialog";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/features/auth/auth.store";
@@ -126,7 +125,6 @@ export const ApprovalsPage = () => {
 
   return (
     <div>
-      <PageHeader title="Approvals" description="Review pending approvals, workflow steps, thresholds, and approval history." />
       <div className="space-y-4 p-4 md:p-6">
         {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
         {error ? <InlineAlert title={friendlyHrmError(error, "Approval action could not be completed.", "approval")} variant="error" /> : null}

@@ -7,7 +7,7 @@ import { DataTable } from "@/components/data/DataTable";
 import { RowActions } from "@/components/data/RowActions";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
-import { PageHeader } from "@/components/layout/PageHeader";
+import { PageActionBar } from "@/components/layout/PageActionBar";
 import { OutletCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -172,11 +172,7 @@ export const HolidayCalendarPage = () => {
 
   return (
     <div>
-      <PageHeader
-        title="Holiday Calendar"
-        description="Manage public, company, outlet-specific, recurring, and payroll-aware holiday rules."
-        actions={<div className="flex gap-2">{canManageSettings ? <Button variant="outline" onClick={() => { setSettingsDraft({ ...(settingsQuery.data?.data.settings ?? {}), reason: "" }); setSettingsOpen(true); }}>Settings</Button> : null}{canCreate ? <Button onClick={() => { setSelected(null); setPayload(blankHoliday()); setFormOpen(true); }}><CalendarPlus className="h-4 w-4" />New holiday</Button> : null}</div>}
-      />
+      <PageActionBar label="Holiday calendar page actions"><div className="flex flex-wrap items-center justify-end gap-2">{canManageSettings ? <Button variant="outline" onClick={() => { setSettingsDraft({ ...(settingsQuery.data?.data.settings ?? {}), reason: "" }); setSettingsOpen(true); }}>Settings</Button> : null}{canCreate ? <Button onClick={() => { setSelected(null); setPayload(blankHoliday()); setFormOpen(true); }}><CalendarPlus className="h-4 w-4" />New holiday</Button> : null}</div></PageActionBar>
       <div className="space-y-4 p-4 md:p-6">
         {success ? <InlineAlert variant="success" title={success} /> : null}
         {(listQuery.error || calendarQuery.error || settingsQuery.error) ? <InlineAlert variant="error" title={friendlyHrmError(listQuery.error ?? calendarQuery.error ?? settingsQuery.error, "Holiday calendar could not be loaded.", "leave")} /> : null}

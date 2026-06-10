@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 
 import { DataTable } from "@/components/data/DataTable";
 import { StatusBadge } from "@/components/data/StatusBadge";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { formatDate } from "@/lib/format";
 
 import { KycUpdateForm } from "./KycUpdateForm";
@@ -38,7 +37,6 @@ export const KycUpdatePage = () => {
 
   return (
     <div>
-      <PageHeader title="Profile Update Request" description="Request reviewed changes to official profile information." />
       <div className="grid gap-4 p-4 md:p-6 xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.8fr)]">
         <section className="rounded-lg border bg-card p-4">
           <h2 className="text-base font-semibold">New request</h2>

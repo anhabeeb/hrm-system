@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/data/EmptyState";
 import { LoadingState } from "@/components/data/LoadingState";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
-import { PageHeader } from "@/components/layout/PageHeader";
+import { PageActionBar } from "@/components/layout/PageActionBar";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { employeesApi } from "./employees.api";
@@ -76,11 +76,7 @@ export const Employee360Page = () => {
 
   return (
     <div>
-      <PageHeader
-        title="Employee 360 Profile"
-        description="Employee-wise HR profile across attendance, leave, long leave, documents, contracts, assets, payroll readiness, alerts, and history."
-        actions={<div className="flex gap-2"><Button asChild variant="outline"><Link to="/employees"><ArrowLeft className="h-4 w-4" /> Back to employees</Link></Button>{employeeId ? <Button asChild variant="outline"><Link to={`/employees/${employeeId}/print`}><Printer className="h-4 w-4" /> Print Profile</Link></Button> : null}</div>}
-      />
+      <PageActionBar label="Employee profile page actions"><div className="flex flex-wrap items-center justify-end gap-2"><Button asChild variant="outline"><Link to="/employees"><ArrowLeft className="h-4 w-4" /> Back to employees</Link></Button>{employeeId ? <Button asChild variant="outline"><Link to={`/employees/${employeeId}/print`}><Printer className="h-4 w-4" /> Print Profile</Link></Button> : null}</div></PageActionBar>
       <div className="space-y-4 p-4 md:p-6">
         {profileQuery.isLoading ? <LoadingState rows={10} /> : null}
         {profileQuery.isError ? <InlineAlert title="Employee profile could not be loaded." variant="error">Please check your permission and outlet scope, then try again.</InlineAlert> : null}

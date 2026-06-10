@@ -7,7 +7,6 @@ import { DataTable } from "@/components/data/DataTable";
 import { RowActions } from "@/components/data/RowActions";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { LookupCombobox } from "@/components/selectors/LookupCombobox";
 import { lookupApi } from "@/components/selectors/lookup-api";
 import { Button } from "@/components/ui/button";
@@ -157,10 +156,6 @@ export const AttendanceReportsPage = () => {
 
   return (
     <div>
-      <PageHeader
-        title="Attendance Reports"
-        description="Review attendance, exceptions, and device punch activity using roster, leave, correction, and biometric context."
-      />
       <div className="space-y-4 p-4 md:p-6">
         {activeQuery.isError ? (
           <InlineAlert title={friendlyOperationalError(activeQuery.error, "Attendance report could not be loaded.")} variant="error" />

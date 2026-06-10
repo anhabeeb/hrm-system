@@ -7,7 +7,7 @@ import { DataTable } from "@/components/data/DataTable";
 import { RowActions } from "@/components/data/RowActions";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
-import { PageHeader } from "@/components/layout/PageHeader";
+import { PageActionBar } from "@/components/layout/PageActionBar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -157,11 +157,7 @@ export const NotificationsPage = () => {
 
   return (
     <div>
-      <PageHeader
-        title="Notifications"
-        description="View in-app notifications, email delivery jobs, and safe notification preferences without exposing provider secrets."
-        actions={<Button variant="outline" disabled={markAllMutation.isPending} onClick={() => markAllMutation.mutate()}><Check className="h-4 w-4" />Mark filtered read</Button>}
-      />
+      <PageActionBar label="Notifications page actions"><Button variant="outline" disabled={markAllMutation.isPending} onClick={() => markAllMutation.mutate()}><Check className="h-4 w-4" />Mark filtered read</Button></PageActionBar>
       <div className="space-y-4 p-4 md:p-6">
         {success ? <InlineAlert variant="success" title={success} /> : null}
         {(listQuery.error || countQuery.error || preferencesQuery.error || emailListQuery.error || emailPreferencesQuery.error || emailSettingsQuery.error || statusMutation.error || markAllMutation.error || preferenceMutation.error || emailRetryMutation.error || emailPreferenceMutation.error || emailSettingsMutation.error) ? (

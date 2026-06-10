@@ -146,7 +146,7 @@ mustInclude(permissions, [
 if (!roles.includes("rp_backup_recovery_admin_")) fail("backup/restore permissions are not assigned to admin roles");
 
 mustInclude(page, [
-  "Backup & Restore",
+  "Backup and restore page actions",
   "Backup Jobs",
   "Restore Jobs",
   "Validate/Preview",

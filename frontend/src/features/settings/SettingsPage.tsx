@@ -13,7 +13,6 @@ import {
   BarChart3,
 } from "lucide-react";
 
-import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 
 const settingsLinks = [
@@ -32,7 +31,6 @@ const settingsLinks = [
 
 export const SettingsPage = () => (
   <div>
-    <PageHeader title="Settings" description="Structured company administration settings. Use each section to update validated settings with a reason and audit history." />
     <div className="grid gap-4 p-4 md:grid-cols-2 md:p-6 xl:grid-cols-3">
       {settingsLinks.map((item) => {
         const Icon = item.icon;

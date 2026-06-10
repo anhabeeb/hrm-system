@@ -194,6 +194,12 @@ describe("frontend completed-phase hardening coverage", () => {
     const topbar = read("frontend/src/components/layout/Topbar.tsx");
     const breadcrumbs = read("frontend/src/components/layout/Breadcrumbs.tsx");
     const pageHeader = read("frontend/src/components/layout/PageHeader.tsx");
+    const pageActionBar = read("frontend/src/components/layout/PageActionBar.tsx");
+    const leavePage = read("frontend/src/features/leave/LeavePage.tsx");
+    const normalPageHeaderUsages = frontendFiles().filter(({ relative: file, text }) => {
+      if (file === "frontend/src/components/layout/PageHeader.tsx") return false;
+      return (file.startsWith("frontend/src/features/") || file.startsWith("frontend/src/components/data/")) && (text.includes("PageHeader") || /<PageHeader\b/.test(text));
+    });
 
     expect(topbar).toContain("<Breadcrumbs />");
     expect(breadcrumbs).toContain('aria-label="Breadcrumb"');
@@ -201,9 +207,16 @@ describe("frontend completed-phase hardening coverage", () => {
     expect(pageHeader).not.toContain("text-xl");
     expect(pageHeader).not.toContain("tracking-tight");
     expect(pageHeader).not.toContain("border-b");
-    expect(pageHeader).toContain("justify-end");
-    expect(pageHeader).toContain("flex-wrap");
-    expect(pageHeader).toContain("aria-label");
+    expect(pageHeader).toContain("Backward-compatible wrapper only");
+    expect(pageHeader).toContain("PageActionBar");
+    expect(pageActionBar).toContain("justify-end");
+    expect(pageActionBar).toContain("flex-wrap");
+    expect(pageActionBar).toContain("aria-label");
+    expect(normalPageHeaderUsages.map((file) => file.relative)).toEqual([]);
+    expect(leavePage).not.toContain("Leave operations");
+    expect(leavePage).not.toContain("Backend-paginated lists with reason-based HR actions.");
+    expect(leavePage).toContain("PageActionBar");
+    expect(leavePage).toContain("New request");
   });
 
   it("preserves critical page action buttons after header compaction", () => {
@@ -216,12 +229,49 @@ describe("frontend completed-phase hardening coverage", () => {
       ["frontend/src/features/advances/AdvancesPage.tsx", "New advance"],
       ["frontend/src/features/salary-loans/SalaryLoansPage.tsx", "New loan"],
       ["frontend/src/features/assets/AssetsPage.tsx", "Create asset"],
+      ["frontend/src/features/leave/LeavePage.tsx", "New request"],
+      ["frontend/src/features/imports/ImportCenterPage.tsx", "Create job"],
+      ["frontend/src/features/imports/ImportCenterPage.tsx", "Apply valid rows"],
+      ["frontend/src/features/import-export/ImportExportPage.tsx", "Create export"],
+      ["frontend/src/features/import-export/ImportExportPage.tsx", "Upload import"],
+      ["frontend/src/features/report-exports/ReportExportActions.tsx", "CSV"],
+      ["frontend/src/features/report-exports/ReportExportActions.tsx", "Print"],
     ];
 
     for (const [file, actionText] of criticalActions) {
       const text = read(file);
-      expect(text).toContain("PageHeader");
       expect(text).toContain(actionText);
+    }
+  });
+
+  it("uses responsive page action bars for moved header actions", () => {
+    const actionPages = [
+      "frontend/src/features/backup-recovery/BackupRecoveryPage.tsx",
+      "frontend/src/features/import-export/ImportExportPage.tsx",
+      "frontend/src/features/report-exports/ExportHistoryPage.tsx",
+      "frontend/src/features/holidays/HolidayCalendarPage.tsx",
+      "frontend/src/features/rosters/RostersPage.tsx",
+      "frontend/src/features/notifications/NotificationsPage.tsx",
+      "frontend/src/features/imports/ImportCenterPage.tsx",
+      "frontend/src/features/employees/Employee360Page.tsx",
+      "frontend/src/features/attendance/AttendanceCorrectionsPage.tsx",
+      "frontend/src/features/long-leave/LongLeavePage.tsx",
+      "frontend/src/features/payroll/PayrollPage.tsx",
+      "frontend/src/features/profile/ProfilePage.tsx",
+    ];
+
+    for (const file of actionPages) {
+      expect(read(file)).toContain("PageActionBar");
+    }
+
+    for (const file of [
+      "frontend/src/features/backup-recovery/BackupRecoveryPage.tsx",
+      "frontend/src/features/import-export/ImportExportPage.tsx",
+      "frontend/src/features/holidays/HolidayCalendarPage.tsx",
+      "frontend/src/features/rosters/RostersPage.tsx",
+      "frontend/src/features/employees/Employee360Page.tsx",
+    ]) {
+      expect(read(file)).toContain("flex flex-wrap items-center justify-end gap-2");
     }
   });
 });

@@ -11,7 +11,7 @@ import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { ReasonDialog } from "@/components/forms/ReasonDialog";
 import { LoadingButton } from "@/components/forms/LoadingButton";
-import { PageHeader } from "@/components/layout/PageHeader";
+import { PageActionBar } from "@/components/layout/PageActionBar";
 import { OutletCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -134,7 +134,7 @@ export const ImportExportPage = () => {
   const mutationError = createExportMutation.error ?? uploadMutation.error ?? downloadMutation.error ?? reasonMutation.error;
   return (
     <div>
-      <PageHeader title="Import / Export" description="Manage data exports, import validation, templates, and secure data movement." actions={<div className="flex gap-2">{canViewExports && has("export.create") ? <Button onClick={() => setExportOpen(true)}><Plus className="h-4 w-4" />Create export</Button> : null}{canViewImports && has("import.create") ? <Button variant="outline" onClick={() => setImportOpen(true)}><Upload className="h-4 w-4" />Upload import</Button> : null}</div>} />
+      <PageActionBar label="Import and export page actions"><div className="flex flex-wrap items-center justify-end gap-2">{canViewExports && has("export.create") ? <Button onClick={() => setExportOpen(true)}><Plus className="h-4 w-4" />Create export</Button> : null}{canViewImports && has("import.create") ? <Button variant="outline" onClick={() => setImportOpen(true)}><Upload className="h-4 w-4" />Upload import</Button> : null}</div></PageActionBar>
       <div className="space-y-4 p-4 md:p-6">
         {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
         {(activeError || mutationError) ? <InlineAlert title={friendlyHrmError(activeError ?? mutationError, "Import/export data could not be loaded.")} variant="error" /> : null}

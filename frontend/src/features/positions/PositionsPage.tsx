@@ -8,7 +8,6 @@ import { FilterBar } from "@/components/data/FilterBar";
 import { RowActions } from "@/components/data/RowActions";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/features/auth/auth.store";
@@ -65,7 +64,6 @@ export const PositionsPage = () => {
 
   return (
     <div>
-      <PageHeader title="Positions" description="Manage position titles and department alignment" />
       <div className="space-y-4 p-4 md:p-6">
         {success ? <InlineAlert title={success} variant="success" /> : null}
         {query.isError ? <InlineAlert title="Positions could not be loaded." variant="error">Please adjust filters or try again.</InlineAlert> : null}

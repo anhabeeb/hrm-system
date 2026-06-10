@@ -4,7 +4,7 @@ import { Download, RefreshCw } from "lucide-react";
 import { DataTable } from "@/components/data/DataTable";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
-import { PageHeader } from "@/components/layout/PageHeader";
+import { PageActionBar } from "@/components/layout/PageActionBar";
 import { Button } from "@/components/ui/button";
 import { formatReportValue } from "@/features/reports/report-format";
 import { friendlyHrmError } from "@/lib/hrm-errors";
@@ -15,11 +15,9 @@ export const ExportHistoryPage = () => {
   const rows = query.data?.data.data ?? [];
   return (
     <div>
-      <PageHeader
-        title="Export History"
-        description="Review report export jobs, redaction level, status, and safe CSV downloads."
-        actions={<Button variant="outline" onClick={() => void query.refetch()}><RefreshCw className="h-4 w-4" /> Refresh</Button>}
-      />
+      <PageActionBar label="Export history page actions">
+        <Button variant="outline" onClick={() => void query.refetch()}><RefreshCw className="h-4 w-4" /> Refresh</Button>
+      </PageActionBar>
       <div className="space-y-4 p-4 md:p-6">
         {query.isError ? <InlineAlert title={friendlyHrmError(query.error, "Export history could not be loaded.")} variant="error" /> : null}
         <DataTable

@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { toastError, toastSuccess } from "@/components/feedback/toast-helpers";
 import { useToast } from "@/components/feedback/useToast";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -66,7 +65,6 @@ export const CompanyInformationPage = () => {
 
   return (
     <div>
-      <PageHeader title="Company Information" description="View and update company profile details without re-running first-time setup." />
       <div className="space-y-4 p-4 md:p-6">
         {query.isError ? <InlineAlert title="Company information could not be loaded." variant="error" /> : null}
         <div className="flex flex-wrap items-start justify-between gap-3 rounded-lg border bg-card p-4">

@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 
 import { InlineAlert } from "@/components/feedback/InlineAlert";
-import { PageHeader } from "@/components/layout/PageHeader";
+import { PageActionBar } from "@/components/layout/PageActionBar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/auth.store";
 import { friendlyHrmError } from "@/lib/hrm-errors";
@@ -59,7 +59,7 @@ export const SalaryLoansPage = () => {
   const error = listQuery.error ?? createMutation.error ?? actionMutation.error;
   return (
     <div>
-      <PageHeader title="Salary Loans" description="Create salary loans, generate installment schedules, pause, and settle with locked-period protection." actions={auth.hasPermission("salary_loans.create") ? <Button onClick={() => setFormOpen(true)}><Plus className="h-4 w-4" />New loan</Button> : null} />
+      {auth.hasPermission("salary_loans.create") ? <PageActionBar label="Salary loans page actions"><Button onClick={() => setFormOpen(true)}><Plus className="h-4 w-4" />New loan</Button></PageActionBar> : null}
       <div className="space-y-4 p-4 md:p-6">
         {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
         {error ? <InlineAlert title={friendlyHrmError(error, "Salary loan action could not be completed.", "payroll")} variant="error" /> : null}

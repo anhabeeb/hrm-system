@@ -6,7 +6,6 @@ import { Fingerprint, Plus } from "lucide-react";
 import { DetailDrawer } from "@/components/data/DetailDrawer";
 import { DetailSection } from "@/components/data/DetailSection";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { EmployeeCombobox, OutletCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -160,7 +159,6 @@ export const BiometricPage = () => {
 
   return (
     <div>
-      <PageHeader title="Biometric" description="Manage biometric devices, employee mappings, punch logs, and unmatched users." />
       <div className="space-y-4 p-4 md:p-6">
         {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
         {oneTimeToken ? (

@@ -4,7 +4,6 @@ import { useSearchParams } from "react-router-dom";
 import { RefreshCw } from "lucide-react";
 
 import { InlineAlert } from "@/components/feedback/InlineAlert";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { OutletCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -93,7 +92,6 @@ export const SyncStatusPage = () => {
 
   return (
     <div>
-      <PageHeader title="Sync Status" description="Monitor offline attendance sync batches, conflicts, and device state." />
       <div className="space-y-4 p-4 md:p-6">
         {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
         {(statusQuery.isError || batchesQuery.isError || conflictsQuery.isError) ? <InlineAlert title="Sync data could not be loaded." variant="error" /> : null}

@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 
 import { InlineAlert } from "@/components/feedback/InlineAlert";
-import { PageHeader } from "@/components/layout/PageHeader";
+import { PageActionBar } from "@/components/layout/PageActionBar";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/features/auth/auth.store";
@@ -66,7 +66,7 @@ export const UniformsPage = () => {
 
   return (
     <div>
-      <PageHeader title="Uniforms" description="Track uniform issues, returns, and pending employee returns." actions={has("uniforms.issue") ? <Button onClick={() => setIssueOpen(true)}><Plus className="h-4 w-4" />Issue uniform</Button> : null} />
+      {has("uniforms.issue") ? <PageActionBar label="Uniforms page actions"><Button onClick={() => setIssueOpen(true)}><Plus className="h-4 w-4" />Issue uniform</Button></PageActionBar> : null}
       <div className="space-y-4 p-4 md:p-6">
         {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
         {error ? <InlineAlert title={friendlyHrmError(error, "Uniform action could not be completed.")} variant="error" /> : null}

@@ -8,7 +8,6 @@ import { FilterBar } from "@/components/data/FilterBar";
 import { RowActions } from "@/components/data/RowActions";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/features/auth/auth.store";
@@ -48,7 +47,6 @@ export const DepartmentsPage = () => {
   const canEdit = auth.hasPermission("departments.edit");
   return (
     <div>
-      <PageHeader title="Departments" description="Manage company departments used in employee profiles" />
       <div className="space-y-4 p-4 md:p-6">
         {success ? <InlineAlert title={success} variant="success" /> : null}
         {query.isError ? <InlineAlert title="Departments could not be loaded." variant="error">Please adjust filters or try again.</InlineAlert> : null}

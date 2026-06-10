@@ -12,7 +12,7 @@ import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { toastError, toastSuccess } from "@/components/feedback/toast-helpers";
 import { useToast } from "@/components/feedback/useToast";
 import { LoadingButton } from "@/components/forms/LoadingButton";
-import { PageHeader } from "@/components/layout/PageHeader";
+import { PageActionBar } from "@/components/layout/PageActionBar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -113,11 +113,7 @@ export const ImportCenterPage = () => {
 
   return (
     <div>
-      <PageHeader
-        title="Import Center"
-        description="Validate, preview, and safely apply structured HRM CSV imports with row-level errors."
-        actions={<Button variant="outline" onClick={() => void downloadTemplate(activeTemplate)} disabled={!activeTemplate || !has("imports.templates.view")}><Download className="h-4 w-4" />Template CSV</Button>}
-      />
+      <PageActionBar label="Import center page actions"><Button variant="outline" onClick={() => void downloadTemplate(activeTemplate)} disabled={!activeTemplate || !has("imports.templates.view")}><Download className="h-4 w-4" />Template CSV</Button></PageActionBar>
       <div className="space-y-4 p-4 md:p-6">
         {error ? <InlineAlert title={friendlyHrmError(error, "Import action could not be completed.")} variant="error" /> : null}
         <Tabs defaultValue="center">

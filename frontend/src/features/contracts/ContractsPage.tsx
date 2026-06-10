@@ -4,7 +4,6 @@ import { useSearchParams } from "react-router-dom";
 
 import { DataTable } from "@/components/data/DataTable";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { DepartmentCombobox, EmployeeCombobox, OutletCombobox, PositionCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,7 +42,6 @@ export const ContractsPage = () => {
 
   return (
     <div>
-      <PageHeader title="Employee Contracts" description="Track active, expiring, expired, renewed, and archived employment contracts." />
       <div className="space-y-4 p-4 md:p-6">
         {query.error ? <InlineAlert variant="error" title={friendlyHrmError(query.error, "Contracts could not be loaded.")} /> : null}
         <div className="grid gap-3 rounded-lg border bg-card p-4 md:grid-cols-4">

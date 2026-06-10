@@ -12,7 +12,6 @@ import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { toastError, toastSuccess } from "@/components/feedback/toast-helpers";
 import { useToast } from "@/components/feedback/useToast";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { EmployeeCombobox, OutletCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -152,7 +151,6 @@ export const ReportsPage = () => {
   const activeError = activeTab === "payroll" ? payrollQuery.error : activeTab === "audit" ? auditQuery.error : activeTab === "devices" ? devicesQuery.error : activeTab === "compliance" ? documentSummaryQuery.error ?? expiringDocumentsQuery.error ?? missingDocumentsQuery.error : activeTab === "attendance" ? attendanceReportQuery.error ?? leaveReportQuery.error : activeTab === "hr" ? employeeReportQuery.error ?? assetReportQuery.error : activeTab === "catalog" ? catalogQuery.error : null;
   return (
     <div>
-      <PageHeader title="Reports" description="Generate operational, compliance, payroll, and audit reports." />
       <div className="space-y-4 p-4 md:p-6">
         {activeError ? <InlineAlert title={friendlyHrmError(activeError, "Report data could not be loaded.")} variant="error" /> : null}
         <div className="grid gap-3 rounded-lg border bg-card p-4 md:grid-cols-6">

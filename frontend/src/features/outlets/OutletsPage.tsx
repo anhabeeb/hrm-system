@@ -7,7 +7,6 @@ import { DataTable } from "@/components/data/DataTable";
 import { RowActions } from "@/components/data/RowActions";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/auth.store";
 import { ApiError } from "@/lib/api-errors";
@@ -62,7 +61,6 @@ export const OutletsPage = () => {
 
   return (
     <div>
-      <PageHeader title="Outlets" description="Manage operational outlets used for employee access and HR workflows" />
       <div className="space-y-4 p-4 md:p-6">
         {success ? <InlineAlert title={success} variant="success" /> : null}
         {query.isError ? <InlineAlert title="Outlets could not be loaded." variant="error">Please adjust filters or try again.</InlineAlert> : null}

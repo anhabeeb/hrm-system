@@ -6,7 +6,6 @@ import { UserPlus } from "lucide-react";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { toastError, toastSuccess } from "@/components/feedback/toast-helpers";
 import { useToast } from "@/components/feedback/useToast";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/auth.store";
 import { departmentsApi } from "@/features/departments/departments.api";
@@ -135,7 +134,6 @@ export const EmployeesPage = () => {
 
   return (
     <div>
-      <PageHeader title="Employees" description="Manage employee profiles, work assignments, and HR record foundations" />
       <div className="space-y-4 p-4 md:p-6">
         {employeesQuery.isError ? <InlineAlert title="Employees could not be loaded." variant="error">Please adjust filters or try again.</InlineAlert> : null}
         <div className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">

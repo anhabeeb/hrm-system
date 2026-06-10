@@ -1,5 +1,9 @@
 import type { ReactNode } from "react";
 
+import { PageActionBar } from "./PageActionBar";
+
+// Backward-compatible wrapper only. New pages should use PageActionBar directly;
+// this component intentionally does not render page titles or descriptions.
 export const PageHeader = ({ title, description: _description, actions }: {
   title: string;
   description?: string;
@@ -10,8 +14,8 @@ export const PageHeader = ({ title, description: _description, actions }: {
   if (!actions) return null;
 
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2 px-4 pt-3 md:px-6" aria-label={`${title} page actions`}>
+    <PageActionBar label={`${title} page actions`}>
       {actions}
-    </div>
+    </PageActionBar>
   );
 };

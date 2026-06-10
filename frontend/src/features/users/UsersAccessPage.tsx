@@ -8,7 +8,6 @@ import { EmptyState } from "@/components/data/EmptyState";
 import { RowActions } from "@/components/data/RowActions";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
-import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/features/auth/auth.store";
@@ -120,7 +119,6 @@ export const UsersAccessPage = () => {
 
   return (
     <div>
-      <PageHeader title="Users & Access" description="User accounts, role foundation, and permission matrix overview" />
       <div className="space-y-4 p-4 md:p-6">
         {!USER_ACCESS_API_CONNECTED ? (
           <InlineAlert title="Users & Access APIs are disabled in this build." variant="info">
