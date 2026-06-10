@@ -177,13 +177,9 @@ for (const phrase of ["minify: false", "minification pass"]) {
   mustInclude("frontend vite config", viteConfig, phrase);
 }
 const frontendPackage = read("frontend/package.json");
-const frontendBuildScript = read("frontend/scripts/build.mjs");
 const frontendTypecheckScript = read("frontend/scripts/typecheck.mjs");
-mustInclude("frontend package build", frontendPackage, '"build": "node ./scripts/build.mjs"');
+mustInclude("frontend package build", frontendPackage, '"build": "npm run typecheck && vite build --config vite.config.mjs --configLoader native"');
 mustInclude("frontend package typecheck", frontendPackage, '"typecheck": "node ./scripts/typecheck.mjs"');
-mustInclude("frontend build script", frontendBuildScript, 'await run("frontend typecheck"');
-mustInclude("frontend build script", frontendBuildScript, 'await run("vite build"');
-mustInclude("frontend build script", frontendBuildScript, "shell: false");
 mustInclude("frontend typecheck script", frontendTypecheckScript, "--noEmit");
 mustInclude("frontend typecheck script", frontendTypecheckScript, "--project");
 mustInclude("frontend typecheck script", frontendTypecheckScript, "shell: false");

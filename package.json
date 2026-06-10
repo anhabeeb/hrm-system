@@ -7,7 +7,7 @@
     "dev": "wrangler dev",
     "build": "npm run build:all",
     "build:api": "tsc --noEmit",
-    "build:frontend": "npm --prefix frontend install && npm --prefix frontend run build",
+    "build:frontend": "npm --prefix frontend run build",
     "build:all": "npm run build:api && npm run build:frontend && npm run verify:frontend-assets && npm run verify:critical-routes && npm run verify:document-schema && npm run verify:salary-schema && npm run verify:approval-schema && npm run verify:compensation-schema && npm run verify:payroll-schema && npm run verify:payslip-schema && npm run verify:employee-lifecycle-schema && npm run verify:offboarding-schema && npm run verify:contract-schema && npm run verify:roster-schema && npm run verify:attendance-schema && npm run verify:biometric-schema && npm run verify:attendance-reports-schema && npm run verify:leave-balance-schema && npm run verify:leave-approval-schema && npm run verify:long-leave-schema && npm run verify:holiday-schema && npm run verify:notifications-schema && npm run verify:email-notifications-schema && npm run verify:expiry-alerts-schema && npm run verify:dashboard-schema && npm run verify:hr-reports-schema && npm run verify:payroll-reports-schema && npm run verify:export-print-schema && npm run verify:imports-schema && npm run verify:backup-restore-schema && npm run verify:data-retention-schema && npm run verify:permission-audit && npm run verify:security-hardening && npm run verify:no-todo-tests && npm run verify:performance-d1",
     "verify:frontend-assets": "node scripts/verify-frontend-assets.mjs",
     "verify:critical-routes": "node scripts/verify-critical-routes.mjs",

@@ -124,6 +124,7 @@ const requestProtected = async (headers: Record<string, string> = {}, method = "
 };
 
 beforeEach(() => {
+  vi.resetModules();
   vi.useFakeTimers();
   vi.setSystemTime(now);
   vi.clearAllMocks();
@@ -133,6 +134,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.clearAllTimers();
   vi.useRealTimers();
 });
 

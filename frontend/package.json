@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node ./scripts/build.mjs",
+    "build": "npm run typecheck && vite build --config vite.config.mjs --configLoader native",
     "preview": "vite preview",
     "typecheck": "node ./scripts/typecheck.mjs"
   },

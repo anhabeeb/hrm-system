@@ -156,8 +156,20 @@ export const verifyCriticalRoutes = (baseDir = rootDir) => {
   if (scripts.build !== "npm run build:all") {
     failures.push('package.json: "build" must be "npm run build:all".');
   }
-  if (!scripts["build:frontend"]?.includes("npm --prefix frontend") || !scripts["build:frontend"]?.includes("run build")) {
+  const frontendBuildScript = scripts["build:frontend"] ?? "";
+  const usesFrontendBuild = frontendBuildScript.includes("npm --prefix frontend") && frontendBuildScript.includes("run build");
+  if (!usesFrontendBuild) {
     failures.push('package.json: "build:frontend" must build frontend/dist.');
+  }
+  const frontendPackage = JSON.parse(readText("frontend/package.json", baseDir));
+  const frontendPackageBuild = frontendPackage.scripts?.build ?? "";
+  if (
+    !frontendPackageBuild.includes("npm run typecheck") ||
+    !frontendPackageBuild.includes("vite build") ||
+    !frontendPackageBuild.includes("vite.config.mjs") ||
+    !frontendPackageBuild.includes("--configLoader native")
+  ) {
+    failures.push('frontend/package.json: "build" must run typecheck and the Vite native production build directly.');
   }
   if (!scripts["build:all"]?.includes("npm run build:api")) {
     failures.push('package.json: "build:all" must include API typecheck/build.');

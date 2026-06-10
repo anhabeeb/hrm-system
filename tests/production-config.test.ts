@@ -83,9 +83,11 @@ describe("production config safety checks", () => {
 
   it("root deploy script builds API and frontend before deploying", () => {
     const pkg = JSON.parse(readText("package.json")) as { scripts?: Record<string, string> };
+    const frontendPkg = JSON.parse(readText("frontend/package.json")) as { scripts?: Record<string, string> };
 
     expect(pkg.scripts?.["build:api"]).toBe("tsc --noEmit");
-    expect(pkg.scripts?.["build:frontend"]).toContain("npm --prefix frontend run build");
+    expect(pkg.scripts?.["build:frontend"]).toBe("npm --prefix frontend run build");
+    expect(frontendPkg.scripts?.build).toBe("npm run typecheck && vite build --config vite.config.mjs --configLoader native");
     expect(pkg.scripts?.["verify:frontend-assets"]).toBe("node scripts/verify-frontend-assets.mjs");
     expect(pkg.scripts?.["verify:critical-routes"]).toBe("node scripts/verify-critical-routes.mjs");
     expect(pkg.scripts?.["build:all"]).toContain("build:api");
