@@ -1,16 +1,15 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
+import { toastError } from "@/components/feedback/toast-helpers";
+import { useToast } from "@/components/feedback/useToast";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { FormError } from "@/components/feedback/FormError";
-import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { LoadingButton } from "@/components/forms/LoadingButton";
 import { PasswordInput } from "@/components/forms/PasswordInput";
-import { ApiError } from "@/lib/api-errors";
 
 import { AuthLayout } from "./AuthLayout";
 import { useAuth } from "./auth.store";
@@ -21,19 +20,30 @@ type LoginValues = z.infer<typeof loginSchema>;
 
 export const LoginPage = () => {
   const { login } = useAuth();
+  const toast = useToast();
+  const { info, warning } = toast;
   const navigate = useNavigate();
   const location = useLocation();
   const sessionExpiredMessage = new URLSearchParams(location.search).get("reason") === "session_expired"
     ? "Your session expired due to inactivity. Please sign in again."
     : null;
-  const [error, setError] = useState<{ message: string; requestId?: string } | null>(null);
+  const stateMessage = (location.state as { message?: string } | null)?.message ?? null;
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
   });
 
+  useEffect(() => {
+    if (sessionExpiredMessage) {
+      warning("Session expired", sessionExpiredMessage, { id: "login-session-expired" });
+      return;
+    }
+    if (stateMessage) {
+      info("Sign in required", stateMessage, { id: `login-message-${stateMessage}` });
+    }
+  }, [info, sessionExpiredMessage, stateMessage, warning]);
+
   const onSubmit = async (values: LoginValues) => {
-    setError(null);
     try {
       const result = await login(values);
       if (result.requires2FA) {
@@ -43,11 +53,7 @@ export const LoginPage = () => {
       const destination = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? "/dashboard";
       navigate(destination, { replace: true });
     } catch (err) {
-      if (err instanceof ApiError) {
-        setError({ message: err.message, requestId: err.requestId });
-      } else {
-        setError({ message: "Unable to sign in. Please try again." });
-      }
+      toastError(toast, err, "Unable to sign in. Please try again.");
     }
   };
 
@@ -55,12 +61,6 @@ export const LoginPage = () => {
     <AuthLayout title="Sign in" description="Use your HRM administrator account to continue.">
       <Form {...form}>
         <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
-          <FormError message={error?.message} requestId={error?.requestId} />
-          {sessionExpiredMessage ? (
-            <InlineAlert title={sessionExpiredMessage} variant="warning" />
-          ) : (location.state as { message?: string } | null)?.message ? (
-            <InlineAlert title={(location.state as { message: string }).message} variant="warning" />
-          ) : null}
           <FormField
             control={form.control}
             name="email"

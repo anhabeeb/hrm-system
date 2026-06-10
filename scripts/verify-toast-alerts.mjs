@@ -47,6 +47,12 @@ requireContains("Persistent AppErrorAlert", "frontend/src/components/feedback/Ap
   "ErrorDetailsAccordion",
   "CopyDiagnosticsButton",
 ]);
+requireContains("Login toast feedback", "frontend/src/features/auth/LoginPage.tsx", [
+  "useToast",
+  "toastError",
+  "Session expired",
+  "Unable to sign in. Please try again.",
+]);
 requireContains("API client background guard", "frontend/src/lib/api-client.ts", [
   "X-HRM-Background-Request",
   "X-HRM-User-Activity",
@@ -64,6 +70,11 @@ if (!/if \(!persistent && \(variant === "success" \|\| variant === "error"\)\) r
   failures.push("InlineAlert must render normal success/error feedback as toast-only.");
 }
 
+const loginPage = read("frontend/src/features/auth/LoginPage.tsx");
+if (/FormError|InlineAlert|AppErrorAlert/.test(loginPage)) {
+  failures.push("LoginPage must not render inline/page alerts for normal auth feedback.");
+}
+
 const tests = read("tests/frontend-ui-hardening.test.ts");
 for (const phrase of [
   "ToastProvider",
@@ -74,6 +85,8 @@ for (const phrase of [
   "variant === \"success\"",
   "variant === \"error\"",
   "persistent",
+  "LoginPage",
+  "toastError",
 ]) {
   if (!tests.includes(phrase)) failures.push(`Toast test coverage missing ${phrase}`);
 }

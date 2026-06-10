@@ -149,6 +149,7 @@ describe("frontend completed-phase hardening coverage", () => {
     const toastProvider = read("frontend/src/components/feedback/ToastProvider.tsx");
     const inlineAlert = read("frontend/src/components/feedback/InlineAlert.tsx");
     const appErrorAlert = read("frontend/src/components/feedback/AppErrorAlert.tsx");
+    const loginPage = read("frontend/src/features/auth/LoginPage.tsx");
     const apiErrors = read("frontend/src/lib/api-errors.ts");
 
     expect(apiErrors).toContain("hrm:session-expired");
@@ -162,6 +163,12 @@ describe("frontend completed-phase hardening coverage", () => {
     expect(inlineAlert).toContain("return null");
     expect(appErrorAlert).toContain("persistent");
     expect(appErrorAlert).toContain("ErrorDetailsAccordion");
+    expect(loginPage).toContain("useToast");
+    expect(loginPage).toContain("toastError");
+    expect(loginPage).toContain("Session expired");
+    expect(loginPage).not.toContain("FormError");
+    expect(loginPage).not.toContain("InlineAlert");
+    expect(loginPage).not.toContain("AppErrorAlert");
   });
 
   it("keeps background polling from becoming noisy toast feedback", () => {
