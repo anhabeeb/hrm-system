@@ -30,7 +30,7 @@ export const LoginPage = () => {
   const stateMessage = (location.state as { message?: string } | null)?.message ?? null;
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: "", password: "" },
+    defaultValues: { identifier: "", password: "" },
   });
 
   useEffect(() => {
@@ -45,7 +45,7 @@ export const LoginPage = () => {
 
   const onSubmit = async (values: LoginValues) => {
     try {
-      const result = await login(values);
+      const result = await login({ ...values, identifier: values.identifier.trim() });
       if (result.requires2FA) {
         navigate("/2fa");
         return;
@@ -63,12 +63,12 @@ export const LoginPage = () => {
         <form className="space-y-4" onSubmit={form.handleSubmit(onSubmit)}>
           <FormField
             control={form.control}
-            name="email"
+            name="identifier"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Email</FormLabel>
+                <FormLabel>Username or email</FormLabel>
                 <FormControl>
-                  <Input autoComplete="email" placeholder="name@company.com" {...field} />
+                  <Input autoComplete="username" placeholder="Enter your username or email" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>

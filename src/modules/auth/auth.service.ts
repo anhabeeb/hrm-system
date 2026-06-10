@@ -79,6 +79,12 @@ const toSafeUser = (user: UserRecord): SafeUserProfile => ({
 const isActiveUser = (user: UserRecord): boolean =>
   user.status === "active" && !user.deleted_at;
 
+const hasActiveLinkedEmployee = async (env: Env, user: UserRecord): Promise<boolean> => {
+  if (!user.employee_id) return true;
+  const employee = await authRepository.findLinkedEmployeeLoginStatus(env, user.company_id, user.employee_id);
+  return Boolean(employee && !employee.deleted_at && employee.employment_status !== "archived");
+};
+
 const validateEmailFormat = (email: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
 const normalizeEmailUpdatePayload = (payload: unknown): { email: string } => {
@@ -570,10 +576,10 @@ export const login = async (
   input: LoginInput,
   request: AuthenticatedRequestContext,
 ) => {
-  const loginIdentifier = normalizeEmail(input.email);
+  const loginIdentifier = (input.identifier ?? input.email ?? "").trim().toLowerCase();
   const user = await authRepository.findUserByLoginIdentifier(env, loginIdentifier);
 
-  if (!user || !isActiveUser(user)) {
+  if (!user || !isActiveUser(user) || !(await hasActiveLinkedEmployee(env, user))) {
     await audit(env, { action: "login_failed", user, request });
     throw new AuthError(LOGIN_ERROR_MESSAGE);
   }

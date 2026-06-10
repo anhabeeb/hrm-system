@@ -1,7 +1,8 @@
 import type { CurrentUser } from "@/types/auth";
 
 export interface LoginInput {
-  email: string;
+  identifier: string;
+  email?: string;
   password: string;
   totp_code?: string;
   backup_code?: string;

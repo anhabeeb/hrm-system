@@ -4,6 +4,10 @@ import { defineConfig } from "vite";
 export default defineConfig({
   plugins: [react()],
   build: {
+    // The production environment has intermittently hung during Vite's final
+    // minification pass. Keep typechecking and Rollup bundling intact, but
+    // emit unminified chunks so the normal `npm run build` path completes.
+    minify: false,
     rollupOptions: {
       output: {
         manualChunks(id) {

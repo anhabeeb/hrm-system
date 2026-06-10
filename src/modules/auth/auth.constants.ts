@@ -14,7 +14,7 @@ export const TOTP_DIGITS = 6;
 export const TOTP_WINDOW = 1;
 export const BACKUP_CODE_COUNT = 10;
 
-export const LOGIN_ERROR_MESSAGE = "The email or password is incorrect.";
+export const LOGIN_ERROR_MESSAGE = "Invalid username/email or password.";
 export const LOCKED_ACCOUNT_MESSAGE =
   "Your account is locked. Please try again later or contact your system administrator.";
 export const SESSION_EXPIRED_MESSAGE =

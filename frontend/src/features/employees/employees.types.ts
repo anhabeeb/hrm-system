@@ -44,8 +44,15 @@ export interface Employee {
   has_login?: boolean | number | null;
   linked_user_id?: string | null;
   linked_username?: string | null;
+  linked_user_email?: string | null;
   linked_user_active?: boolean | number | null;
+  linked_role_id?: string | null;
   linked_role_name?: string | null;
+  linked_outlet_count?: number | null;
+  linked_outlet_names?: string | null;
+  linked_password_reset_required?: boolean | number | null;
+  linked_two_factor_enabled?: boolean | number | null;
+  linked_last_login_at?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -100,19 +107,60 @@ export interface EmployeeLoginCreatePayload {
   store_ids?: string[];
   outlet_ids?: string[];
   force_password_change?: boolean;
-  require_2fa?: boolean;
   is_active?: boolean;
 }
 
-export interface EmployeeLoginCreateResponse {
+export interface EmployeeLoginDetails {
   user_id: string;
   employee_id: string;
-  username: string;
+  username: string | null;
   email: string | null;
-  role_id: string;
+  role_id: string | null;
+  role_name: string | null;
+  outlet_ids: string[];
+  outlet_names: string[];
+  outlet_access_count: number;
+  status: string;
   is_active: boolean;
-  force_password_change: boolean;
-  require_2fa: boolean;
+  password_reset_required: boolean;
+  two_factor_enabled: boolean;
+  two_factor_status: "enabled" | "available_after_first_login";
+  last_login_at: string | null;
+}
+
+export type EmployeeLoginCreateResponse = EmployeeLoginDetails;
+
+export interface EmployeeLoginUpdatePayload {
+  username?: string;
+  email?: string | null;
+  role_id?: string;
+  store_ids?: string[];
+  outlet_ids?: string[];
+  is_active?: boolean;
+}
+
+export interface EmployeeLoginResetPasswordPayload {
+  temporary_password: string;
+  force_password_change?: boolean;
+}
+
+export interface EmployeeLoginLinkExistingPayload {
+  user_id: string;
+  role_id?: string;
+  store_ids?: string[];
+  outlet_ids?: string[];
+}
+
+export interface EmployeeLoginLinkCandidate {
+  id: string;
+  full_name: string;
+  username: string | null;
+  email: string | null;
+  status: string;
+  employee_id: string | null;
+  employee_name: string | null;
+  employee_code: string | null;
+  linked_status: "available" | "linked_to_current_employee";
 }
 
 export interface EmployeeStatusHistoryRow {

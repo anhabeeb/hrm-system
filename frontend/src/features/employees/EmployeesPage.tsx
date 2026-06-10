@@ -17,10 +17,10 @@ import { searchParamNumber } from "@/lib/query-string";
 import { EmployeeDetailDrawer } from "./EmployeeDetailDrawer";
 import { EmployeeFilters, type EmployeeFilterValues } from "./EmployeeFilters";
 import { EmployeeForm } from "./EmployeeForm";
-import { EmployeeLoginDialog } from "./EmployeeLoginDialog";
+import { EmployeeLoginDialog, type EmployeeLoginDialogMode } from "./EmployeeLoginDialog";
 import { EmployeeList } from "./EmployeeList";
 import { employeesApi } from "./employees.api";
-import type { Employee, EmployeeLoginCreatePayload, EmployeeUpdatePayload } from "./employees.types";
+import type { Employee, EmployeeLoginCreatePayload, EmployeeLoginLinkExistingPayload, EmployeeLoginResetPasswordPayload, EmployeeLoginUpdatePayload, EmployeeUpdatePayload } from "./employees.types";
 import type { EmployeeFormValues } from "./employees.schema";
 
 const listKey = (filters: Record<string, unknown>) => ["employees", filters];
@@ -35,6 +35,7 @@ export const EmployeesPage = () => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
+  const [loginDialogMode, setLoginDialogMode] = useState<EmployeeLoginDialogMode>("create");
   const [formMode, setFormMode] = useState<"create" | "edit">("create");
   const [mutationError, setMutationError] = useState<ApiError | null>(null);
   const toast = useToast();
@@ -65,7 +66,6 @@ export const EmployeesPage = () => {
   const departmentsQuery = useQuery({ queryKey: ["departments", "options"], queryFn: () => departmentsApi.list({ page_size: 100 }) });
   const positionsQuery = useQuery({ queryKey: ["positions", "options"], queryFn: () => positionsApi.list({ page_size: 100 }) });
   const rolesQuery = useQuery({ queryKey: ["roles", "employee-login-options"], queryFn: () => rolesApi.list({ page_size: 100 }) });
-
   const refreshList = async () => {
     await queryClient.invalidateQueries({ queryKey: ["employees"] });
   };
@@ -114,6 +114,74 @@ export const EmployeesPage = () => {
     },
   });
 
+  const updateLoginMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: EmployeeLoginUpdatePayload }) => employeesApi.updateLogin(id, payload),
+    onSuccess: async () => {
+      toastSuccess(toast, "Employee login access updated.");
+      setLoginDialogOpen(false);
+      await refreshList();
+      if (selectedEmployee) {
+        const refreshed = await employeesApi.get(selectedEmployee.id);
+        setSelectedEmployee(refreshed.data.employee);
+      }
+    },
+    onError: (error) => toastError(toast, error, "Employee login access could not be updated."),
+  });
+
+  const resetLoginPasswordMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: EmployeeLoginResetPasswordPayload }) => employeesApi.resetLoginPassword(id, payload),
+    onSuccess: async () => {
+      toastSuccess(toast, "Temporary password reset for employee login.");
+      setLoginDialogOpen(false);
+      await refreshList();
+      if (selectedEmployee) {
+        const refreshed = await employeesApi.get(selectedEmployee.id);
+        setSelectedEmployee(refreshed.data.employee);
+      }
+    },
+    onError: (error) => toastError(toast, error, "Employee login password could not be reset."),
+  });
+
+  const linkExistingLoginMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: EmployeeLoginLinkExistingPayload }) => employeesApi.linkExistingLogin(id, payload),
+    onSuccess: async () => {
+      toastSuccess(toast, "Existing user linked to employee.");
+      setLoginDialogOpen(false);
+      await refreshList();
+      if (selectedEmployee) {
+        const refreshed = await employeesApi.get(selectedEmployee.id);
+        setSelectedEmployee(refreshed.data.employee);
+      }
+    },
+    onError: (error) => toastError(toast, error, "Existing user could not be linked."),
+  });
+
+  const disableLoginMutation = useMutation({
+    mutationFn: (id: string) => employeesApi.disableLogin(id),
+    onSuccess: async () => {
+      toastSuccess(toast, "Employee login disabled and sessions revoked.");
+      await refreshList();
+      if (selectedEmployee) {
+        const refreshed = await employeesApi.get(selectedEmployee.id);
+        setSelectedEmployee(refreshed.data.employee);
+      }
+    },
+    onError: (error) => toastError(toast, error, "Employee login could not be disabled."),
+  });
+
+  const enableLoginMutation = useMutation({
+    mutationFn: (id: string) => employeesApi.enableLogin(id),
+    onSuccess: async () => {
+      toastSuccess(toast, "Employee login enabled.");
+      await refreshList();
+      if (selectedEmployee) {
+        const refreshed = await employeesApi.get(selectedEmployee.id);
+        setSelectedEmployee(refreshed.data.employee);
+      }
+    },
+    onError: (error) => toastError(toast, error, "Employee login could not be enabled."),
+  });
+
   const openCreate = () => {
     setMutationError(null);
     setSelectedEmployee(null);
@@ -152,6 +220,11 @@ export const EmployeesPage = () => {
   const canEditDocuments = auth.hasPermission("documents.edit") && auth.hasFeature("documents");
   const canViewNotes = auth.hasPermission("employees.view");
   const canCreateLogin = auth.hasAnyPermission(["employees.login.create", "users.create"]);
+  const canEditLogin = auth.hasAnyPermission(["employees.login.link", "users.edit"]);
+  const canDisableLogin = auth.hasAnyPermission(["employees.login.revoke", "users.disable", "users.edit"]);
+  const canEnableLogin = auth.hasAnyPermission(["employees.login.link", "users.enable", "users.edit"]);
+  const canResetLoginPassword = auth.hasAnyPermission(["employees.login.revoke", "users.reset_password", "users.edit"]);
+  const canLinkExistingLogin = auth.hasAnyPermission(["employees.login.link", "users.edit"]);
 
   return (
     <div>
@@ -198,10 +271,39 @@ export const EmployeesPage = () => {
           onEdit={openEdit}
           onCreateLogin={(employee) => {
             setSelectedEmployee(employee);
+            setLoginDialogMode("create");
+            setLoginDialogOpen(true);
+          }}
+          onEditLogin={(employee) => {
+            setSelectedEmployee(employee);
+            setLoginDialogMode("edit");
+            setLoginDialogOpen(true);
+          }}
+          onEnableLogin={(employee) => {
+            setSelectedEmployee(employee);
+            enableLoginMutation.mutate(employee.id);
+          }}
+          onDisableLogin={(employee) => {
+            setSelectedEmployee(employee);
+            disableLoginMutation.mutate(employee.id);
+          }}
+          onResetLoginPassword={(employee) => {
+            setSelectedEmployee(employee);
+            setLoginDialogMode("reset");
+            setLoginDialogOpen(true);
+          }}
+          onLinkExistingLogin={(employee) => {
+            setSelectedEmployee(employee);
+            setLoginDialogMode("link");
             setLoginDialogOpen(true);
           }}
           canEdit={canEdit}
           canCreateLogin={canCreateLogin}
+          canEditLogin={canEditLogin}
+          canDisableLogin={canDisableLogin}
+          canEnableLogin={canEnableLogin}
+          canResetLoginPassword={canResetLoginPassword}
+          canLinkExistingLogin={canLinkExistingLogin}
           canManageJobChange={canManageJobChange}
           canViewSalary={canViewSalary}
           canEditSalary={canEditSalary}
@@ -215,15 +317,24 @@ export const EmployeesPage = () => {
           canManageContracts={canManageContracts}
         />
         <EmployeeLoginDialog
+          mode={loginDialogMode}
           employee={selectedEmployee}
           open={loginDialogOpen}
           roles={rolesQuery.data?.data ?? []}
           outlets={outletsQuery.data?.data ?? []}
-          loading={createLoginMutation.isPending}
+          loading={createLoginMutation.isPending || updateLoginMutation.isPending || resetLoginPasswordMutation.isPending || linkExistingLoginMutation.isPending}
           onOpenChange={setLoginDialogOpen}
           onSubmit={(payload) => {
             if (!selectedEmployee) return;
-            createLoginMutation.mutate({ id: selectedEmployee.id, payload });
+            if (loginDialogMode === "edit") {
+              updateLoginMutation.mutate({ id: selectedEmployee.id, payload: payload as EmployeeLoginUpdatePayload });
+            } else if (loginDialogMode === "reset") {
+              resetLoginPasswordMutation.mutate({ id: selectedEmployee.id, payload: payload as EmployeeLoginResetPasswordPayload });
+            } else if (loginDialogMode === "link") {
+              linkExistingLoginMutation.mutate({ id: selectedEmployee.id, payload: payload as EmployeeLoginLinkExistingPayload });
+            } else {
+              createLoginMutation.mutate({ id: selectedEmployee.id, payload: payload as EmployeeLoginCreatePayload });
+            }
           }}
         />
         <EmployeeForm

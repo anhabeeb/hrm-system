@@ -15,6 +15,8 @@ import type {
   EmployeeCompensationComponentInput,
   EmployeeCompensationComponentRecord,
   EmployeeCompensationComponentEndInput,
+  EmployeeLoginLinkCandidate,
+  EmployeeLoginLinkCandidateFilters,
   JobChangeInput,
   OutletAssignmentInput,
   SalaryHistoryInput,
@@ -77,8 +79,15 @@ const employeeSelect = `SELECT e.*,
   CASE WHEN lu.id IS NULL THEN 0 ELSE 1 END AS has_login,
   lu.id AS linked_user_id,
   COALESCE(lu.username, lu.email, lu.full_name) AS linked_username,
+  lu.email AS linked_user_email,
   CASE WHEN lu.status = 'active' THEN 1 ELSE 0 END AS linked_user_active,
+  MIN(lr.id) AS linked_role_id,
   MIN(lr.role_name) AS linked_role_name,
+  COUNT(DISTINCT luo.outlet_id) AS linked_outlet_count,
+  GROUP_CONCAT(DISTINCT lo.name) AS linked_outlet_names,
+  lu.password_reset_required AS linked_password_reset_required,
+  lu.two_factor_enabled AS linked_two_factor_enabled,
+  lu.last_login_at AS linked_last_login_at,
   CASE
     WHEN MIN(ed.expiry_date) IS NULL THEN NULL
     WHEN MIN(ed.expiry_date) <= date('now', '+30 day') THEN 'expiring_soon'
@@ -91,6 +100,8 @@ LEFT JOIN positions p ON p.id = e.position_id
 LEFT JOIN users lu ON lu.company_id = e.company_id AND lu.employee_id = e.id AND lu.deleted_at IS NULL
 LEFT JOIN user_roles lur ON lur.company_id = lu.company_id AND lur.user_id = lu.id
 LEFT JOIN roles lr ON lr.company_id = lur.company_id AND lr.id = lur.role_id AND lr.is_active = 1
+LEFT JOIN user_outlets luo ON luo.company_id = lu.company_id AND luo.user_id = lu.id AND (luo.ends_at IS NULL OR luo.ends_at > datetime('now'))
+LEFT JOIN outlets lo ON lo.company_id = luo.company_id AND lo.id = luo.outlet_id AND lo.deleted_at IS NULL
 LEFT JOIN employee_documents ed ON ed.employee_id = e.id AND ed.deleted_at IS NULL`;
 
 const buildEmployeeFilters = (
@@ -2306,6 +2317,168 @@ export const disableLinkedUser = (
     "UPDATE users SET status = 'disabled', updated_at = ? WHERE company_id = ? AND id = ?",
     [new Date().toISOString(), companyId, userId],
   );
+
+export const enableLinkedUser = (
+  env: Env,
+  companyId: string,
+  userId: string,
+) =>
+  execute(
+    env,
+    "UPDATE users SET status = 'active', updated_at = ? WHERE company_id = ? AND id = ?",
+    [new Date().toISOString(), companyId, userId],
+  );
+
+export const updateLinkedUserIdentity = (
+  env: Env,
+  companyId: string,
+  userId: string,
+  input: {
+    username: string | null;
+    email: string | null;
+    status: string;
+  },
+) =>
+  execute(
+    env,
+    "UPDATE users SET username = ?, email = ?, status = ?, updated_at = ? WHERE company_id = ? AND id = ?",
+    [input.username, input.email, input.status, new Date().toISOString(), companyId, userId],
+  );
+
+export const updateLinkedUserPassword = (
+  env: Env,
+  companyId: string,
+  userId: string,
+  input: {
+    passwordHash: string;
+    passwordAlgo: string;
+    forcePasswordChange: boolean;
+  },
+) =>
+  execute(
+    env,
+    `UPDATE users
+     SET password_hash = ?,
+         password_algo = ?,
+         password_updated_at = ?,
+         last_password_reset_at = ?,
+         password_reset_required = ?,
+         updated_at = ?
+     WHERE company_id = ? AND id = ?`,
+    [
+      input.passwordHash,
+      input.passwordAlgo,
+      new Date().toISOString(),
+      new Date().toISOString(),
+      input.forcePasswordChange ? 1 : 0,
+      new Date().toISOString(),
+      companyId,
+      userId,
+    ],
+  );
+
+export const linkExistingUserToEmployee = (
+  env: Env,
+  companyId: string,
+  userId: string,
+  employeeId: string,
+) =>
+  execute(
+    env,
+    "UPDATE users SET employee_id = ?, updated_at = ? WHERE company_id = ? AND id = ? AND deleted_at IS NULL",
+    [employeeId, new Date().toISOString(), companyId, userId],
+  );
+
+const buildLoginLinkCandidateFilters = (
+  companyId: string,
+  filters: EmployeeLoginLinkCandidateFilters,
+  outletScope: EmployeeAccessibleOutletScope,
+) => {
+  const clauses = ["u.company_id = ?", "u.deleted_at IS NULL"];
+  const values: unknown[] = [companyId];
+
+  if (filters.employee_id) {
+    clauses.push("(u.employee_id IS NULL OR u.employee_id = ?)");
+    values.push(filters.employee_id);
+  } else {
+    clauses.push("u.employee_id IS NULL");
+  }
+
+  if (filters.search) {
+    const term = `%${filters.search.toLowerCase()}%`;
+    clauses.push(
+      "(lower(COALESCE(u.full_name, '')) LIKE ? OR lower(COALESCE(u.username, '')) LIKE ? OR lower(COALESCE(u.email, '')) LIKE ?)",
+    );
+    values.push(term, term, term);
+  }
+
+  if (!outletScope.isSuperAdmin) {
+    if (outletScope.outletIds.length === 0) {
+      clauses.push("1 = 0");
+    } else {
+      const placeholders = outletScope.outletIds.map(() => "?").join(", ");
+      clauses.push(
+        `(e.primary_outlet_id IN (${placeholders})
+          OR EXISTS (
+            SELECT 1
+              FROM user_outlets uo_scope
+             WHERE uo_scope.company_id = u.company_id
+               AND uo_scope.user_id = u.id
+               AND uo_scope.outlet_id IN (${placeholders})
+               AND (uo_scope.ends_at IS NULL OR uo_scope.ends_at > ?)
+          ))`,
+      );
+      values.push(...outletScope.outletIds, ...outletScope.outletIds, new Date().toISOString());
+    }
+  }
+
+  return { whereSql: clauses.join(" AND "), values };
+};
+
+export const countLoginLinkCandidates = (
+  env: Env,
+  companyId: string,
+  filters: EmployeeLoginLinkCandidateFilters,
+  outletScope: EmployeeAccessibleOutletScope,
+): Promise<number> => {
+  const { whereSql, values } = buildLoginLinkCandidateFilters(companyId, filters, outletScope);
+  return queryOne<{ total: number }>(
+    env,
+    `SELECT COUNT(*) AS total
+       FROM users u
+       LEFT JOIN employees e ON e.company_id = u.company_id AND e.id = u.employee_id AND e.deleted_at IS NULL
+      WHERE ${whereSql}`,
+    values,
+  ).then((row) => row?.total ?? 0);
+};
+
+export const listLoginLinkCandidates = (
+  env: Env,
+  companyId: string,
+  filters: EmployeeLoginLinkCandidateFilters,
+  outletScope: EmployeeAccessibleOutletScope,
+): Promise<EmployeeLoginLinkCandidate[]> => {
+  const { whereSql, values } = buildLoginLinkCandidateFilters(companyId, filters, outletScope);
+  const offset = (filters.page - 1) * filters.page_size;
+  return queryMany<EmployeeLoginLinkCandidate>(
+    env,
+    `SELECT u.id,
+            u.full_name,
+            u.username,
+            u.email,
+            u.status,
+            u.employee_id,
+            e.full_name AS employee_name,
+            e.employee_code,
+            CASE WHEN u.employee_id = ? THEN 'linked_to_current_employee' ELSE 'available' END AS linked_status
+       FROM users u
+       LEFT JOIN employees e ON e.company_id = u.company_id AND e.id = u.employee_id AND e.deleted_at IS NULL
+      WHERE ${whereSql}
+      ORDER BY lower(COALESCE(u.full_name, u.username, u.email, u.id)) ASC
+      LIMIT ? OFFSET ?`,
+    [filters.employee_id ?? "", ...values, filters.page_size, offset],
+  );
+};
 
 export const revokeUserSessions = (env: Env, companyId: string, userId: string) =>
   execute(

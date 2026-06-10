@@ -143,8 +143,14 @@ export const Employee360Page = () => {
                 <SimpleTable title="Login Access" rows={metricRows({
                   "Login status": employee.has_login ? "Login Assigned" : "No login assigned",
                   Username: employee.linked_username,
+                  Email: employee.linked_user_email,
+                  "Linked user": employee.linked_user_id,
                   Role: employee.linked_role_name,
+                  "Store / outlet access": employee.linked_outlet_names || (employee.has_login ? `${employee.linked_outlet_count ?? 0} outlet(s)` : null),
                   "Account status": employee.linked_user_active ? "Active" : employee.has_login ? "Inactive / disabled" : null,
+                  "Password reset required": employee.has_login ? (employee.linked_password_reset_required ? "Yes" : "No") : null,
+                  "Two-factor": employee.has_login ? (employee.linked_two_factor_enabled ? "Enabled" : "Available after first sign-in") : null,
+                  "Last login": employee.linked_last_login_at,
                 })} columns={["metric", "value"]} />
               </TabsContent>
 

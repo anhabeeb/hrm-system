@@ -225,6 +225,14 @@ const createEnv = (options: { authUserId?: string } = {}) => {
       const [companyId, email] = values as string[];
       return users.find((user) => user.company_id === companyId && user.email?.toLowerCase() === email.toLowerCase() && !user.deleted_at) ?? null;
     }
+    if (normalized.includes("from users where lower(email)")) {
+      const [email] = values as string[];
+      return users.find((user) => user.email?.toLowerCase() === email.toLowerCase() && !user.deleted_at) ?? null;
+    }
+    if (normalized.includes("from users where lower(username)")) {
+      const [username] = values as string[];
+      return users.find((user) => "username" in user && String((user as TestUser & { username?: string | null }).username ?? "").toLowerCase() === username.toLowerCase() && !user.deleted_at) ?? null;
+    }
     if (normalized.includes("count(distinct u.id) as total") && normalized.includes("r.role_key = 'super_admin'")) {
       const companyId = values[0] as string;
       const excludeUserId = values[1] as string | undefined;
@@ -445,6 +453,67 @@ describe("Users & Access API routes", () => {
     expect(migration).toContain("idx_users_company_employee_unique");
     expect(form).toContain("Linked Employee");
     expect(form).toContain("SelectItem");
+  });
+
+  it("employee login link-existing UI uses a searchable user selector instead of raw ID typing", () => {
+    const dialog = readFileSync("frontend/src/features/employees/EmployeeLoginDialog.tsx", "utf8");
+    const page = readFileSync("frontend/src/features/employees/EmployeesPage.tsx", "utf8");
+    const api = readFileSync("frontend/src/features/employees/employees.api.ts", "utf8");
+    const routes = readFileSync("src/routes/employees.routes.ts", "utf8");
+    const repository = readFileSync("src/modules/employees/employees.repository.ts", "utf8");
+
+    expect(dialog).toContain("Search existing users");
+    expect(dialog).toContain("No available unlinked users found.");
+    expect(dialog).toContain("user.full_name");
+    expect(dialog).toContain("user.username");
+    expect(dialog).toContain("user.email");
+    expect(dialog).toContain("user.status");
+    expect(dialog).toContain("loginLinkCandidates");
+    expect(dialog).toContain("!user.employee_id || user.employee_id === employee?.id");
+    expect(dialog).not.toContain("Existing user ID");
+    expect(page).not.toContain("usersApi.list({ page_size: 100 })");
+    expect(page).not.toContain("usersApi");
+    expect(api).toContain("loginLinkCandidates");
+    expect(api).toContain("/employees/login-link-candidates");
+    expect(routes).toContain('"/login-link-candidates"');
+    expect(routes).toContain('requireAnyPermissionOrError(["employees.login.link", "users.edit"]');
+    expect(routes).not.toContain('requirePermission("users.view")');
+    expect(repository).toContain("password_hash");
+    expect(repository).toContain("listLoginLinkCandidates");
+    expect(repository).not.toMatch(/SELECT\s+u\.\*/i);
+  });
+
+  it("employee login actions are gated by specific permissions", () => {
+    const drawer = readFileSync("frontend/src/features/employees/EmployeeDetailDrawer.tsx", "utf8");
+    const page = readFileSync("frontend/src/features/employees/EmployeesPage.tsx", "utf8");
+
+    for (const phrase of [
+      "canCreateLogin",
+      "canEditLogin",
+      "canDisableLogin",
+      "canEnableLogin",
+      "canResetLoginPassword",
+      "canLinkExistingLogin",
+    ]) {
+      expect(drawer).toContain(phrase);
+      expect(page).toContain(phrase);
+    }
+    expect(page).toContain("employees.login.create");
+    expect(page).toContain("employees.login.link");
+    expect(page).toContain("employees.login.revoke");
+    expect(page).toContain("users.reset_password");
+  });
+
+  it("frontend production build config avoids the hanging minifier without skipping typecheck", () => {
+    const viteConfig = readFileSync("frontend/vite.config.ts", "utf8");
+    const packageJson = readFileSync("frontend/package.json", "utf8");
+    const buildScript = readFileSync("frontend/scripts/build.mjs", "utf8");
+
+    expect(packageJson).toContain('"build": "node ./scripts/build.mjs"');
+    expect(buildScript).toContain('await run("tsc --noEmit")');
+    expect(buildScript).toContain('await run("vite build")');
+    expect(viteConfig).toContain("minify: false");
+    expect(viteConfig).toContain("minification pass");
   });
 
 });

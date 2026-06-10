@@ -5,6 +5,10 @@ import * as documentsService from "../documents/documents.service";
 import {
   validateEmployeeCreateInput,
   validateEmployeeLoginCreateInput,
+  validateEmployeeLoginLinkExistingInput,
+  validateEmployeeLoginLinkCandidateFilters,
+  validateEmployeeLoginPasswordResetInput,
+  validateEmployeeLoginUpdateInput,
   validateEmployeeListFilters,
   validateEmployeeNoteInput,
   validateEmployeeStatusInput,
@@ -131,6 +135,23 @@ export const getEmployee = async (c: Context<AppContext>) =>
     { requestId: c.get("requestId") },
   );
 
+export const listEmployeeLoginLinkCandidates = async (c: Context<AppContext>) => {
+  const result = await employeesService.listEmployeeLoginLinkCandidates(
+    c.env,
+    actor(c),
+    validateEmployeeLoginLinkCandidateFilters({
+      search: c.req.query("search"),
+      employee_id: c.req.query("employee_id"),
+      page: c.req.query("page"),
+      page_size: c.req.query("page_size"),
+    }),
+  );
+
+  return paginated(result.rows, result.pagination, "Employee login link candidates loaded successfully.", {
+    requestId: c.get("requestId"),
+  });
+};
+
 export const createEmployeeLogin = async (c: Context<AppContext>) =>
   created(
     await employeesService.createEmployeeLogin(
@@ -140,6 +161,63 @@ export const createEmployeeLogin = async (c: Context<AppContext>) =>
       validateEmployeeLoginCreateInput(await readJson(c)),
     ),
     "Login account created for employee.",
+    { requestId: c.get("requestId") },
+  );
+
+export const getEmployeeLogin = async (c: Context<AppContext>) =>
+  ok(
+    await employeesService.getEmployeeLogin(c.env, actor(c), requiredId(c)),
+    "Employee login access loaded successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const updateEmployeeLogin = async (c: Context<AppContext>) =>
+  ok(
+    await employeesService.updateEmployeeLogin(
+      c.env,
+      actor(c),
+      requiredId(c),
+      validateEmployeeLoginUpdateInput(await readJson(c)),
+    ),
+    "Employee login access updated successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const disableEmployeeLogin = async (c: Context<AppContext>) =>
+  ok(
+    await employeesService.disableEmployeeLogin(c.env, actor(c), requiredId(c)),
+    "Employee login disabled successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const enableEmployeeLogin = async (c: Context<AppContext>) =>
+  ok(
+    await employeesService.enableEmployeeLogin(c.env, actor(c), requiredId(c)),
+    "Employee login enabled successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const resetEmployeeLoginPassword = async (c: Context<AppContext>) =>
+  ok(
+    await employeesService.resetEmployeeLoginPassword(
+      c.env,
+      actor(c),
+      requiredId(c),
+      validateEmployeeLoginPasswordResetInput(await readJson(c)),
+    ),
+    "Employee login password reset successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const linkExistingUserToEmployee = async (c: Context<AppContext>) =>
+  created(
+    await employeesService.linkExistingUserToEmployee(
+      c.env,
+      actor(c),
+      requiredId(c),
+      validateEmployeeLoginLinkExistingInput(await readJson(c)),
+    ),
+    "Existing user linked to employee successfully.",
     { requestId: c.get("requestId") },
   );
 

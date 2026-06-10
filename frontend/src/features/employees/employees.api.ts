@@ -1,7 +1,7 @@
 import { api } from "@/lib/api-client";
 import { buildQueryString } from "@/lib/query-string";
 import type { DocumentUpdatePayload, DocumentUploadPayload } from "@/features/documents/documents.types";
-import type { CompensationComponentDefinition, CompensationComponentDefinitionPayload, Employee, Employee360Profile, EmployeeCompensationComponent, EmployeeCompensationComponentEndPayload, EmployeeCompensationComponentMutationResponse, EmployeeCompensationComponentPayload, EmployeeCompensationSummary, EmployeeDetailResponse, EmployeeDocumentCompliance, EmployeeDocumentRow, EmployeeFilters, EmployeeJobChangePayload, EmployeeJobChangeResponse, EmployeeJobHistoryRow, EmployeeLoginCreatePayload, EmployeeLoginCreateResponse, EmployeeNoteRow, EmployeePayload, EmployeeSalaryChangePayload, EmployeeSalaryChangeResponse, EmployeeSalaryRow, EmployeeStatusChangePayload, EmployeeStatusHistoryRow, EmployeeUpdatePayload } from "./employees.types";
+import type { CompensationComponentDefinition, CompensationComponentDefinitionPayload, Employee, Employee360Profile, EmployeeCompensationComponent, EmployeeCompensationComponentEndPayload, EmployeeCompensationComponentMutationResponse, EmployeeCompensationComponentPayload, EmployeeCompensationSummary, EmployeeDetailResponse, EmployeeDocumentCompliance, EmployeeDocumentRow, EmployeeFilters, EmployeeJobChangePayload, EmployeeJobChangeResponse, EmployeeJobHistoryRow, EmployeeLoginCreatePayload, EmployeeLoginCreateResponse, EmployeeLoginDetails, EmployeeLoginLinkCandidate, EmployeeLoginLinkExistingPayload, EmployeeLoginResetPasswordPayload, EmployeeLoginUpdatePayload, EmployeeNoteRow, EmployeePayload, EmployeeSalaryChangePayload, EmployeeSalaryChangeResponse, EmployeeSalaryRow, EmployeeStatusChangePayload, EmployeeStatusHistoryRow, EmployeeUpdatePayload } from "./employees.types";
 
 export const employeesApi = {
   list: (filters: EmployeeFilters) => api.get<Employee[]>(`/employees${buildQueryString(filters)}`),
@@ -19,8 +19,22 @@ export const employeesApi = {
   profileTimeline: (id: string, filters: { limit?: number } = {}) => api.get<{ data: Employee360Profile["timeline"] }>(`/employees/${id}/profile/timeline${buildQueryString(filters)}`),
   create: (payload: EmployeePayload) => api.post<{ employee: Employee } | { id: string }>("/employees", payload),
   update: (id: string, payload: EmployeeUpdatePayload) => api.patch<{ employee: Employee } | { updated: boolean }>(`/employees/${id}`, payload),
+  login: (id: string) =>
+    api.get<{ login: EmployeeLoginDetails | null }>(`/employees/${id}/login`),
+  loginLinkCandidates: (filters: { search?: string; employee_id?: string; page?: number; page_size?: number }) =>
+    api.get<EmployeeLoginLinkCandidate[]>(`/employees/login-link-candidates${buildQueryString(filters)}`),
   createLogin: (id: string, payload: EmployeeLoginCreatePayload) =>
     api.post<EmployeeLoginCreateResponse>(`/employees/${id}/login`, payload),
+  updateLogin: (id: string, payload: EmployeeLoginUpdatePayload) =>
+    api.patch<EmployeeLoginDetails>(`/employees/${id}/login`, payload),
+  disableLogin: (id: string) =>
+    api.post<EmployeeLoginDetails>(`/employees/${id}/login/disable`, {}),
+  enableLogin: (id: string) =>
+    api.post<EmployeeLoginDetails>(`/employees/${id}/login/enable`, {}),
+  resetLoginPassword: (id: string, payload: EmployeeLoginResetPasswordPayload) =>
+    api.post<EmployeeLoginDetails>(`/employees/${id}/login/reset-password`, payload),
+  linkExistingLogin: (id: string, payload: EmployeeLoginLinkExistingPayload) =>
+    api.post<EmployeeLoginDetails>(`/employees/${id}/login/link-existing`, payload),
   statusHistory: (id: string) => api.get<{ history: EmployeeStatusHistoryRow[] }>(`/employees/${id}/status-history`),
   changeStatus: (id: string, payload: EmployeeStatusChangePayload) =>
     api.post<{ employee: Employee; status_history: EmployeeStatusHistoryRow | null; updated: boolean; scheduled?: boolean }>(`/employees/${id}/status-change`, payload),

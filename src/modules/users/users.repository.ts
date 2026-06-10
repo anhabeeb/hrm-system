@@ -80,11 +80,25 @@ export const findUserByEmail = (env: Env, companyId: string, email: string): Pro
     [companyId, email],
   );
 
+export const findUserByEmailGlobally = (env: Env, email: string): Promise<UserRecord | null> =>
+  one<UserRecord>(
+    env,
+    "SELECT * FROM users WHERE lower(email) = lower(?) AND deleted_at IS NULL LIMIT 1",
+    [email],
+  );
+
 export const findUserByUsername = (env: Env, companyId: string, username: string): Promise<UserRecord | null> =>
   one<UserRecord>(
     env,
     "SELECT * FROM users WHERE company_id = ? AND lower(username) = lower(?) AND deleted_at IS NULL LIMIT 1",
     [companyId, username],
+  );
+
+export const findUserByUsernameGlobally = (env: Env, username: string): Promise<UserRecord | null> =>
+  one<UserRecord>(
+    env,
+    "SELECT * FROM users WHERE lower(username) = lower(?) AND deleted_at IS NULL LIMIT 1",
+    [username],
   );
 
 export const findUserByEmployeeId = (env: Env, companyId: string, employeeId: string): Promise<UserRecord | null> =>
@@ -147,7 +161,6 @@ export const createEmployeeLoginUser = async (
     passwordHash: string;
     passwordAlgo: string;
     forcePasswordChange: boolean;
-    require2fa: boolean;
     status: string;
     roleId: string;
     outletIds: string[];
@@ -251,13 +264,14 @@ export const getUserRoles = (env: Env, companyId: string, userIds: string[]) => 
 export const getUserOutlets = (env: Env, companyId: string, userIds: string[]) => {
   if (userIds.length === 0) return Promise.resolve([]);
   const placeholders = userIds.map(() => "?").join(", ");
-  return many<{ user_id: string; outlet_id: string }>(
+  return many<{ user_id: string; outlet_id: string; outlet_name?: string | null }>(
     env,
-    `SELECT user_id, outlet_id
-       FROM user_outlets
-      WHERE company_id = ? AND user_id IN (${placeholders})
-        AND (ends_at IS NULL OR ends_at > ?)
-      ORDER BY outlet_id`,
+    `SELECT uo.user_id, uo.outlet_id, o.name AS outlet_name
+       FROM user_outlets uo
+       LEFT JOIN outlets o ON o.company_id = uo.company_id AND o.id = uo.outlet_id AND o.deleted_at IS NULL
+      WHERE uo.company_id = ? AND uo.user_id IN (${placeholders})
+        AND (uo.ends_at IS NULL OR uo.ends_at > ?)
+      ORDER BY uo.outlet_id`,
     [companyId, ...userIds, new Date().toISOString()],
   );
 };

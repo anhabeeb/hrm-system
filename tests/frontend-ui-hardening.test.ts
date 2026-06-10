@@ -171,6 +171,25 @@ describe("frontend completed-phase hardening coverage", () => {
     expect(loginPage).not.toContain("AppErrorAlert");
   });
 
+  it("login form accepts username or email through a single identifier field", () => {
+    const loginPage = read("frontend/src/features/auth/LoginPage.tsx");
+    const loginSchema = read("frontend/src/features/auth/login.schema.ts");
+    const authTypes = read("frontend/src/features/auth/auth.types.ts");
+    const authStore = read("frontend/src/features/auth/auth.store.tsx");
+
+    expect(loginPage).toContain('name="identifier"');
+    expect(loginPage).toContain("Username or email");
+    expect(loginPage).toContain("Enter your username or email");
+    expect(loginPage).toContain("identifier: values.identifier.trim()");
+    expect(loginPage).not.toContain('name="email"');
+    expect(loginSchema).toContain("identifier:");
+    expect(loginSchema).toContain("Username or email is required.");
+    expect(loginSchema).not.toContain(".email(");
+    expect(authTypes).toContain("identifier: string");
+    expect(authStore).toContain("identifier: input.identifier");
+    expect(authStore).not.toContain("email: input.email");
+  });
+
   it("keeps background polling from becoming noisy toast feedback", () => {
     const apiClient = read("frontend/src/lib/api-client.ts");
     const notificationApi = read("frontend/src/features/notifications/notifications.api.ts");

@@ -16,6 +16,10 @@ import type {
   EmployeeCompensationComponentInput,
   EmployeeCreateInput,
   EmployeeLoginCreateInput,
+  EmployeeLoginLinkExistingInput,
+  EmployeeLoginLinkCandidateFilters,
+  EmployeeLoginPasswordResetInput,
+  EmployeeLoginUpdateInput,
   EmployeeListFilters,
   EmployeeNoteInput,
   EmployeeStatusInput,
@@ -82,6 +86,33 @@ const usernameSchema = z
   .min(3, "Username must be at least 3 characters.")
   .max(80, "Username must be 80 characters or fewer.")
   .regex(/^[a-zA-Z0-9._-]+$/, "Username may contain letters, numbers, dots, underscores, and hyphens.");
+
+const loginEmailSchema = z
+  .string()
+  .trim()
+  .email("Please enter a valid email address.")
+  .transform((value) => value.toLowerCase())
+  .nullable()
+  .optional();
+
+const loginOutletIdsSchema = {
+  store_ids: z.array(z.string().trim().min(1)).optional(),
+  outlet_ids: z.array(z.string().trim().min(1)).optional(),
+};
+
+const rejectUnsupportedEmployeeLogin2fa = (require2fa: boolean) => {
+  if (!require2fa) return;
+  throw new AppError({
+    code: "EMPLOYEE_LOGIN_2FA_SETUP_UNSUPPORTED",
+    title: "Two-factor setup happens after first sign-in",
+    message: "Two-factor authentication is configured by the user after their first sign-in.",
+    statusCode: 400,
+    retryable: false,
+    fieldErrors: {
+      require_2fa: "Two-factor authentication is configured by the user after first sign-in.",
+    },
+  });
+};
 
 const asRecord = (payload: unknown): Record<string, unknown> =>
   typeof payload === "object" && payload !== null
@@ -265,17 +296,17 @@ export const validateEmployeeLoginCreateInput = (payload: unknown): EmployeeLogi
   const input = parse(
     z.object({
       username: usernameSchema,
-      email: z.string().trim().email("Please enter a valid email address.").transform((value) => value.toLowerCase()).nullable().optional(),
+      email: loginEmailSchema,
       temporary_password: z.string().min(1, "Temporary password is required."),
       role_id: z.string().trim().min(1, "Role is required."),
-      store_ids: z.array(z.string().trim().min(1)).optional(),
-      outlet_ids: z.array(z.string().trim().min(1)).optional(),
+      ...loginOutletIdsSchema,
       force_password_change: z.boolean().default(true),
       require_2fa: z.boolean().default(false),
       is_active: z.boolean().default(true),
     }),
     payload,
   );
+  rejectUnsupportedEmployeeLogin2fa(input.require_2fa);
   const passwordResult = validateNewPassword(input.temporary_password, input.temporary_password);
   if (!passwordResult.valid) {
     throw new ValidationError(passwordResult.message, {
@@ -289,6 +320,68 @@ export const validateEmployeeLoginCreateInput = (payload: unknown): EmployeeLogi
     outlet_ids: input.outlet_ids ?? input.store_ids ?? [],
   };
 };
+
+export const validateEmployeeLoginUpdateInput = (payload: unknown): EmployeeLoginUpdateInput => {
+  const raw = asRecord(payload);
+  const input = parse(
+    z.object({
+      username: usernameSchema.optional(),
+      email: loginEmailSchema,
+      role_id: z.string().trim().min(1, "Role is required.").optional(),
+      ...loginOutletIdsSchema,
+      is_active: z.boolean().optional(),
+      require_2fa: z.boolean().optional(),
+    }),
+    payload,
+  );
+  rejectUnsupportedEmployeeLogin2fa(input.require_2fa === true);
+  return {
+    ...input,
+    email: "email" in raw ? input.email ?? null : undefined,
+    store_ids: input.store_ids ?? input.outlet_ids,
+    outlet_ids: input.outlet_ids ?? input.store_ids,
+  };
+};
+
+export const validateEmployeeLoginPasswordResetInput = (payload: unknown): EmployeeLoginPasswordResetInput => {
+  const input = parse(
+    z.object({
+      temporary_password: z.string().min(1, "Temporary password is required."),
+      force_password_change: z.boolean().default(true),
+    }),
+    payload,
+  );
+  const passwordResult = validateNewPassword(input.temporary_password, input.temporary_password);
+  if (!passwordResult.valid) {
+    throw new ValidationError(passwordResult.message, {
+      temporary_password: passwordResult.message ?? "Please choose a stronger password.",
+    });
+  }
+  return input;
+};
+
+export const validateEmployeeLoginLinkExistingInput = (payload: unknown): EmployeeLoginLinkExistingInput =>
+  parse(
+    z.object({
+      user_id: z.string().trim().min(1, "User is required."),
+      role_id: z.string().trim().min(1, "Role is required.").optional(),
+      ...loginOutletIdsSchema,
+    }),
+    payload,
+  );
+
+export const validateEmployeeLoginLinkCandidateFilters = (
+  query: Record<string, string | undefined>,
+): EmployeeLoginLinkCandidateFilters =>
+  parse(
+    z.object({
+      search: z.string().trim().max(120).optional(),
+      employee_id: z.string().trim().min(1).optional(),
+      page: z.coerce.number().int().min(1).default(1),
+      page_size: z.coerce.number().int().min(1).max(50).default(20),
+    }),
+    query,
+  );
 
 export const validateEmployeeUpdateInput = (payload: unknown): EmployeeUpdateInput => {
   const rawPayload =

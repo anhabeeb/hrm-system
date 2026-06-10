@@ -27,10 +27,10 @@ const emailSchema = z
 
 const loginIdentifierSchema = z
   .string({
-    required_error: "Email or username is required.",
+    required_error: "Username or email is required.",
   })
   .trim()
-  .min(1, "Email or username is required.");
+  .min(1, "Username or email is required.");
 
 const passwordSchema = z.string({
   required_error: "Password is required.",
@@ -55,12 +55,28 @@ const parse = <T>(schema: z.ZodType<T>, payload: unknown): T => {
 
 export const validateLoginInput = (payload: unknown): LoginInput =>
   parse(
-    z.object({
-      email: loginIdentifierSchema.transform((value) => value.toLowerCase()),
-      password: passwordSchema,
-      totp_code: z.string().trim().optional(),
-      backup_code: z.string().trim().optional(),
-    }),
+    z
+      .object({
+        identifier: loginIdentifierSchema.optional(),
+        email: loginIdentifierSchema.optional(),
+        password: passwordSchema,
+        totp_code: z.string().trim().optional(),
+        backup_code: z.string().trim().optional(),
+      })
+      .transform((value) => {
+        const identifier = (value.identifier ?? value.email ?? "").trim().toLowerCase();
+        return {
+          identifier,
+          email: value.email?.trim().toLowerCase(),
+          password: value.password,
+          totp_code: value.totp_code,
+          backup_code: value.backup_code,
+        };
+      })
+      .refine((value) => value.identifier.length > 0, {
+        message: "Username or email is required.",
+        path: ["identifier"],
+      }),
     payload,
   );
 

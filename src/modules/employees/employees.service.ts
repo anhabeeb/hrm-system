@@ -2,6 +2,11 @@ import type {
   DocumentMetadataInput,
   EmployeeCreateInput,
   EmployeeLoginCreateInput,
+  EmployeeLoginDetails,
+  EmployeeLoginLinkCandidateFilters,
+  EmployeeLoginLinkExistingInput,
+  EmployeeLoginPasswordResetInput,
+  EmployeeLoginUpdateInput,
   EmployeeListFilters,
   EmployeeListRow,
   EmployeePersistInput,
@@ -799,11 +804,39 @@ export const getEmployee = async (
   employeeId: string,
 ) => maskEmployee(await ensureEmployeeAccess(env, context, employeeId), hasSensitivePermission(context));
 
-export const createEmployeeLogin = async (
+export const listEmployeeLoginLinkCandidates = async (
+  env: Env,
+  context: AuthActor,
+  filters: EmployeeLoginLinkCandidateFilters,
+) => {
+  if (filters.employee_id) {
+    await ensureActiveEmployeeForLogin(env, context, filters.employee_id);
+  }
+
+  const outletScope = {
+    isSuperAdmin: permissionService.isSuperAdmin(context),
+    outletIds: context.outletIds,
+  };
+  const [total, rows] = await Promise.all([
+    employeesRepository.countLoginLinkCandidates(env, context.companyId, filters, outletScope),
+    employeesRepository.listLoginLinkCandidates(env, context.companyId, filters, outletScope),
+  ]);
+  const pagination: PaginationMeta = {
+    page: filters.page,
+    page_size: filters.page_size,
+    total,
+    total_pages: Math.max(1, Math.ceil(total / filters.page_size)),
+  };
+
+  return { rows, pagination };
+};
+
+const asBoolean = (value: number | boolean | null | undefined) => value === true || value === 1;
+
+const ensureActiveEmployeeForLogin = async (
   env: Env,
   context: AuthActor,
   employeeId: string,
-  input: EmployeeLoginCreateInput,
 ) => {
   const employee = await ensureEmployeeAccess(env, context, employeeId);
   if (employee.deleted_at || employee.employment_status === "archived") {
@@ -814,53 +847,38 @@ export const createEmployeeLogin = async (
       retryable: false,
     });
   }
+  return employee;
+};
 
-  const existingLogin = await usersRepository.findUserByEmployeeId(env, context.companyId, employeeId);
-  if (existingLogin) {
-    throw new AppError({
-      code: "EMPLOYEE_ALREADY_HAS_LOGIN",
-      title: "Login already assigned",
-      message: "This employee already has a linked login account.",
-      statusCode: 409,
-      retryable: false,
-    });
-  }
+const outletIdsForInput = (
+  employee: EmployeeListRow,
+  input: { store_ids?: string[]; outlet_ids?: string[] },
+) => {
+  const requested = [...new Set(input.store_ids ?? input.outlet_ids ?? [])];
+  return requested.length > 0 ? requested : employee.primary_outlet_id ? [employee.primary_outlet_id] : [];
+};
 
-  const existingUsername = await usersRepository.findUserByUsername(env, context.companyId, input.username);
-  if (existingUsername) {
-    throw new AppError({
-      code: "DUPLICATE_USERNAME",
-      message: "A user with this username already exists.",
-      statusCode: 409,
-      retryable: false,
-    });
-  }
-
-  if (input.email) {
-    const existingEmail = await usersRepository.findUserByEmail(env, context.companyId, input.email);
-    if (existingEmail) {
+const ensureRoleAndOutletAccess = async (
+  env: Env,
+  context: AuthActor,
+  employee: EmployeeListRow,
+  input: { role_id?: string; store_ids?: string[]; outlet_ids?: string[] },
+) => {
+  let role: { id: string; role_name: string; role_key: string } | null = null;
+  if (input.role_id) {
+    const roles = await usersRepository.findRolesByIds(env, context.companyId, [input.role_id]);
+    if (roles.length !== 1) {
       throw new AppError({
-        code: "DUPLICATE_USER_EMAIL",
-        message: "A user with this email already exists.",
-        statusCode: 409,
+        code: "ROLE_NOT_FOUND",
+        message: "Please choose a valid role.",
+        statusCode: 404,
         retryable: false,
       });
     }
+    role = roles[0] ?? null;
   }
 
-  const roles = await usersRepository.findRolesByIds(env, context.companyId, [input.role_id]);
-  if (roles.length !== 1) {
-    throw new AppError({
-      code: "ROLE_NOT_FOUND",
-      message: "Please choose a valid role.",
-      statusCode: 404,
-      retryable: false,
-    });
-  }
-
-  const requestedOutletIds = [...new Set(input.store_ids ?? input.outlet_ids ?? [])];
-  const defaultOutletIds = employee.primary_outlet_id ? [employee.primary_outlet_id] : [];
-  const outletIds = requestedOutletIds.length > 0 ? requestedOutletIds : defaultOutletIds;
+  const outletIds = outletIdsForInput(employee, input);
   if (outletIds.some((outletId) => !permissionService.hasOutletAccess(context, outletId))) {
     throw new OutletAccessError("You cannot assign login access outside your outlet scope.");
   }
@@ -876,6 +894,150 @@ export const createEmployeeLogin = async (
     }
   }
 
+  return { role, outletIds };
+};
+
+const ensureUniqueLoginIdentity = async (
+  env: Env,
+  _companyId: string,
+  input: { username?: string | null; email?: string | null },
+  currentUserId?: string,
+) => {
+  if (input.username) {
+    const existingUsername = await usersRepository.findUserByUsernameGlobally(env, input.username);
+    if (existingUsername && existingUsername.id !== currentUserId) {
+      throw new AppError({
+        code: "DUPLICATE_USERNAME",
+        message: "A user with this username already exists.",
+        statusCode: 409,
+        retryable: false,
+      });
+    }
+  }
+
+  if (input.email) {
+    const existingEmail = await usersRepository.findUserByEmailGlobally(env, input.email);
+    if (existingEmail && existingEmail.id !== currentUserId) {
+      throw new AppError({
+        code: "DUPLICATE_USER_EMAIL",
+        message: "A user with this email already exists.",
+        statusCode: 409,
+        retryable: false,
+      });
+    }
+  }
+};
+
+const loginDetailsFromUser = async (
+  env: Env,
+  context: AuthActor,
+  employeeId: string,
+  userId: string,
+): Promise<EmployeeLoginDetails> => {
+  const user = await usersRepository.findUserById(env, context.companyId, userId);
+  if (!user || user.employee_id !== employeeId) {
+    throw new AppError({
+      code: "EMPLOYEE_LOGIN_NOT_FOUND",
+      message: "This employee does not have a linked login account.",
+      statusCode: 404,
+      retryable: false,
+    });
+  }
+
+  const [role] = await usersRepository.getUserRoles(env, context.companyId, [user.id]);
+  const outletRows = await usersRepository.getUserOutlets(env, context.companyId, [user.id]);
+  return {
+    user_id: user.id,
+    employee_id: employeeId,
+    username: user.username,
+    email: user.email,
+    role_id: role?.role_id ?? null,
+    role_name: role?.role_name ?? null,
+    outlet_ids: outletRows.map((row) => row.outlet_id),
+    outlet_names: outletRows.map((row) => row.outlet_name).filter((name): name is string => Boolean(name)),
+    outlet_access_count: outletRows.length,
+    status: user.status,
+    is_active: user.status === "active",
+    password_reset_required: user.password_reset_required === 1,
+    two_factor_enabled: user.two_factor_enabled === 1,
+    two_factor_status: user.two_factor_enabled === 1 ? "enabled" : "available_after_first_login",
+    last_login_at: user.last_login_at,
+  };
+};
+
+const linkedLoginOrThrow = async (
+  env: Env,
+  context: AuthActor,
+  employeeId: string,
+) => {
+  const employee = await ensureActiveEmployeeForLogin(env, context, employeeId);
+  const user = await usersRepository.findUserByEmployeeId(env, context.companyId, employeeId);
+  if (!user) {
+    throw new AppError({
+      code: "EMPLOYEE_LOGIN_NOT_FOUND",
+      message: "This employee does not have a linked login account.",
+      statusCode: 404,
+      retryable: false,
+    });
+  }
+  return { employee, user };
+};
+
+const assertCanDisableLinkedUser = async (
+  env: Env,
+  context: AuthActor,
+  userId: string,
+) => {
+  const roles = await usersRepository.getUserRoles(env, context.companyId, [userId]);
+  const isSuperAdmin = roles.some((role) => role.role_key === "super_admin");
+  if (!isSuperAdmin) return;
+  const remaining = await usersRepository.countActiveSuperAdmins(env, context.companyId, userId);
+  if (remaining === 0) {
+    throw new AppError({
+      code: "LAST_SUPER_ADMIN_LOGIN",
+      title: "Super Admin account required",
+      message: "You cannot disable the last active Super Admin login.",
+      statusCode: 409,
+      retryable: false,
+    });
+  }
+};
+
+export const getEmployeeLogin = async (
+  env: Env,
+  context: AuthActor,
+  employeeId: string,
+) => {
+  await ensureActiveEmployeeForLogin(env, context, employeeId);
+  const user = await usersRepository.findUserByEmployeeId(env, context.companyId, employeeId);
+  if (!user) {
+    return { login: null };
+  }
+  return { login: await loginDetailsFromUser(env, context, employeeId, user.id) };
+};
+
+export const createEmployeeLogin = async (
+  env: Env,
+  context: AuthActor,
+  employeeId: string,
+  input: EmployeeLoginCreateInput,
+) => {
+  const employee = await ensureActiveEmployeeForLogin(env, context, employeeId);
+
+  const existingLogin = await usersRepository.findUserByEmployeeId(env, context.companyId, employeeId);
+  if (existingLogin) {
+    throw new AppError({
+      code: "EMPLOYEE_ALREADY_HAS_LOGIN",
+      title: "Login already assigned",
+      message: "This employee already has a linked login account.",
+      statusCode: 409,
+      retryable: false,
+    });
+  }
+
+  await ensureUniqueLoginIdentity(env, context.companyId, input);
+  const { outletIds } = await ensureRoleAndOutletAccess(env, context, employee, input);
+
   const userId = createPrefixedId("user");
   const passwordHash = await hashPassword(input.temporary_password, env.PASSWORD_PEPPER, env);
   await usersRepository.createEmployeeLoginUser(env, {
@@ -888,7 +1050,6 @@ export const createEmployeeLogin = async (
     passwordHash,
     passwordAlgo: PASSWORD_HASH_ALGORITHM,
     forcePasswordChange: input.force_password_change,
-    require2fa: input.require_2fa,
     status: input.is_active ? "active" : "disabled",
     roleId: input.role_id,
     outletIds,
@@ -908,21 +1069,174 @@ export const createEmployeeLogin = async (
       role_id: input.role_id,
       outlet_ids: outletIds,
       force_password_change: input.force_password_change,
-      require_2fa: false,
+      two_factor_setup: "available_after_first_login",
       is_active: input.is_active,
     },
   });
 
-  return {
-    user_id: userId,
-    employee_id: employeeId,
-    username: input.username,
-    email: input.email ?? null,
+  return await loginDetailsFromUser(env, context, employeeId, userId);
+};
+
+export const updateEmployeeLogin = async (
+  env: Env,
+  context: AuthActor,
+  employeeId: string,
+  input: EmployeeLoginUpdateInput,
+) => {
+  const { employee, user } = await linkedLoginOrThrow(env, context, employeeId);
+  const nextUsername = input.username ?? user.username;
+  const nextEmail = input.email !== undefined ? input.email : user.email;
+  const nextStatus = input.is_active === undefined ? user.status : input.is_active ? "active" : "disabled";
+  await ensureUniqueLoginIdentity(env, context.companyId, { username: nextUsername, email: nextEmail }, user.id);
+  const { outletIds } = await ensureRoleAndOutletAccess(env, context, employee, {
     role_id: input.role_id,
-    is_active: input.is_active,
-    force_password_change: input.force_password_change,
-    require_2fa: false,
-  };
+    store_ids: input.store_ids,
+    outlet_ids: input.outlet_ids,
+  });
+  if (nextStatus !== user.status && nextStatus === "disabled") {
+    await assertCanDisableLinkedUser(env, context, user.id);
+  }
+
+  await employeesRepository.updateLinkedUserIdentity(env, context.companyId, user.id, {
+    username: nextUsername,
+    email: nextEmail,
+    status: nextStatus,
+  });
+  if (input.role_id) {
+    await usersRepository.replaceUserRoles(env, context.companyId, user.id, [input.role_id]);
+  }
+  if (input.store_ids !== undefined || input.outlet_ids !== undefined) {
+    await usersRepository.replaceUserOutlets(env, context.companyId, user.id, outletIds);
+  }
+  if (nextStatus === "disabled") {
+    await usersRepository.revokeUserSessions(env, context.companyId, user.id);
+  }
+  await ensureAudit(env, context, {
+    action: "employee_login_updated",
+    entityType: "user",
+    entityId: user.id,
+    employeeId,
+    outletId: employee.primary_outlet_id,
+    oldValue: { username: user.username, email: user.email, status: user.status },
+    newValue: { username: nextUsername, email: nextEmail, status: nextStatus, role_id: input.role_id ?? null, outlet_ids: input.store_ids ?? input.outlet_ids ?? null },
+  });
+  return await loginDetailsFromUser(env, context, employeeId, user.id);
+};
+
+export const disableEmployeeLogin = async (
+  env: Env,
+  context: AuthActor,
+  employeeId: string,
+) => {
+  const { employee, user } = await linkedLoginOrThrow(env, context, employeeId);
+  await assertCanDisableLinkedUser(env, context, user.id);
+  await employeesRepository.disableLinkedUser(env, context.companyId, user.id);
+  await usersRepository.revokeUserSessions(env, context.companyId, user.id);
+  await ensureAudit(env, context, {
+    action: "employee_login_disabled",
+    entityType: "user",
+    entityId: user.id,
+    employeeId,
+    outletId: employee.primary_outlet_id,
+    newValue: { status: "disabled", sessions_revoked: true },
+  });
+  return await loginDetailsFromUser(env, context, employeeId, user.id);
+};
+
+export const enableEmployeeLogin = async (
+  env: Env,
+  context: AuthActor,
+  employeeId: string,
+) => {
+  const { employee, user } = await linkedLoginOrThrow(env, context, employeeId);
+  await employeesRepository.enableLinkedUser(env, context.companyId, user.id);
+  await ensureAudit(env, context, {
+    action: "employee_login_enabled",
+    entityType: "user",
+    entityId: user.id,
+    employeeId,
+    outletId: employee.primary_outlet_id,
+    newValue: { status: "active" },
+  });
+  return await loginDetailsFromUser(env, context, employeeId, user.id);
+};
+
+export const resetEmployeeLoginPassword = async (
+  env: Env,
+  context: AuthActor,
+  employeeId: string,
+  input: EmployeeLoginPasswordResetInput,
+) => {
+  const { employee, user } = await linkedLoginOrThrow(env, context, employeeId);
+  const passwordHash = await hashPassword(input.temporary_password, env.PASSWORD_PEPPER, env);
+  await employeesRepository.updateLinkedUserPassword(env, context.companyId, user.id, {
+    passwordHash,
+    passwordAlgo: PASSWORD_HASH_ALGORITHM,
+    forcePasswordChange: input.force_password_change,
+  });
+  await usersRepository.revokeUserSessions(env, context.companyId, user.id);
+  await ensureAudit(env, context, {
+    action: "employee_login_password_reset",
+    entityType: "user",
+    entityId: user.id,
+    employeeId,
+    outletId: employee.primary_outlet_id,
+    newValue: { password_reset_required: input.force_password_change, sessions_revoked: true },
+  });
+  return await loginDetailsFromUser(env, context, employeeId, user.id);
+};
+
+export const linkExistingUserToEmployee = async (
+  env: Env,
+  context: AuthActor,
+  employeeId: string,
+  input: EmployeeLoginLinkExistingInput,
+) => {
+  const employee = await ensureActiveEmployeeForLogin(env, context, employeeId);
+  const existingEmployeeLogin = await usersRepository.findUserByEmployeeId(env, context.companyId, employeeId);
+  if (existingEmployeeLogin) {
+    throw new AppError({
+      code: "EMPLOYEE_ALREADY_HAS_LOGIN",
+      title: "Login already assigned",
+      message: "This employee already has a linked login account.",
+      statusCode: 409,
+      retryable: false,
+    });
+  }
+  const user = await usersRepository.findUserById(env, context.companyId, input.user_id);
+  if (!user) {
+    throw new AppError({
+      code: "USER_NOT_FOUND",
+      message: "The selected user could not be found.",
+      statusCode: 404,
+      retryable: false,
+    });
+  }
+  if (user.employee_id && user.employee_id !== employeeId) {
+    throw new AppError({
+      code: "USER_ALREADY_LINKED_TO_EMPLOYEE",
+      message: "This user is already linked to another employee.",
+      statusCode: 409,
+      retryable: false,
+    });
+  }
+  const { outletIds } = await ensureRoleAndOutletAccess(env, context, employee, input);
+  await employeesRepository.linkExistingUserToEmployee(env, context.companyId, user.id, employeeId);
+  if (input.role_id) {
+    await usersRepository.replaceUserRoles(env, context.companyId, user.id, [input.role_id]);
+  }
+  if (input.store_ids !== undefined || input.outlet_ids !== undefined) {
+    await usersRepository.replaceUserOutlets(env, context.companyId, user.id, outletIds);
+  }
+  await ensureAudit(env, context, {
+    action: "employee_login_linked_existing_user",
+    entityType: "user",
+    entityId: user.id,
+    employeeId,
+    outletId: employee.primary_outlet_id,
+    newValue: { user_id: user.id, employee_id: employeeId, role_id: input.role_id ?? null, outlet_ids: input.store_ids ?? input.outlet_ids ?? null },
+  });
+  return await loginDetailsFromUser(env, context, employeeId, user.id);
 };
 
 const profileLimit = (limit?: number) => Math.min(Math.max(limit ?? 25, 1), 100);

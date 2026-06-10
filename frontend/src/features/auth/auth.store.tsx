@@ -91,14 +91,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         response = await authApi.login(input);
         if (response.data.two_factor_required) {
-          setPendingTwoFactorLogin({ email: input.email, password: input.password, challenge_id: response.data.challenge_id });
+          setPendingTwoFactorLogin({ identifier: input.identifier, password: input.password, challenge_id: response.data.challenge_id });
           setRequires2FA(true);
           return { requires2FA: true };
         }
       } catch (error) {
         if (error instanceof ApiError && error.code === "TWO_FACTOR_REQUIRED") {
           const details = error.details as { challenge_id?: string } | undefined;
-          setPendingTwoFactorLogin({ email: input.email, password: input.password, challenge_id: details?.challenge_id });
+          setPendingTwoFactorLogin({ identifier: input.identifier, password: input.password, challenge_id: details?.challenge_id });
           setRequires2FA(true);
           return { requires2FA: true };
         }

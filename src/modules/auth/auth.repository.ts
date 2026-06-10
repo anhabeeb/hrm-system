@@ -33,8 +33,18 @@ const execute = async (
 export const findUserByEmail = (env: Env, email: string): Promise<UserRecord | null> =>
   queryOne<UserRecord>(
     env,
-    "SELECT * FROM users WHERE lower(email) = lower(?) LIMIT 1",
-    [email],
+    `SELECT *
+       FROM users
+      WHERE deleted_at IS NULL
+        AND lower(COALESCE(email, '')) = lower(?)
+        AND (
+          SELECT COUNT(DISTINCT ux.id)
+            FROM users ux
+           WHERE ux.deleted_at IS NULL
+             AND lower(COALESCE(ux.email, '')) = lower(?)
+        ) = 1
+      LIMIT 1`,
+    [email, email],
   );
 
 export const findUserByLoginIdentifier = (env: Env, identifier: string): Promise<UserRecord | null> =>
@@ -42,10 +52,27 @@ export const findUserByLoginIdentifier = (env: Env, identifier: string): Promise
     env,
     `SELECT *
        FROM users
-      WHERE lower(COALESCE(email, '')) = lower(?)
-         OR lower(COALESCE(username, '')) = lower(?)
+      WHERE deleted_at IS NULL
+        AND (lower(COALESCE(email, '')) = lower(?) OR lower(COALESCE(username, '')) = lower(?))
+        AND (
+          SELECT COUNT(DISTINCT ux.id)
+            FROM users ux
+           WHERE ux.deleted_at IS NULL
+             AND (lower(COALESCE(ux.email, '')) = lower(?) OR lower(COALESCE(ux.username, '')) = lower(?))
+        ) = 1
       LIMIT 1`,
-    [identifier, identifier],
+    [identifier, identifier, identifier, identifier],
+  );
+
+export const findLinkedEmployeeLoginStatus = (
+  env: Env,
+  companyId: string,
+  employeeId: string,
+): Promise<{ id: string; employment_status: string; deleted_at: string | null } | null> =>
+  queryOne(
+    env,
+    "SELECT id, employment_status, deleted_at FROM employees WHERE company_id = ? AND id = ? LIMIT 1",
+    [companyId, employeeId],
   );
 
 export const findUserByEmailInCompany = (env: Env, companyId: string, email: string): Promise<UserRecord | null> =>

@@ -33,8 +33,18 @@ interface EmployeeDetailDrawerProps {
   onOpenChange: (open: boolean) => void;
   onEdit?: (employee: Employee) => void;
   onCreateLogin?: (employee: Employee) => void;
+  onEditLogin?: (employee: Employee) => void;
+  onEnableLogin?: (employee: Employee) => void;
+  onDisableLogin?: (employee: Employee) => void;
+  onResetLoginPassword?: (employee: Employee) => void;
+  onLinkExistingLogin?: (employee: Employee) => void;
   canEdit: boolean;
   canCreateLogin: boolean;
+  canEditLogin: boolean;
+  canDisableLogin: boolean;
+  canEnableLogin: boolean;
+  canResetLoginPassword: boolean;
+  canLinkExistingLogin: boolean;
   canManageJobChange: boolean;
   canViewSalary: boolean;
   canEditSalary: boolean;
@@ -54,8 +64,18 @@ export const EmployeeDetailDrawer = ({
   onOpenChange,
   onEdit,
   onCreateLogin,
+  onEditLogin,
+  onEnableLogin,
+  onDisableLogin,
+  onResetLoginPassword,
+  onLinkExistingLogin,
   canEdit,
   canCreateLogin,
+  canEditLogin,
+  canDisableLogin,
+  canEnableLogin,
+  canResetLoginPassword,
+  canLinkExistingLogin,
   canManageJobChange,
   canViewSalary,
   canEditSalary,
@@ -148,12 +168,38 @@ export const EmployeeDetailDrawer = ({
           ...(employee.has_login
             ? [
                 { label: "Username", value: employee.linked_username ?? "Not available" },
+                { label: "Email", value: employee.linked_user_email ?? "Not available" },
+                { label: "Linked user", value: employee.linked_user_id ?? "Not available" },
                 { label: "Role", value: employee.linked_role_name ?? "Not assigned" },
+                { label: "Store / outlet access", value: employee.linked_outlet_names || `${employee.linked_outlet_count ?? 0} outlet(s)` },
                 { label: "Account status", value: employee.linked_user_active ? "Active" : "Inactive / disabled" },
+                { label: "Password reset required", value: employee.linked_password_reset_required ? "Yes" : "No" },
+                { label: "Two-factor", value: employee.linked_two_factor_enabled ? "Enabled" : "Available after first sign-in" },
+                { label: "Last login", value: displayDate(employee.linked_last_login_at) },
+                ...(canEditLogin || canDisableLogin || canEnableLogin || canResetLoginPassword
+                  ? [{
+                      label: "Actions",
+                      value: (
+                        <div className="flex flex-wrap items-center gap-2">
+                          {canEditLogin ? <Button size="sm" variant="outline" onClick={() => onEditLogin?.(employee)}>Edit login</Button> : null}
+                          {employee.linked_user_active && canDisableLogin
+                            ? <Button size="sm" variant="outline" onClick={() => onDisableLogin?.(employee)}>Disable login</Button>
+                            : null}
+                          {!employee.linked_user_active && canEnableLogin
+                            ? <Button size="sm" variant="outline" onClick={() => onEnableLogin?.(employee)}>Enable login</Button>
+                            : null}
+                          {canResetLoginPassword ? <Button size="sm" variant="outline" onClick={() => onResetLoginPassword?.(employee)}>Reset password</Button> : null}
+                        </div>
+                      ),
+                    }]
+                  : []),
               ]
             : []),
           ...(!employee.has_login && canCreateLogin
             ? [{ label: "Action", value: <Button size="sm" onClick={() => onCreateLogin?.(employee)}>Create Login</Button> }]
+            : []),
+          ...(!employee.has_login && canLinkExistingLogin
+            ? [{ label: "Link existing", value: <Button size="sm" variant="outline" onClick={() => onLinkExistingLogin?.(employee)}>Link Existing User</Button> }]
             : []),
         ]}
       />

@@ -95,8 +95,8 @@ const ensureUser = async (env: Env, context: AuthActor, id: string) => {
   return user;
 };
 
-const ensureUniqueEmail = async (env: Env, companyId: string, email: string, currentUserId?: string) => {
-  const existing = await usersRepository.findUserByEmail(env, companyId, email);
+const ensureUniqueEmail = async (env: Env, _companyId: string, email: string, currentUserId?: string) => {
+  const existing = await usersRepository.findUserByEmailGlobally(env, email);
   if (existing && existing.id !== currentUserId) {
     throw new AppError({
       code: "DUPLICATE_USER_EMAIL",
@@ -107,9 +107,9 @@ const ensureUniqueEmail = async (env: Env, companyId: string, email: string, cur
   }
 };
 
-const ensureUniqueUsername = async (env: Env, companyId: string, username: string | null | undefined, currentUserId?: string) => {
+const ensureUniqueUsername = async (env: Env, _companyId: string, username: string | null | undefined, currentUserId?: string) => {
   if (!username) return;
-  const existing = await usersRepository.findUserByUsername(env, companyId, username);
+  const existing = await usersRepository.findUserByUsernameGlobally(env, username);
   if (existing && existing.id !== currentUserId) {
     throw new AppError({
       code: "DUPLICATE_USERNAME",

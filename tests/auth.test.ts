@@ -1,6 +1,6 @@
 ﻿import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { validateKycUpdateRequestInput } from "../src/modules/auth/auth.validators";
+import { validateKycUpdateRequestInput, validateLoginInput } from "../src/modules/auth/auth.validators";
 import { PASSWORD_HASH_ALGORITHM, PASSWORD_HASH_VERSION, PBKDF2_MAX_WORKERS_ITERATIONS } from "../src/modules/auth/auth.constants";
 import { hashPassword, passwordNeedsRehash, resolvePasswordHashConfig, verifyPassword } from "../src/services/password.service";
 import { ValidationError } from "../src/utils/errors";
@@ -35,13 +35,24 @@ const authRepoMock = vi.hoisted(() => {
     state,
     findUserByEmail: vi.fn(async (_env: Env, email: string) => {
       const normalized = email.toLowerCase();
-      return [...state.users.values()].find((user) => user.email?.toLowerCase() === normalized) ?? null;
+      const matches = [...state.users.values()].filter((user) => user.email?.toLowerCase() === normalized && !user.deleted_at);
+      return new Set(matches.map((user) => user.id)).size === 1 ? matches[0] ?? null : null;
     }),
     findUserByLoginIdentifier: vi.fn(async (_env: Env, identifier: string) => {
       const normalized = identifier.toLowerCase();
-      return [...state.users.values()].find((user) =>
+      const matches = [...state.users.values()].filter((user) =>
         user.email?.toLowerCase() === normalized || user.username?.toLowerCase() === normalized,
-      ) ?? null;
+      );
+      return new Set(matches.map((user) => user.id)).size === 1 ? matches[0] ?? null : null;
+    }),
+    findLinkedEmployeeLoginStatus: vi.fn(async (_env: Env, companyId: string, employeeId: string) => {
+      if (employeeId === "emp_archived") {
+        return { id: employeeId, employment_status: "archived", deleted_at: null };
+      }
+      if (employeeId === "emp_deleted") {
+        return { id: employeeId, employment_status: "active", deleted_at: new Date().toISOString() };
+      }
+      return { id: employeeId, employment_status: "active", deleted_at: null };
     }),
     findUserByEmailInCompany: vi.fn(async (_env: Env, companyId: string, email: string) => {
       const normalized = email.toLowerCase();
@@ -236,6 +247,7 @@ const createTestUser = async (): Promise<UserRecord> => ({
   id: "user_2fa",
   company_id: "company_1",
   employee_id: null,
+  username: "twofactor.user",
   full_name: "Two Factor User",
   email: "twofactor@example.com",
   phone: null,
@@ -359,6 +371,107 @@ describe("my profile KYC validation", () => {
         },
       }),
     ).toThrow(ValidationError);
+  });
+});
+
+describe("username or email login", () => {
+  it("validates identifier or legacy email without requiring email format", () => {
+    expect(validateLoginInput({ identifier: "  twofactor.user  ", password: "SecurePass123" })).toMatchObject({
+      identifier: "twofactor.user",
+      password: "SecurePass123",
+    });
+    expect(validateLoginInput({ email: "TWOFACTOR@example.com", password: "SecurePass123" })).toMatchObject({
+      identifier: "twofactor@example.com",
+      password: "SecurePass123",
+    });
+    expect(() => validateLoginInput({ identifier: "", password: "SecurePass123" })).toThrow("Username or email is required.");
+  });
+
+  it("logs in with email or username using trim and case-insensitive matching", async () => {
+    const authService = await import("../src/modules/auth/auth.service");
+
+    const emailResult = await authService.login(
+      testEnv,
+      { identifier: "  TWOFACTOR@example.com  ", password: "SecurePass123" },
+      testRequest,
+    );
+    expect(emailResult.response.user?.email).toBe("twofactor@example.com");
+
+    authRepoMock.state.sessions.length = 0;
+    const usernameResult = await authService.login(
+      testEnv,
+      { identifier: "  TWOFACTOR.USER  ", password: "SecurePass123" },
+      testRequest,
+    );
+    expect(usernameResult.response.user?.email).toBe("twofactor@example.com");
+  });
+
+  it("keeps legacy email payload login compatible", async () => {
+    const authService = await import("../src/modules/auth/auth.service");
+
+    const result = await authService.login(
+      testEnv,
+      { email: "twofactor@example.com", password: "SecurePass123" },
+      testRequest,
+    );
+
+    expect(result.response.user?.id).toBe("user_2fa");
+  });
+
+  it("uses a generic failure for unknown identifiers and wrong passwords", async () => {
+    const authService = await import("../src/modules/auth/auth.service");
+
+    await expect(authService.login(
+      testEnv,
+      { identifier: "missing.user", password: "SecurePass123" },
+      testRequest,
+    )).rejects.toMatchObject({ message: "Invalid username/email or password." });
+
+    await expect(authService.login(
+      testEnv,
+      { identifier: "twofactor.user", password: "WrongPass123" },
+      testRequest,
+    )).rejects.toMatchObject({ message: "Invalid username/email or password." });
+  });
+
+  it("does not authenticate disabled or archived employee-linked users", async () => {
+    const authService = await import("../src/modules/auth/auth.service");
+    const disabledUser = { ...(await createTestUser()), id: "user_disabled", username: "disabled.user", email: "disabled@example.com", status: "disabled" };
+    const archivedEmployeeUser = { ...(await createTestUser()), id: "user_archived_employee", username: "archived.employee", email: "archived@example.com", employee_id: "emp_archived" };
+    authRepoMock.state.users.set(disabledUser.id, disabledUser);
+    authRepoMock.state.users.set(archivedEmployeeUser.id, archivedEmployeeUser);
+
+    await expect(authService.login(
+      testEnv,
+      { identifier: "disabled.user", password: "SecurePass123" },
+      testRequest,
+    )).rejects.toMatchObject({ message: "Invalid username/email or password." });
+
+    await expect(authService.login(
+      testEnv,
+      { identifier: "archived.employee", password: "SecurePass123" },
+      testRequest,
+    )).rejects.toMatchObject({ message: "Invalid username/email or password." });
+  });
+
+  it("does not authenticate ambiguous duplicate username or email matches", async () => {
+    const authService = await import("../src/modules/auth/auth.service");
+    const duplicateByUsername = { ...(await createTestUser()), id: "user_dup_username", username: "twofactor.user", email: "other@example.com" };
+    const duplicateByEmail = { ...(await createTestUser()), id: "user_dup_email", username: "other.user", email: "twofactor@example.com" };
+    authRepoMock.state.users.set(duplicateByUsername.id, duplicateByUsername);
+    authRepoMock.state.users.set(duplicateByEmail.id, duplicateByEmail);
+
+    await expect(authService.login(
+      testEnv,
+      { identifier: "twofactor.user", password: "SecurePass123" },
+      testRequest,
+    )).rejects.toMatchObject({ message: "Invalid username/email or password." });
+
+    await expect(authService.login(
+      testEnv,
+      { identifier: "twofactor@example.com", password: "SecurePass123" },
+      testRequest,
+    )).rejects.toMatchObject({ message: "Invalid username/email or password." });
   });
 });
 

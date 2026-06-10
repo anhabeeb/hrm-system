@@ -18,6 +18,14 @@ employeesRoutes.use("*", requireFeature("employee_management"));
 employeesRoutes.get("/", requirePermission("employees.view"), employeesController.listEmployees);
 employeesRoutes.post("/", requirePermission("employees.create"), employeesController.createEmployee);
 employeesRoutes.get(
+  "/login-link-candidates",
+  requireAnyPermissionOrError(["employees.login.link", "users.edit"], {
+    code: "EMPLOYEE_LOGIN_PERMISSION_DENIED",
+    message: "You do not have permission to link existing users to employees.",
+  }),
+  employeesController.listEmployeeLoginLinkCandidates,
+);
+employeesRoutes.get(
   "/:id/payslips",
   requireFeature("payslips"),
   requirePermission("payslips.view"),
@@ -244,6 +252,14 @@ employeesRoutes.get(
   }),
   employeesController.getEmployeeProfileTimeline,
 );
+employeesRoutes.get(
+  "/:id/login",
+  requireAnyPermissionOrError(["employees.login.view", "employees.view", "users.view"], {
+    code: "EMPLOYEE_LOGIN_PERMISSION_DENIED",
+    message: "You do not have permission to view employee login access.",
+  }),
+  employeesController.getEmployeeLogin,
+);
 employeesRoutes.post(
   "/:id/login",
   requireAnyPermissionOrError(["employees.login.create", "users.create"], {
@@ -251,6 +267,46 @@ employeesRoutes.post(
     message: "You do not have permission to create login access for employees.",
   }),
   employeesController.createEmployeeLogin,
+);
+employeesRoutes.patch(
+  "/:id/login",
+  requireAnyPermissionOrError(["employees.login.link", "users.edit"], {
+    code: "EMPLOYEE_LOGIN_PERMISSION_DENIED",
+    message: "You do not have permission to update employee login access.",
+  }),
+  employeesController.updateEmployeeLogin,
+);
+employeesRoutes.post(
+  "/:id/login/disable",
+  requireAnyPermissionOrError(["employees.login.revoke", "users.disable", "users.edit"], {
+    code: "EMPLOYEE_LOGIN_PERMISSION_DENIED",
+    message: "You do not have permission to disable employee login access.",
+  }),
+  employeesController.disableEmployeeLogin,
+);
+employeesRoutes.post(
+  "/:id/login/enable",
+  requireAnyPermissionOrError(["employees.login.link", "users.enable", "users.edit"], {
+    code: "EMPLOYEE_LOGIN_PERMISSION_DENIED",
+    message: "You do not have permission to enable employee login access.",
+  }),
+  employeesController.enableEmployeeLogin,
+);
+employeesRoutes.post(
+  "/:id/login/reset-password",
+  requireAnyPermissionOrError(["employees.login.revoke", "users.reset_password", "users.edit"], {
+    code: "EMPLOYEE_LOGIN_PERMISSION_DENIED",
+    message: "You do not have permission to reset employee login passwords.",
+  }),
+  employeesController.resetEmployeeLoginPassword,
+);
+employeesRoutes.post(
+  "/:id/login/link-existing",
+  requireAnyPermissionOrError(["employees.login.link", "users.edit"], {
+    code: "EMPLOYEE_LOGIN_PERMISSION_DENIED",
+    message: "You do not have permission to link existing users to employees.",
+  }),
+  employeesController.linkExistingUserToEmployee,
 );
 employeesRoutes.get("/:id", requirePermission("employees.view"), employeesController.getEmployee);
 employeesRoutes.patch("/:id", requirePermission("employees.edit"), employeesController.updateEmployee);
