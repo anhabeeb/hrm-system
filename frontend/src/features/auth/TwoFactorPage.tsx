@@ -8,6 +8,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { FormError } from "@/components/feedback/FormError";
 import { ApiError } from "@/lib/api-errors";
+import { getDefaultLandingPath } from "@/lib/default-landing";
 
 import { AuthLayout } from "./AuthLayout";
 import { useAuth } from "./auth.store";
@@ -27,8 +28,8 @@ export const TwoFactorPage = () => {
   const onSubmit = async (values: z.infer<typeof twoFactorLoginSchema>) => {
     setError(null);
     try {
-      await verifyLoginTwoFactor(values.code);
-      navigate("/dashboard", { replace: true });
+      const user = await verifyLoginTwoFactor(values.code);
+      navigate(getDefaultLandingPath(user), { replace: true });
     } catch (err) {
       if (err instanceof ApiError && (err.code === "INVALID_TWO_FACTOR_CODE" || err.code === "TWO_FACTOR_SETUP_EXPIRED")) {
         setError(new ApiError("The verification code is invalid or has expired.", {

@@ -4,6 +4,7 @@ import { authMiddleware } from "../middleware/auth.middleware";
 import { requireFeature } from "../middleware/feature.middleware";
 import { requireAnyPermission, requirePermission } from "../middleware/permission.middleware";
 import { requireReason } from "../middleware/reason-required.middleware";
+import * as engineController from "../modules/approvals/approval-workflow-engine.controller";
 import * as controller from "../modules/approvals/approvals.controller";
 import type { AppContext } from "../types/api.types";
 
@@ -15,16 +16,49 @@ approvalsRoutes.use("*", requireFeature("approvals"));
 approvalsRoutes.get("/settings-summary", requireAnyPermission(["approvals.view", "approval_workflows.view", "approval_thresholds.view"]), controller.getSettingsSummary);
 approvalsRoutes.get("/my-pending-count", requirePermission("approvals.view"), controller.getMyPendingCount);
 
-approvalsRoutes.get("/workflows", requireAnyPermission(["approval_workflows.view", "leave.approvals.settings.manage"]), controller.listWorkflows);
-approvalsRoutes.post("/workflows", requireAnyPermission(["approval_workflows.manage", "leave.approvals.settings.manage"]), requireReason(), controller.createWorkflow);
-approvalsRoutes.get("/workflows/:workflowId", requireAnyPermission(["approval_workflows.view", "leave.approvals.settings.manage"]), controller.getWorkflow);
-approvalsRoutes.patch("/workflows/:workflowId", requireAnyPermission(["approval_workflows.manage", "leave.approvals.settings.manage"]), controller.updateWorkflow);
-approvalsRoutes.post("/workflows/:workflowId/enable", requireAnyPermission(["approval_workflows.manage", "leave.approvals.settings.manage"]), requireReason(), controller.enableWorkflow);
-approvalsRoutes.post("/workflows/:workflowId/disable", requireAnyPermission(["approval_workflows.manage", "leave.approvals.settings.manage"]), requireReason(), controller.disableWorkflow);
-approvalsRoutes.get("/workflows/:workflowId/steps", requireAnyPermission(["approval_workflows.view", "leave.approvals.settings.manage"]), controller.listWorkflowSteps);
-approvalsRoutes.post("/workflows/:workflowId/steps", requireAnyPermission(["approval_workflows.manage", "leave.approvals.settings.manage"]), requireReason(), controller.createWorkflowStep);
-approvalsRoutes.patch("/workflows/:workflowId/steps/:stepId", requireAnyPermission(["approval_workflows.manage", "leave.approvals.settings.manage"]), requireReason(), controller.updateWorkflowStep);
+approvalsRoutes.get("/workflows", requireAnyPermission(["approvals.workflows.view", "approval_workflows.view", "leave.approvals.settings.manage"]), engineController.listWorkflows);
+approvalsRoutes.post("/workflows", requireAnyPermission(["approvals.workflows.manage", "approval_workflows.manage", "leave.approvals.settings.manage"]), engineController.createWorkflow);
+approvalsRoutes.post("/workflows/default-template", requireAnyPermission(["approvals.workflows.manage", "approval_workflows.manage"]), engineController.seedDefaultWorkflowTemplate);
+approvalsRoutes.get("/workflows/:workflowId", requireAnyPermission(["approvals.workflows.view", "approval_workflows.view", "leave.approvals.settings.manage"]), engineController.getWorkflow);
+approvalsRoutes.patch("/workflows/:workflowId", requireAnyPermission(["approvals.workflows.manage", "approval_workflows.manage", "leave.approvals.settings.manage"]), engineController.updateWorkflow);
+approvalsRoutes.post("/workflows/:workflowId/activate", requireAnyPermission(["approvals.workflows.manage", "approval_workflows.manage", "leave.approvals.settings.manage"]), engineController.activateWorkflow);
+approvalsRoutes.post("/workflows/:workflowId/deactivate", requireAnyPermission(["approvals.workflows.manage", "approval_workflows.manage", "leave.approvals.settings.manage"]), engineController.deactivateWorkflow);
+approvalsRoutes.post("/workflows/:workflowId/archive", requireAnyPermission(["approvals.workflows.manage", "approval_workflows.manage", "leave.approvals.settings.manage"]), engineController.archiveWorkflow);
+approvalsRoutes.post("/workflows/:workflowId/enable", requireAnyPermission(["approvals.workflows.manage", "approval_workflows.manage", "leave.approvals.settings.manage"]), engineController.activateWorkflow);
+approvalsRoutes.post("/workflows/:workflowId/disable", requireAnyPermission(["approvals.workflows.manage", "approval_workflows.manage", "leave.approvals.settings.manage"]), engineController.deactivateWorkflow);
+approvalsRoutes.get("/workflows/:workflowId/steps", requireAnyPermission(["approvals.workflowSteps.view", "approvals.workflows.view", "approval_workflows.view", "leave.approvals.settings.manage"]), engineController.listWorkflowSteps);
+approvalsRoutes.post("/workflows/:workflowId/steps", requireAnyPermission(["approvals.workflowSteps.manage", "approvals.workflows.manage", "approval_workflows.manage", "leave.approvals.settings.manage"]), engineController.createWorkflowStep);
+approvalsRoutes.post("/workflows/:workflowId/steps/reorder", requireAnyPermission(["approvals.workflowSteps.manage", "approvals.workflows.manage", "approval_workflows.manage", "leave.approvals.settings.manage"]), engineController.reorderWorkflowSteps);
+approvalsRoutes.patch("/workflows/:workflowId/steps/:stepId", requireAnyPermission(["approvals.workflowSteps.manage", "approvals.workflows.manage", "approval_workflows.manage", "leave.approvals.settings.manage"]), engineController.updateWorkflowStep);
+approvalsRoutes.post("/workflows/:workflowId/steps/:stepId/disable", requireAnyPermission(["approvals.workflowSteps.manage", "approvals.workflows.manage", "approval_workflows.manage", "leave.approvals.settings.manage"]), engineController.disableWorkflowStep);
+approvalsRoutes.post("/workflows/:workflowId/steps/:stepId/enable", requireAnyPermission(["approvals.workflowSteps.manage", "approvals.workflows.manage", "approval_workflows.manage", "leave.approvals.settings.manage"]), engineController.enableWorkflowStep);
 approvalsRoutes.delete("/workflows/:workflowId/steps/:stepId", requireAnyPermission(["approval_workflows.manage", "leave.approvals.settings.manage"]), requireReason(), controller.deleteWorkflowStep);
+
+approvalsRoutes.get("/requests", requireAnyPermission(["approvals.requests.view", "approvals.department.view", "approvals.hrFinal.view", "approvals.financeFinal.view", "approvals.view"]), engineController.listRequests);
+approvalsRoutes.post("/requests", requirePermission("approvals.requests.create"), engineController.createApprovalRequest);
+approvalsRoutes.get("/requests/:id", requireAnyPermission(["approvals.requests.view", "approvals.department.view", "approvals.hrFinal.view", "approvals.financeFinal.view", "approvals.view"]), engineController.getApprovalRequest);
+approvalsRoutes.post("/requests/:id/submit", requireAnyPermission(["approvals.requests.create", "approvals.requests.createForOthers"]), engineController.submitApprovalRequest);
+approvalsRoutes.post("/requests/:id/cancel", requireAnyPermission(["approvals.requests.cancel", "approvals.requests.cancelAny"]), engineController.cancelApprovalRequest);
+approvalsRoutes.post("/requests/:id/approve", requireAnyPermission(["approvals.requests.approve", "approvals.department.approve", "approvals.hrFinal.approve", "approvals.financeFinal.approve"]), engineController.approveApprovalRequest);
+approvalsRoutes.post("/requests/:id/reject", requireAnyPermission(["approvals.requests.reject", "approvals.department.reject", "approvals.hrFinal.reject", "approvals.financeFinal.reject"]), engineController.rejectApprovalRequest);
+approvalsRoutes.post("/requests/:id/escalate", requirePermission("approvals.requests.escalate"), engineController.escalateApprovalRequest);
+approvalsRoutes.post("/requests/:id/steps/:stepId/assign", requirePermission("approvals.requests.assign"), engineController.assignApprovalRequestStep);
+approvalsRoutes.get("/requests/:id/timeline", requireAnyPermission([
+  "approvals.requests.view",
+  "approvals.requests.audit.view",
+  "approvals.department.view",
+  "approvals.hrFinal.view",
+  "approvals.financeFinal.view",
+  "approvals.department.approve",
+  "approvals.hrFinal.approve",
+  "approvals.financeFinal.approve",
+  "approvals.department.reject",
+  "approvals.hrFinal.reject",
+  "approvals.financeFinal.reject",
+  "approvals.view",
+]), engineController.getApprovalRequestTimeline);
+approvalsRoutes.get("/my-pending", engineController.getMyPending);
+approvalsRoutes.get("/my-requests", engineController.getMyRequests);
 
 approvalsRoutes.get("/thresholds", requirePermission("approval_thresholds.view"), controller.listThresholds);
 approvalsRoutes.post("/thresholds", requirePermission("approval_thresholds.edit"), requireReason(), controller.createThreshold);

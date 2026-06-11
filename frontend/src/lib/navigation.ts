@@ -31,6 +31,7 @@ import {
   ShieldCheck,
   Shirt,
   TabletSmartphone,
+  UserCircle,
   Users,
   WalletCards,
 } from "lucide-react";
@@ -45,9 +46,24 @@ export const navigationGroups: NavGroup[] = [
   {
     label: "Main",
     items: [
-      { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
+      { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard, requiredPermissionsAny: ["dashboard.view", "dashboard.view_company", "dashboard.view_outlet"] },
       { label: "Notifications", path: "/notifications", icon: Bell, requiredPermissionsAny: ["notifications.view", "notifications.manage_own"] },
       { label: "Expiry Alerts", path: "/expiry-alerts", icon: FileClock, requiredPermissionsAny: ["expiry_alerts.view", "expiry_alerts.view_own"] },
+    ],
+  },
+  {
+    label: "Self-Service",
+    items: [
+      { label: "Employee Dashboard", path: "/self/dashboard", icon: LayoutDashboard, requiredPermission: "self.dashboard.view" },
+      { label: "My Profile", path: "/self/profile", icon: UserCircle, requiredPermissionsAny: ["self.profile.view", "self.dashboard.view"] },
+      { label: "My Attendance", path: "/self/attendance", icon: Clock3, requiredFeature: "attendance", requiredPermission: "self.attendance.view" },
+      { label: "My Roster", path: "/self/roster", icon: CalendarDays, requiredFeature: "roster", requiredPermission: "self.roster.view" },
+      { label: "My Leave", path: "/self/leave", icon: CalendarClock, requiredFeature: "leave_management", requiredPermission: "self.leave.view" },
+      { label: "My Requests", path: "/self/requests", icon: ClipboardCheck, requiredPermission: "self.requests.view" },
+      { label: "My Documents / KYC", path: "/self/documents", icon: FileText, requiredFeature: "documents", requiredPermission: "self.documents.view" },
+      { label: "My Payslips", path: "/self/payslips", icon: ReceiptText, requiredFeature: "payslips", requiredPermission: "self.payslips.view" },
+      { label: "My Pending Approvals", path: "/self/pending-approvals", icon: FileCheck2, requiredPermissionsAny: ["department.approvals.view", "approvals.department.approve", "approvals.hrFinal.approve", "approvals.financeFinal.approve"] },
+      { label: "Department Dashboard", path: "/self/department-dashboard", icon: Building2, requiredPermission: "department.dashboard.view" },
     ],
   },
   {

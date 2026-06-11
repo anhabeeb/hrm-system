@@ -3,6 +3,7 @@ import { buildQueryString } from "@/lib/query-string";
 import type {
   AttendanceConflict,
   AttendanceCorrection,
+  AttendanceCorrectionTimeline,
   AttendanceEvent,
   AttendanceFilters,
   AttendanceReportResponse,
@@ -23,8 +24,10 @@ export const attendanceApi = {
   manualBatch: (payload: ManualAttendanceBatchPayload) => api.post<ManualAttendanceBatchResult>("/attendance/manual-batch", payload),
   requestCorrection: (payload: CorrectionRequestPayload) => api.post<{ correction_id?: string }>("/attendance/correction-request", payload),
   listCorrections: (filters: AttendanceFilters = {}) => api.get<AttendanceCorrection[]>(`/attendance/corrections${buildQueryString(filters)}`),
+  getCorrectionTimeline: (id: string) => api.get<AttendanceCorrectionTimeline>(`/attendance/corrections/${id}/approval-timeline`),
   approveCorrection: (id: string, payload: ReasonPayload) => api.post<{ approved: boolean }>(`/attendance/corrections/${id}/approve`, payload),
   rejectCorrection: (id: string, payload: ReasonPayload) => api.post<{ rejected: boolean }>(`/attendance/corrections/${id}/reject`, payload),
+  cancelCorrection: (id: string, payload: ReasonPayload) => api.post<{ cancelled: boolean }>(`/attendance/corrections/${id}/cancel`, payload),
   listConflicts: (filters: AttendanceFilters = {}) => api.get<AttendanceConflict[]>(`/attendance/conflicts${buildQueryString(filters)}`),
   resolveConflict: (id: string, payload: ReasonPayload) => api.post<{ resolved: boolean }>(`/attendance/conflicts/${id}/resolve`, payload),
   reports: {

@@ -124,6 +124,15 @@ export const approveCorrection = async (c: Context<AppContext>) =>
 export const rejectCorrection = async (c: Context<AppContext>) =>
   ok(await service.rejectCorrection(c.env, actor(c), id(c), validateReviewInput(await body(c))), "Attendance correction rejected.", { requestId: c.get("requestId") });
 
+export const cancelCorrection = async (c: Context<AppContext>) =>
+  ok(await service.cancelCorrection(c.env, actor(c), id(c), validateReviewInput(await body(c))), "Attendance correction cancelled.", { requestId: c.get("requestId") });
+
+export const getCorrection = async (c: Context<AppContext>) =>
+  ok(await service.getCorrection(c.env, actor(c), id(c)), "Attendance correction loaded successfully.", { requestId: c.get("requestId") });
+
+export const correctionTimeline = async (c: Context<AppContext>) =>
+  ok(await service.getCorrectionApprovalTimeline(c.env, actor(c), id(c)), "Attendance correction timeline loaded successfully.", { requestId: c.get("requestId") });
+
 const listFilters = (c: Context<AppContext>) => ({
   status: c.req.query("status"),
   conflict_type: c.req.query("conflict_type"),

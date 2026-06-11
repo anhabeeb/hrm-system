@@ -1,7 +1,7 @@
 import { api } from "@/lib/api-client";
 import { buildQueryString } from "@/lib/query-string";
 import { sanitizeApprovalPayload } from "./approval-sanitize";
-import type { ApprovalFilters, ApprovalHistory, ApprovalRequest, ApprovalStep, ApprovalThreshold, ApprovalWorkflow, ThresholdFilters, WorkflowFilters } from "./approvals.types";
+import type { ApprovalEngineRequest, ApprovalEngineTimeline, ApprovalFilters, ApprovalHistory, ApprovalRequest, ApprovalStep, ApprovalThreshold, ApprovalWorkflow, ThresholdFilters, WorkflowFilters } from "./approvals.types";
 
 const sanitizeApproval = (approval: ApprovalRequest): ApprovalRequest => ({
   ...approval,
@@ -50,4 +50,16 @@ export const approvalsApi = {
   thresholdHistory: (id: string) => api.get<ApprovalHistory[]>(`/approvals/thresholds/${id}/history`),
   settingsSummary: () => api.get<Record<string, unknown>>("/approvals/settings-summary"),
   myPendingCount: () => api.get<{ pending_count?: number; count?: number }>("/approvals/my-pending-count"),
+  engineRequests: (filters: ApprovalFilters = {}) => api.get<ApprovalEngineRequest[]>(`/approvals/requests${buildQueryString(filters)}`),
+  engineRequest: (id: string) => api.get<ApprovalEngineRequest>(`/approvals/requests/${id}`),
+  createEngineRequest: (payload: Partial<ApprovalEngineRequest> & Record<string, unknown>) => api.post<ApprovalEngineRequest>("/approvals/requests", payload),
+  submitEngineRequest: (id: string) => api.post<ApprovalEngineRequest>(`/approvals/requests/${id}/submit`, {}),
+  approveEngineRequest: (id: string, comment?: string) => api.post<ApprovalEngineRequest>(`/approvals/requests/${id}/approve`, { comment }),
+  rejectEngineRequest: (id: string, reason: string, comment?: string) => api.post<ApprovalEngineRequest>(`/approvals/requests/${id}/reject`, { reason, comment }),
+  cancelEngineRequest: (id: string, reason?: string) => api.post<ApprovalEngineRequest>(`/approvals/requests/${id}/cancel`, { reason }),
+  escalateEngineRequest: (id: string, reason: string) => api.post<ApprovalEngineRequest>(`/approvals/requests/${id}/escalate`, { reason }),
+  assignEngineApprover: (id: string, stepId: string, userId: string, reason: string) => api.post<ApprovalEngineRequest>(`/approvals/requests/${id}/steps/${stepId}/assign`, { user_id: userId, reason }),
+  engineTimeline: (id: string) => api.get<ApprovalEngineTimeline>(`/approvals/requests/${id}/timeline`),
+  myPendingEngine: (filters: ApprovalFilters = {}) => api.get<ApprovalEngineRequest[]>(`/approvals/my-pending${buildQueryString(filters)}`),
+  myRequestsEngine: (filters: ApprovalFilters = {}) => api.get<ApprovalEngineRequest[]>(`/approvals/my-requests${buildQueryString(filters)}`),
 };

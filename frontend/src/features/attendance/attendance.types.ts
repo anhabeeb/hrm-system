@@ -52,13 +52,48 @@ export interface AttendanceCorrection {
   id: string;
   employee_id?: string;
   employee_name?: string;
+  employee_code?: string;
+  department_id?: string | null;
+  position_id?: string | null;
+  level?: number | null;
   attendance_date?: string;
+  requested_date?: string;
   correction_type: string;
   requested_by_name?: string;
   requested_by?: string;
   status: string;
+  approval_status?: string | null;
+  approval_request_id?: string | null;
+  approval_current_step?: string | null;
+  approval_current_step_name?: string | null;
+  rejection_reason?: string | null;
+  cancellation_reason?: string | null;
+  applied_at?: string | null;
   reason?: string;
   created_at?: string;
+}
+
+export interface AttendanceCorrectionTimeline {
+  correction: AttendanceCorrection;
+  request?: {
+    id: string;
+    status: string;
+    current_step_id?: string | null;
+  } | null;
+  steps: Array<{
+    id: string;
+    step_name?: string | null;
+    step_code?: string | null;
+    status: string;
+    fallback_applied?: string | null;
+  }>;
+  actions: Array<{
+    id: string;
+    action: string;
+    actor_user_id?: string | null;
+    actor_name?: string | null;
+    reason?: string | null;
+  }>;
 }
 
 export interface AttendanceConflict {
@@ -258,11 +293,14 @@ export interface ManualAttendanceBatchResult {
 
 export interface CorrectionRequestPayload {
   employee_id: string;
+  outlet_id?: string;
   attendance_date: string;
   correction_type: string;
   reason: string;
   requested_clock_in?: string;
   requested_clock_out?: string;
+  requested_status?: string;
+  new_value_json?: Record<string, unknown>;
 }
 
 export interface ReasonPayload {

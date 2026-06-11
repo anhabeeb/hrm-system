@@ -4,6 +4,7 @@ import * as balanceService from "./leave-balance.service";
 import * as calendarService from "./leave-calendar.service";
 import * as policyService from "./leave-policy.service";
 import * as repository from "./leave.repository";
+import * as approvalEngineService from "../approvals/approval-workflow-engine.service";
 import * as longLeaveCalculator from "../long-leave/long-leave-calculator.service";
 import * as longLeaveRepository from "../long-leave/long-leave.repository";
 import * as holidayCalculation from "../holidays/holiday-calculation.service";
@@ -159,6 +160,165 @@ const assertEmployeeCanUseLeave = (employee: Awaited<ReturnType<typeof ensureEmp
   if (employee.deleted_at || ["archived", "resigned", "terminated", "retired", "inactive"].includes(employee.employment_status)) {
     throw new ConflictError("This employee cannot create a new leave request.");
   }
+};
+
+const LEAVE_CREATE_FOR_OTHERS_PERMISSIONS = [
+  "leave.requests.create_for_employee",
+  "approvals.requests.createForOthers",
+];
+
+const LEAVE_SUBMIT_FOR_OTHERS_PERMISSIONS = [
+  ...LEAVE_CREATE_FOR_OTHERS_PERMISSIONS,
+];
+
+const LEAVE_CANCEL_FOR_OTHERS_PERMISSIONS = [
+  "leave.requests.cancel_any",
+  "leave.requests.override",
+  "approvals.requests.cancelAny",
+];
+
+const LEAVE_GLOBAL_VIEW_PERMISSIONS = [
+  "leave.requests.view_all",
+  "leave.approvals.view",
+  "leave.manage_balances",
+  "leave.requests.create_for_employee",
+  "approvals.requests.view",
+];
+
+const LEAVE_DEPARTMENT_VIEW_PERMISSIONS = [
+  "approvals.department.view",
+  "approvals.department.approve",
+  "approvals.department.reject",
+];
+
+const LEAVE_HR_FINAL_VIEW_PERMISSIONS = [
+  "approvals.hrFinal.view",
+  "approvals.hrFinal.approve",
+  "approvals.hrFinal.reject",
+];
+
+const LEAVE_FINANCE_FINAL_VIEW_PERMISSIONS = [
+  "approvals.financeFinal.view",
+  "approvals.financeFinal.approve",
+  "approvals.financeFinal.reject",
+];
+
+const actorLeaveEmployee = (env: Env, context: AuthActor) =>
+  repository.findEmployeeByUserId(env, context.companyId, context.actorUserId);
+
+const isActiveLeaveEmployee = (employee: Awaited<ReturnType<typeof actorLeaveEmployee>> | null | undefined) =>
+  Boolean(employee && !employee.deleted_at && !employee.archived_at && !["archived", "resigned", "terminated", "retired", "inactive"].includes(employee.employment_status));
+
+const hasLeaveGlobalView = (context: AuthActor) =>
+  permissionService.isSuperAdmin(context) || permissionService.hasAnyPermission(context, LEAVE_GLOBAL_VIEW_PERMISSIONS);
+
+const hasLeaveCreateForOthers = (context: AuthActor) =>
+  permissionService.isSuperAdmin(context) || permissionService.hasAnyPermission(context, LEAVE_CREATE_FOR_OTHERS_PERMISSIONS);
+
+export const canCreateLeaveForEmployee = async (env: Env, context: AuthActor, employeeId: string) => {
+  if (hasLeaveCreateForOthers(context)) return true;
+  const employee = await actorLeaveEmployee(env, context);
+  return Boolean(isActiveLeaveEmployee(employee) && employee?.id === employeeId);
+};
+
+export const assertLeaveRequestSubjectAllowed = async (env: Env, context: AuthActor, employeeId: string) => {
+  if (await canCreateLeaveForEmployee(env, context, employeeId)) return;
+  const employee = await actorLeaveEmployee(env, context);
+  if (!isActiveLeaveEmployee(employee)) {
+    throw new PermissionError("Your employee profile is not linked to this login. Please contact HR.");
+  }
+  throw new PermissionError("You can only create leave requests for your own employee profile.");
+};
+
+export const buildLeaveRequestVisibilityFilter = async (env: Env, context: AuthActor): Promise<repository.LeaveRequestVisibilityFilter> => {
+  if (hasLeaveGlobalView(context)) return { values: [] };
+  const clauses: string[] = [];
+  const values: unknown[] = [];
+  const employee = await actorLeaveEmployee(env, context);
+
+  if (isActiveLeaveEmployee(employee)) {
+    clauses.push("r.employee_id = ?");
+    values.push(employee!.id);
+  }
+
+  if (isActiveLeaveEmployee(employee) && employee?.department_id && permissionService.hasAnyPermission(context, LEAVE_DEPARTMENT_VIEW_PERMISSIONS)) {
+    clauses.push(`EXISTS (
+      SELECT 1
+        FROM approval_requests ar
+        JOIN approval_request_steps s ON s.company_id = ar.company_id AND s.approval_request_id = ar.id
+       WHERE ar.company_id = r.company_id
+         AND ar.operation_type = 'LEAVE_REQUEST'
+         AND ar.subject_type = 'LEAVE_REQUEST'
+         AND ar.subject_id = r.id
+         AND ar.department_id = ?
+         AND s.approver_resolver_type IN ('DEPARTMENT_HEAD', 'DEPARTMENT_LEVEL', 'DEPARTMENT_ROLE')
+         AND s.status IN ('PENDING', 'ESCALATED', 'WAITING_FOR_APPROVER')
+         AND (s.assigned_approver_user_id IS NULL OR s.assigned_approver_user_id = ?)
+         AND (s.required_min_level IS NULL OR ? >= s.required_min_level)
+         AND (s.required_max_level IS NULL OR ? <= s.required_max_level)
+    )`);
+    values.push(employee.department_id, context.actorUserId, employee.level ?? 0, employee.level ?? 99);
+  }
+
+  if (permissionService.hasAnyPermission(context, LEAVE_HR_FINAL_VIEW_PERMISSIONS)) {
+    clauses.push(`EXISTS (
+      SELECT 1
+        FROM approval_requests ar
+        JOIN approval_request_steps s ON s.company_id = ar.company_id AND s.approval_request_id = ar.id
+       WHERE ar.company_id = r.company_id
+         AND ar.operation_type = 'LEAVE_REQUEST'
+         AND ar.subject_type = 'LEAVE_REQUEST'
+         AND ar.subject_id = r.id
+         AND s.approver_resolver_type = 'HR_FINAL_APPROVER'
+         AND s.status IN ('PENDING', 'ESCALATED', 'WAITING_FOR_APPROVER')
+    )`);
+  }
+
+  if (permissionService.hasAnyPermission(context, LEAVE_FINANCE_FINAL_VIEW_PERMISSIONS)) {
+    clauses.push(`EXISTS (
+      SELECT 1
+        FROM approval_requests ar
+        JOIN approval_request_steps s ON s.company_id = ar.company_id AND s.approval_request_id = ar.id
+       WHERE ar.company_id = r.company_id
+         AND ar.operation_type = 'LEAVE_REQUEST'
+         AND ar.subject_type = 'LEAVE_REQUEST'
+         AND ar.subject_id = r.id
+         AND s.approver_resolver_type = 'FINANCE_FINAL_APPROVER'
+         AND s.status IN ('PENDING', 'ESCALATED', 'WAITING_FOR_APPROVER')
+    )`);
+  }
+
+  return clauses.length > 0 ? { extra: `(${clauses.join(" OR ")})`, values } : { extra: "1 = 0", values: [] };
+};
+
+export const canViewLeaveRequest = async (env: Env, context: AuthActor, request: LeaveRequestRecord) => {
+  if (hasLeaveGlobalView(context)) return true;
+  const employee = await actorLeaveEmployee(env, context);
+  if (isActiveLeaveEmployee(employee) && employee?.id === request.employee_id) return true;
+  const engineApproval = await findLeaveEngineApproval(env, context, request);
+  if (!engineApproval) return false;
+  try {
+    await approvalEngineService.getTimeline(env, context, engineApproval.id);
+    return true;
+  } catch (error) {
+    if (error instanceof PermissionError || (error instanceof AppError && error.statusCode === 403)) return false;
+    throw error;
+  }
+};
+
+const assertLeaveRequestOwnerOrDelegate = async (
+  env: Env,
+  context: AuthActor,
+  request: LeaveRequestRecord,
+  action: "submit" | "cancel" | "withdraw",
+) => {
+  const employee = await actorLeaveEmployee(env, context);
+  const ownsRequest = isActiveLeaveEmployee(employee) && employee?.id === request.employee_id;
+  if (ownsRequest) return;
+  if (permissionService.isSuperAdmin(context)) return;
+  const permissions = action === "submit" ? LEAVE_SUBMIT_FOR_OTHERS_PERMISSIONS : LEAVE_CANCEL_FOR_OTHERS_PERMISSIONS;
+  if (permissionService.hasAnyPermission(context, permissions)) return;
+  throw new PermissionError(`You can only ${action} leave requests for your own employee profile.`);
 };
 
 const assertPayrollUnlocked = async (
@@ -328,6 +488,111 @@ const approvalRequestSync = (
   request.approval_request_id
     ? { id: request.approval_request_id, status, current_step: currentStep ?? null }
     : null;
+
+const LEAVE_APPROVAL_OPERATION = "LEAVE_REQUEST" as const;
+const LEAVE_APPROVAL_SUBJECT_TYPE = "LEAVE_REQUEST";
+
+const approvalStatusFromEngine = (status?: string | null) => {
+  if (!status) return "pending";
+  const normalized = status.toUpperCase();
+  if (normalized === "APPROVED") return "approved";
+  if (normalized === "REJECTED") return "rejected";
+  if (normalized === "CANCELLED") return "cancelled";
+  if (normalized === "DRAFT") return "draft";
+  if (normalized === "NEEDS_MANUAL_ASSIGNMENT") return "needs_manual_assignment";
+  if (normalized === "ESCALATED") return "escalated";
+  return "pending";
+};
+
+type LeaveApprovalEngineSnapshot = {
+  id: string;
+  status?: string | null;
+  current_step_id?: string | null;
+  current_step_name?: string | null;
+  submitted_at?: string | null;
+  approved_at?: string | null;
+  rejected_at?: string | null;
+  cancelled_at?: string | null;
+  completed_at?: string | null;
+};
+
+const leaveSnapshotFromEngine = (approval: LeaveApprovalEngineSnapshot | null | undefined): Partial<LeaveRequestRecord> => ({
+  approval_request_id: approval?.id ?? null,
+  approval_status: approvalStatusFromEngine(approval?.status),
+  approval_current_step: approval?.current_step_name ?? approval?.current_step_id ?? null,
+  approval_submitted_at: approval?.submitted_at ?? null,
+  approval_completed_at: approval?.completed_at ?? approval?.approved_at ?? approval?.rejected_at ?? approval?.cancelled_at ?? null,
+});
+
+const createLeaveEngineApprovalDraft = async (
+  env: Env,
+  context: AuthActor,
+  request: LeaveRequestRecord,
+) =>
+  approvalEngineService.createApprovalRequestDraft(env, context, {
+    operation_type: LEAVE_APPROVAL_OPERATION,
+    subject_type: LEAVE_APPROVAL_SUBJECT_TYPE,
+    subject_id: request.id,
+    requester_employee_id: request.employee_id,
+    subject_employee_id: request.employee_id,
+    title: `Leave request ${request.start_date} to ${request.end_date}`,
+    summary: `Leave request for ${request.total_days} day${request.total_days === 1 ? "" : "s"}.`,
+    payload_json: {
+      leave_request_id: request.id,
+      employee_id: request.employee_id,
+      leave_type_id: request.leave_type_id,
+      start_date: request.start_date,
+      end_date: request.end_date,
+      total_days: request.total_days,
+      affects_payroll: request.affects_payroll,
+    },
+  }, {
+    allowModuleBoundCreateForOthers: true,
+    modulePermission: "leave.requests.create_for_employee",
+    moduleOperationType: LEAVE_APPROVAL_OPERATION,
+  });
+
+const submitLeaveEngineApproval = async (
+  env: Env,
+  context: AuthActor,
+  request: LeaveRequestRecord,
+) => {
+  const existing = await repository.findEngineApprovalRequestForLeave(env, context.companyId, request.id, request.approval_request_id);
+  const draft = existing ?? await createLeaveEngineApprovalDraft(env, context, request);
+  if (!draft) throw new ConflictError("Approval workflow is not configured for leave requests.");
+  if (draft.status === "DRAFT") {
+    return approvalEngineService.submitApprovalRequest(env, context, draft.id);
+  }
+  return draft;
+};
+
+const findLeaveEngineApproval = (env: Env, context: AuthActor, request: LeaveRequestRecord) =>
+  repository.findEngineApprovalRequestForLeave(env, context.companyId, request.id, request.approval_request_id);
+
+const leaveTimelineSnapshotFromEngine = async (
+  env: Env,
+  context: AuthActor,
+  approvalRequestId: string,
+): Promise<Partial<LeaveRequestRecord>> => {
+  const timeline = await approvalEngineService.getTimeline(env, context, approvalRequestId);
+  const departmentStep = timeline.steps.find(
+    (step) =>
+      step.status === "APPROVED" &&
+      ["DEPARTMENT_HEAD", "DEPARTMENT_LEVEL", "DEPARTMENT_ROLE"].includes(step.approver_resolver_type),
+  );
+  const hrStep = timeline.steps.find((step) => step.status === "APPROVED" && step.approver_resolver_type === "HR_FINAL_APPROVER");
+  return {
+    approval_current_step: timeline.request.current_step_name ?? timeline.request.current_step_id ?? null,
+    ...(departmentStep ? {
+      department_approved_at: departmentStep.approved_at ?? null,
+      department_approved_by: departmentStep.assigned_approver_user_id ?? context.actorUserId,
+    } : {}),
+    ...(hrStep ? {
+      hr_approved_at: hrStep.approved_at ?? null,
+      hr_approved_by: hrStep.assigned_approver_user_id ?? context.actorUserId,
+    } : {}),
+  };
+};
 
 const assertLongLeaveImpactMonthsUnlocked = async (env: Env, companyId: string, rows: Array<{ payroll_month: string }>) => {
   for (const row of rows) {
@@ -765,9 +1030,10 @@ export const rebuildEmployeeLeaveBalances = async (env: Env, context: AuthActor,
 };
 
 export const listRequests = async (env: Env, context: AuthActor, filters: LeaveRequestFilters): Promise<LeaveListResult<any>> => {
-  const total = await repository.countRequests(env, context.companyId, filters, scope(context));
+  const visibility = await buildLeaveRequestVisibilityFilter(env, context);
+  const total = await repository.countRequests(env, context.companyId, filters, scope(context), visibility);
   return {
-    rows: await repository.listRequests(env, context.companyId, filters, scope(context)),
+    rows: await repository.listRequests(env, context.companyId, filters, scope(context), visibility),
     pagination: pagination(filters.page, filters.page_size, total),
   };
 };
@@ -775,8 +1041,11 @@ export const listRequests = async (env: Env, context: AuthActor, filters: LeaveR
 export const getRequest = async (env: Env, context: AuthActor, id: string) => {
   const request = await repository.findRequest(env, context.companyId, id);
   if (!request) throw new NotFoundError("Leave request could not be found.");
-  if (!permissionService.hasOutletAccess(context, request.outlet_id)) {
-    throw new OutletAccessError("You do not have access to this employee's outlet.");
+  if (!await canViewLeaveRequest(env, context, request)) {
+    if (!permissionService.hasOutletAccess(context, request.outlet_id)) {
+      throw new OutletAccessError("You do not have access to this employee's outlet.");
+    }
+    throw new PermissionError("You do not have permission to view this leave request.");
   }
   return request;
 };
@@ -908,6 +1177,7 @@ const planPendingRequestUpdateRebalance = async (
 
 export const createRequest = async (env: Env, context: AuthActor, input: LeaveRequestInput) => {
   const validated = await validateRequestBusinessRules(env, context, input);
+  await assertLeaveRequestSubjectAllowed(env, context, validated.employee.id);
   const requiresApproval = await settingsService.shouldRequireApproval(env, context.companyId, "leave_request", context);
   const canDirectApprove =
     !requiresApproval &&
@@ -944,12 +1214,12 @@ export const createRequest = async (env: Env, context: AuthActor, input: LeaveRe
     created_at: timestamp,
     updated_at: timestamp,
   };
-  const approvalPlan = await buildLeaveApprovalWorkflowIfRequired(env, context, request, requiresApproval);
-  request.approval_request_id = approvalPlan.approvalRequestId;
+  const engineApproval = requiresApproval ? await submitLeaveEngineApproval(env, context, request) : null;
+  if (engineApproval) {
+    Object.assign(request, leaveSnapshotFromEngine(engineApproval));
+  }
   const balanceEntry = await planRequestBalanceForCreation(env, context, validated, request);
-  if (approvalPlan.approvalRequest || approvalPlan.steps.length > 0) {
-    await repository.createLeaveRequestWithApprovalWorkflow(env, request, approvalPlan.approvalRequest, approvalPlan.steps, balanceEntry);
-  } else if (balanceEntry) {
+  if (balanceEntry) {
     await repository.createLeaveRequestWithBalanceTransaction(env, request, balanceEntry);
   } else {
     await repository.createRequest(env, request);
@@ -1059,10 +1329,22 @@ export const updateRequest = async (env: Env, context: AuthActor, id: string, in
 
 export const submitRequest = async (env: Env, context: AuthActor, id: string, input: LeaveActionInput) => {
   const request = await getRequest(env, context, id);
+  await assertLeaveRequestOwnerOrDelegate(env, context, request, "submit");
   if (["pending", "pending_approval", "partially_approved"].includes(request.status)) {
+    const existingEngineApproval = await findLeaveEngineApproval(env, context, request);
+    if (existingEngineApproval) {
+      return {
+        submitted: true,
+        already_submitted: true,
+        already_applied: true,
+        approval_request_id: existingEngineApproval.id,
+        approval_status: approvalStatusFromEngine(existingEngineApproval.status),
+        approval_current_step: existingEngineApproval.current_step_name ?? existingEngineApproval.current_step_id ?? null,
+      };
+    }
     const existingSteps = await repository.countApprovalSteps(env, context.companyId, id);
     if (existingSteps > 0 || request.status === "partially_approved") {
-      return { submitted: true, already_applied: true };
+      return { submitted: true, already_submitted: true, already_applied: true };
     }
   }
   if (!["draft", "submitted", "returned_for_more_info"].includes(request.status)) {
@@ -1077,15 +1359,11 @@ export const submitRequest = async (env: Env, context: AuthActor, id: string, in
   }, id);
   const requiresApproval = await settingsService.shouldRequireApproval(env, context.companyId, "leave_request", context);
   const submittedAt = nowIso();
-  const existingGenericApproval = request.approval_request_id
-    ? null
-    : await repository.findGenericApprovalRequestByEntity(env, context.companyId, "leave_request", id);
   const nextRequest: LeaveRequestRecord = {
     ...request,
     total_days: validated.totalDays,
     status: requiresApproval ? "pending_approval" : "approved",
     approval_status: requiresApproval ? "pending" : "approved",
-    approval_request_id: request.approval_request_id ?? existingGenericApproval?.id ?? null,
     submitted_at: submittedAt,
     submitted_by: context.actorUserId,
     approved_at: requiresApproval ? request.approved_at ?? null : submittedAt,
@@ -1094,14 +1372,10 @@ export const submitRequest = async (env: Env, context: AuthActor, id: string, in
     affects_payroll: validated.leaveType.affects_payroll,
     updated_at: submittedAt,
   };
-  const approvalPlan = await buildLeaveApprovalWorkflowIfRequired(
-    env,
-    context,
-    nextRequest,
-    requiresApproval,
-    { existingApprovalRequestId: nextRequest.approval_request_id },
-  );
-  nextRequest.approval_request_id = approvalPlan.approvalRequestId ?? nextRequest.approval_request_id;
+  const engineApproval = requiresApproval ? await submitLeaveEngineApproval(env, context, nextRequest) : null;
+  if (engineApproval) {
+    Object.assign(nextRequest, leaveSnapshotFromEngine(engineApproval));
+  }
   const idempotencyKey = requiresApproval ? `leave_request:${request.id}:reserved` : `leave_request:${request.id}:used`;
   const existingBalanceTransaction = await repository.findTransactionByIdempotencyKey(env, context.companyId, idempotencyKey);
   const balanceEntry = existingBalanceTransaction ? null : await planRequestBalanceForCreation(env, context, validated, nextRequest);
@@ -1109,6 +1383,9 @@ export const submitRequest = async (env: Env, context: AuthActor, id: string, in
     status: nextRequest.status,
     approval_request_id: nextRequest.approval_request_id,
     approval_status: nextRequest.approval_status,
+    approval_current_step: nextRequest.approval_current_step ?? null,
+    approval_submitted_at: nextRequest.approval_submitted_at ?? submittedAt,
+    approval_completed_at: nextRequest.approval_completed_at ?? null,
     submitted_at: submittedAt,
     submitted_by: context.actorUserId,
     approved_at: nextRequest.approved_at,
@@ -1118,15 +1395,11 @@ export const submitRequest = async (env: Env, context: AuthActor, id: string, in
     affects_payroll: validated.leaveType.affects_payroll,
   };
   if (requiresApproval) {
-    await repository.submitLeaveRequestWithApprovalWorkflow(
-      env,
-      context.companyId,
-      id,
-      requestValues,
-      approvalPlan.approvalRequest,
-      approvalPlan.steps,
-      balanceEntry,
-    );
+    if (balanceEntry) {
+      await repository.updateLeaveRequestStatusWithBalanceTransaction(env, context.companyId, id, requestValues, balanceEntry, null);
+    } else {
+      await repository.updateLeaveRequestStatus(env, context.companyId, id, requestValues, null);
+    }
   } else if (balanceEntry) {
     await repository.updateLeaveRequestStatusWithBalanceTransaction(
       env,
@@ -1262,6 +1535,104 @@ export const approveRequest = async (env: Env, context: AuthActor, id: string, i
   if (["approved", "direct_approved", "finalized", "taken"].includes(request.status)) {
     return { approved: true, already_applied: true };
   }
+  const engineApprovalLink = await findLeaveEngineApproval(env, context, request);
+  if (engineApprovalLink) {
+    const validated = await validateRequestBusinessRules(env, context, {
+      employee_id: request.employee_id,
+      leave_type_id: request.leave_type_id,
+      start_date: request.start_date,
+      end_date: request.end_date,
+      reason: request.reason,
+    }, id, { skipBalanceAvailabilityCheck: true });
+    const longLeaveRecord = await ensureLongLeaveForRequest(env, context, request, validated.employee);
+    const engineApproval = await approvalEngineService.approveStep(env, context, engineApprovalLink.id, input.reason, { allowModuleBoundAction: true });
+    const isFinalApproval = engineApproval?.status === "APPROVED";
+    let entry: repository.LeaveBalanceBatchEntry | null = null;
+    if (isFinalApproval && policyService.shouldCheckBalance(validated.leaveType)) {
+      const balanceBeforeApproval = await balanceService.initializeBalanceIfNeeded(
+        env,
+        context.companyId,
+        validated.employee,
+        validated.leaveType.id,
+        Number(request.start_date.slice(0, 4)),
+        validated.policy,
+        validated.leaveType,
+      );
+      entry = balanceService.planBalanceTransaction({
+        balance: balanceBeforeApproval,
+        leaveType: validated.leaveType,
+        policy: validated.policy,
+        type: "leave_used",
+        quantityDays: -request.total_days,
+        effectiveDate: request.start_date,
+        source: "leave_request",
+        reason: input.reason,
+        leaveRequestId: request.id,
+        idempotencyKey: `leave_request:${request.id}:used`,
+        createdBy: context.actorUserId,
+        mutate: (current) => ({
+          ...current,
+          pending_days: Math.max(0, (current.pending_days ?? 0) - request.total_days),
+          used_days: current.used_days + request.total_days,
+        }),
+      });
+    }
+    const approvedAt = nowIso();
+    const engineSnapshot = {
+      ...leaveSnapshotFromEngine(engineApproval),
+      ...await leaveTimelineSnapshotFromEngine(env, context, engineApprovalLink.id),
+    };
+    const requestValues: Partial<LeaveRequestRecord> = isFinalApproval
+      ? {
+          status: "approved",
+          approval_status: "approved",
+          approved_at: approvedAt,
+          approved_by: context.actorUserId,
+          decision_reason: input.reason,
+          ...engineSnapshot,
+        }
+      : {
+          status: "partially_approved",
+          approval_status: engineSnapshot.approval_status ?? approvalStatusFromEngine(engineApproval?.status),
+          decision_reason: input.reason,
+          ...engineSnapshot,
+        };
+    if (entry) {
+      await repository.updateLeaveRequestStatusWithBalanceTransaction(env, context.companyId, id, requestValues, entry, null);
+    } else {
+      await repository.updateLeaveRequestStatus(env, context.companyId, id, requestValues, null);
+    }
+    await ensureAudit(env, context, {
+      action: isFinalApproval ? LEAVE_AUDIT_ACTIONS.approvalStepApproved : LEAVE_AUDIT_ACTIONS.approvalStepApproved,
+      entityType: "leave_request",
+      entityId: id,
+      employeeId: request.employee_id,
+      outletId: request.outlet_id,
+      oldValue: request,
+      newValue: { status: requestValues.status, approval_request_id: engineApprovalLink.id, approval_current_step: requestValues.approval_current_step },
+      reason: input.reason,
+    });
+    await broadcast(env, context, isFinalApproval ? "leave.request_approved" : "leave.approval_step_approved", { id, employee_id: request.employee_id });
+    void notifyLeaveEvent(env, context, isFinalApproval ? "leave_request_approved" : "leave_approval_assigned", request, isFinalApproval
+      ? {
+          title: "Leave request approved",
+          message: "A leave request has been approved.",
+          targetUserIds: [request.created_by],
+        }
+      : {
+          title: "Leave approval moved to the next step",
+          message: "A leave approval step was completed and the request is waiting for the next reviewer.",
+          priority: "high",
+          targetPermissionKeys: ["approvals.hrFinal.approve", "leave.approvals.approve"],
+          targetRoleKeys: ["hr_admin", "admin"],
+        });
+    return {
+      approved: isFinalApproval,
+      partially_approved: !isFinalApproval,
+      long_leave_required: Boolean(longLeaveRecord),
+      long_leave_record_id: longLeaveRecord?.id,
+    };
+  }
   const currentStep = await assertApprovalStepActionable(env, context, request, input.reason);
   const validated = await validateRequestBusinessRules(env, context, {
     employee_id: request.employee_id,
@@ -1374,6 +1745,45 @@ export const approveRequest = async (env: Env, context: AuthActor, id: string, i
 export const rejectRequest = async (env: Env, context: AuthActor, id: string, input: LeaveActionInput) => {
   const request = await getRequest(env, context, id);
   if (request.status === "rejected") return { rejected: true, already_applied: true };
+  const engineApprovalLink = await findLeaveEngineApproval(env, context, request);
+  if (engineApprovalLink) {
+    const engineApproval = await approvalEngineService.rejectStep(env, context, engineApprovalLink.id, input.reason, input.reason, { allowModuleBoundAction: true });
+    const entry = await planReleasePendingBalance(env, context, request, input.reason, "released");
+    const rejectedAt = nowIso();
+    const requestValues: Partial<LeaveRequestRecord> = {
+      status: "rejected",
+      approval_status: "rejected",
+      rejected_at: rejectedAt,
+      rejected_by: context.actorUserId,
+      rejection_reason: input.reason,
+      decision_reason: input.reason,
+      ...leaveSnapshotFromEngine(engineApproval),
+      ...await leaveTimelineSnapshotFromEngine(env, context, engineApprovalLink.id),
+    };
+    if (entry) {
+      await repository.updateLeaveRequestStatusWithBalanceTransaction(env, context.companyId, id, requestValues, entry, null);
+    } else {
+      await repository.updateLeaveRequestStatus(env, context.companyId, id, requestValues, null);
+    }
+    await ensureAudit(env, context, {
+      action: LEAVE_AUDIT_ACTIONS.approvalStepRejected,
+      entityType: "leave_request",
+      entityId: id,
+      employeeId: request.employee_id,
+      outletId: request.outlet_id,
+      oldValue: request,
+      newValue: { status: "rejected", approval_request_id: engineApprovalLink.id },
+      reason: input.reason,
+    });
+    await broadcast(env, context, "leave.request_rejected", { id, employee_id: request.employee_id });
+    void notifyLeaveEvent(env, context, "leave_request_rejected", request, {
+      title: "Leave request rejected",
+      message: "A leave request was rejected. Open it to review the reason.",
+      priority: "high",
+      targetUserIds: [request.created_by],
+    });
+    return { rejected: true };
+  }
   const currentStep = await assertApprovalStepActionable(env, context, request, input.reason);
   const entry = await planReleasePendingBalance(env, context, request, input.reason, "released");
   const rejectedAt = nowIso();
@@ -1434,10 +1844,17 @@ export const rejectRequest = async (env: Env, context: AuthActor, id: string, in
 
 export const cancelRequest = async (env: Env, context: AuthActor, id: string, input: LeaveActionInput) => {
   const request = await getRequest(env, context, id);
+  await assertLeaveRequestOwnerOrDelegate(env, context, request, "cancel");
   if (request.affects_payroll === 1) {
     await assertPayrollUnlocked(env, context.companyId, request.start_date, request.end_date);
   }
   if (["cancelled", "withdrawn"].includes(request.status)) return { cancelled: true, already_applied: true };
+  const engineApprovalLink = pendingStatuses.includes(request.status)
+    ? await findLeaveEngineApproval(env, context, request)
+    : null;
+  const engineApproval = engineApprovalLink
+    ? await approvalEngineService.cancelRequest(env, context, engineApprovalLink.id, input.reason, { allowModuleBoundAction: true })
+    : null;
   let entry: repository.LeaveBalanceBatchEntry | null = null;
   if (["approved", "direct_approved"].includes(request.status)) {
     const employee = await ensureEmployeeAccess(env, context, request.employee_id);
@@ -1471,8 +1888,9 @@ export const cancelRequest = async (env: Env, context: AuthActor, id: string, in
     cancelled_at: cancelledAt,
     cancelled_by: context.actorUserId,
     decision_reason: input.reason,
+    ...(engineApproval ? leaveSnapshotFromEngine(engineApproval) : {}),
   };
-  const genericApprovalUpdate = approvalRequestSync(request, "cancelled", null);
+  const genericApprovalUpdate = engineApprovalLink ? null : approvalRequestSync(request, "cancelled", null);
   if (entry) {
     await repository.updateLeaveRequestStatusWithBalanceTransaction(env, context.companyId, id, requestValues, entry, genericApprovalUpdate);
   } else {
@@ -1511,13 +1929,20 @@ export const cancelRequest = async (env: Env, context: AuthActor, id: string, in
 
 export const withdrawRequest = async (env: Env, context: AuthActor, id: string, input: LeaveActionInput) => {
   const request = await getRequest(env, context, id);
+  await assertLeaveRequestOwnerOrDelegate(env, context, request, "withdraw");
   if (!pendingStatuses.includes(request.status)) {
     if (request.status === "withdrawn") return { withdrawn: true, already_applied: true };
     throw new AppError("Only pending leave requests can be withdrawn.", "LEAVE_APPROVAL_INVALID_TRANSITION", 409);
   }
-  if (request.created_by !== context.actorUserId && !permissionService.hasAnyPermission(context, ["leave.requests.withdraw", "leave.cancel", "leave.edit"])) {
+  const employee = await actorLeaveEmployee(env, context);
+  const ownsByEmployee = isActiveLeaveEmployee(employee) && employee?.id === request.employee_id;
+  if (request.created_by !== context.actorUserId && !ownsByEmployee && !permissionService.hasAnyPermission(context, LEAVE_CANCEL_FOR_OTHERS_PERMISSIONS)) {
     throw new PermissionError("You do not have permission to withdraw this leave request.");
   }
+  const engineApprovalLink = await findLeaveEngineApproval(env, context, request);
+  const engineApproval = engineApprovalLink
+    ? await approvalEngineService.cancelRequest(env, context, engineApprovalLink.id, input.reason, { allowModuleBoundAction: true })
+    : null;
   const entry = await planReleasePendingBalance(env, context, request, input.reason, "withdrawn_released");
   const withdrawnAt = nowIso();
   const requestValues: Partial<LeaveRequestRecord> = {
@@ -1526,8 +1951,9 @@ export const withdrawRequest = async (env: Env, context: AuthActor, id: string, 
     withdrawn_at: withdrawnAt,
     withdrawn_by: context.actorUserId,
     decision_reason: input.reason,
+    ...(engineApproval ? leaveSnapshotFromEngine(engineApproval) : {}),
   };
-  const genericApprovalUpdate = approvalRequestSync(request, "withdrawn", null);
+  const genericApprovalUpdate = engineApprovalLink ? null : approvalRequestSync(request, "withdrawn", null);
   if (entry) {
     await repository.updateLeaveRequestStatusWithBalanceTransaction(env, context.companyId, id, requestValues, entry, genericApprovalUpdate);
   } else {
@@ -1564,17 +1990,47 @@ export const withdrawRequest = async (env: Env, context: AuthActor, id: string, 
 };
 
 export const listApprovalInbox = async (env: Env, context: AuthActor, filters: LeaveRequestFilters): Promise<LeaveListResult<any>> => {
-  const rows = await repository.listApprovalInbox(env, context.companyId, filters, scope(context), context.actorUserId, context.permissions ?? []);
+  const enginePending = await approvalEngineService.getMyPending(env, context, {
+    operation_type: LEAVE_APPROVAL_OPERATION,
+    status: filters.approval_status,
+    department_id: filters.department_id,
+    search: undefined,
+    page: filters.page,
+    page_size: filters.page_size,
+  });
+  const leaveIds = enginePending.rows
+    .map((row) => row.subject_id)
+    .filter((id): id is string => Boolean(id));
+  const leaveRows = await repository.listRequestsByIds(env, context.companyId, leaveIds);
+  const byId = new Map(leaveRows.map((row) => [row.id, row]));
+  const rows = enginePending.rows
+    .map((approval) => {
+      const leave = byId.get(approval.subject_id);
+      if (!leave) return null;
+      return {
+        ...leave,
+        approval_request_id: approval.id,
+        approval_status: approvalStatusFromEngine(approval.status),
+        approval_current_step: approval.current_step_name ?? approval.current_step_id ?? null,
+        current_step_id: approval.current_step_id ?? null,
+        current_step_order: null,
+        approver_type: approval.current_step_name ?? "Approval step",
+        required_permission_key: null,
+        submitted_at: approval.submitted_at ?? leave.submitted_at,
+      };
+    })
+    .filter(Boolean);
   return {
     rows,
-    pagination: pagination(filters.page, filters.page_size, rows.length),
+    pagination: enginePending.pagination,
   };
 };
 
 export const listApprovalHistory = async (env: Env, context: AuthActor, filters: LeaveRequestFilters): Promise<LeaveListResult<any>> => {
-  const total = await repository.countRequests(env, context.companyId, filters, scope(context));
+  const visibility = await buildLeaveRequestVisibilityFilter(env, context);
+  const total = await repository.countRequests(env, context.companyId, filters, scope(context), visibility);
   return {
-    rows: await repository.listApprovalHistory(env, context.companyId, filters, scope(context)),
+    rows: await repository.listApprovalHistory(env, context.companyId, filters, scope(context), visibility),
     pagination: pagination(filters.page, filters.page_size, total),
   };
 };
@@ -1583,13 +2039,43 @@ export const getApprovalDetail = async (env: Env, context: AuthActor, requestId:
   const request = await getRequest(env, context, requestId);
   const steps = await repository.listApprovalSteps(env, context.companyId, requestId);
   const transactions = await repository.listLeaveRequestTransactions(env, context.companyId, requestId);
-  const genericApproval = request.approval_request_id
+  const engineApproval = await findLeaveEngineApproval(env, context, request);
+  const engineTimeline = engineApproval ? await approvalEngineService.getTimeline(env, context, engineApproval.id) : null;
+  const genericApproval = !engineApproval && request.approval_request_id
     ? await repository.findGenericApprovalRequestByEntity(env, context.companyId, "leave_request", requestId)
     : null;
+  const engineSteps: LeaveApprovalStepRecord[] = (engineTimeline?.steps ?? []).map((step) => ({
+    id: step.id,
+    company_id: step.company_id,
+    leave_request_id: request.id,
+    step_order: step.step_order,
+    approver_type: step.approver_resolver_type,
+    approver_user_id: step.assigned_approver_user_id,
+    approver_role_id: step.required_role_id,
+    approver_role_key: null,
+    required_permission_key: step.required_permission,
+    status: step.status.toLowerCase(),
+    decision_by: step.assigned_approver_user_id,
+    decision_at: step.approved_at ?? step.rejected_at ?? step.skipped_at ?? step.escalated_at,
+    decision_note: step.fallback_applied,
+    delegated_to: null,
+    delegated_by: null,
+    delegated_at: null,
+    due_at: step.due_at,
+    created_at: step.created_at,
+    updated_at: step.updated_at,
+  }));
   return {
     leave_request: request,
-    generic_approval_request: genericApproval,
-    approval_steps: steps,
+    generic_approval_request: engineTimeline
+      ? {
+          id: engineTimeline.request.id,
+          status: approvalStatusFromEngine(engineTimeline.request.status),
+          current_step: engineTimeline.request.current_step_name ?? engineTimeline.request.current_step_id,
+        }
+      : genericApproval,
+    engine_approval_request: engineTimeline?.request ?? null,
+    approval_steps: engineSteps.length > 0 ? engineSteps : steps,
     balance_transactions: transactions,
     holiday_impact: await (async () => {
       const leaveType = await repository.findLeaveType(env, context.companyId, request.leave_type_id).catch(() => null);
@@ -1614,12 +2100,24 @@ export const getApprovalDetail = async (env: Env, context: AuthActor, requestId:
         note: `Generic approval request ${genericApproval.id} is ${genericApproval.status}.`,
         current_step: genericApproval.current_step,
       }] : []),
-      ...steps.map((step) => ({
+      ...(engineTimeline ? [{
+        type: `approval_engine_${approvalStatusFromEngine(engineTimeline.request.status)}`,
+        at: engineTimeline.request.updated_at,
+        by: engineTimeline.request.requester_user_id,
+        note: `Approval engine request ${engineTimeline.request.id} is ${engineTimeline.request.status}.`,
+      }] : []),
+      ...(engineSteps.length > 0 ? engineSteps : steps).map((step) => ({
         type: `approval_step_${step.status}`,
         at: step.decision_at ?? step.created_at,
         by: step.decision_by ?? step.delegated_to ?? step.approver_user_id,
         note: step.decision_note,
         step_order: step.step_order,
+      })),
+      ...(engineTimeline?.actions ?? []).map((action) => ({
+        type: `approval_action_${action.action.toLowerCase()}`,
+        at: action.created_at,
+        by: action.actor_user_id,
+        note: action.reason ?? action.comment,
       })),
       ...transactions.map((transaction) => ({
         type: `balance_${transaction.transaction_type}`,

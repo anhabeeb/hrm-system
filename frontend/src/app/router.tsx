@@ -14,6 +14,8 @@ import { FirstTimeSetupPage } from "@/features/bootstrap/FirstTimeSetupPage";
 import { ProfilePage } from "@/features/profile/ProfilePage";
 import { SecurityPage } from "@/features/profile/SecurityPage";
 import { KycUpdatePage } from "@/features/profile/KycUpdatePage";
+import { useAuth } from "@/features/auth/auth.store";
+import { getDefaultLandingPath } from "@/lib/default-landing";
 
 const lazyNamed = <T extends Record<string, ComponentType<any>>>(
   loader: () => Promise<T>,
@@ -72,6 +74,11 @@ const ImportExportSettingsPage = lazyNamed(() => import("@/features/settings/imp
 const DevicesSyncSettingsPage = lazyNamed(() => import("@/features/settings/devices-sync/DevicesSyncSettingsPage"), "DevicesSyncSettingsPage");
 const AuditLogsPage = lazyNamed(() => import("@/features/audit/AuditLogsPage"), "AuditLogsPage");
 const ProfileUpdateRequestsPage = lazyNamed(() => import("@/features/profile-update-requests/ProfileUpdateRequestsPage"), "ProfileUpdateRequestsPage");
+const EmployeeDashboardPage = lazyNamed(() => import("@/features/self-service/EmployeeDashboardPage"), "EmployeeDashboardPage");
+const MyProfilePage = lazyNamed(() => import("@/features/self-service/MyProfilePage"), "MyProfilePage");
+const MyRequestsPage = lazyNamed(() => import("@/features/self-service/MyRequestsPage"), "MyRequestsPage");
+const MyPendingApprovalsPage = lazyNamed(() => import("@/features/self-service/MyPendingApprovalsPage"), "MyPendingApprovalsPage");
+const SelfServiceModulePage = lazyNamed(() => import("@/features/self-service/SelfServiceModulePage"), "SelfServiceModulePage");
 
 const routeFallback = (
   <div className="p-4 text-sm text-muted-foreground md:p-6">Loading page...</div>
@@ -90,6 +97,11 @@ const guarded = (
   </ModuleRoute>
 );
 
+const DefaultLandingRedirect = () => {
+  const { user } = useAuth();
+  return <Navigate to={getDefaultLandingPath(user)} replace />;
+};
+
 export const AppRouter = () => (
   <Suspense fallback={routeFallback}>
   <Routes>
@@ -105,8 +117,18 @@ export const AppRouter = () => (
       <Route path="/reports/print/:reportKey" element={guarded(<ReportPrintPage />, { permission: "report_exports.print", feature: "reports" })} />
       <Route path="/employees/:employeeId/print" element={guarded(<ReportPrintPage employeeProfile />, { permission: "report_exports.employee_profile.print", feature: "employee_management" })} />
       <Route element={<AppShell />}>
-        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route index element={<DefaultLandingRedirect />} />
         <Route path="/dashboard" element={guarded(<DashboardPage />, { permissionsAny: ["dashboard.view", "dashboard.view_company", "dashboard.view_outlet"] })} />
+        <Route path="/self/dashboard" element={guarded(<EmployeeDashboardPage />, { permission: "self.dashboard.view" })} />
+        <Route path="/self/profile" element={guarded(<MyProfilePage />, { permissionsAny: ["self.profile.view", "self.dashboard.view"] })} />
+        <Route path="/self/requests" element={guarded(<MyRequestsPage />, { permission: "self.requests.view" })} />
+        <Route path="/self/pending-approvals" element={guarded(<MyPendingApprovalsPage />, { permissionsAny: ["department.approvals.view", "approvals.department.approve", "approvals.hrFinal.approve", "approvals.financeFinal.approve"] })} />
+        <Route path="/self/attendance" element={guarded(<SelfServiceModulePage moduleKey="attendance" />, { permission: "self.attendance.view", feature: "attendance" })} />
+        <Route path="/self/roster" element={guarded(<SelfServiceModulePage moduleKey="roster" />, { permission: "self.roster.view", feature: "roster" })} />
+        <Route path="/self/leave" element={guarded(<SelfServiceModulePage moduleKey="leave" />, { permission: "self.leave.view", feature: "leave_management" })} />
+        <Route path="/self/documents" element={guarded(<SelfServiceModulePage moduleKey="documents" />, { permission: "self.documents.view", feature: "documents" })} />
+        <Route path="/self/payslips" element={guarded(<SelfServiceModulePage moduleKey="payslips" />, { permission: "self.payslips.view", feature: "payslips" })} />
+        <Route path="/self/department-dashboard" element={guarded(<SelfServiceModulePage moduleKey="department-dashboard" />, { permission: "department.dashboard.view" })} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/profile/security" element={<SecurityPage />} />
         <Route path="/profile/kyc-update" element={<KycUpdatePage />} />

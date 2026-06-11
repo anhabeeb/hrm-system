@@ -3,6 +3,7 @@
 import { countInclusiveDays } from "../src/modules/leave/leave-calendar.service";
 import * as leaveService from "../src/modules/leave/leave.service";
 import * as leaveRepository from "../src/modules/leave/leave.repository";
+import * as approvalEngineService from "../src/modules/approvals/approval-workflow-engine.service";
 import * as settingsService from "../src/services/settings.service";
 import * as auditService from "../src/services/audit.service";
 import * as holidayService from "../src/modules/holidays/holidays.service";
@@ -324,11 +325,16 @@ describe("holiday-aware leave request behavior", () => {
     vi.spyOn(settingsService, "shouldRequireApproval").mockResolvedValue(true);
     vi.spyOn(settingsService, "isFeatureEnabled").mockResolvedValue(false);
     vi.spyOn(auditService, "createAuditLog").mockResolvedValue({ created: true } as any);
-    vi.spyOn(leaveRepository, "findApprovalWorkflow").mockResolvedValue({ id: "workflow_1", is_enabled: 1 } as any);
-    vi.spyOn(leaveRepository, "listWorkflowSteps").mockResolvedValue([
-      { step_order: 1, approver_role_key: "hr_admin", required_permission_key: "leave.approvals.approve", approval_type: "single" },
-    ] as any);
-    vi.spyOn(leaveRepository, "createLeaveRequestWithApprovalWorkflow").mockImplementation(async (_env, request, _approval, _steps, entry) => {
+    vi.spyOn(leaveRepository, "findEngineApprovalRequestForLeave").mockResolvedValue(null);
+    vi.spyOn(approvalEngineService, "createApprovalRequestDraft").mockResolvedValue({ id: "approval_engine_req_1", status: "DRAFT" } as any);
+    vi.spyOn(approvalEngineService, "submitApprovalRequest").mockResolvedValue({
+      id: "approval_engine_req_1",
+      status: "IN_REVIEW",
+      current_step_id: "approval_step_1",
+      current_step_name: "Department Approval",
+      submitted_at: "2026-06-01T00:00:00.000Z",
+    } as any);
+    vi.spyOn(leaveRepository, "createLeaveRequestWithBalanceTransaction").mockImplementation(async (_env, request, entry) => {
       capturedRequest = request;
       capturedQuantity = entry?.transaction.quantity_days ?? 0;
       return [] as any;

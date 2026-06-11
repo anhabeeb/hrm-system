@@ -10,9 +10,9 @@ import { authApi } from "./api";
 import type { LoginInput } from "./auth.types";
 
 interface AuthContextValue extends AuthStateSnapshot {
-  refreshMe: () => Promise<void>;
-  login: (input: LoginInput) => Promise<{ requires2FA: boolean }>;
-  verifyLoginTwoFactor: (code: string) => Promise<void>;
+  refreshMe: () => Promise<CurrentUser | null>;
+  login: (input: LoginInput) => Promise<{ requires2FA: boolean; user: CurrentUser | null }>;
+  verifyLoginTwoFactor: (code: string) => Promise<CurrentUser | null>;
   logout: () => Promise<void>;
   setRequires2FA: (value: boolean) => void;
   hasPendingTwoFactorLogin: boolean;
@@ -52,19 +52,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     [],
   );
 
-  const refreshMe = useCallback(async () => {
+  const refreshMe = useCallback(async (): Promise<CurrentUser | null> => {
     setIsLoading(true);
     try {
       const response = await authApi.me();
-      applyUser(response.data.user, {
+      const nextUser = normalizeUser(response.data.user, {
         roles: response.data.roles,
         permissions: response.data.permissions,
         outletIds: response.data.outlet_ids,
         features: response.data.features,
       });
+      setUser(nextUser);
+      return nextUser;
     } catch {
       applyUser(null);
       clearAuthToken();
+      return null;
     } finally {
       setIsLoading(false);
       setHasHydrated(true);
@@ -93,14 +96,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (response.data.two_factor_required) {
           setPendingTwoFactorLogin({ identifier: input.identifier, password: input.password, remember_me: input.remember_me, challenge_id: response.data.challenge_id });
           setRequires2FA(true);
-          return { requires2FA: true };
+          return { requires2FA: true, user: null };
         }
       } catch (error) {
         if (error instanceof ApiError && error.code === "TWO_FACTOR_REQUIRED") {
           const details = error.details as { challenge_id?: string } | undefined;
           setPendingTwoFactorLogin({ identifier: input.identifier, password: input.password, remember_me: input.remember_me, challenge_id: details?.challenge_id });
           setRequires2FA(true);
-          return { requires2FA: true };
+          return { requires2FA: true, user: null };
         }
         throw error;
       }
@@ -111,16 +114,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (response.data.user) {
         applyUser(response.data.user);
       }
-      await refreshMe();
+      const refreshedUser = await refreshMe();
 
       setRequires2FA(false);
-      return { requires2FA: false };
+      return { requires2FA: false, user: refreshedUser };
     },
     [applyUser, refreshMe],
   );
 
   const verifyLoginTwoFactor = useCallback(
-    async (code: string) => {
+    async (code: string): Promise<CurrentUser | null> => {
       if (!pendingTwoFactorLogin) {
         throw new Error("Please log in again to continue.");
       }
@@ -137,10 +140,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (response.data.user) {
         applyUser(response.data.user);
       }
-      await refreshMe();
+      const refreshedUser = await refreshMe();
 
       setPendingTwoFactorLogin(null);
       setRequires2FA(false);
+      return refreshedUser;
     },
     [applyUser, pendingTwoFactorLogin, refreshMe],
   );

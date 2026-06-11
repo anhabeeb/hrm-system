@@ -16,6 +16,14 @@ export interface LeaveRequest {
   requested_by_name?: string | null;
   approval_request_id?: string | null;
   approval_status?: string | null;
+  approval_current_step?: string | null;
+  approval_submitted_at?: string | null;
+  approval_completed_at?: string | null;
+  department_approved_at?: string | null;
+  department_approved_by?: string | null;
+  hr_approved_at?: string | null;
+  hr_approved_by?: string | null;
+  rejection_reason?: string | null;
   current_step_id?: string | null;
   current_step_order?: number | null;
   approver_type?: string | null;
@@ -58,7 +66,13 @@ export interface LeaveApprovalDetail {
   generic_approval_request?: {
     id: string;
     status?: string;
-    current_step?: number | null;
+    current_step?: number | string | null;
+  } | null;
+  engine_approval_request?: {
+    id: string;
+    status: string;
+    current_step_id?: string | null;
+    current_step_name?: string | null;
   } | null;
   approval_steps: LeaveApprovalStep[];
   balance_transactions: LeaveBalanceTransaction[];

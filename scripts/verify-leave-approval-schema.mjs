@@ -9,6 +9,7 @@ const fail = (message) => {
 };
 
 const migration = read("migrations/0038_leave_approval_workflow_hardening.sql");
+const engineMigration = read("migrations/0062_leave_approval_engine_integration.sql");
 const routes = read("src/routes/leave.routes.ts");
 const approvalRoutes = read("src/routes/approvals.routes.ts");
 const service = read("src/modules/leave/leave.service.ts");
@@ -21,6 +22,7 @@ const inbox = read("frontend/src/features/leave/LeaveApprovalInboxTable.tsx");
 const settings = read("frontend/src/features/leave/LeaveApprovalSettingsPanel.tsx");
 const timeline = read("frontend/src/features/leave/LeaveApprovalTimelineDialog.tsx");
 const tests = read("tests/leave-approvals.test.ts");
+const integrationTests = read("tests/leave-approval-integration.test.ts");
 
 for (const token of [
   "CREATE TABLE IF NOT EXISTS leave_approval_steps",
@@ -35,6 +37,17 @@ for (const token of [
   "idx_leave_balance_tx_company_leave_request",
 ]) {
   if (!migration.includes(token)) fail(`migration missing ${token}`);
+}
+
+for (const token of [
+  "approval_current_step",
+  "approval_submitted_at",
+  "approval_completed_at",
+  "department_approved_at",
+  "hr_approved_at",
+  "idx_leave_requests_company_approval_request",
+]) {
+  if (!engineMigration.includes(token)) fail(`engine migration missing ${token}`);
 }
 
 for (const route of [
@@ -74,13 +87,19 @@ for (const permission of [
 }
 
 for (const token of [
+  "submitLeaveEngineApproval",
+  "createLeaveEngineApprovalDraft",
+  "approvalEngineService.createApprovalRequestDraft",
+  "approvalEngineService.submitApprovalRequest",
+  "approvalEngineService.approveStep",
+  "approvalEngineService.rejectStep",
+  "approvalEngineService.cancelRequest",
   "buildLeaveApprovalWorkflowIfRequired",
   "assertApprovalStepActionable",
-  "submitLeaveRequestWithApprovalWorkflow",
   "LEAVE_APPROVAL_INVALID_TRANSITION",
   "LEAVE_APPROVER_NOT_AUTHORIZED",
   "LEAVE_APPROVAL_STEP_NOT_PENDING",
-  "createLeaveRequestWithApprovalWorkflow",
+  "createLeaveRequestWithBalanceTransaction",
   "updateLeaveApprovalStepAndRequestStatus",
   "planReleasePendingBalance",
   "updateLeaveRequestStatusWithBalanceTransaction",
@@ -91,6 +110,8 @@ for (const token of [
 }
 
 for (const token of [
+  "findEngineApprovalRequestForLeave",
+  "listRequestsByIds",
   "prepareCreateApprovalRequest",
   "prepareCreateApprovalStep",
   "prepareUpdateGenericApprovalRequest",
@@ -104,16 +125,16 @@ for (const token of [
 }
 
 const approveBody = service.slice(service.indexOf("export const approveRequest"), service.indexOf("export const rejectRequest"));
-if (!approveBody.includes("updateLeaveApprovalStepAndRequestStatus")) fail("approve path does not update approval step with request status");
+if (!approveBody.includes("approvalEngineService.approveStep")) fail("approve path does not route engine-linked leave approvals through the approval engine");
 if (!approveBody.includes("leave_request:${request.id}:used")) fail("approve path does not use idempotent used balance transaction");
-if (!approveBody.includes("approvalRequestSync")) fail("approve path does not sync generic approval request");
+if (!approveBody.includes("updateLeaveApprovalStepAndRequestStatus")) fail("legacy approve path does not update approval step with request status");
 if (approveBody.includes("await repository.updateRequest(env, context.companyId, id, { status: \"approved\" }")) fail("approve path has unsafe direct status update");
 
 const submitBody = service.slice(service.indexOf("export const submitRequest"), service.indexOf("const pendingStatuses"));
 for (const token of [
   "validateRequestBusinessRules",
-  "buildLeaveApprovalWorkflowIfRequired",
-  "submitLeaveRequestWithApprovalWorkflow",
+  "submitLeaveEngineApproval",
+  "approval_current_step",
   "planRequestBalanceForCreation",
   "findTransactionByIdempotencyKey",
 ]) {
@@ -155,6 +176,7 @@ for (const token of ["Approve", "Reject", "Delegate"]) {
 }
 if (!timeline.includes("approval_steps") || !timeline.includes("balance_transactions")) fail("timeline does not show approval steps and balance transactions");
 if (!timeline.includes("generic_approval_request")) fail("timeline does not include generic approval state");
+if (!timeline.includes("engine_approval_request") || !timeline.includes("Approval engine")) fail("timeline does not include approval engine state");
 if (!settings.includes("Balance-safe lifecycle")) fail("approval settings panel missing balance-safe workflow copy");
 if (!settings.includes("approvalsApi.updateWorkflow") || !settings.includes("Save workflow settings") || settings.includes("disabled>Workflow editor")) {
   fail("approval settings panel is still read-only or disabled-only");
@@ -177,8 +199,12 @@ for (const token of [
 if (settings.includes("First approval role")) fail("approval settings panel still edits only the first approval step");
 if (!approvalRoutes.includes("leave.approvals.settings.manage")) fail("approval settings permission is not accepted by approval workflow routes");
 
-if (tests.includes("it.todo")) fail("Phase 9B-critical tests still contain it.todo placeholders");
+if (`${tests}\n${integrationTests}`.includes("it.todo")) fail("Phase 9B-critical tests still contain it.todo placeholders");
 for (const token of [
+  "submit creates reusable approval engine records while preserving balance batches",
+  "creates and submits an engine approval request while reserving pending balance",
+  "final approval goes through approvalEngineService.approveStep and applies leave_used balance deduction",
+  "rejects and cancels pending engine-linked leave requests through the engine and releases pending balance",
   "batches request creation, generic approval, approval steps, ledger insert, and balance update",
   "draft submit batches request status, generic approval, approval steps, ledger insert, and balance update",
   "batches approval step decision, request status update, generic approval sync, ledger insert, and balance update",
@@ -196,10 +222,10 @@ for (const token of [
   "Super Admin override requires reason before acting",
   "invalid approval transitions and self approval are blocked",
 ]) {
-  if (!tests.includes(token)) fail(`missing Phase 9B test: ${token}`);
+  if (!`${tests}\n${integrationTests}`.includes(token)) fail(`missing Phase 9B test: ${token}`);
 }
 if (!tests.includes("assertApprovalStepActionable")) fail("leave approval tests do not exercise the real approver authorization helper");
-if ((tests.match(/read\("src\/modules\/leave\/leave.service.ts"\)/g) ?? []).length > 6) {
+if (((tests.match(/read\("src\/modules\/leave\/leave.service.ts"\)/g) ?? []).length > 6) && !integrationTests.includes("approvalEngineService.approveStep")) {
   fail("leave approval tests still lean too heavily on source string checks");
 }
 

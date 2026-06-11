@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { LoadingButton } from "@/components/forms/LoadingButton";
 import { PasswordInput } from "@/components/forms/PasswordInput";
 import { bootstrapApi } from "@/features/bootstrap/bootstrap.api";
+import { getDefaultLandingPath } from "@/lib/default-landing";
 
 import { AuthLayout } from "./AuthLayout";
 import { useAuth } from "./auth.store";
@@ -64,7 +65,10 @@ export const LoginPage = () => {
         navigate("/2fa");
         return;
       }
-      const destination = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname ?? "/dashboard";
+      const requestedPath = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
+      const destination = requestedPath && requestedPath !== "/" && requestedPath !== "/dashboard"
+        ? requestedPath
+        : getDefaultLandingPath(result.user);
       navigate(destination, { replace: true });
     } catch (err) {
       toastError(toast, err, "Unable to sign in. Please try again.");

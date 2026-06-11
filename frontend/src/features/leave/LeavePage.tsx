@@ -189,11 +189,12 @@ export const LeavePage = () => {
     },
   });
 
-  const canCreate = auth.hasPermission("leave.create");
-  const canApprove = auth.hasAnyPermission(["leave.approvals.approve", "leave.approve"]);
-  const canReject = auth.hasAnyPermission(["leave.approvals.reject", "leave.reject"]);
-  const canCancel = auth.hasAnyPermission(["leave.requests.cancel", "leave.cancel", "leave.edit"]);
-  const canWithdraw = auth.hasAnyPermission(["leave.requests.withdraw", "leave.cancel", "leave.edit"]);
+  const canCreate = auth.hasAnyPermission(["leave.create", "leave.requests.create_for_employee", "approvals.requests.create", "approvals.requests.createForOthers"]);
+  const canCreateForOthers = auth.isSuperAdmin || auth.hasAnyPermission(["leave.requests.create_for_employee", "approvals.requests.createForOthers"]);
+  const canApprove = auth.hasAnyPermission(["leave.approvals.approve", "leave.approve", "approvals.requests.approve", "approvals.department.approve", "approvals.hrFinal.approve", "approvals.financeFinal.approve"]);
+  const canReject = auth.hasAnyPermission(["leave.approvals.reject", "leave.reject", "approvals.requests.reject", "approvals.department.reject", "approvals.hrFinal.reject", "approvals.financeFinal.reject"]);
+  const canCancel = auth.hasAnyPermission(["leave.requests.cancel", "leave.cancel", "leave.edit", "approvals.requests.cancel", "approvals.requests.cancelAny"]);
+  const canWithdraw = auth.hasAnyPermission(["leave.requests.withdraw", "leave.cancel", "leave.edit", "approvals.requests.cancel"]);
   const canDelegate = auth.hasAnyPermission(["leave.approvals.delegate", "leave.approvals.override"]);
   const canEscalate = auth.hasAnyPermission(["leave.approvals.escalate", "leave.approvals.override"]);
   const canAdjust = auth.hasAnyPermission(["leave.balances.adjust", "leave.manage_balances", "leave_policy_override.manage"]);
@@ -228,7 +229,16 @@ export const LeavePage = () => {
       </div>
       <LeaveRequestDetailDrawer request={selectedRequest} open={drawerOpen} onOpenChange={setDrawerOpen} />
       <LeaveApprovalTimelineDialog request={timelineRequest} open={Boolean(timelineRequest)} onOpenChange={(open) => !open && setTimelineRequest(null)} />
-      <LeaveRequestForm open={formOpen} loading={createMutation.isPending} error={createMutation.error ? friendlyHrmError(createMutation.error, "Leave request could not be submitted.", "leave") : null} onOpenChange={setFormOpen} onSubmit={(payload: LeaveRequestPayload) => createMutation.mutate(payload)} />
+      <LeaveRequestForm
+        open={formOpen}
+        loading={createMutation.isPending}
+        error={createMutation.error ? friendlyHrmError(createMutation.error, "Leave request could not be submitted.", "leave") : null}
+        canCreateForOthers={canCreateForOthers}
+        currentEmployeeId={auth.user?.employee_id ?? null}
+        currentEmployeeName={auth.user?.full_name ?? null}
+        onOpenChange={setFormOpen}
+        onSubmit={(payload: LeaveRequestPayload) => createMutation.mutate(payload)}
+      />
       <ReasonDialog open={Boolean(action)} title={action === "approve" ? "Approve leave request" : action === "reject" ? "Reject leave request" : action === "withdraw" ? "Withdraw leave request" : action === "escalate" ? "Escalate leave approval" : "Cancel leave request"} description="A reason is required for this leave action." confirmLabel={action === "approve" ? "Approve" : action === "reject" ? "Reject" : action === "withdraw" ? "Withdraw request" : action === "escalate" ? "Escalate approval" : "Cancel request"} loading={actionMutation.isPending} error={actionMutation.error ? friendlyHrmError(actionMutation.error, "Leave action could not be completed.", "leave") : null} onOpenChange={(open) => !open && setAction(null)} onSubmit={(reason) => selectedRequest && actionMutation.mutate({ id: selectedRequest.id, reason })} />
       <LeaveDelegateDialog request={delegateRequest} loading={delegateMutation.isPending} error={delegateMutation.error ? friendlyHrmError(delegateMutation.error, "Leave approval could not be delegated.", "leave") : null} onOpenChange={(open) => !open && setDelegateRequest(null)} onSubmit={(delegated_to, reason) => delegateRequest && delegateMutation.mutate({ id: delegateRequest.id, delegated_to, reason })} />
       <LeaveBalanceAdjustmentDialog balance={selectedBalance} loading={adjustMutation.isPending} error={adjustMutation.error ? friendlyHrmError(adjustMutation.error, "Leave balance could not be adjusted.", "leave") : null} onOpenChange={(open) => !open && setSelectedBalance(null)} onSubmit={(employeeId, payload) => adjustMutation.mutate({ employeeId, payload })} />

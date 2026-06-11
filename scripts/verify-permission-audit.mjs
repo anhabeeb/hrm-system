@@ -43,14 +43,14 @@ const listFiles = (dir, extensions, baseDir = rootDir) => {
 export const extractSeededPermissions = (baseDir = rootDir) => {
   const seed = readText("seeds/permissions.seed.sql", baseDir);
   return new Set(
-    [...seed.matchAll(/'([a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+)'/g)].map(
+    [...seed.matchAll(/'([a-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+)'/g)].map(
       (match) => match[1],
     ),
   );
 };
 
 const extractStrings = (text) =>
-  [...text.matchAll(/["']([a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+)["']/g)].map(
+  [...text.matchAll(/["']([a-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+)["']/g)].map(
     (match) => match[1],
   );
 

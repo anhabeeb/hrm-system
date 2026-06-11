@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 
@@ -8,7 +8,7 @@ import { DetailDrawer } from "@/components/data/DetailDrawer";
 import { DetailSection } from "@/components/data/DetailSection";
 import { RowActions } from "@/components/data/RowActions";
 import { StatusBadge } from "@/components/data/StatusBadge";
-import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { useToast } from "@/components/feedback/useToast";
 import { PageActionBar } from "@/components/layout/PageActionBar";
 import { EmployeeCombobox, OutletCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
@@ -30,19 +30,19 @@ const columns: TableColumn<AttendanceCorrection>[] = [
   { key: "attendance_date", header: "Attendance Date", cell: (row) => formatDate(row.attendance_date) },
   { key: "correction_type", header: "Correction Type", cell: (row) => humanize(row.correction_type) },
   { key: "requested_by", header: "Requested By", cell: (row) => row.requested_by_name ?? row.requested_by ?? "-" },
-  { key: "status", header: "Status", cell: (row) => <StatusBadge status={row.status} /> },
+  { key: "status", header: "Status", cell: (row) => <div className="space-y-1"><StatusBadge status={row.status} />{row.approval_current_step_name ? <p className="text-xs text-muted-foreground">{row.approval_current_step_name}</p> : row.approval_status ? <p className="text-xs text-muted-foreground">{humanize(row.approval_status)}</p> : null}</div> },
   { key: "reason", header: "Reason", cell: (row) => row.reason ?? "-" },
 ];
 
 export const AttendanceCorrectionsPage = () => {
   const auth = useAuth();
+  const toast = useToast();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selected, setSelected] = useState<AttendanceCorrection | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
-  const [reasonDialog, setReasonDialog] = useState<"approve" | "reject" | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [reasonDialog, setReasonDialog] = useState<"approve" | "reject" | "cancel" | null>(null);
 
   const filters = useMemo<AttendanceFilters>(() => ({
     outlet_id: searchParams.get("outlet_id") || undefined,
@@ -65,46 +65,69 @@ export const AttendanceCorrectionsPage = () => {
   };
 
   const correctionsQuery = useQuery({ queryKey: ["attendance", "corrections-page", filters], queryFn: () => attendanceApi.listCorrections(filters) });
+  const timelineQuery = useQuery({
+    queryKey: ["attendance", "correction-timeline", selected?.id],
+    queryFn: () => attendanceApi.getCorrectionTimeline(selected!.id),
+    enabled: Boolean(detailOpen && selected?.id),
+  });
   const refresh = async () => queryClient.invalidateQueries({ queryKey: ["attendance"] });
+
+  useEffect(() => {
+    if (timelineQuery.error) {
+      toast.error(friendlyOperationalError(timelineQuery.error, "Attendance correction timeline could not be loaded."));
+    }
+  }, [timelineQuery.error, toast]);
 
   const correctionMutation = useMutation({
     mutationFn: attendanceApi.requestCorrection,
     onSuccess: async () => {
-      setSuccessMessage("Attendance correction submitted successfully.");
+      toast.success("Attendance correction submitted for approval.");
       setRequestOpen(false);
       await refresh();
     },
+    onError: (error) => toast.error(friendlyOperationalError(error, "Attendance correction could not be submitted.")),
   });
 
   const approveMutation = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: ReasonPayload }) => attendanceApi.approveCorrection(id, payload),
     onSuccess: async () => {
-      setSuccessMessage("Attendance correction approved.");
+      toast.success("Attendance correction approval updated.");
       setReasonDialog(null);
       await refresh();
     },
+    onError: (error) => toast.error(friendlyOperationalError(error, "Attendance correction could not be approved.")),
   });
 
   const rejectMutation = useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: ReasonPayload }) => attendanceApi.rejectCorrection(id, payload),
     onSuccess: async () => {
-      setSuccessMessage("Attendance correction rejected.");
+      toast.success("Attendance correction rejected.");
       setReasonDialog(null);
       await refresh();
     },
+    onError: (error) => toast.error(friendlyOperationalError(error, "Attendance correction could not be rejected.")),
   });
 
-  const canRequest = auth.hasAnyPermission(["attendance.manual_entry", "attendance.edit"]);
-  const canApprove = auth.hasPermission("attendance.approve_correction");
-  const canReject = auth.hasPermission("attendance.reject_correction");
-  const actionError = correctionMutation.error ?? approveMutation.error ?? rejectMutation.error;
+  const cancelMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: ReasonPayload }) => attendanceApi.cancelCorrection(id, payload),
+    onSuccess: async () => {
+      toast.success("Attendance correction cancelled.");
+      setReasonDialog(null);
+      await refresh();
+    },
+    onError: (error) => toast.error(friendlyOperationalError(error, "Attendance correction could not be cancelled.")),
+  });
+
+  const canCreateForOthers = auth.isSuperAdmin || auth.hasPermission("attendance.corrections.createForOthers");
+  const canRequest = auth.hasAnyPermission(["attendance.corrections.create", "attendance.corrections.createForOthers", "attendance.manual_entry", "attendance.edit"]);
+  const canApprove = auth.hasAnyPermission(["attendance.corrections.approve", "attendance.approve_correction", "approvals.department.approve", "approvals.hrFinal.approve"]);
+  const canReject = auth.hasAnyPermission(["attendance.corrections.reject", "attendance.reject_correction", "approvals.department.reject", "approvals.hrFinal.reject"]);
+  const canCancel = auth.hasAnyPermission(["attendance.corrections.cancel", "attendance.corrections.cancelAny", "approvals.requests.cancel", "approvals.requests.cancelAny"]);
 
   return (
     <div>
       {canRequest ? <PageActionBar label="Time corrections page actions"><Button onClick={() => setRequestOpen(true)}><Plus className="h-4 w-4" />Add correction request</Button></PageActionBar> : null}
       <div className="space-y-4 p-4 md:p-6">
-        {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
-        {(correctionsQuery.isError || actionError) ? <InlineAlert title={friendlyOperationalError(correctionsQuery.error ?? actionError, "Attendance corrections could not be loaded.")} variant="error" /> : null}
         <div className="grid gap-3 rounded-lg border bg-card p-4 md:grid-cols-5">
           <Label className="space-y-1.5 text-sm">Outlet<OutletCombobox value={filters.outlet_id} onChange={(value) => updateFilters({ outlet_id: value, employee_id: undefined })} placeholder="All accessible outlets" /></Label>
           <Label className="space-y-1.5 text-sm">Employee<EmployeeCombobox value={filters.employee_id} outletId={filters.outlet_id} onChange={(value) => updateFilters({ employee_id: value })} placeholder="All employees" /></Label>
@@ -128,27 +151,59 @@ export const AttendanceCorrectionsPage = () => {
                 { key: "view", onSelect: () => { setSelected(row); setDetailOpen(true); } },
                 ...(canApprove ? [{ key: "approve" as const, onSelect: () => { setSelected(row); setReasonDialog("approve"); } }] : []),
                 ...(canReject ? [{ key: "reject" as const, onSelect: () => { setSelected(row); setReasonDialog("reject"); } }] : []),
+                ...(canCancel ? [{ key: "more" as const, label: "Cancel", onSelect: () => { setSelected(row); setReasonDialog("cancel"); } }] : []),
               ]}
             />
           )}
         />
       </div>
       <DetailDrawer open={detailOpen} onOpenChange={setDetailOpen} title="Correction detail" subtitle={selected?.employee_name ?? selected?.employee_id}>
-        {selected ? <DetailSection title="Safe correction detail" rows={[{ label: "Payload", value: <pre className="max-h-96 overflow-auto rounded bg-muted p-3 text-xs">{JSON.stringify(sanitizeForDisplay(selected), null, 2)}</pre> }]} /> : null}
+        {selected ? (
+          <div className="space-y-4">
+            <DetailSection title="Approval status" rows={[
+              { label: "Status", value: selected.status },
+              { label: "Approval", value: selected.approval_status ?? "Not linked" },
+              { label: "Current step", value: selected.approval_current_step_name ?? selected.approval_current_step ?? "-" },
+              { label: "Applied", value: selected.applied_at ? formatDate(selected.applied_at) : "-" },
+              { label: "Reason", value: selected.reason ?? "-" },
+              { label: "Rejection/cancellation", value: selected.rejection_reason ?? selected.cancellation_reason ?? "-" },
+            ]} />
+            <DetailSection
+              title="Approval timeline"
+              rows={(timelineQuery.data?.data?.steps ?? []).map((step: any) => ({
+                label: step.step_name ?? step.step_code ?? "Approval step",
+                value: `${humanize(step.status ?? "pending")}${step.fallback_applied ? ` (${humanize(step.fallback_applied)})` : ""}`,
+              })).concat((timelineQuery.data?.data?.actions ?? []).map((action: any) => ({
+                label: action.action ?? "Action",
+                value: `${action.actor_name ?? action.actor_user_id ?? "System"}${action.reason ? ` - ${action.reason}` : ""}`,
+              })))}
+            />
+            <DetailSection title="Safe correction detail" rows={[{ label: "Payload", value: <pre className="max-h-96 overflow-auto rounded bg-muted p-3 text-xs">{JSON.stringify(sanitizeForDisplay(selected), null, 2)}</pre> }]} />
+          </div>
+        ) : null}
       </DetailDrawer>
-      <CorrectionRequestDialog open={requestOpen} loading={correctionMutation.isPending} error={correctionMutation.error} onOpenChange={setRequestOpen} onSubmit={(payload) => correctionMutation.mutate(payload as CorrectionRequestPayload)} />
+      <CorrectionRequestDialog
+        open={requestOpen}
+        loading={correctionMutation.isPending}
+        error={correctionMutation.error}
+        canSelectEmployee={canCreateForOthers}
+        currentEmployeeId={auth.user?.employee_id ?? null}
+        onOpenChange={setRequestOpen}
+        onSubmit={(payload) => correctionMutation.mutate(payload as CorrectionRequestPayload)}
+      />
       <CorrectionRequestDialog
         open={Boolean(reasonDialog)}
         mode="reason"
-        title={reasonDialog === "approve" ? "Approve correction" : "Reject correction"}
+        title={reasonDialog === "approve" ? "Approve correction" : reasonDialog === "reject" ? "Reject correction" : "Cancel correction"}
         description="A reason is required for this action."
-        loading={approveMutation.isPending || rejectMutation.isPending}
-        error={approveMutation.error ?? rejectMutation.error}
+        loading={approveMutation.isPending || rejectMutation.isPending || cancelMutation.isPending}
+        error={approveMutation.error ?? rejectMutation.error ?? cancelMutation.error}
         onOpenChange={(open) => !open && setReasonDialog(null)}
         onSubmit={(payload) => {
           const reasonPayload = payload as ReasonPayload;
           if (reasonDialog === "approve" && selected) approveMutation.mutate({ id: selected.id, payload: reasonPayload });
           if (reasonDialog === "reject" && selected) rejectMutation.mutate({ id: selected.id, payload: reasonPayload });
+          if (reasonDialog === "cancel" && selected) cancelMutation.mutate({ id: selected.id, payload: reasonPayload });
         }}
       />
     </div>

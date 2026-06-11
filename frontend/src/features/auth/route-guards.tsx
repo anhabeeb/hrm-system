@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { FullPagePermissionDenied } from "@/components/feedback/PermissionDenied";
 import { LoadingState } from "@/components/data/LoadingState";
 import { useAuth } from "@/features/auth/auth.store";
+import { getDefaultLandingPath } from "@/lib/default-landing";
 import { hasFeature } from "@/lib/features";
 import { hasAnyPermission, hasPermission } from "@/lib/permissions";
 
@@ -23,14 +24,14 @@ export const ProtectedRoute = () => {
 };
 
 export const PublicRoute = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   if (isLoading) {
     return <LoadingState rows={5} />;
   }
 
   if (isAuthenticated) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={getDefaultLandingPath(user)} replace />;
   }
 
   return <Outlet />;

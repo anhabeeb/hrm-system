@@ -56,10 +56,23 @@ export const findEmployee = (env: Env, companyId: string, employeeId: string) =>
   one<LeaveEmployeeRecord>(
     env,
     `SELECT id, employee_code, full_name, employee_type, primary_outlet_id,
-      department_id, position_id, employment_status, deleted_at,
+      department_id, position_id, level, employment_status, deleted_at, archived_at,
       date_of_joining, hire_date, joined_at, exit_date, termination_date
      FROM employees WHERE company_id = ? AND id = ? LIMIT 1`,
     [companyId, employeeId],
+  );
+
+export const findEmployeeByUserId = (env: Env, companyId: string, userId: string) =>
+  one<LeaveEmployeeRecord>(
+    env,
+    `SELECT e.id, e.employee_code, e.full_name, e.employee_type, e.primary_outlet_id,
+      e.department_id, e.position_id, e.level, e.employment_status, e.deleted_at, e.archived_at,
+      e.date_of_joining, e.hire_date, e.joined_at, e.exit_date, e.termination_date
+     FROM users u
+     JOIN employees e ON e.company_id = u.company_id AND e.id = u.employee_id
+     WHERE u.company_id = ? AND u.id = ? AND u.deleted_at IS NULL
+     LIMIT 1`,
+    [companyId, userId],
   );
 
 export const listLeaveTypes = (env: Env, companyId: string, filters: LeaveTypeFilters) => {
@@ -463,7 +476,14 @@ export const listEligibleEmployeesForAccrual = (
   );
 };
 
-const requestWhere = (companyId: string, filters: LeaveRequestFilters, scope: LeaveOutletScope) => {
+export type LeaveRequestVisibilityFilter = { extra?: string; values?: unknown[] };
+
+const requestWhere = (
+  companyId: string,
+  filters: LeaveRequestFilters,
+  scope: LeaveOutletScope,
+  visibility?: LeaveRequestVisibilityFilter,
+) => {
   const clauses = ["r.company_id = ?"];
   const values: unknown[] = [companyId];
   applyOutletScope(clauses, values, "e", filters, scope);
@@ -476,11 +496,21 @@ const requestWhere = (companyId: string, filters: LeaveRequestFilters, scope: Le
   if (filters.approval_status) { clauses.push("COALESCE(r.approval_status, r.status) = ?"); values.push(filters.approval_status); }
   if (filters.date_from) { clauses.push("r.end_date >= ?"); values.push(filters.date_from); }
   if (filters.date_to) { clauses.push("r.start_date <= ?"); values.push(filters.date_to); }
+  if (visibility?.extra) {
+    clauses.push(visibility.extra);
+    values.push(...(visibility.values ?? []));
+  }
   return { sql: clauses.join(" AND "), values };
 };
 
-export const listRequests = (env: Env, companyId: string, filters: LeaveRequestFilters, scope: LeaveOutletScope) => {
-  const built = requestWhere(companyId, filters, scope);
+export const listRequests = (
+  env: Env,
+  companyId: string,
+  filters: LeaveRequestFilters,
+  scope: LeaveOutletScope,
+  visibility?: LeaveRequestVisibilityFilter,
+) => {
+  const built = requestWhere(companyId, filters, scope, visibility);
   const sort = filters.sort_by === "employee_name" ? "e.full_name" : filters.sort_by === "leave_type_name" ? "lt.leave_name" : `r.${filters.sort_by}`;
   return many<any>(
     env,
@@ -488,6 +518,8 @@ export const listRequests = (env: Env, companyId: string, filters: LeaveRequestF
       e.primary_outlet_id AS outlet_id, o.name AS outlet_name, lt.leave_name AS leave_type_name,
       r.start_date, r.end_date, r.total_days, r.status, r.affects_payroll,
       r.approval_request_id, COALESCE(r.approval_status, r.status) AS approval_status,
+      r.approval_current_step, r.approval_submitted_at, r.approval_completed_at,
+      r.department_approved_at, r.department_approved_by, r.hr_approved_at, r.hr_approved_by,
       r.created_by AS requested_by, r.submitted_at, r.approved_at, r.rejected_at, r.cancelled_at, r.withdrawn_at,
       r.created_at, 'view,approve,reject,cancel,withdraw,delegate,timeline' AS actions_available
      FROM leave_requests r
@@ -501,8 +533,14 @@ export const listRequests = (env: Env, companyId: string, filters: LeaveRequestF
   );
 };
 
-export const countRequests = async (env: Env, companyId: string, filters: LeaveRequestFilters, scope: LeaveOutletScope) => {
-  const built = requestWhere(companyId, filters, scope);
+export const countRequests = async (
+  env: Env,
+  companyId: string,
+  filters: LeaveRequestFilters,
+  scope: LeaveOutletScope,
+  visibility?: LeaveRequestVisibilityFilter,
+) => {
+  const built = requestWhere(companyId, filters, scope, visibility);
   const row = await one<{ total: number }>(
     env,
     `SELECT COUNT(*) AS total FROM leave_requests r JOIN employees e ON e.id = r.employee_id WHERE ${built.sql}`,
@@ -512,9 +550,19 @@ export const countRequests = async (env: Env, companyId: string, filters: LeaveR
 };
 
 export const findRequest = (env: Env, companyId: string, id: string) =>
-  one<LeaveRequestRecord & { employee_code: string; employee_name: string; outlet_id: string | null; leave_type_name: string }>(
+  one<LeaveRequestRecord & {
+    employee_code: string;
+    employee_name: string;
+    outlet_id: string | null;
+    employee_department_id?: string | null;
+    employee_position_id?: string | null;
+    employee_level?: number | null;
+    leave_type_name: string;
+  }>(
     env,
-    `SELECT r.*, e.employee_code, e.full_name AS employee_name, e.primary_outlet_id AS outlet_id, lt.leave_name AS leave_type_name
+    `SELECT r.*, e.employee_code, e.full_name AS employee_name, e.primary_outlet_id AS outlet_id,
+      e.department_id AS employee_department_id, e.position_id AS employee_position_id, e.level AS employee_level,
+      lt.leave_name AS leave_type_name
      FROM leave_requests r
      JOIN employees e ON e.id = r.employee_id
      JOIN leave_types lt ON lt.id = r.leave_type_id
@@ -649,9 +697,11 @@ const prepareCreateRequest = (env: Env, request: LeaveRequestRecord) =>
     `INSERT INTO leave_requests (
       id, company_id, employee_id, leave_type_id, start_date, end_date,
       total_days, reason, status, created_by, approval_request_id,
-      approval_status, submitted_at, submitted_by, affects_payroll,
+      approval_status, approval_current_step, approval_submitted_at, approval_completed_at,
+      department_approved_at, department_approved_by, hr_approved_at, hr_approved_by, rejection_reason,
+      submitted_at, submitted_by, affects_payroll,
       created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ),
     [
       request.id,
@@ -666,6 +716,14 @@ const prepareCreateRequest = (env: Env, request: LeaveRequestRecord) =>
       request.created_by,
       request.approval_request_id,
       request.approval_status ?? null,
+      request.approval_current_step ?? null,
+      request.approval_submitted_at ?? null,
+      request.approval_completed_at ?? null,
+      request.department_approved_at ?? null,
+      request.department_approved_by ?? null,
+      request.hr_approved_at ?? null,
+      request.hr_approved_by ?? null,
+      request.rejection_reason ?? null,
       request.submitted_at ?? null,
       request.submitted_by ?? null,
       request.affects_payroll,
@@ -680,6 +738,8 @@ export const createRequest = (env: Env, request: LeaveRequestRecord) =>
 const prepareUpdateRequest = (env: Env, companyId: string, id: string, values: Partial<LeaveRequestRecord>) => {
   const allowed: Array<keyof LeaveRequestRecord> = [
     "leave_type_id", "start_date", "end_date", "total_days", "reason", "status", "approval_request_id",
+    "approval_current_step", "approval_submitted_at", "approval_completed_at",
+    "department_approved_at", "department_approved_by", "hr_approved_at", "hr_approved_by", "rejection_reason",
     "approval_status", "submitted_at", "submitted_by", "approved_at", "approved_by", "rejected_at", "rejected_by",
     "cancelled_at", "cancelled_by", "withdrawn_at", "withdrawn_by", "decision_reason", "affects_payroll",
   ];
@@ -698,6 +758,60 @@ const prepareUpdateRequest = (env: Env, companyId: string, id: string, values: P
 
 export const updateRequest = (env: Env, companyId: string, id: string, values: Partial<LeaveRequestRecord>) =>
   prepareUpdateRequest(env, companyId, id, values).run();
+
+export const findEngineApprovalRequestForLeave = (
+  env: Env,
+  companyId: string,
+  leaveRequestId: string,
+  approvalRequestId?: string | null,
+) =>
+  one<{
+    id: string;
+    status: string;
+    current_step_id: string | null;
+    current_step_name?: string | null;
+    submitted_at?: string | null;
+    approved_at?: string | null;
+    rejected_at?: string | null;
+    cancelled_at?: string | null;
+    completed_at?: string | null;
+  }>(
+    env,
+    `SELECT r.id, r.status, r.current_step_id, s.step_name AS current_step_name,
+            r.submitted_at, r.approved_at, r.rejected_at, r.cancelled_at, r.completed_at
+       FROM approval_requests r
+       LEFT JOIN approval_request_steps s ON s.company_id = r.company_id AND s.id = r.current_step_id
+      WHERE r.company_id = ?
+        AND r.operation_type = 'LEAVE_REQUEST'
+        AND r.subject_type = 'LEAVE_REQUEST'
+        AND r.subject_id = ?
+        AND (? IS NULL OR r.id = ?)
+      ORDER BY r.updated_at DESC
+      LIMIT 1`,
+    [companyId, leaveRequestId, approvalRequestId ?? null, approvalRequestId ?? null],
+  );
+
+export const listRequestsByIds = (env: Env, companyId: string, ids: string[]) => {
+  if (ids.length === 0) return Promise.resolve([]);
+  const placeholders = ids.map(() => "?").join(", ");
+  return many<any>(
+    env,
+    `SELECT r.id, r.employee_id, e.employee_code, e.full_name AS employee_name,
+      e.primary_outlet_id AS outlet_id, o.name AS outlet_name, lt.leave_name AS leave_type_name,
+      r.start_date, r.end_date, r.total_days, r.status, r.affects_payroll,
+      r.approval_request_id, COALESCE(r.approval_status, r.status) AS approval_status,
+      r.approval_current_step, r.approval_submitted_at, r.approval_completed_at,
+      r.department_approved_at, r.department_approved_by, r.hr_approved_at, r.hr_approved_by,
+      r.reason, r.created_by AS requested_by, r.submitted_at, r.approved_at, r.rejected_at, r.cancelled_at, r.withdrawn_at,
+      r.created_at
+     FROM leave_requests r
+     JOIN employees e ON e.id = r.employee_id
+     JOIN leave_types lt ON lt.id = r.leave_type_id
+     LEFT JOIN outlets o ON o.id = e.primary_outlet_id
+     WHERE r.company_id = ? AND r.id IN (${placeholders})`,
+    [companyId, ...ids],
+  );
+};
 
 export interface LeaveBalanceBatchEntry {
   transaction: LeaveBalanceTransactionRecord;
@@ -973,8 +1087,14 @@ export const countApprovalInbox = async (env: Env, companyId: string, filters: L
   return rows.length;
 };
 
-export const listApprovalHistory = (env: Env, companyId: string, filters: LeaveRequestFilters, scope: LeaveOutletScope) => {
-  const built = requestWhere(companyId, filters, scope);
+export const listApprovalHistory = (
+  env: Env,
+  companyId: string,
+  filters: LeaveRequestFilters,
+  scope: LeaveOutletScope,
+  visibility?: LeaveRequestVisibilityFilter,
+) => {
+  const built = requestWhere(companyId, filters, scope, visibility);
   return many<any>(
     env,
     `SELECT r.id, r.employee_id, e.employee_code, e.full_name AS employee_name,

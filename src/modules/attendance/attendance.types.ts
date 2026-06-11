@@ -170,8 +170,13 @@ export interface CorrectionRequestInput {
   employee_id: string;
   attendance_event_id?: string;
   correction_type: string;
+  attendance_date?: string;
+  requested_clock_in?: string;
+  requested_clock_out?: string;
+  requested_status?: AttendanceSummaryStatus;
+  outlet_id?: string;
   old_value_json?: Record<string, unknown>;
-  new_value_json: Record<string, unknown>;
+  new_value_json?: Record<string, unknown>;
   reason: string;
 }
 

@@ -268,12 +268,42 @@ export const findEmployeeForAttendance = (
     full_name: string;
     primary_outlet_id: string | null;
     department_id: string | null;
+    position_id: string | null;
+    level: number | null;
     employment_status: string;
+    archived_at: string | null;
     deleted_at: string | null;
   }>(
     env,
-    "SELECT id, employee_code, full_name, primary_outlet_id, department_id, employment_status, joined_at, resigned_at, terminated_at, deleted_at FROM employees WHERE company_id = ? AND id = ? LIMIT 1",
+    "SELECT id, employee_code, full_name, primary_outlet_id, department_id, position_id, level, employment_status, archived_at, joined_at, resigned_at, terminated_at, deleted_at FROM employees WHERE company_id = ? AND id = ? LIMIT 1",
     [companyId, employeeId],
+  );
+
+export const findEmployeeByUserId = (
+  env: Env,
+  companyId: string,
+  userId: string,
+) =>
+  one<{
+    id: string;
+    employee_code: string | null;
+    full_name: string | null;
+    primary_outlet_id: string | null;
+    department_id: string | null;
+    position_id: string | null;
+    level: number | null;
+    employment_status: string;
+    archived_at: string | null;
+    deleted_at: string | null;
+  }>(
+    env,
+    `SELECT e.id, e.employee_code, e.full_name, e.primary_outlet_id, e.department_id,
+            e.position_id, e.level, e.employment_status, e.archived_at, e.deleted_at
+       FROM users u
+       JOIN employees e ON e.company_id = u.company_id AND e.id = u.employee_id
+      WHERE u.company_id = ? AND u.id = ? AND u.deleted_at IS NULL
+      LIMIT 1`,
+    [companyId, userId],
   );
 
 export const findEventById = (env: Env, companyId: string, id: string) =>
@@ -432,6 +462,7 @@ export const findAttendanceHolidayForDate = (
 export const updateAttendanceEvent = (
   env: Env,
   companyId: string,
+  employeeId: string,
   id: string,
   eventType: "clock_in" | "clock_out",
   eventTime: string,
@@ -441,8 +472,8 @@ export const updateAttendanceEvent = (
     `UPDATE attendance_events
      SET event_type = ?, event_time = ?, attendance_method = 'manual',
        source = 'admin_dashboard', updated_at = ?
-     WHERE company_id = ? AND id = ?`,
-    [eventType, eventTime, new Date().toISOString(), companyId, id],
+     WHERE company_id = ? AND employee_id = ? AND id = ?`,
+    [eventType, eventTime, new Date().toISOString(), companyId, employeeId, id],
   );
 
 export const createAttendanceEvent = (
@@ -599,20 +630,22 @@ export const createCorrection = (env: Env, input: {
   id: string;
   companyId: string;
   employeeId: string;
+  outletId?: string | null;
   attendanceEventId?: string | null;
   correctionType: string;
   oldValueJson?: string | null;
   newValueJson: string;
   reason: string;
   requestedBy?: string | null;
+  requestedDate?: string | null;
 }) =>
   run(
     env,
     `INSERT INTO attendance_corrections (
       id, company_id, employee_id, attendance_event_id, correction_type,
       old_value_json, new_value_json, reason, requested_by, status,
-      created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+      approval_status, requested_date, outlet_id, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'DRAFT', ?, ?, ?, ?)`,
     [
       input.id,
       input.companyId,
@@ -623,6 +656,8 @@ export const createCorrection = (env: Env, input: {
       input.newValueJson,
       input.reason,
       input.requestedBy ?? null,
+      input.requestedDate ?? null,
+      input.outletId ?? null,
       new Date().toISOString(),
       new Date().toISOString(),
     ],
@@ -630,6 +665,133 @@ export const createCorrection = (env: Env, input: {
 
 export const findCorrectionById = (env: Env, companyId: string, id: string) =>
   one<any>(env, "SELECT * FROM attendance_corrections WHERE company_id = ? AND id = ? LIMIT 1", [companyId, id]);
+
+export const findCorrectionByApprovalRequestId = (env: Env, companyId: string, approvalRequestId: string) =>
+  one<any>(env, "SELECT * FROM attendance_corrections WHERE company_id = ? AND approval_request_id = ? LIMIT 1", [companyId, approvalRequestId]);
+
+export const findDuplicatePendingCorrection = (
+  env: Env,
+  input: { companyId: string; employeeId: string; correctionType: string; requestedDate?: string | null; attendanceEventId?: string | null; currentId?: string | null },
+) =>
+  one<{ id: string }>(
+    env,
+    `SELECT id FROM attendance_corrections
+      WHERE company_id = ? AND employee_id = ? AND correction_type = ?
+        AND status IN ('pending', 'PENDING', 'PENDING_DEPARTMENT_APPROVAL', 'PENDING_HR_APPROVAL', 'PENDING_MANUAL_REVIEW')
+        AND (? IS NULL OR requested_date = ? OR date(created_at) = ?)
+        AND (? IS NULL OR attendance_event_id = ?)
+        AND (? IS NULL OR id <> ?)
+      LIMIT 1`,
+    [
+      input.companyId,
+      input.employeeId,
+      input.correctionType,
+      input.requestedDate ?? null,
+      input.requestedDate ?? null,
+      input.requestedDate ?? null,
+      input.attendanceEventId ?? null,
+      input.attendanceEventId ?? null,
+      input.currentId ?? null,
+      input.currentId ?? null,
+    ],
+  );
+
+export const updateCorrectionApprovalLink = (
+  env: Env,
+  companyId: string,
+  id: string,
+  input: { approvalRequestId: string; approvalStatus: string; currentStep?: string | null },
+) =>
+  run(
+    env,
+    `UPDATE attendance_corrections
+        SET approval_request_id = ?, approval_status = ?, approval_current_step = ?,
+            approval_submitted_at = COALESCE(approval_submitted_at, ?), updated_at = ?
+      WHERE company_id = ? AND id = ?`,
+    [input.approvalRequestId, input.approvalStatus, input.currentStep ?? null, new Date().toISOString(), new Date().toISOString(), companyId, id],
+  );
+
+export const updateCorrectionApprovalStatus = (
+  env: Env,
+  companyId: string,
+  id: string,
+  input: {
+    status?: string;
+    approvalStatus?: string | null;
+    currentStep?: string | null;
+    actorId?: string | null;
+    reason?: string | null;
+    departmentApproved?: boolean;
+    hrApproved?: boolean;
+    rejected?: boolean;
+    cancelled?: boolean;
+    applied?: boolean;
+  },
+) => {
+  const now = new Date().toISOString();
+  return run(
+    env,
+    `UPDATE attendance_corrections
+        SET status = COALESCE(?, status),
+            approval_status = COALESCE(?, approval_status),
+            approval_current_step = ?,
+            approved_by = CASE WHEN ? = 1 OR ? = 1 THEN ? ELSE approved_by END,
+            department_approved_at = CASE WHEN ? = 1 THEN ? ELSE department_approved_at END,
+            department_approved_by = CASE WHEN ? = 1 THEN ? ELSE department_approved_by END,
+            hr_approved_at = CASE WHEN ? = 1 THEN ? ELSE hr_approved_at END,
+            hr_approved_by = CASE WHEN ? = 1 THEN ? ELSE hr_approved_by END,
+            rejected_at = CASE WHEN ? = 1 THEN ? ELSE rejected_at END,
+            rejected_by = CASE WHEN ? = 1 THEN ? ELSE rejected_by END,
+            rejection_reason = CASE WHEN ? = 1 THEN ? ELSE rejection_reason END,
+            cancelled_at = CASE WHEN ? = 1 THEN ? ELSE cancelled_at END,
+            cancelled_by = CASE WHEN ? = 1 THEN ? ELSE cancelled_by END,
+            cancellation_reason = CASE WHEN ? = 1 THEN ? ELSE cancellation_reason END,
+            approval_completed_at = CASE WHEN ? = 1 OR ? = 1 OR ? = 1 THEN ? ELSE approval_completed_at END,
+            applied_at = CASE WHEN ? = 1 THEN ? ELSE applied_at END,
+            applied_by = CASE WHEN ? = 1 THEN ? ELSE applied_by END,
+            updated_at = ?
+      WHERE company_id = ? AND id = ?`,
+    [
+      input.status ?? null,
+      input.approvalStatus ?? null,
+      input.currentStep ?? null,
+      input.departmentApproved ? 1 : 0,
+      input.hrApproved ? 1 : 0,
+      input.actorId ?? null,
+      input.departmentApproved ? 1 : 0,
+      now,
+      input.departmentApproved ? 1 : 0,
+      input.actorId ?? null,
+      input.hrApproved ? 1 : 0,
+      now,
+      input.hrApproved ? 1 : 0,
+      input.actorId ?? null,
+      input.rejected ? 1 : 0,
+      now,
+      input.rejected ? 1 : 0,
+      input.actorId ?? null,
+      input.rejected ? 1 : 0,
+      input.reason ?? null,
+      input.cancelled ? 1 : 0,
+      now,
+      input.cancelled ? 1 : 0,
+      input.actorId ?? null,
+      input.cancelled ? 1 : 0,
+      input.reason ?? null,
+      input.hrApproved ? 1 : 0,
+      input.rejected ? 1 : 0,
+      input.cancelled ? 1 : 0,
+      now,
+      input.applied ? 1 : 0,
+      now,
+      input.applied ? 1 : 0,
+      input.actorId ?? null,
+      now,
+      companyId,
+      id,
+    ],
+  );
+};
 
 export const updateCorrectionStatus = (
   env: Env,
@@ -649,19 +811,36 @@ export const listCorrections = (
   companyId: string,
   filters: { status?: string; employee_id?: string; outlet_id?: string; date_from?: string; date_to?: string; page: number; page_size: number },
   scope: AttendanceOutletScope,
+  visibilityExtra?: string,
+  visibilityValues: unknown[] = [],
 ) => {
   const clauses = ["c.company_id = ?"];
   const values: unknown[] = [companyId];
-  applyOutletScope(clauses, values, "e", filters, scope);
+  if (!scope.isSuperAdmin) {
+    if (scope.outletIds.length === 0) clauses.push("1 = 0");
+    else {
+      clauses.push("COALESCE(c.outlet_id, e.primary_outlet_id) IN (" + scope.outletIds.map(() => "?").join(", ") + ")");
+      values.push(...scope.outletIds);
+    }
+  }
   if (filters.status) { clauses.push("c.status = ?"); values.push(filters.status); }
   if (filters.employee_id) { clauses.push("c.employee_id = ?"); values.push(filters.employee_id); }
-  if (filters.outlet_id) { clauses.push("e.primary_outlet_id = ?"); values.push(filters.outlet_id); }
-  if (filters.date_from) { clauses.push("c.created_at >= ?"); values.push(filters.date_from); }
-  if (filters.date_to) { clauses.push("c.created_at <= ?"); values.push(filters.date_to); }
+  if (filters.outlet_id) { clauses.push("COALESCE(c.outlet_id, e.primary_outlet_id) = ?"); values.push(filters.outlet_id); }
+  if (filters.date_from) { clauses.push("COALESCE(c.requested_date, date(c.created_at)) >= ?"); values.push(filters.date_from); }
+  if (filters.date_to) { clauses.push("COALESCE(c.requested_date, date(c.created_at)) <= ?"); values.push(filters.date_to); }
+  if (visibilityExtra) clauses.push(visibilityExtra);
   return many<any>(
     env,
-    `SELECT c.* FROM attendance_corrections c JOIN employees e ON e.id = c.employee_id WHERE ${clauses.join(" AND ")} ORDER BY c.created_at DESC LIMIT ? OFFSET ?`,
-    [...values, filters.page_size, (filters.page - 1) * filters.page_size],
+    `SELECT c.*, e.full_name AS employee_name, e.employee_code, e.department_id, e.position_id, e.level,
+            u.full_name AS requested_by_name,
+            ars.step_name AS approval_current_step_name
+       FROM attendance_corrections c
+       JOIN employees e ON e.company_id = c.company_id AND e.id = c.employee_id
+       LEFT JOIN users u ON u.company_id = c.company_id AND u.id = c.requested_by
+       LEFT JOIN approval_request_steps ars ON ars.company_id = c.company_id AND ars.id = c.approval_current_step
+      WHERE ${clauses.join(" AND ")}
+      ORDER BY c.created_at DESC LIMIT ? OFFSET ?`,
+    [...values, ...visibilityValues, filters.page_size, (filters.page - 1) * filters.page_size],
   );
 };
 
@@ -670,19 +849,31 @@ export const countCorrections = async (
   companyId: string,
   filters: { status?: string; employee_id?: string; outlet_id?: string; date_from?: string; date_to?: string },
   scope: AttendanceOutletScope,
+  visibilityExtra?: string,
+  visibilityValues: unknown[] = [],
 ) => {
   const clauses = ["c.company_id = ?"];
   const values: unknown[] = [companyId];
-  applyOutletScope(clauses, values, "e", filters, scope);
+  if (!scope.isSuperAdmin) {
+    if (scope.outletIds.length === 0) clauses.push("1 = 0");
+    else {
+      clauses.push("COALESCE(c.outlet_id, e.primary_outlet_id) IN (" + scope.outletIds.map(() => "?").join(", ") + ")");
+      values.push(...scope.outletIds);
+    }
+  }
   if (filters.status) { clauses.push("c.status = ?"); values.push(filters.status); }
   if (filters.employee_id) { clauses.push("c.employee_id = ?"); values.push(filters.employee_id); }
-  if (filters.outlet_id) { clauses.push("e.primary_outlet_id = ?"); values.push(filters.outlet_id); }
-  if (filters.date_from) { clauses.push("c.created_at >= ?"); values.push(filters.date_from); }
-  if (filters.date_to) { clauses.push("c.created_at <= ?"); values.push(filters.date_to); }
+  if (filters.outlet_id) { clauses.push("COALESCE(c.outlet_id, e.primary_outlet_id) = ?"); values.push(filters.outlet_id); }
+  if (filters.date_from) { clauses.push("COALESCE(c.requested_date, date(c.created_at)) >= ?"); values.push(filters.date_from); }
+  if (filters.date_to) { clauses.push("COALESCE(c.requested_date, date(c.created_at)) <= ?"); values.push(filters.date_to); }
+  if (visibilityExtra) clauses.push(visibilityExtra);
   const row = await one<{ total: number }>(
     env,
-    `SELECT COUNT(*) AS total FROM attendance_corrections c JOIN employees e ON e.id = c.employee_id WHERE ${clauses.join(" AND ")}`,
-    values,
+    `SELECT COUNT(*) AS total
+       FROM attendance_corrections c
+       JOIN employees e ON e.company_id = c.company_id AND e.id = c.employee_id
+      WHERE ${clauses.join(" AND ")}`,
+    [...values, ...visibilityValues],
   );
   return row?.total ?? 0;
 };

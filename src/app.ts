@@ -50,6 +50,7 @@ import { rolesRoutes } from "./routes/roles.routes";
 import { rostersRoutes } from "./routes/rosters.routes";
 import { settingsRoutes } from "./routes/settings.routes";
 import { salaryLoansRoutes } from "./routes/salary-loans.routes";
+import { selfServiceRoutes } from "./routes/self-service.routes";
 import { shiftTemplatesRoutes } from "./routes/shift-templates.routes";
 import { syncRoutes } from "./routes/sync.routes";
 import { uniformsRoutes } from "./routes/uniforms.routes";
@@ -117,6 +118,7 @@ apiV1.route("/outlets", outletsRoutes);
 apiV1.route("/departments", departmentsRoutes);
 apiV1.route("/positions", positionsRoutes);
 apiV1.route("/profile-update-requests", profileUpdateRequestsRoutes);
+apiV1.route("/self", selfServiceRoutes);
 
 app.route(API_PREFIX, apiV1);
 

@@ -51,6 +51,15 @@ INSERT OR IGNORE INTO permissions (id, permission_key, module, action, descripti
 ('perm_attendance_delete', 'attendance.delete', 'attendance', 'delete', 'Delete attendance records.', '2026-01-01T00:00:00Z'),
 ('perm_attendance_approve_correction', 'attendance.approve_correction', 'attendance', 'approve_correction', 'Approve attendance corrections.', '2026-01-01T00:00:00Z'),
 ('perm_attendance_reject_correction', 'attendance.reject_correction', 'attendance', 'reject_correction', 'Reject attendance corrections.', '2026-01-01T00:00:00Z'),
+('perm_attendance_corrections_view', 'attendance.corrections.view', 'attendance', 'corrections_view', 'View attendance correction requests and approval status.', '2026-01-01T00:00:00Z'),
+('perm_attendance_corrections_create', 'attendance.corrections.create', 'attendance', 'corrections_create', 'Create own attendance correction requests.', '2026-01-01T00:00:00Z'),
+('perm_attendance_corrections_create_for_others', 'attendance.corrections.createForOthers', 'attendance', 'corrections_create_for_others', 'Create attendance correction requests on behalf of employees.', '2026-01-01T00:00:00Z'),
+('perm_attendance_corrections_cancel', 'attendance.corrections.cancel', 'attendance', 'corrections_cancel', 'Cancel own pending attendance correction requests.', '2026-01-01T00:00:00Z'),
+('perm_attendance_corrections_cancel_any', 'attendance.corrections.cancelAny', 'attendance', 'corrections_cancel_any', 'Cancel another employee attendance correction request with reason.', '2026-01-01T00:00:00Z'),
+('perm_attendance_corrections_approve', 'attendance.corrections.approve', 'attendance', 'corrections_approve', 'Approve attendance correction workflow steps.', '2026-01-01T00:00:00Z'),
+('perm_attendance_corrections_reject', 'attendance.corrections.reject', 'attendance', 'corrections_reject', 'Reject attendance correction workflow steps.', '2026-01-01T00:00:00Z'),
+('perm_attendance_corrections_audit_view', 'attendance.corrections.audit.view', 'attendance', 'corrections_audit_view', 'View attendance correction approval timeline and audit history.', '2026-01-01T00:00:00Z'),
+('perm_attendance_corrections_apply', 'attendance.corrections.apply', 'attendance', 'corrections_apply', 'Apply approved attendance corrections safely.', '2026-01-01T00:00:00Z'),
 ('perm_attendance_resolve_conflicts', 'attendance.resolve_conflicts', 'attendance', 'resolve_conflicts', 'Resolve attendance conflicts.', '2026-01-01T00:00:00Z'),
 ('perm_attendance_export', 'attendance.export', 'attendance', 'export', 'Export attendance records.', '2026-01-01T00:00:00Z'),
 ('perm_attendance_manage_settings', 'attendance.manage_settings', 'attendance', 'manage_settings', 'Manage attendance settings.', '2026-01-01T00:00:00Z'),
@@ -509,3 +518,47 @@ INSERT OR IGNORE INTO permissions (id, permission_key, module, action, descripti
 ('perm_org_level_role_templates_manage', 'organization.levelRoleTemplates.manage', 'organization', 'level_role_templates_manage', 'Manage level role templates.', '2026-01-01T00:00:00Z'),
 ('perm_employees_structure_view', 'employees.structure.view', 'employees', 'structure_view', 'View employee department, position, and level structure.', '2026-01-01T00:00:00Z'),
 ('perm_employees_structure_manage', 'employees.structure.manage', 'employees', 'structure_manage', 'Manage employee department, position, and level structure.', '2026-01-01T00:00:00Z');
+
+-- General approval workflow engine permissions. Levels identify approver
+-- candidates only; these permissions remain the final authority for actions.
+INSERT OR IGNORE INTO permissions (id, permission_key, module, action, description, created_at) VALUES
+('perm_approval_engine_workflows_view', 'approvals.workflows.view', 'approvals', 'workflows_view', 'View reusable approval workflows.', '2026-01-01T00:00:00Z'),
+('perm_approval_engine_workflows_manage', 'approvals.workflows.manage', 'approvals', 'workflows_manage', 'Manage reusable approval workflows.', '2026-01-01T00:00:00Z'),
+('perm_approval_engine_steps_view', 'approvals.workflowSteps.view', 'approvals', 'workflow_steps_view', 'View reusable approval workflow steps.', '2026-01-01T00:00:00Z'),
+('perm_approval_engine_steps_manage', 'approvals.workflowSteps.manage', 'approvals', 'workflow_steps_manage', 'Manage reusable approval workflow steps.', '2026-01-01T00:00:00Z'),
+('perm_approval_engine_requests_view', 'approvals.requests.view', 'approvals', 'requests_view', 'View approval requests.', '2026-01-01T00:00:00Z'),
+('perm_approval_engine_requests_create', 'approvals.requests.create', 'approvals', 'requests_create', 'Create approval requests.', '2026-01-01T00:00:00Z'),
+('perm_approval_engine_requests_create_for_others', 'approvals.requests.createForOthers', 'approvals', 'requests_create_for_others', 'Create approval requests on behalf of another employee.', '2026-01-01T00:00:00Z'),
+('perm_approval_engine_requests_cancel', 'approvals.requests.cancel', 'approvals', 'requests_cancel', 'Cancel own or managed approval requests.', '2026-01-01T00:00:00Z'),
+('perm_approval_engine_requests_cancel_any', 'approvals.requests.cancelAny', 'approvals', 'requests_cancel_any', 'Cancel another employee approval request with a required reason.', '2026-01-01T00:00:00Z'),
+('perm_approval_engine_requests_approve', 'approvals.requests.approve', 'approvals', 'requests_approve', 'Approve eligible approval request steps.', '2026-01-01T00:00:00Z'),
+('perm_approval_engine_requests_reject', 'approvals.requests.reject', 'approvals', 'requests_reject', 'Reject eligible approval request steps.', '2026-01-01T00:00:00Z'),
+('perm_approval_engine_requests_assign', 'approvals.requests.assign', 'approvals', 'requests_assign', 'Assign or reassign approval request approvers.', '2026-01-01T00:00:00Z'),
+('perm_approval_engine_requests_escalate', 'approvals.requests.escalate', 'approvals', 'requests_escalate', 'Escalate approval request steps.', '2026-01-01T00:00:00Z'),
+('perm_approval_engine_requests_audit', 'approvals.requests.audit.view', 'approvals', 'requests_audit_view', 'View approval request action history.', '2026-01-01T00:00:00Z'),
+('perm_approval_engine_department_view', 'approvals.department.view', 'approvals', 'department_view', 'View department approval queues.', '2026-01-01T00:00:00Z'),
+('perm_approval_engine_department_approve', 'approvals.department.approve', 'approvals', 'department_approve', 'Approve department approval steps when eligible.', '2026-01-01T00:00:00Z'),
+('perm_approval_engine_department_reject', 'approvals.department.reject', 'approvals', 'department_reject', 'Reject department approval steps when eligible.', '2026-01-01T00:00:00Z'),
+('perm_approval_engine_hr_view', 'approvals.hrFinal.view', 'approvals', 'hr_final_view', 'View HR final approval queues.', '2026-01-01T00:00:00Z'),
+('perm_approval_engine_hr_approve', 'approvals.hrFinal.approve', 'approvals', 'hr_final_approve', 'Approve HR final approval steps.', '2026-01-01T00:00:00Z'),
+('perm_approval_engine_hr_reject', 'approvals.hrFinal.reject', 'approvals', 'hr_final_reject', 'Reject HR final approval steps.', '2026-01-01T00:00:00Z'),
+('perm_approval_engine_finance_view', 'approvals.financeFinal.view', 'approvals', 'finance_final_view', 'View finance final approval queues.', '2026-01-01T00:00:00Z'),
+('perm_approval_engine_finance_approve', 'approvals.financeFinal.approve', 'approvals', 'finance_final_approve', 'Approve finance final approval steps.', '2026-01-01T00:00:00Z'),
+('perm_approval_engine_finance_reject', 'approvals.financeFinal.reject', 'approvals', 'finance_final_reject', 'Reject finance final approval steps.', '2026-01-01T00:00:00Z');
+
+-- Employee self-service dashboard and access foundation permissions.
+INSERT OR IGNORE INTO permissions (id, permission_key, module, action, description, created_at) VALUES
+('perm_self_dashboard_view', 'self.dashboard.view', 'self_service', 'dashboard_view', 'View own employee self-service dashboard.', '2026-01-01T00:00:00Z'),
+('perm_self_profile_view', 'self.profile.view', 'self_service', 'profile_view', 'View own employee profile summary.', '2026-01-01T00:00:00Z'),
+('perm_self_attendance_view', 'self.attendance.view', 'self_service', 'attendance_view', 'View own attendance summary.', '2026-01-01T00:00:00Z'),
+('perm_self_roster_view', 'self.roster.view', 'self_service', 'roster_view', 'View own roster summary.', '2026-01-01T00:00:00Z'),
+('perm_self_leave_view', 'self.leave.view', 'self_service', 'leave_view', 'View own leave balance and leave requests.', '2026-01-01T00:00:00Z'),
+('perm_self_requests_view', 'self.requests.view', 'self_service', 'requests_view', 'View own approval and module requests.', '2026-01-01T00:00:00Z'),
+('perm_self_documents_view', 'self.documents.view', 'self_service', 'documents_view', 'View own document and KYC status summary.', '2026-01-01T00:00:00Z'),
+('perm_self_payslips_view', 'self.payslips.view', 'self_service', 'payslips_view', 'View own payslip status summary.', '2026-01-01T00:00:00Z'),
+('perm_self_access_summary_view', 'self.accessSummary.view', 'self_service', 'access_summary_view', 'View safe own access summary.', '2026-01-01T00:00:00Z'),
+('perm_department_dashboard_view', 'department.dashboard.view', 'self_service', 'department_dashboard_view', 'View department dashboard widgets when role permissions allow.', '2026-01-01T00:00:00Z'),
+('perm_department_attendance_view', 'department.attendance.view', 'self_service', 'department_attendance_view', 'View department attendance widgets when role permissions allow.', '2026-01-01T00:00:00Z'),
+('perm_department_leave_view', 'department.leave.view', 'self_service', 'department_leave_view', 'View department leave widgets when role permissions allow.', '2026-01-01T00:00:00Z'),
+('perm_department_requests_view', 'department.requests.view', 'self_service', 'department_requests_view', 'View department request widgets when role permissions allow.', '2026-01-01T00:00:00Z'),
+('perm_department_approvals_view', 'department.approvals.view', 'self_service', 'department_approvals_view', 'View own eligible department approval queue.', '2026-01-01T00:00:00Z');

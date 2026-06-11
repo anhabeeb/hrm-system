@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { FormError } from "@/components/feedback/FormError";
 import { LoadingButton } from "@/components/forms/LoadingButton";
@@ -20,6 +20,8 @@ export const CorrectionRequestDialog = ({
   initial,
   loading,
   error,
+  canSelectEmployee = true,
+  currentEmployeeId,
   onOpenChange,
   onSubmit,
 }: {
@@ -30,11 +32,13 @@ export const CorrectionRequestDialog = ({
   initial?: Partial<CorrectionRequestPayload> & { outlet_id?: string };
   loading?: boolean;
   error?: unknown;
+  canSelectEmployee?: boolean;
+  currentEmployeeId?: string | null;
   onOpenChange: (open: boolean) => void;
   onSubmit: (payload: CorrectionRequestPayload | ReasonPayload) => void;
 }) => {
   const [values, setValues] = useState<CorrectionRequestPayload>({
-    employee_id: initial?.employee_id ?? "",
+    employee_id: initial?.employee_id ?? currentEmployeeId ?? "",
     attendance_date: initial?.attendance_date ?? "",
     correction_type: initial?.correction_type ?? "clock_in_time",
     requested_clock_in: "",
@@ -44,9 +48,27 @@ export const CorrectionRequestDialog = ({
   const [outletId, setOutletId] = useState(initial?.outlet_id ?? "");
   const [localError, setLocalError] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!open) return;
+    setValues({
+      employee_id: initial?.employee_id ?? currentEmployeeId ?? "",
+      attendance_date: initial?.attendance_date ?? "",
+      correction_type: initial?.correction_type ?? "clock_in_time",
+      requested_clock_in: "",
+      requested_clock_out: "",
+      reason: "",
+    });
+    setOutletId(initial?.outlet_id ?? "");
+    setLocalError(null);
+  }, [currentEmployeeId, initial?.attendance_date, initial?.correction_type, initial?.employee_id, initial?.outlet_id, open]);
+
   const submit = () => {
     if (!values.reason.trim()) {
       setLocalError("Reason is required.");
+      return;
+    }
+    if (mode === "request" && !canSelectEmployee && !currentEmployeeId) {
+      setLocalError("Your employee profile is not linked to this login. Please contact HR.");
       return;
     }
     if (mode === "request" && (!values.employee_id || !values.attendance_date || !values.correction_type)) {
@@ -54,7 +76,7 @@ export const CorrectionRequestDialog = ({
       return;
     }
     setLocalError(null);
-    onSubmit(mode === "request" ? values : { reason: values.reason, notes: values.reason, resolution_notes: values.reason });
+    onSubmit(mode === "request" ? { ...values, outlet_id: outletId || undefined } : { reason: values.reason, notes: values.reason, resolution_notes: values.reason });
   };
 
   return (
@@ -67,14 +89,22 @@ export const CorrectionRequestDialog = ({
         <div className="grid gap-3">
           {mode === "request" ? (
             <>
-              <div className="grid gap-1.5">
-                <Label>Outlet</Label>
-                <OutletCombobox value={outletId} onChange={(value) => { setOutletId(value ?? ""); setValues((current) => ({ ...current, employee_id: "" })); }} placeholder="Select outlet first" />
-              </div>
-              <div className="grid gap-1.5">
-                <Label>Employee</Label>
-                <EmployeeCombobox value={values.employee_id} outletId={outletId} onChange={(value) => setValues((current) => ({ ...current, employee_id: value ?? "" }))} />
-              </div>
+              {canSelectEmployee ? (
+                <>
+                  <div className="grid gap-1.5">
+                    <Label>Outlet</Label>
+                    <OutletCombobox value={outletId} onChange={(value) => { setOutletId(value ?? ""); setValues((current) => ({ ...current, employee_id: "" })); }} placeholder="Select outlet first" />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <Label>Employee</Label>
+                    <EmployeeCombobox value={values.employee_id} outletId={outletId} onChange={(value) => setValues((current) => ({ ...current, employee_id: value ?? "" }))} />
+                  </div>
+                </>
+              ) : (
+                <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                  {currentEmployeeId ? "This correction will be submitted for your linked employee profile." : "Your employee profile is not linked to this login. Please contact HR."}
+                </div>
+              )}
               <div className="grid gap-1.5">
                 <Label htmlFor="correction-date">Attendance date</Label>
                 <Input id="correction-date" type="date" value={values.attendance_date} onChange={(event) => setValues((current) => ({ ...current, attendance_date: event.target.value }))} />

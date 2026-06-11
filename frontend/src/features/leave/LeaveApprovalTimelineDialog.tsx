@@ -36,7 +36,8 @@ export const LeaveApprovalTimelineDialog = ({
               { label: "Leave type", value: detail.leave_request.leave_type_name ?? detail.leave_request.leave_type_id },
               { label: "Dates", value: `${formatDate(detail.leave_request.start_date)} to ${formatDate(detail.leave_request.end_date)}` },
               { label: "Status", value: <StatusBadge status={detail.leave_request.approval_status ?? detail.leave_request.status} /> },
-              { label: "Generic approval", value: detail.generic_approval_request ? `${detail.generic_approval_request.status ?? "pending"} · step ${detail.generic_approval_request.current_step ?? "-"}` : "Not linked" },
+              { label: "Approval engine", value: detail.generic_approval_request ? `${detail.generic_approval_request.status ?? "pending"} - step ${detail.generic_approval_request.current_step ?? "-"}` : "Not linked" },
+              { label: "Current step", value: detail.engine_approval_request?.current_step_name ?? detail.leave_request.approval_current_step ?? "Not linked" },
             ]}
           />
           <div className="rounded-lg border">

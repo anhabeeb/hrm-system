@@ -30,14 +30,15 @@ describe("Phase 9B leave approval workflow guards", () => {
     }
   });
 
-  it("submit creates approval workflow records in the same request and balance batch", () => {
+  it("submit creates reusable approval engine records while preserving balance batches", () => {
     const service = read("src/modules/leave/leave.service.ts");
     const repository = read("src/modules/leave/leave.repository.ts");
 
-    expect(service).toContain("buildLeaveApprovalWorkflowIfRequired");
-    expect(service).toContain("createLeaveRequestWithApprovalWorkflow");
-    expect(repository).toContain("prepareCreateApprovalRequest");
-    expect(repository).toContain("prepareCreateApprovalStep");
+    expect(service).toContain("submitLeaveEngineApproval");
+    expect(service).toContain("approvalEngineService.createApprovalRequestDraft");
+    expect(service).toContain("approvalEngineService.submitApprovalRequest");
+    expect(repository).toContain("findEngineApprovalRequestForLeave");
+    expect(repository).toContain("prepareCreateRequest");
     expect(repository).toContain("prepareCreateBalanceTransaction");
     expect(repository).toContain("prepareUpsertBalance");
   });
@@ -45,7 +46,9 @@ describe("Phase 9B leave approval workflow guards", () => {
   it("approval, rejection, cancellation, and withdrawal use Phase 9A atomic balance helpers", () => {
     const service = read("src/modules/leave/leave.service.ts");
 
-    expect(service).toContain("updateLeaveApprovalStepAndRequestStatus");
+    expect(service).toContain("approvalEngineService.approveStep");
+    expect(service).toContain("approvalEngineService.rejectStep");
+    expect(service).toContain("approvalEngineService.cancelRequest");
     expect(service).toContain("updateLeaveRequestStatusWithBalanceTransaction");
     expect(service).toContain("planReleasePendingBalance");
     expect(service).toContain("leave_request:${request.id}:used");

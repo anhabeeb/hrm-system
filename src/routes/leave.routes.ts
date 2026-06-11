@@ -32,20 +32,20 @@ leaveRoutes.post("/balances/:employeeId/adjust", requireAnyPermission(["leave.ba
 leaveRoutes.post("/accrual/preview", requireAnyPermission(["leave.accrual.preview", "leave.balances.view", "leave.view"]), controller.previewAccrual);
 leaveRoutes.post("/accrual/apply", requireAnyPermission(["leave.accrual.apply", "leave.balances.manage", "leave.manage_balances"]), requireReason(), controller.applyAccrual);
 
-leaveRoutes.get("/approvals/inbox", requireAnyPermission(["leave.approvals.view", "leave.approvals.approve", "leave.approve"]), controller.listApprovalInbox);
-leaveRoutes.get("/approvals/history", requireAnyPermission(["leave.approvals.view", "leave.timeline.view", "leave.view"]), controller.listApprovalHistory);
-leaveRoutes.get("/approvals/:requestId", requireAnyPermission(["leave.approvals.view", "leave.timeline.view", "leave.view"]), controller.getApprovalDetail);
+leaveRoutes.get("/approvals/inbox", requireAnyPermission(["leave.approvals.view", "leave.approvals.approve", "leave.approve", "approvals.department.view", "approvals.department.approve", "approvals.hrFinal.view", "approvals.hrFinal.approve", "approvals.financeFinal.view", "approvals.financeFinal.approve"]), controller.listApprovalInbox);
+leaveRoutes.get("/approvals/history", requireAnyPermission(["leave.approvals.view", "leave.timeline.view", "leave.view", "approvals.requests.view", "approvals.department.view", "approvals.hrFinal.view", "approvals.financeFinal.view"]), controller.listApprovalHistory);
+leaveRoutes.get("/approvals/:requestId", requireAnyPermission(["leave.approvals.view", "leave.timeline.view", "leave.view", "approvals.requests.view", "approvals.department.view", "approvals.hrFinal.view", "approvals.financeFinal.view"]), controller.getApprovalDetail);
 
-leaveRoutes.get("/requests", requirePermission("leave.view"), controller.listRequests);
-leaveRoutes.get("/requests/:requestId/timeline", requireAnyPermission(["leave.timeline.view", "leave.approvals.view", "leave.view"]), controller.getTimeline);
-leaveRoutes.get("/requests/:id", requirePermission("leave.view"), controller.getRequest);
-leaveRoutes.post("/requests", requireAnyPermission(["leave.create", "leave.requests.create_for_employee"]), controller.createRequest);
-leaveRoutes.post("/requests/:id/submit", requireAnyPermission(["leave.requests.submit", "leave.create"]), requireReason(), controller.submitRequest);
+leaveRoutes.get("/requests", requireAnyPermission(["leave.view", "leave.approvals.view", "approvals.requests.view", "approvals.department.view", "approvals.hrFinal.view", "approvals.financeFinal.view", "approvals.department.approve", "approvals.hrFinal.approve", "approvals.financeFinal.approve", "approvals.department.reject", "approvals.hrFinal.reject", "approvals.financeFinal.reject"]), controller.listRequests);
+leaveRoutes.get("/requests/:requestId/timeline", requireAnyPermission(["leave.timeline.view", "leave.approvals.view", "leave.view", "approvals.requests.view", "approvals.requests.audit.view", "approvals.department.view", "approvals.hrFinal.view", "approvals.financeFinal.view", "approvals.department.approve", "approvals.hrFinal.approve", "approvals.financeFinal.approve", "approvals.department.reject", "approvals.hrFinal.reject", "approvals.financeFinal.reject"]), controller.getTimeline);
+leaveRoutes.get("/requests/:id", requireAnyPermission(["leave.view", "leave.approvals.view", "approvals.requests.view", "approvals.department.view", "approvals.hrFinal.view", "approvals.financeFinal.view", "approvals.department.approve", "approvals.hrFinal.approve", "approvals.financeFinal.approve", "approvals.department.reject", "approvals.hrFinal.reject", "approvals.financeFinal.reject"]), controller.getRequest);
+leaveRoutes.post("/requests", requireAnyPermission(["leave.create", "leave.requests.create_for_employee", "approvals.requests.create", "approvals.requests.createForOthers"]), controller.createRequest);
+leaveRoutes.post("/requests/:id/submit", requireAnyPermission(["leave.requests.submit", "leave.create", "approvals.requests.create", "approvals.requests.createForOthers"]), requireReason(), controller.submitRequest);
 leaveRoutes.patch("/requests/:id", requirePermission("leave.edit"), controller.updateRequest);
-leaveRoutes.post("/requests/:id/approve", requireAnyPermission(["leave.approvals.approve", "leave.approve", "leave.requests.override"]), requireReason(), controller.approveRequest);
-leaveRoutes.post("/requests/:id/reject", requireAnyPermission(["leave.approvals.reject", "leave.reject"]), requireReason(), controller.rejectRequest);
-leaveRoutes.post("/requests/:id/cancel", requireAnyPermission(["leave.requests.cancel", "leave.cancel", "leave.edit", "leave.requests.override"]), requireReason(), controller.cancelRequest);
-leaveRoutes.post("/requests/:id/withdraw", requireAnyPermission(["leave.requests.withdraw", "leave.cancel", "leave.edit"]), requireReason(), controller.withdrawRequest);
+leaveRoutes.post("/requests/:id/approve", requireAnyPermission(["leave.approvals.approve", "leave.approve", "leave.requests.override", "approvals.requests.approve", "approvals.department.approve", "approvals.hrFinal.approve", "approvals.financeFinal.approve"]), requireReason(), controller.approveRequest);
+leaveRoutes.post("/requests/:id/reject", requireAnyPermission(["leave.approvals.reject", "leave.reject", "approvals.requests.reject", "approvals.department.reject", "approvals.hrFinal.reject", "approvals.financeFinal.reject"]), requireReason(), controller.rejectRequest);
+leaveRoutes.post("/requests/:id/cancel", requireAnyPermission(["leave.requests.cancel", "leave.cancel", "leave.edit", "leave.requests.override", "approvals.requests.cancel", "approvals.requests.cancelAny"]), requireReason(), controller.cancelRequest);
+leaveRoutes.post("/requests/:id/withdraw", requireAnyPermission(["leave.requests.withdraw", "leave.cancel", "leave.edit", "approvals.requests.cancel"]), requireReason(), controller.withdrawRequest);
 leaveRoutes.post("/requests/:id/delegate", requireAnyPermission(["leave.approvals.delegate", "leave.approvals.override"]), requireReason(), controller.delegateRequest);
 leaveRoutes.post("/requests/:id/escalate", requireAnyPermission(["leave.approvals.escalate", "leave.approvals.override"]), requireReason(), controller.escalateRequest);
 

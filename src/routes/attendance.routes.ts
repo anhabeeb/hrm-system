@@ -29,10 +29,13 @@ attendanceRoutes.post("/clock-in", requireAnyPermission(["attendance.create", "a
 attendanceRoutes.post("/clock-out", requireAnyPermission(["attendance.create", "attendance.manual_entry"]), controller.clockOut);
 attendanceRoutes.post("/manual-batch", requirePermission("attendance.manual_entry"), requireReason(), controller.manualBatch);
 attendanceRoutes.post("/manual-entry", requirePermission("attendance.manual_entry"), requireReason(), controller.manualEntry);
-attendanceRoutes.post("/correction-request", requireAnyPermission(["attendance.manual_entry", "attendance.edit"]), requireReason(), controller.correctionRequest);
-attendanceRoutes.post("/corrections/:id/approve", requirePermission("attendance.approve_correction"), requireReason({ fields: ["reason", "notes"] }), controller.approveCorrection);
-attendanceRoutes.post("/corrections/:id/reject", requirePermission("attendance.reject_correction"), requireReason({ fields: ["reason", "notes"] }), controller.rejectCorrection);
-attendanceRoutes.get("/corrections", requirePermission("attendance.view"), controller.listCorrections);
+attendanceRoutes.post("/correction-request", requireAnyPermission(["attendance.corrections.create", "attendance.corrections.createForOthers", "attendance.manual_entry", "attendance.edit"]), requireReason(), controller.correctionRequest);
+attendanceRoutes.get("/corrections", requireAnyPermission(["attendance.view", "attendance.corrections.view", "approvals.department.view", "approvals.hrFinal.view", "approvals.department.approve", "approvals.hrFinal.approve"]), controller.listCorrections);
+attendanceRoutes.get("/corrections/:id", requireAnyPermission(["attendance.view", "attendance.corrections.view", "approvals.department.view", "approvals.hrFinal.view", "approvals.department.approve", "approvals.hrFinal.approve"]), controller.getCorrection);
+attendanceRoutes.get("/corrections/:id/approval-timeline", requireAnyPermission(["attendance.corrections.audit.view", "attendance.view", "approvals.requests.audit.view", "approvals.department.view", "approvals.hrFinal.view", "approvals.department.approve", "approvals.hrFinal.approve"]), controller.correctionTimeline);
+attendanceRoutes.post("/corrections/:id/cancel", requireAnyPermission(["attendance.corrections.cancel", "attendance.corrections.cancelAny", "approvals.requests.cancel", "approvals.requests.cancelAny"]), requireReason({ fields: ["reason", "notes"] }), controller.cancelCorrection);
+attendanceRoutes.post("/corrections/:id/approve", requireAnyPermission(["attendance.corrections.approve", "attendance.approve_correction", "approvals.department.approve", "approvals.hrFinal.approve"]), requireReason({ fields: ["reason", "notes"] }), controller.approveCorrection);
+attendanceRoutes.post("/corrections/:id/reject", requireAnyPermission(["attendance.corrections.reject", "attendance.reject_correction", "approvals.department.reject", "approvals.hrFinal.reject"]), requireReason({ fields: ["reason", "notes"] }), controller.rejectCorrection);
 attendanceRoutes.get("/conflicts", requirePermission("attendance.view_conflicts"), controller.listConflicts);
 attendanceRoutes.post("/conflicts/:id/resolve", requirePermission("attendance.resolve_conflicts"), requireReason({ fields: ["reason", "resolution_notes"] }), controller.resolveConflict);
 attendanceRoutes.get("/missing-punches", requirePermission("attendance.view"), controller.missingPunches);

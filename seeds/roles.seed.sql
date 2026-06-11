@@ -140,6 +140,9 @@ WHERE permission_key IN (
   'employees.view', 'my_profile.view', 'my_profile.change_password', 'my_profile.manage_own_2fa',
   'my_profile.submit_kyc_update', 'attendance.view', 'attendance.create',
   'attendance.manual_entry', 'attendance.approve_correction', 'attendance.reject_correction',
+  'attendance.corrections.view', 'attendance.corrections.create', 'attendance.corrections.createForOthers',
+  'attendance.corrections.cancel', 'attendance.corrections.cancelAny', 'attendance.corrections.approve',
+  'attendance.corrections.reject', 'attendance.corrections.audit.view',
   'attendance.view_conflicts', 'attendance.export', 'kiosk.view', 'leave.view',
   'leave.create', 'leave.approve', 'leave.reject', 'long_leave.view', 'roster.view',
   'roster.create', 'roster.edit', 'roster.publish', 'roster.view_conflicts',
@@ -155,6 +158,7 @@ FROM permissions
 WHERE permission_key IN (
   'my_profile.view', 'my_profile.change_password', 'my_profile.manage_own_2fa',
   'my_profile.submit_kyc_update', 'employees.view', 'attendance.view',
+  'attendance.corrections.view', 'attendance.corrections.create', 'attendance.corrections.cancel',
   'kiosk.view', 'leave.view', 'roster.view', 'holidays.view', 'dashboard.view',
   'dashboard.view_outlet', 'dashboard.attendance.view', 'dashboard.leave.view',
   'notifications.view', 'expiry_alerts.view'
@@ -172,6 +176,9 @@ WHERE permission_key IN (
   'auth.sessions.view_own',
   'auth.sessions.revoke_own',
   'security.2fa.manage_own',
+  'attendance.corrections.view',
+  'attendance.corrections.create',
+  'attendance.corrections.cancel',
   'notifications.view',
   'expiry_alerts.view_own'
 );
@@ -270,6 +277,39 @@ JOIN permissions ON permission_key IN (
   'leave.approvals.reject',
   'leave.approvals.delegate',
   'leave.timeline.view'
+)
+WHERE roles.company_id = 'company_seed_default'
+  AND roles.role_key IN ('outlet_manager', 'department_manager', 'manager');
+
+INSERT OR IGNORE INTO role_permissions (id, company_id, role_id, permission_key, created_at)
+SELECT 'rp_leave_engine_approval_admin_' || roles.role_key || '_' || replace(permission_key, '.', '_'), 'company_seed_default', roles.id, permission_key, '2026-01-01T00:00:00Z'
+FROM roles
+JOIN permissions ON permission_key IN (
+  'approvals.requests.create',
+  'approvals.requests.createForOthers',
+  'approvals.requests.cancel',
+  'approvals.requests.cancelAny',
+  'approvals.requests.approve',
+  'approvals.requests.reject',
+  'approvals.department.view',
+  'approvals.department.approve',
+  'approvals.department.reject',
+  'approvals.hrFinal.view',
+  'approvals.hrFinal.approve',
+  'approvals.hrFinal.reject'
+)
+WHERE roles.company_id = 'company_seed_default'
+  AND roles.role_key IN ('owner', 'admin', 'hr_admin', 'super_admin');
+
+INSERT OR IGNORE INTO role_permissions (id, company_id, role_id, permission_key, created_at)
+SELECT 'rp_leave_engine_approval_manager_' || roles.role_key || '_' || replace(permission_key, '.', '_'), 'company_seed_default', roles.id, permission_key, '2026-01-01T00:00:00Z'
+FROM roles
+JOIN permissions ON permission_key IN (
+  'approvals.requests.create',
+  'approvals.requests.cancel',
+  'approvals.department.view',
+  'approvals.department.approve',
+  'approvals.department.reject'
 )
 WHERE roles.company_id = 'company_seed_default'
   AND roles.role_key IN ('outlet_manager', 'department_manager', 'manager');
@@ -496,3 +536,34 @@ JOIN permissions ON permission_key IN (
 )
 WHERE roles.company_id = 'company_seed_default'
   AND roles.role_key IN ('hr_admin', 'hr_officer', 'auditor');
+
+INSERT OR IGNORE INTO role_permissions (id, company_id, role_id, permission_key, created_at)
+SELECT 'rp_self_service_' || roles.role_key || '_' || replace(permission_key, '.', '_'), 'company_seed_default', roles.id, permission_key, '2026-01-01T00:00:00Z'
+FROM roles
+JOIN permissions ON permission_key IN (
+  'self.dashboard.view',
+  'self.profile.view',
+  'self.attendance.view',
+  'self.roster.view',
+  'self.leave.view',
+  'self.requests.view',
+  'self.documents.view',
+  'self.payslips.view',
+  'self.accessSummary.view',
+  'notifications.manage_own'
+)
+WHERE roles.company_id = 'company_seed_default'
+  AND roles.role_key IN ('employee', 'staff', 'supervisor', 'outlet_manager', 'hr_officer', 'hr_admin', 'admin', 'owner', 'super_admin');
+
+INSERT OR IGNORE INTO role_permissions (id, company_id, role_id, permission_key, created_at)
+SELECT 'rp_department_self_service_' || roles.role_key || '_' || replace(permission_key, '.', '_'), 'company_seed_default', roles.id, permission_key, '2026-01-01T00:00:00Z'
+FROM roles
+JOIN permissions ON permission_key IN (
+  'department.dashboard.view',
+  'department.attendance.view',
+  'department.leave.view',
+  'department.requests.view',
+  'department.approvals.view'
+)
+WHERE roles.company_id = 'company_seed_default'
+  AND roles.role_key IN ('supervisor', 'outlet_manager', 'hr_officer', 'hr_admin', 'admin', 'owner', 'super_admin');

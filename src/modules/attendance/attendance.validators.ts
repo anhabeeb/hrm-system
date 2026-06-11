@@ -110,9 +110,16 @@ export const validateCorrectionRequestInput = (
       employee_id: z.string().trim().min(1, "Employee is required."),
       attendance_event_id: z.string().trim().optional(),
       correction_type: z.string().trim().min(1, "Correction type is required."),
+      attendance_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Please enter a valid attendance date.").optional(),
+      requested_clock_in: z.string().trim().optional(),
+      requested_clock_out: z.string().trim().optional(),
+      requested_status: z.enum(ATTENDANCE_SUMMARY_STATUSES).optional(),
+      outlet_id: z.string().trim().optional(),
       old_value_json: z.record(z.unknown()).optional(),
-      new_value_json: z.record(z.unknown()),
+      new_value_json: z.record(z.unknown()).optional(),
       reason,
+    }).refine((value) => Boolean(value.new_value_json || value.attendance_date), {
+      message: "Attendance date or correction details are required.",
     }),
     payload,
   );

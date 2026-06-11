@@ -124,6 +124,14 @@ export interface LeaveRequestRecord {
   created_by: string | null;
   approval_request_id: string | null;
   approval_status?: string | null;
+  approval_current_step?: string | null;
+  approval_submitted_at?: string | null;
+  approval_completed_at?: string | null;
+  department_approved_at?: string | null;
+  department_approved_by?: string | null;
+  hr_approved_at?: string | null;
+  hr_approved_by?: string | null;
+  rejection_reason?: string | null;
   submitted_at?: string | null;
   submitted_by?: string | null;
   approved_at?: string | null;
@@ -175,8 +183,10 @@ export interface LeaveEmployeeRecord {
   primary_outlet_id: string | null;
   department_id: string | null;
   position_id: string | null;
+  level?: number | null;
   employment_status: string;
   deleted_at: string | null;
+  archived_at?: string | null;
 }
 
 export interface LeaveListResult<T> {
