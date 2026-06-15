@@ -64,6 +64,7 @@ const criticalFiles = [
 criticalFiles.forEach(requireFile);
 
 const migrations = listFiles("migrations", (file) => /^\d{4}_.+\.sql$/.test(path.basename(file))).sort();
+const primaryMigrations = migrations.filter((file) => !/^\d{4}_\d+_repair_/.test(path.basename(file)));
 const migrationText = migrations.map(read).join("\n");
 const packageJson = readIfExists("package.json");
 const frontendPackageJson = readIfExists("frontend/package.json");
@@ -76,11 +77,11 @@ const router = readIfExists("frontend/src/app/router.tsx");
 const navigation = readIfExists("frontend/src/lib/navigation.ts");
 const wrangler = readIfExists("wrangler.jsonc");
 
-for (let index = 0; index < migrations.length; index += 1) {
+for (let index = 0; index < primaryMigrations.length; index += 1) {
   const expected = String(index + 1).padStart(4, "0");
-  const actual = path.basename(migrations[index]).slice(0, 4);
+  const actual = path.basename(primaryMigrations[index]).slice(0, 4);
   if (actual !== expected) {
-    fail(`Migration ordering is not sequential near ${migrations[index]}; expected ${expected}.`);
+    fail(`Migration ordering is not sequential near ${primaryMigrations[index]}; expected ${expected}.`);
     break;
   }
 }
@@ -94,6 +95,7 @@ for (let index = 0; index < migrations.length; index += 1) {
   "0068_advance_salary_approval_engine.sql",
   "0069_employee_document_kyc_approval_engine.sql",
   "0071_document_kyc_staging_hardening.sql",
+  "0071_9_repair_missing_approval_workflow_foundation.sql",
   "0072_employee_structure_change_approval_engine.sql",
   "0073_employee_lifecycle_approval_engine.sql",
   "0075_employee_disciplinary_action_approval_engine.sql",

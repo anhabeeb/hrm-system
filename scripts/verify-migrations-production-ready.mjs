@@ -15,16 +15,17 @@ if (!fs.existsSync(migrationsDir)) {
 const migrationFiles = fs.existsSync(migrationsDir)
   ? fs.readdirSync(migrationsDir).filter((file) => /^\d{4}_.+\.sql$/.test(file)).sort()
   : [];
+const primaryMigrationFiles = migrationFiles.filter((file) => !/^\d{4}_\d+_repair_/.test(file));
 
 if (migrationFiles.length === 0) {
   fail("No numbered SQL migrations were found.");
 }
 
-for (let index = 0; index < migrationFiles.length; index += 1) {
+for (let index = 0; index < primaryMigrationFiles.length; index += 1) {
   const expected = String(index + 1).padStart(4, "0");
-  const actual = migrationFiles[index].slice(0, 4);
+  const actual = primaryMigrationFiles[index].slice(0, 4);
   if (actual !== expected) {
-    fail(`Migration numbering gap or duplicate near ${migrationFiles[index]}: expected prefix ${expected}.`);
+    fail(`Migration numbering gap or duplicate near ${primaryMigrationFiles[index]}: expected prefix ${expected}.`);
     break;
   }
 }
@@ -52,6 +53,7 @@ const expectedTables = [
   "level_role_templates",
   "employee_structure_history",
   "approval_workflows",
+  "approval_workflow_steps",
   "approval_steps",
   "approval_requests",
   "approval_request_steps",
@@ -107,6 +109,7 @@ for (const marker of expectedIndexMarkers) {
 }
 
 const latestExpected = [
+  "0071_9_repair_missing_approval_workflow_foundation.sql",
   "0072_employee_structure_change_approval_engine.sql",
   "0073_employee_lifecycle_approval_engine.sql",
   "0074_employee_lifecycle_safety_hardening.sql",
@@ -133,5 +136,7 @@ if (failures.length > 0) {
   for (const failure of failures) console.error(`- ${failure}`);
   process.exitCode = 1;
 } else {
-  console.log(`Migration production readiness verification passed (${migrationFiles.length} ordered migrations checked).`);
+  console.log(
+    `Migration production readiness verification passed (${primaryMigrationFiles.length} primary migrations and ${migrationFiles.length - primaryMigrationFiles.length} repair migrations checked).`,
+  );
 }
