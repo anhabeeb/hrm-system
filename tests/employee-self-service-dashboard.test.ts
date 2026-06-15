@@ -115,8 +115,12 @@ describe("employee self-service dashboard foundation", () => {
     expect(read("src/app.ts")).toContain('apiV1.route("/self", selfServiceRoutes)');
     expect(read("src/routes/self-service.routes.ts")).toContain('selfServiceRoutes.get("/dashboard"');
     expect(read("src/routes/self-service.routes.ts")).toContain("authMiddleware");
+    expect(read("src/routes/self-service.routes.ts")).toContain("requireLinkedEmployeeForSelfService");
+    expect(read("src/routes/self-service.routes.ts")).toContain("SELF_SERVICE_EMPLOYEE_PROFILE_REQUIRED");
     expect(read("frontend/src/app/router.tsx")).toContain("/self/dashboard");
+    expect(read("frontend/src/app/router.tsx")).toContain("requiresLinkedEmployee: true");
     expect(read("frontend/src/lib/navigation.ts")).toContain("Self-Service");
+    expect(read("frontend/src/lib/navigation.ts")).toContain("requiresLinkedEmployee: true");
     expect(read("seeds/permissions.seed.sql")).toContain("self.dashboard.view");
     expect(read("seeds/permissions.seed.sql")).toContain("department.dashboard.view");
     expect(read("frontend/src/features/self-service/EmployeeDashboardPage.tsx")).not.toMatch(/window\.alert|window\.confirm/);
@@ -132,6 +136,7 @@ describe("employee self-service dashboard foundation", () => {
 
     expect(landing).toContain("getDefaultLandingPath");
     expect(landing).toContain("dashboard.view_company");
+    expect(landing).toContain("user?.employee_id");
     expect(landing).toContain('return "/self/dashboard"');
     expect(login).toContain("getDefaultLandingPath(result.user)");
     expect(twoFactor).toContain("getDefaultLandingPath(user)");
@@ -145,6 +150,18 @@ describe("employee self-service dashboard foundation", () => {
 
     expect(navigation).toContain('label: "Dashboard", path: "/dashboard"');
     expect(navigation).toContain('requiredPermissionsAny: ["dashboard.view", "dashboard.view_company", "dashboard.view_outlet"]');
+  });
+
+  it("hides self-service navigation and routes from standalone accounts", () => {
+    const navigation = read("frontend/src/lib/navigation.ts");
+    const router = read("frontend/src/app/router.tsx");
+    const guards = read("frontend/src/features/auth/route-guards.tsx");
+
+    expect(navigation).toContain("!item.requiresLinkedEmployee || Boolean(user?.employee_id)");
+    expect(router).toContain('path="/self/dashboard"');
+    expect(router).toContain("requiresLinkedEmployee: true");
+    expect(guards).toContain("requiresLinkedEmployee && !user?.employee_id");
+    expect(guards).toContain('<Navigate to="/dashboard" replace />');
   });
 
   it("uses professional request empty-state text", () => {
@@ -163,14 +180,25 @@ describe("employee self-service dashboard foundation", () => {
     expect(JSON.stringify(result)).not.toMatch(/password_hash|session_token|reset_token|totp_secret/i);
   });
 
-  it("user without linked employee gets safe limited state and useful dashboard message", async () => {
+  it("user without linked employee is rejected from self-service APIs", async () => {
     mocks.repository.findSelfProfile.mockResolvedValue({ ...profileRow, employee_id: null, deleted_at: null });
 
-    const dashboard = await service.getSelfDashboard(env, actor());
+    await expect(service.getSelfDashboard(env, actor())).rejects.toMatchObject({
+      code: "SELF_SERVICE_EMPLOYEE_PROFILE_REQUIRED",
+      message: "Self-service is only available for accounts linked to an employee profile.",
+    });
+  });
 
-    expect(dashboard.profile.linked_employee).toBe(false);
-    expect(dashboard.widgets[0].description).toContain("not linked");
-    expect(dashboard.requests).toEqual([]);
+  it("standalone Super Admin bypass does not bypass the linked employee requirement", async () => {
+    mocks.repository.findSelfProfile.mockResolvedValue({ ...profileRow, employee_id: null, deleted_at: null });
+
+    await expect(service.getSelfProfile(env, actor({
+      isSuperAdmin: true,
+      roleKeys: ["super_admin"],
+      permissions: [],
+    }))).rejects.toMatchObject({
+      code: "SELF_SERVICE_EMPLOYEE_PROFILE_REQUIRED",
+    });
   });
 
   it("normal employee dashboard includes self widgets but not department widgets without permission", async () => {

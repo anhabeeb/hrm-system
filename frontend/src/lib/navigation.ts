@@ -54,16 +54,16 @@ export const navigationGroups: NavGroup[] = [
   {
     label: "Self-Service",
     items: [
-      { label: "Employee Dashboard", path: "/self/dashboard", icon: LayoutDashboard, requiredPermission: "self.dashboard.view" },
-      { label: "My Profile", path: "/self/profile", icon: UserCircle, requiredPermissionsAny: ["self.profile.view", "self.dashboard.view"] },
-      { label: "My Attendance", path: "/self/attendance", icon: Clock3, requiredFeature: "attendance", requiredPermission: "self.attendance.view" },
-      { label: "My Roster", path: "/self/roster", icon: CalendarDays, requiredFeature: "roster", requiredPermission: "self.roster.view" },
-      { label: "My Leave", path: "/self/leave", icon: CalendarClock, requiredFeature: "leave_management", requiredPermission: "self.leave.view" },
-      { label: "My Requests", path: "/self/requests", icon: ClipboardCheck, requiredPermission: "self.requests.view" },
-      { label: "My Documents / KYC", path: "/self/documents", icon: FileText, requiredFeature: "documents", requiredPermission: "self.documents.view" },
-      { label: "My Payslips", path: "/self/payslips", icon: ReceiptText, requiredFeature: "payslips", requiredPermission: "self.payslips.view" },
-      { label: "My Pending Approvals", path: "/self/pending-approvals", icon: FileCheck2, requiredPermissionsAny: ["department.approvals.view", "approvals.department.approve", "approvals.hrFinal.approve", "approvals.financeFinal.approve"] },
-      { label: "Department Dashboard", path: "/self/department-dashboard", icon: Building2, requiredPermission: "department.dashboard.view" },
+      { label: "Employee Dashboard", path: "/self/dashboard", icon: LayoutDashboard, requiredPermission: "self.dashboard.view", requiresLinkedEmployee: true },
+      { label: "My Profile", path: "/self/profile", icon: UserCircle, requiredPermissionsAny: ["self.profile.view", "self.dashboard.view"], requiresLinkedEmployee: true },
+      { label: "My Attendance", path: "/self/attendance", icon: Clock3, requiredFeature: "attendance", requiredPermission: "self.attendance.view", requiresLinkedEmployee: true },
+      { label: "My Roster", path: "/self/roster", icon: CalendarDays, requiredFeature: "roster", requiredPermission: "self.roster.view", requiresLinkedEmployee: true },
+      { label: "My Leave", path: "/self/leave", icon: CalendarClock, requiredFeature: "leave_management", requiredPermission: "self.leave.view", requiresLinkedEmployee: true },
+      { label: "My Requests", path: "/self/requests", icon: ClipboardCheck, requiredPermission: "self.requests.view", requiresLinkedEmployee: true },
+      { label: "My Documents / KYC", path: "/self/documents", icon: FileText, requiredFeature: "documents", requiredPermission: "self.documents.view", requiresLinkedEmployee: true },
+      { label: "My Payslips", path: "/self/payslips", icon: ReceiptText, requiredFeature: "payslips", requiredPermission: "self.payslips.view", requiresLinkedEmployee: true },
+      { label: "My Pending Approvals", path: "/self/pending-approvals", icon: FileCheck2, requiredPermissionsAny: ["department.approvals.view", "approvals.department.approve", "approvals.hrFinal.approve", "approvals.financeFinal.approve"], requiresLinkedEmployee: true },
+      { label: "Department Dashboard", path: "/self/department-dashboard", icon: Building2, requiredPermission: "department.dashboard.view", requiresLinkedEmployee: true },
     ],
   },
   {
@@ -163,6 +163,7 @@ export const navigationGroups: NavGroup[] = [
 ];
 
 export const canAccessNavItem = (user: CurrentUser | null, item: NavItem) =>
+  (!item.requiresLinkedEmployee || Boolean(user?.employee_id)) &&
   hasPermission(user, item.requiredPermission) &&
   hasAnyPermission(user, item.requiredPermissionsAny) &&
   hasFeature(user, item.requiredFeature);

@@ -50,6 +50,8 @@ mustInclude("app routes", app, 'apiV1.route("/self", selfServiceRoutes)');
   'selfServiceRoutes.get("/pending-approvals"',
   'selfServiceRoutes.get("/navigation"',
   "authMiddleware",
+  "requireLinkedEmployeeForSelfService",
+  "SELF_SERVICE_EMPLOYEE_PROFILE_REQUIRED",
   "self.dashboard.view",
 ].forEach((token) => mustInclude("self routes", routes, token));
 
@@ -60,6 +62,9 @@ mustInclude("app routes", app, 'apiV1.route("/self", selfServiceRoutes)');
   "getSelfAccessSummary",
   "getSelfRequests",
   "getSelfPendingApprovals",
+  "requireLinkedEmployeeForSelfService",
+  "SELF_SERVICE_EMPLOYEE_PROFILE_REQUIRED",
+  "Self-service is only available for accounts linked to an employee profile.",
   "resolveEmployeeNavigation",
   "canViewAttendance",
   "canViewRoster",
@@ -74,6 +79,7 @@ mustInclude("app routes", app, 'apiV1.route("/self", selfServiceRoutes)');
   "getDefaultLandingPath",
   "dashboard.view_company",
   "self.dashboard.view",
+  "user?.employee_id",
   "notifications.manage_own",
   "getVisibleNavigation",
 ].forEach((token) => mustInclude("default landing helper", landing, token));
@@ -89,7 +95,8 @@ if (/navigate\(\s*["']\/dashboard["']/.test(login)) failures.push("LoginPage mus
 if (/navigate\(\s*["']\/dashboard["']/.test(twoFactor)) failures.push("TwoFactorPage must not navigate every user to /dashboard.");
 
 mustInclude("public route landing", routeGuards, "getDefaultLandingPath(user)");
-if (/<Navigate\s+to=["']\/dashboard["']/.test(routeGuards)) failures.push("PublicRoute must not redirect every authenticated user to /dashboard.");
+mustInclude("self route linked employee guard", routeGuards, "requiresLinkedEmployee && !user?.employee_id");
+mustInclude("standalone admin self-service redirect", routeGuards, '<Navigate to="/dashboard" replace />');
 
 mustInclude("router landing", router, "DefaultLandingRedirect");
 mustInclude("permission denied landing", permissionDenied, "getDefaultLandingPath(user)");
@@ -115,6 +122,7 @@ if (/password_hash|session_token|reset_token|totp_secret/i.test(repository)) {
   "/self/requests",
   "/self/pending-approvals",
   "SelfServiceModulePage",
+  "requiresLinkedEmployee: true",
 ].forEach((token) => mustInclude("frontend router", router, token));
 
 [
@@ -127,6 +135,8 @@ if (/password_hash|session_token|reset_token|totp_secret/i.test(repository)) {
   "My Pending Approvals",
   "self.dashboard.view",
   "department.dashboard.view",
+  "requiresLinkedEmployee: true",
+  "!item.requiresLinkedEmployee || Boolean(user?.employee_id)",
 ].forEach((token) => mustInclude("frontend navigation", navigation, token));
 
 [
@@ -140,7 +150,8 @@ if (/password_hash|session_token|reset_token|totp_secret/i.test(repository)) {
 [
   "normal employee dashboard includes self widgets",
   "linked employee sees own profile",
-  "not linked",
+  "user without linked employee is rejected from self-service APIs",
+  "standalone Super Admin bypass does not bypass the linked employee requirement",
   "module-disabled widgets",
   "created on behalf",
   "pending approvals",

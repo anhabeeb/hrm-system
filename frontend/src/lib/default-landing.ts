@@ -8,7 +8,7 @@ export const notificationPermissions = ["notifications.view", "notifications.man
 
 export const getDefaultLandingPath = (user: CurrentUser | null) => {
   if (hasAnyPermission(user, adminDashboardPermissions)) return "/dashboard";
-  if (hasPermission(user, "self.dashboard.view")) return "/self/dashboard";
+  if (user?.employee_id && hasPermission(user, "self.dashboard.view")) return "/self/dashboard";
   if (hasAnyPermission(user, notificationPermissions)) return "/notifications";
 
   const firstVisibleItem = getVisibleNavigation(user).flatMap((group) => group.items)[0];

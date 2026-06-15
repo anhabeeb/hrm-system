@@ -10,9 +10,16 @@ const has = (context: AuthActor, permission: string) =>
 const hasAny = (context: AuthActor, permissions: string[]) =>
   permissionService.isSuperAdmin(context) || permissionService.hasAnyPermission(context, permissions);
 const feature = (features: Set<string>, key: string) => features.has(key);
+export const SELF_SERVICE_LINKED_EMPLOYEE_REQUIRED_MESSAGE =
+  "Self-service is only available for accounts linked to an employee profile.";
 
 const activeEmployee = (row: any) =>
-  Boolean(row?.employee_id && !row.deleted_at && !row.archived_at && !["inactive", "archived", "deleted", "terminated", "resigned"].includes(row.employment_status));
+  Boolean(
+    row?.employee_id &&
+    !row.deleted_at &&
+    !row.archived_at &&
+    !["inactive", "archived", "deleted", "terminated", "resigned"].includes(String(row.employment_status ?? "").toLowerCase()),
+  );
 
 const employeeFromRow = (row: any): SelfProfile["employee"] => row?.employee_id ? ({
   id: row.employee_id,
@@ -33,13 +40,20 @@ const employeeFromRow = (row: any): SelfProfile["employee"] => row?.employee_id 
   phone: row.employee_phone ?? null,
 }) : null;
 
+export const requireLinkedEmployeeForSelfService = (profile: SelfProfile) => {
+  if (!profile.linked_employee || !profile.employee) {
+    throw new PermissionError(SELF_SERVICE_LINKED_EMPLOYEE_REQUIRED_MESSAGE, "SELF_SERVICE_EMPLOYEE_PROFILE_REQUIRED");
+  }
+  return profile.employee;
+};
+
 export const getSelfProfile = async (env: Env, context: AuthActor): Promise<SelfProfile> => {
   if (!has(context, "self.profile.view") && !has(context, "self.dashboard.view")) throw new PermissionError();
   const [row, roles] = await Promise.all([
     repository.findSelfProfile(env, context.companyId, context.actorUserId),
     repository.listSelfRoleNames(env, context.companyId, context.actorUserId),
   ]);
-  return {
+  const profile: SelfProfile = {
     linked_employee: activeEmployee(row),
     user: {
       id: row?.user_id ?? context.actorUserId,
@@ -56,6 +70,8 @@ export const getSelfProfile = async (env: Env, context: AuthActor): Promise<Self
       ...(context.permissions ?? []).filter((permission) => permission.startsWith("self.") || permission.startsWith("department.")).slice(0, 8),
     ],
   };
+  requireLinkedEmployeeForSelfService(profile);
+  return profile;
 };
 
 export const resolveEmployeeNavigation = (context: AuthActor, profile: SelfProfile, features: Set<string>): SelfNavigationItem[] => {
@@ -130,21 +146,7 @@ export const getSelfDashboard = async (env: Env, context: AuthActor) => {
   ]);
   const featureSet = new Set(enabledFeatures);
   const navigation = resolveEmployeeNavigation(context, profile, featureSet);
-  if (!profile.employee) {
-    return {
-      profile,
-      navigation,
-      widgets: [widget({
-        key: "profile-link",
-        title: "Employee profile not linked",
-        enabled: true,
-        status: "attention",
-        description: "Your employee profile is not linked to this login. Please contact HR.",
-      })],
-      requests: [],
-      pending_approvals: [],
-    };
-  }
+  const employee = requireLinkedEmployeeForSelfService(profile);
 
   const today = todayIso();
   const attendanceEnabled = feature(featureSet, "attendance");
@@ -159,20 +161,20 @@ export const getSelfDashboard = async (env: Env, context: AuthActor) => {
   const canViewDocuments = documentsEnabled && has(context, "self.documents.view");
   const canViewPayslips = payslipsEnabled && has(context, "self.payslips.view");
   const [attendance, roster, leaveBalance, leaveCounts, correctionCounts, documents, notifications, payslip, requests, pendingApprovals] = await Promise.all([
-    canViewAttendance ? repository.getTodayAttendance(env, context.companyId, profile.employee.id, today).catch(() => null) : Promise.resolve(null),
-    canViewRoster ? repository.getNextRosterShift(env, context.companyId, profile.employee.id, today).catch(() => null) : Promise.resolve(null),
-    canViewLeave ? repository.getLeaveBalanceSummary(env, context.companyId, profile.employee.id).catch(() => null) : Promise.resolve(null),
-    canViewLeave ? repository.getLeaveRequestCounts(env, context.companyId, profile.employee.id).catch(() => null) : Promise.resolve(null),
-    canViewAttendance ? repository.getAttendanceCorrectionCounts(env, context.companyId, profile.employee.id, context.actorUserId).catch(() => null) : Promise.resolve(null),
-    canViewDocuments ? repository.getDocumentSummary(env, context.companyId, profile.employee.id, today).catch(() => null) : Promise.resolve(null),
+    canViewAttendance ? repository.getTodayAttendance(env, context.companyId, employee.id, today).catch(() => null) : Promise.resolve(null),
+    canViewRoster ? repository.getNextRosterShift(env, context.companyId, employee.id, today).catch(() => null) : Promise.resolve(null),
+    canViewLeave ? repository.getLeaveBalanceSummary(env, context.companyId, employee.id).catch(() => null) : Promise.resolve(null),
+    canViewLeave ? repository.getLeaveRequestCounts(env, context.companyId, employee.id).catch(() => null) : Promise.resolve(null),
+    canViewAttendance ? repository.getAttendanceCorrectionCounts(env, context.companyId, employee.id, context.actorUserId).catch(() => null) : Promise.resolve(null),
+    canViewDocuments ? repository.getDocumentSummary(env, context.companyId, employee.id, today).catch(() => null) : Promise.resolve(null),
     repository.getUnreadNotificationCount(env, context.companyId, context.actorUserId).catch(() => null),
-    canViewPayslips ? repository.getLatestPayslip(env, context.companyId, profile.employee.id).catch(() => null) : Promise.resolve(null),
-    has(context, "self.requests.view") ? repository.listSelfRequests(env, context.companyId, context.actorUserId, profile.employee.id, 5).catch(() => []) : Promise.resolve([]),
+    canViewPayslips ? repository.getLatestPayslip(env, context.companyId, employee.id).catch(() => null) : Promise.resolve(null),
+    has(context, "self.requests.view") ? repository.listSelfRequests(env, context.companyId, context.actorUserId, employee.id, 5).catch(() => []) : Promise.resolve([]),
     hasAny(context, ["department.approvals.view", "approvals.department.approve", "approvals.hrFinal.approve", "approvals.financeFinal.approve"])
       ? repository.listSelfPendingApprovals(env, context.companyId, context.actorUserId, {
-        id: profile.employee.id,
-        department_id: profile.employee.department_id,
-        level: profile.employee.level,
+        id: employee.id,
+        department_id: employee.department_id,
+        level: employee.level,
       }, context.permissions ?? [], 5).catch(() => [])
       : Promise.resolve([]),
   ]);
@@ -183,13 +185,13 @@ export const getSelfDashboard = async (env: Env, context: AuthActor) => {
       title: "My profile summary",
       enabled: true,
       status: "ok",
-      value: profile.employee.full_name,
-      description: `${profile.employee.department_name ?? "Unassigned department"} - ${profile.employee.position_title ?? "Unassigned position"}`,
+      value: employee.full_name,
+      description: `${employee.department_name ?? "Unassigned department"} - ${employee.position_title ?? "Unassigned position"}`,
       href: "/self/profile",
       rows: [
-        { label: "Employee code", value: profile.employee.employee_code },
-        { label: "Level", value: profile.employee.level ? `Level ${profile.employee.level}` : "Unassigned" },
-        { label: "Outlet/store", value: profile.employee.outlet_name ?? "Unassigned" },
+        { label: "Employee code", value: employee.employee_code },
+        { label: "Level", value: employee.level ? `Level ${employee.level}` : "Unassigned" },
+        { label: "Outlet/store", value: employee.outlet_name ?? "Unassigned" },
       ],
     }),
     widget({

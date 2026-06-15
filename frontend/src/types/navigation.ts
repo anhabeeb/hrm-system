@@ -9,6 +9,7 @@ export interface NavItem {
   requiredPermission?: PermissionKey;
   requiredPermissionsAny?: PermissionKey[];
   requiredFeature?: FeatureKey;
+  requiresLinkedEmployee?: boolean;
   children?: NavItem[];
   badge?: string;
 }

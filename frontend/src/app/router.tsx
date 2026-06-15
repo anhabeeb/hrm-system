@@ -90,12 +90,13 @@ const routeFallback = (
 
 const guarded = (
   element: ReactNode,
-  options: { permission?: string; permissionsAny?: string[]; feature?: string } = {},
+  options: { permission?: string; permissionsAny?: string[]; feature?: string; requiresLinkedEmployee?: boolean } = {},
 ) => (
   <ModuleRoute
     requiredPermission={options.permission}
     requiredPermissionsAny={options.permissionsAny}
     requiredFeature={options.feature}
+    requiresLinkedEmployee={options.requiresLinkedEmployee}
   >
     {element}
   </ModuleRoute>
@@ -123,16 +124,16 @@ export const AppRouter = () => (
       <Route element={<AppShell />}>
         <Route index element={<DefaultLandingRedirect />} />
         <Route path="/dashboard" element={guarded(<DashboardPage />, { permissionsAny: ["dashboard.view", "dashboard.view_company", "dashboard.view_outlet"] })} />
-        <Route path="/self/dashboard" element={guarded(<EmployeeDashboardPage />, { permission: "self.dashboard.view" })} />
-        <Route path="/self/profile" element={guarded(<MyProfilePage />, { permissionsAny: ["self.profile.view", "self.dashboard.view"] })} />
-        <Route path="/self/requests" element={guarded(<MyRequestsPage />, { permission: "self.requests.view" })} />
-        <Route path="/self/pending-approvals" element={guarded(<MyPendingApprovalsPage />, { permissionsAny: ["department.approvals.view", "approvals.department.approve", "approvals.hrFinal.approve", "approvals.financeFinal.approve"] })} />
-        <Route path="/self/attendance" element={guarded(<SelfServiceModulePage moduleKey="attendance" />, { permission: "self.attendance.view", feature: "attendance" })} />
-        <Route path="/self/roster" element={guarded(<SelfServiceModulePage moduleKey="roster" />, { permission: "self.roster.view", feature: "roster" })} />
-        <Route path="/self/leave" element={guarded(<SelfServiceModulePage moduleKey="leave" />, { permission: "self.leave.view", feature: "leave_management" })} />
-        <Route path="/self/documents" element={guarded(<MyDocumentsKycPage />, { permission: "self.documents.view", feature: "documents" })} />
-        <Route path="/self/payslips" element={guarded(<SelfServiceModulePage moduleKey="payslips" />, { permission: "self.payslips.view", feature: "payslips" })} />
-        <Route path="/self/department-dashboard" element={guarded(<SelfServiceModulePage moduleKey="department-dashboard" />, { permission: "department.dashboard.view" })} />
+        <Route path="/self/dashboard" element={guarded(<EmployeeDashboardPage />, { permission: "self.dashboard.view", requiresLinkedEmployee: true })} />
+        <Route path="/self/profile" element={guarded(<MyProfilePage />, { permissionsAny: ["self.profile.view", "self.dashboard.view"], requiresLinkedEmployee: true })} />
+        <Route path="/self/requests" element={guarded(<MyRequestsPage />, { permission: "self.requests.view", requiresLinkedEmployee: true })} />
+        <Route path="/self/pending-approvals" element={guarded(<MyPendingApprovalsPage />, { permissionsAny: ["department.approvals.view", "approvals.department.approve", "approvals.hrFinal.approve", "approvals.financeFinal.approve"], requiresLinkedEmployee: true })} />
+        <Route path="/self/attendance" element={guarded(<SelfServiceModulePage moduleKey="attendance" />, { permission: "self.attendance.view", feature: "attendance", requiresLinkedEmployee: true })} />
+        <Route path="/self/roster" element={guarded(<SelfServiceModulePage moduleKey="roster" />, { permission: "self.roster.view", feature: "roster", requiresLinkedEmployee: true })} />
+        <Route path="/self/leave" element={guarded(<SelfServiceModulePage moduleKey="leave" />, { permission: "self.leave.view", feature: "leave_management", requiresLinkedEmployee: true })} />
+        <Route path="/self/documents" element={guarded(<MyDocumentsKycPage />, { permission: "self.documents.view", feature: "documents", requiresLinkedEmployee: true })} />
+        <Route path="/self/payslips" element={guarded(<SelfServiceModulePage moduleKey="payslips" />, { permission: "self.payslips.view", feature: "payslips", requiresLinkedEmployee: true })} />
+        <Route path="/self/department-dashboard" element={guarded(<SelfServiceModulePage moduleKey="department-dashboard" />, { permission: "department.dashboard.view", requiresLinkedEmployee: true })} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/profile/security" element={<SecurityPage />} />
         <Route path="/profile/kyc-update" element={<KycUpdatePage />} />

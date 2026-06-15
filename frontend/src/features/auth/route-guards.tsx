@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { FullPagePermissionDenied } from "@/components/feedback/PermissionDenied";
 import { LoadingState } from "@/components/data/LoadingState";
 import { useAuth } from "@/features/auth/auth.store";
-import { getDefaultLandingPath } from "@/lib/default-landing";
+import { adminDashboardPermissions, getDefaultLandingPath } from "@/lib/default-landing";
 import { hasFeature } from "@/lib/features";
 import { hasAnyPermission, hasPermission } from "@/lib/permissions";
 
@@ -53,15 +53,21 @@ export const ModuleRoute = ({
   requiredPermission,
   requiredPermissionsAny,
   requiredFeature,
+  requiresLinkedEmployee,
   children,
 }: {
   requiredPermission?: string;
   requiredPermissionsAny?: string[];
   requiredFeature?: string;
+  requiresLinkedEmployee?: boolean;
   children: ReactNode;
 }) => {
   const { user } = useAuth();
 
+  if (requiresLinkedEmployee && !user?.employee_id) {
+    if (hasAnyPermission(user, adminDashboardPermissions)) return <Navigate to="/dashboard" replace />;
+    return <FullPagePermissionDenied />;
+  }
   if (!hasFeature(user, requiredFeature)) return <FullPagePermissionDenied />;
   if (!hasPermission(user, requiredPermission)) return <FullPagePermissionDenied />;
   if (!hasAnyPermission(user, requiredPermissionsAny)) return <FullPagePermissionDenied />;
