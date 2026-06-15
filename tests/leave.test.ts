@@ -190,7 +190,7 @@ describe("holiday-aware leave request behavior", () => {
     email: "hr@example.test",
     roles: ["HR Admin"],
     roleKeys: ["hr_admin"],
-    permissions: ["leave.create", "leave.view"],
+    permissions: ["leave.create", "leave.view", "leave.requests.create_for_employee"],
     outletIds: ["outlet_1"],
     isSuperAdmin: false,
     isAdmin: true,

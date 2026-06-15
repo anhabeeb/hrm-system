@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import { DataTable } from "@/components/data/DataTable";
 import { RowActions } from "@/components/data/RowActions";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { useToast } from "@/components/feedback/useToast";
 import { PageActionBar } from "@/components/layout/PageActionBar";
 import { DepartmentCombobox, EmployeeCombobox, OutletCombobox, PositionCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
@@ -17,12 +18,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ApiError } from "@/lib/api-errors";
+import { useAuth } from "@/features/auth/auth.store";
 import { friendlyHrmError } from "@/lib/hrm-errors";
 import { searchParamNumber } from "@/lib/query-string";
 import type { TableColumn } from "@/types/common";
+import { RosterChangeRequestDialog } from "./RosterChangeRequestDialog";
 import { conflictBadge, formatTimeRange, label, severityBadge, statusBadge } from "./roster-format";
 import { rostersApi, shiftTemplatesApi } from "./rosters.api";
-import type { BulkRosterPayload, RosterConflict, RosterFilters, RosterPayload, RosterShift, ShiftTemplatePayload } from "./rosters.types";
+import type { BulkRosterPayload, RosterChangeRequest, RosterConflict, RosterFilters, RosterPayload, RosterShift, ShiftTemplatePayload } from "./rosters.types";
 
 const today = new Date();
 const startOfWeek = new Date(today);
@@ -77,18 +80,24 @@ const warningReviewFromError = (error: unknown) => {
 };
 
 export const RostersPage = () => {
+  const auth = useAuth();
+  const toast = useToast();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = useState(searchParams.get("tab") ?? "list");
   const [createOpen, setCreateOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
+  const [changeRequestOpen, setChangeRequestOpen] = useState(false);
   const [rosterPayload, setRosterPayload] = useState<RosterPayload>(blankRoster);
   const [bulkPayload, setBulkPayload] = useState<BulkRosterPayload>(blankBulk);
   const [templatePayload, setTemplatePayload] = useState<ShiftTemplatePayload>(blankTemplate);
   const [publishReason, setPublishReason] = useState("");
   const [cancelShift, setCancelShift] = useState<RosterShift | null>(null);
   const [cancelReason, setCancelReason] = useState("");
+  const [selectedChange, setSelectedChange] = useState<RosterChangeRequest | null>(null);
+  const [changeAction, setChangeAction] = useState<"approve" | "reject" | "cancel" | null>(null);
+  const [changeReason, setChangeReason] = useState("");
   const [conflictAction, setConflictAction] = useState<{ conflict: RosterConflict; action: "resolve" | "override" } | null>(null);
   const [conflictReason, setConflictReason] = useState("");
   const [success, setSuccess] = useState<string | null>(null);
@@ -128,12 +137,19 @@ export const RostersPage = () => {
   const rostersQuery = useQuery({ queryKey: ["rosters", filters], queryFn: () => rostersApi.list(filters) });
   const templatesQuery = useQuery({ queryKey: ["shift-templates"], queryFn: () => shiftTemplatesApi.list({ status: "active", page_size: 100 }) });
   const conflictsQuery = useQuery({ queryKey: ["roster-conflicts", filters], queryFn: () => rostersApi.conflicts({ ...filters, status: undefined }) });
+  const rosterChangesQuery = useQuery({ queryKey: ["roster-changes", filters], queryFn: () => rostersApi.listChanges({ ...filters, status: undefined }) });
+  const changeTimelineQuery = useQuery({
+    queryKey: ["roster-change-timeline", selectedChange?.id],
+    queryFn: () => rostersApi.changeTimeline(selectedChange!.id),
+    enabled: Boolean(selectedChange?.id),
+  });
 
   const invalidate = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["rosters"] }),
       queryClient.invalidateQueries({ queryKey: ["shift-templates"] }),
       queryClient.invalidateQueries({ queryKey: ["roster-conflicts"] }),
+      queryClient.invalidateQueries({ queryKey: ["roster-changes"] }),
     ]);
   };
 
@@ -210,6 +226,26 @@ export const RostersPage = () => {
     },
   });
 
+  const changeMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedChange || !changeAction) throw new Error("Select a roster change request first.");
+      if (changeAction === "approve") return rostersApi.approveChange(selectedChange.id, { reason: changeReason || "Approved from roster changes page." });
+      if (changeAction === "reject") return rostersApi.rejectChange(selectedChange.id, { reason: changeReason });
+      return rostersApi.cancelChange(selectedChange.id, { reason: changeReason });
+    },
+    onSuccess: async () => {
+      toast.success(
+        changeAction === "approve" ? "Roster change approved." :
+          changeAction === "reject" ? "Roster change rejected." :
+            "Roster change cancelled.",
+      );
+      setChangeAction(null);
+      setChangeReason("");
+      await invalidate();
+    },
+    onError: (error) => toast.error(friendlyHrmError(error, "Roster change action could not be completed.")),
+  });
+
   const columns: TableColumn<RosterShift>[] = [
     { key: "roster_date", header: "Date", cell: (row) => row.roster_date },
     { key: "employee_name", header: "Employee", cell: (row) => <div><p className="font-medium">{row.employee_name ?? row.employee_id}</p><p className="text-xs text-muted-foreground">{row.employee_code ?? row.position_title ?? "-"}</p></div> },
@@ -230,13 +266,48 @@ export const RostersPage = () => {
     { key: "status", header: "Status", cell: (row) => statusBadge(row.status) },
   ];
 
+  const terminalRosterChangeStatuses = ["APPROVED", "APPLIED", "REJECTED", "CANCELLED", "FAILED_TO_APPLY"];
+  const has = (permission: string) => auth.isSuperAdmin || auth.hasPermission(permission);
+  const canCreateChangeForOthers = has("roster.changes.createForOthers");
+  const canApproveChange = (row: RosterChangeRequest) => {
+    if (terminalRosterChangeStatuses.includes(row.status)) return false;
+    if (has("roster.changes.approve")) return true;
+    if ((row.current_step_name ?? row.status).toLowerCase().includes("hr") || row.status === "PENDING_HR_APPROVAL") {
+      return has("approvals.hrFinal.approve");
+    }
+    return has("approvals.department.approve");
+  };
+  const canRejectChange = (row: RosterChangeRequest) => {
+    if (terminalRosterChangeStatuses.includes(row.status)) return false;
+    if (has("roster.changes.reject")) return true;
+    if ((row.current_step_name ?? row.status).toLowerCase().includes("hr") || row.status === "PENDING_HR_APPROVAL") {
+      return has("approvals.hrFinal.reject");
+    }
+    return has("approvals.department.reject");
+  };
+  const canCancelChange = (row: RosterChangeRequest) => {
+    if (terminalRosterChangeStatuses.includes(row.status)) return false;
+    if (has("roster.changes.cancelAny")) return true;
+    return has("roster.changes.cancel") && Boolean(auth.user?.employee_id && (row.employee_id === auth.user.employee_id || row.requester_employee_id === auth.user.employee_id));
+  };
+
+  const changeColumns: TableColumn<RosterChangeRequest>[] = [
+    { key: "requested_date", header: "Date", cell: (row) => row.requested_date ?? "-" },
+    { key: "employee_name", header: "Employee", cell: (row) => <div><p className="font-medium">{row.employee_name ?? row.employee_id}</p><p className="text-xs text-muted-foreground">{row.employee_code ?? row.position_title ?? "-"}</p></div> },
+    { key: "change_type", header: "Change", cell: (row) => label(row.change_type) },
+    { key: "requested_start_at", header: "Requested", cell: (row) => row.requested_start_at || row.requested_end_at ? formatTimeRange(row.requested_start_at ?? "-", row.requested_end_at ?? "-") : "-" },
+    { key: "department_name", header: "Department", cell: (row) => row.department_name ?? "-" },
+    { key: "status", header: "Status", cell: (row) => statusBadge(row.status) },
+    { key: "current_step_name", header: "Current step", cell: (row) => row.current_step_name ?? label(row.approval_status ?? row.status) },
+  ];
+
   return (
     <div>
-      <PageActionBar label="Duty rosters page actions"><div className="flex flex-wrap items-center justify-end gap-2"><Button onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4" /> Create shift</Button><Button variant="outline" onClick={() => setBulkOpen(true)}>Bulk create</Button><Button variant="outline" onClick={() => setTemplateOpen(true)}>New template</Button></div></PageActionBar>
+      <PageActionBar label="Duty rosters page actions"><div className="flex flex-wrap items-center justify-end gap-2"><Button onClick={() => setChangeRequestOpen(true)} variant="outline">Request change</Button><Button onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4" /> Create shift</Button><Button variant="outline" onClick={() => setBulkOpen(true)}>Bulk create</Button><Button variant="outline" onClick={() => setTemplateOpen(true)}>New template</Button></div></PageActionBar>
       <div className="space-y-4 p-4 md:p-6">
         {success ? <InlineAlert variant="success" title={success} /> : null}
-        {(rostersQuery.error || templatesQuery.error || conflictsQuery.error) ? (
-          <InlineAlert variant="error" title={friendlyHrmError(rostersQuery.error ?? templatesQuery.error ?? conflictsQuery.error, "Roster data could not be loaded.")} />
+        {(rostersQuery.error || templatesQuery.error || conflictsQuery.error || rosterChangesQuery.error) ? (
+          <InlineAlert variant="error" title={friendlyHrmError(rostersQuery.error ?? templatesQuery.error ?? conflictsQuery.error ?? rosterChangesQuery.error, "Roster data could not be loaded.")} />
         ) : null}
 
         <div className="grid gap-3 rounded-lg border bg-card p-4 md:grid-cols-4">
@@ -256,6 +327,7 @@ export const RostersPage = () => {
             <TabsTrigger value="week">Week View</TabsTrigger>
             <TabsTrigger value="templates">Shift Templates</TabsTrigger>
             <TabsTrigger value="conflicts">Conflicts</TabsTrigger>
+            <TabsTrigger value="changes">Change Requests</TabsTrigger>
           </TabsList>
           <TabsContent value="list" className="space-y-3">
             <div className="flex flex-wrap items-end gap-2 rounded-lg border bg-card p-3">
@@ -313,6 +385,29 @@ export const RostersPage = () => {
               emptyDescription="Conflicts will appear when roster entries need HR review."
             />
           </TabsContent>
+          <TabsContent value="changes">
+            <DataTable
+              rows={rosterChangesQuery.data?.data ?? []}
+              loading={rosterChangesQuery.isLoading}
+              columns={changeColumns}
+              getRowId={(row) => row.id}
+              pagination={rosterChangesQuery.data?.pagination}
+              rowActions={(row) => (
+                <RowActions
+                  actions={[
+                    { key: "view", label: "View timeline", onSelect: () => setSelectedChange(row) },
+                    ...(canApproveChange(row) ? [{ key: "approve" as const, label: "Approve", onSelect: () => { setSelectedChange(row); setChangeAction("approve"); } }] : []),
+                    ...(canRejectChange(row) ? [{ key: "reject" as const, label: "Reject", onSelect: () => { setSelectedChange(row); setChangeAction("reject"); } }] : []),
+                    ...(canCancelChange(row) ? [{ key: "delete" as const, label: "Cancel", onSelect: () => { setSelectedChange(row); setChangeAction("cancel"); } }] : []),
+                  ]}
+                />
+              )}
+              onPageChange={(page) => updateFilters({ page })}
+              onPageSizeChange={(page_size) => updateFilters({ page: 1, page_size })}
+              emptyTitle="No roster change requests"
+              emptyDescription="Roster change requests will appear here for department and HR review."
+            />
+          </TabsContent>
         </Tabs>
       </div>
 
@@ -341,6 +436,13 @@ export const RostersPage = () => {
         onOverrideWarnings={() => bulkMutation.mutate({ ...bulkPayload, override_warnings: true })}
       />
       <TemplateDialog open={templateOpen} payload={templatePayload} loading={templateMutation.isPending} error={templateMutation.error} onOpenChange={setTemplateOpen} onPayloadChange={setTemplatePayload} onSubmit={() => templateMutation.mutate(templatePayload)} />
+      <RosterChangeRequestDialog
+        open={changeRequestOpen}
+        onOpenChange={setChangeRequestOpen}
+        currentEmployeeId={auth.user?.employee_id ?? null}
+        canSelectEmployee={canCreateChangeForOthers}
+        onSubmitted={invalidate}
+      />
       <Dialog open={Boolean(cancelShift)} onOpenChange={(open) => !open && setCancelShift(null)}>
         <DialogContent>
           <DialogHeader><DialogTitle>Cancel roster shift</DialogTitle><DialogDescription>Cancellation keeps the roster history and removes this shift from active schedules.</DialogDescription></DialogHeader>
@@ -361,6 +463,45 @@ export const RostersPage = () => {
             <Button variant="outline" onClick={() => setConflictAction(null)}>Close</Button>
             <Button disabled={!conflictReason || conflictMutation.isPending} onClick={() => conflictMutation.mutate()}>
               {conflictAction?.action === "override" ? "Override conflict" : "Resolve conflict"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={Boolean(selectedChange) && !changeAction} onOpenChange={(open) => !open && setSelectedChange(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Approval timeline</DialogTitle>
+            <DialogDescription>{selectedChange?.employee_name ?? selectedChange?.employee_id} - {selectedChange ? label(selectedChange.change_type) : "Roster change"}</DialogDescription>
+          </DialogHeader>
+          {changeTimelineQuery.isLoading ? <p className="text-sm text-muted-foreground">Loading timeline...</p> : null}
+          {changeTimelineQuery.error ? <p className="text-sm text-destructive">{friendlyHrmError(changeTimelineQuery.error, "Timeline could not be loaded.")}</p> : null}
+          <div className="space-y-2">
+            {(changeTimelineQuery.data?.data?.steps ?? []).map((step) => (
+              <div key={step.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                <div>
+                  <p className="font-medium">{step.step_name}</p>
+                  {step.fallback_applied ? <p className="text-xs text-muted-foreground">Fallback: {label(step.fallback_applied)}</p> : null}
+                </div>
+                {statusBadge(step.status)}
+              </div>
+            ))}
+            {!changeTimelineQuery.isLoading && (changeTimelineQuery.data?.data?.steps ?? []).length === 0 ? <p className="text-sm text-muted-foreground">No approval steps have been generated yet.</p> : null}
+          </div>
+          {selectedChange?.apply_error_message ? <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">{selectedChange.apply_error_message}</p> : null}
+          <DialogFooter><Button variant="outline" onClick={() => setSelectedChange(null)}>Close</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={Boolean(changeAction)} onOpenChange={(open) => { if (!open) { setChangeAction(null); setChangeReason(""); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{changeAction === "approve" ? "Approve roster change" : changeAction === "reject" ? "Reject roster change" : "Cancel roster change"}</DialogTitle>
+            <DialogDescription>Record a short reason so the approval timeline stays clear.</DialogDescription>
+          </DialogHeader>
+          <Label className="grid gap-1 text-sm">Reason<Textarea value={changeReason} onChange={(event) => setChangeReason(event.target.value)} /></Label>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setChangeAction(null); setChangeReason(""); }}>Close</Button>
+            <Button disabled={(changeAction !== "approve" && !changeReason.trim()) || changeMutation.isPending} onClick={() => changeMutation.mutate()}>
+              {changeAction === "approve" ? "Approve" : changeAction === "reject" ? "Reject" : "Cancel"}
             </Button>
           </DialogFooter>
         </DialogContent>

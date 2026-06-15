@@ -1,4 +1,6 @@
 import * as repository from "./approval-workflow-engine.repository";
+import * as operationOwnershipRepository from "../operation-ownership/operation-ownership.repository";
+import { resolveOperationResponsibility } from "../operation-ownership/operation-ownership.service";
 import type {
   ApprovalRequestEngineRecord,
   ApprovalResolverCandidate,
@@ -42,6 +44,62 @@ const resolved = (candidates: ApprovalResolverCandidate[]): ApprovalResolverResu
   fallbackApplied: null,
   message: candidates[0] ? "Approver resolved." : "No approver found.",
 });
+
+const isOperationOwnershipResolver = (resolverType: string) =>
+  resolverType === "OPERATION_OWNER" ||
+  resolverType === "OPERATION_FINAL_APPROVER" ||
+  resolverType === "OPERATION_EXECUTOR" ||
+  resolverType === "OPERATION_CONFIGURATION_OWNER" ||
+  resolverType === "OPERATION_ESCALATION" ||
+  resolverType === "BUSINESS_FUNCTION_DEPARTMENT";
+
+const operationResponsibilityType = (resolverType: string) => {
+  if (resolverType === "OPERATION_FINAL_APPROVER") return "FINAL_APPROVAL" as const;
+  if (resolverType === "OPERATION_EXECUTOR") return "EXECUTION" as const;
+  if (resolverType === "OPERATION_CONFIGURATION_OWNER") return "CONFIGURATION" as const;
+  if (resolverType === "OPERATION_ESCALATION") return "ESCALATION" as const;
+  return "OWNER" as const;
+};
+
+const candidatesFromOperationOwnership = async (
+  env: Env,
+  request: ApprovalRequestEngineRecord,
+  step: ApprovalWorkflowStepEngineRecord,
+) => {
+  const resolution = await resolveOperationResponsibility(env, { companyId: request.company_id }, {
+    operation_code: request.operation_type,
+    responsibility_type: operationResponsibilityType(step.approver_resolver_type),
+    requester_employee_id: request.requester_employee_id,
+    subject_employee_id: request.subject_employee_id,
+    department_id: request.department_id,
+    fallback_behavior: step.fallback_behavior === "ESCALATE_TO_SUPER_ADMIN" ? "USE_SUPER_ADMIN" : step.fallback_behavior === "BLOCK_SUBMISSION" ? "BLOCK_OPERATION" : "HOLD_FOR_MANUAL_ASSIGNMENT",
+  });
+
+  if (resolution.resolved_user_id) {
+    return repository.findSpecificUserApprover(env, request.company_id, resolution.resolved_user_id);
+  }
+  if (resolution.resolved_department_id) {
+    return operationOwnershipRepository.listDepartmentApproversForOperation(
+      env,
+      request.company_id,
+      resolution.resolved_department_id,
+      {
+        permissionKey: step.required_permission ?? resolution.required_permission,
+        roleId: step.required_role_id ?? resolution.required_role_id,
+        minLevel: step.required_min_level ?? resolution.min_level,
+        maxLevel: step.required_max_level ?? resolution.max_level,
+      },
+    );
+  }
+  if (resolution.required_role_id || resolution.required_permission) {
+    return repository.findPermissionApprovers(env, request.company_id, {
+      departmentId: resolution.resolved_department_id ?? step.required_department_id,
+      roleId: step.required_role_id ?? resolution.required_role_id,
+      permission: step.required_permission ?? resolution.required_permission,
+    });
+  }
+  return [];
+};
 
 export const resolveApproversForStep = async (
   env: Env,
@@ -88,6 +146,8 @@ export const resolveApproversForStep = async (
     candidates = await repository.findSpecificUserApprover(env, request.company_id, step.specific_user_id);
   } else if (step.approver_resolver_type === "SUPER_ADMIN") {
     candidates = await repository.findSuperAdminApprovers(env, request.company_id);
+  } else if (isOperationOwnershipResolver(step.approver_resolver_type)) {
+    candidates = await candidatesFromOperationOwnership(env, request, step);
   }
 
   const eligible = removeSelf(candidates, request, step.allow_self_approval === 1);

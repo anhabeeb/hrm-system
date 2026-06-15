@@ -9,8 +9,15 @@ import { ReasonDialog } from "@/components/forms/ReasonDialog";
 import { Button } from "@/components/ui/button";
 import { attendanceApi } from "@/features/attendance/attendance.api";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { advancesApi } from "@/features/advances/advances.api";
 import { useAuth } from "@/features/auth/auth.store";
+import { disciplineApi } from "@/features/discipline/discipline.api";
+import { documentsApi } from "@/features/documents/documents.api";
+import { employeeExitApi } from "@/features/offboarding/employeeExit.api";
+import { employeeStructureChangeApi } from "@/features/employee-structure-change/employeeStructureChange.api";
 import { leaveApi } from "@/features/leave/leave.api";
+import { payrollApi } from "@/features/payroll/payroll.api";
+import { rostersApi } from "@/features/rosters/rosters.api";
 import { friendlyHrmError } from "@/lib/hrm-errors";
 import { searchParamNumber } from "@/lib/query-string";
 import { ApprovalActionDialog } from "./ApprovalActionDialog";
@@ -56,7 +63,7 @@ export const ApprovalsPage = () => {
   const canViewInbox = has("approvals.view");
   const canViewWorkflows = has("approval_workflows.view") || has("approvals.workflows.view");
   const canViewThresholds = has("approval_thresholds.view");
-  const canViewEngineRequests = has("approvals.requests.view") || has("approvals.department.view") || has("approvals.hrFinal.view") || has("approvals.financeFinal.view") || canViewInbox;
+  const canViewEngineRequests = has("approvals.requests.view") || has("approvals.department.view") || has("approvals.hrFinal.view") || has("approvals.financeFinal.view") || has("employeeDiscipline.actions.view") || has("employeeDiscipline.actions.viewOwn") || has("employeeDiscipline.actions.review") || has("employeeDiscipline.actions.finalApprove") || has("employeeDiscipline.actions.apply") || canViewInbox;
   const canViewSettings = canViewInbox || canViewWorkflows || canViewThresholds;
   const activeTab = tab === "workflows" && canViewWorkflows ? "workflows" : tab === "requests" && canViewEngineRequests ? "requests" : tab === "my-pending" ? "my-pending" : tab === "my-requests" ? "my-requests" : tab === "thresholds" && canViewThresholds ? "thresholds" : tab === "settings" && canViewSettings ? "settings" : "inbox";
   const filters = useMemo<ApprovalFilterValues>(() => ({
@@ -122,6 +129,41 @@ export const ApprovalsPage = () => {
         if (engineAction === "reject") return await attendanceApi.rejectCorrection(selectedEngineRequest.subject_id, { reason: reason ?? "" });
         if (engineAction === "cancel") return await attendanceApi.cancelCorrection(selectedEngineRequest.subject_id, { reason: reason ?? "" });
       }
+      if (selectedEngineRequest.operation_type === "ROSTER_CHANGE") {
+        if (engineAction === "approve") return await rostersApi.approveChange(selectedEngineRequest.subject_id, { reason: reason ?? "Approved from Approvals page." });
+        if (engineAction === "reject") return await rostersApi.rejectChange(selectedEngineRequest.subject_id, { reason: reason ?? "" });
+        if (engineAction === "cancel") return await rostersApi.cancelChange(selectedEngineRequest.subject_id, { reason: reason ?? "" });
+      }
+      if (selectedEngineRequest.operation_type === "PAYROLL_ADJUSTMENT") {
+        if (engineAction === "approve") return await payrollApi.approveAdjustment(selectedEngineRequest.subject_id, reason ?? "Approved from Approvals page.");
+        if (engineAction === "reject") return await payrollApi.rejectAdjustment(selectedEngineRequest.subject_id, reason ?? "");
+        if (engineAction === "cancel") return await payrollApi.cancelAdjustment(selectedEngineRequest.subject_id, reason ?? "");
+      }
+      if (selectedEngineRequest.operation_type === "ADVANCE_SALARY_REQUEST") {
+        if (engineAction === "approve") return await advancesApi.approveSalaryRequest(selectedEngineRequest.subject_id, reason ?? "Approved from Approvals page.");
+        if (engineAction === "reject") return await advancesApi.rejectSalaryRequest(selectedEngineRequest.subject_id, reason ?? "");
+        if (engineAction === "cancel") return await advancesApi.cancelSalaryRequest(selectedEngineRequest.subject_id, reason ?? "");
+      }
+      if (selectedEngineRequest.operation_type === "DOCUMENT_KYC_UPDATE" || selectedEngineRequest.operation_type === "DOCUMENT_APPROVAL") {
+        if (engineAction === "approve") return await documentsApi.approveKycRequest(selectedEngineRequest.subject_id, reason ?? "Approved from Approvals page.");
+        if (engineAction === "reject") return await documentsApi.rejectKycRequest(selectedEngineRequest.subject_id, reason ?? "");
+        if (engineAction === "cancel") return await documentsApi.cancelKycRequest(selectedEngineRequest.subject_id, reason ?? "");
+      }
+      if (selectedEngineRequest.operation_type === "EMPLOYEE_TRANSFER" || selectedEngineRequest.operation_type === "EMPLOYEE_STRUCTURE_CHANGE") {
+        if (engineAction === "approve") return await employeeStructureChangeApi.approve(selectedEngineRequest.subject_id, reason ?? "Approved from Approvals page.");
+        if (engineAction === "reject") return await employeeStructureChangeApi.reject(selectedEngineRequest.subject_id, reason ?? "");
+        if (engineAction === "cancel") return await employeeStructureChangeApi.cancel(selectedEngineRequest.subject_id, reason ?? "");
+      }
+      if (selectedEngineRequest.operation_type === "RESIGNATION" || selectedEngineRequest.operation_type === "OFFBOARDING") {
+        if (engineAction === "approve") return await employeeExitApi.approve(selectedEngineRequest.subject_id, reason ?? "Approved from Approvals page.");
+        if (engineAction === "reject") return await employeeExitApi.reject(selectedEngineRequest.subject_id, reason ?? "");
+        if (engineAction === "cancel") return await employeeExitApi.cancel(selectedEngineRequest.subject_id, reason ?? "");
+      }
+      if (selectedEngineRequest.operation_type === "DISCIPLINARY_ACTION") {
+        if (engineAction === "approve") return await disciplineApi.approve(selectedEngineRequest.subject_id, reason ?? "Approved from Approvals page.");
+        if (engineAction === "reject") return await disciplineApi.reject(selectedEngineRequest.subject_id, reason ?? "");
+        if (engineAction === "cancel") return await disciplineApi.cancel(selectedEngineRequest.subject_id, reason ?? "");
+      }
       if (engineAction === "approve") return await approvalsApi.approveEngineRequest(selectedEngineRequest.id);
       if (engineAction === "reject") return await approvalsApi.rejectEngineRequest(selectedEngineRequest.id, reason ?? "");
       if (engineAction === "escalate") return await approvalsApi.escalateEngineRequest(selectedEngineRequest.id, reason ?? "");
@@ -178,9 +220,9 @@ export const ApprovalsPage = () => {
             <ApprovalEngineRequestsTable
               rows={engineRequestsQuery.data?.data ?? []}
               loading={engineRequestsQuery.isLoading}
-              canApprove={has("approvals.requests.approve") || has("approvals.department.approve") || has("approvals.hrFinal.approve") || has("approvals.financeFinal.approve")}
-              canReject={has("approvals.requests.reject") || has("approvals.department.reject") || has("approvals.hrFinal.reject") || has("approvals.financeFinal.reject")}
-              canCancel={has("approvals.requests.cancel")}
+                canApprove={has("approvals.requests.approve") || has("approvals.department.approve") || has("approvals.hrFinal.approve") || has("approvals.financeFinal.approve") || has("approvals.operationOwner.approve") || has("approvals.operationFinal.approve") || has("documentKyc.requests.approve") || has("documentKyc.requests.finalApprove") || has("employees.structureRequests.review") || has("employees.structureRequests.finalApprove") || has("employeeLifecycle.resignations.review") || has("employeeLifecycle.resignations.finalApprove") || has("employeeLifecycle.offboarding.review") || has("employeeLifecycle.offboarding.finalApprove") || has("employeeDiscipline.actions.review") || has("employeeDiscipline.actions.investigate") || has("employeeDiscipline.actions.finalApprove")}
+                canReject={has("approvals.requests.reject") || has("approvals.department.reject") || has("approvals.hrFinal.reject") || has("approvals.financeFinal.reject") || has("approvals.operationOwner.reject") || has("approvals.operationFinal.reject") || has("documentKyc.requests.reject") || has("employees.structureRequests.reject") || has("employeeLifecycle.resignations.reject") || has("employeeLifecycle.offboarding.reject") || has("employeeDiscipline.actions.reject")}
+              canCancel={has("approvals.requests.cancel") || has("employeeLifecycle.resignations.cancel") || has("employeeLifecycle.offboarding.cancel") || has("employeeDiscipline.actions.cancel")}
               onView={(row) => { setSelectedEngineRequest(row); toast.info(row.title, row.summary || "Approval request details and timeline are available from the API."); }}
               onApprove={(row) => { setSelectedEngineRequest(row); setEngineAction("approve"); }}
               onReject={(row) => { setSelectedEngineRequest(row); setEngineAction("reject"); }}

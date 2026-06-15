@@ -77,3 +77,59 @@ export interface PayrollCalculatePayload {
   outlet_id?: string;
   reason?: string;
 }
+
+export type PayrollAdjustmentStatus =
+  | "DRAFT"
+  | "PENDING"
+  | "PENDING_OWNER_REVIEW"
+  | "PENDING_FINAL_APPROVAL"
+  | "PENDING_EXECUTION"
+  | "PENDING_MANUAL_REVIEW"
+  | "APPROVED"
+  | "APPLIED"
+  | "REJECTED"
+  | "CANCELLED"
+  | "FAILED_TO_APPLY";
+
+export interface PayrollAdjustment {
+  id: string;
+  employee_id: string;
+  employee_name?: string | null;
+  employee_code?: string | null;
+  department_name?: string | null;
+  position_title?: string | null;
+  outlet_name?: string | null;
+  payroll_run_id?: string | null;
+  payroll_item_id?: string | null;
+  payslip_id?: string | null;
+  adjustment_type: string;
+  adjustment_direction: "ADD" | "DEDUCT" | "NEUTRAL";
+  amount?: number | null;
+  currency?: string | null;
+  effective_payroll_month?: string | null;
+  reason: string;
+  approval_request_id?: string | null;
+  approval_status?: string | null;
+  approval_current_step?: string | null;
+  current_step_name?: string | null;
+  status: PayrollAdjustmentStatus;
+  rejection_reason?: string | null;
+  cancellation_reason?: string | null;
+  apply_error_message?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface PayrollAdjustmentPayload {
+  employee_id?: string;
+  payroll_run_id?: string;
+  payroll_item_id?: string;
+  payslip_id?: string;
+  adjustment_type: string;
+  adjustment_direction: "ADD" | "DEDUCT" | "NEUTRAL";
+  amount?: number | null;
+  currency?: string | null;
+  effective_payroll_month?: string | null;
+  reason: string;
+  requested_value_json?: Record<string, unknown>;
+}

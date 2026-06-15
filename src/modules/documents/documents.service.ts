@@ -67,6 +67,7 @@ export const sanitizeDocumentForResponse = (document: any) => {
   ) as Record<string, any>;
   return {
     ...safe,
+    has_file: Boolean(document.file_key),
     validity_status: calculateDocumentValidityStatus(safe),
     days_until_expiry: daysUntilExpiry(safe.expiry_date),
   };
@@ -103,7 +104,7 @@ const ensureEmployeeAccess = async (env: Env, context: AuthActor, employeeId: st
 const ensureDocument = async (env: Env, context: AuthActor, id: string, action: "view" | "download" | "edit" | "delete" = "view") => {
   const document = await repository.findDocumentById(env, context.companyId, id);
   if (!document) throw new NotFoundError("Document not found.");
-  accessService.assertDocumentAccess(context, document, action);
+  await accessService.assertDocumentAccess(env, context, document, action);
   return document;
 };
 const assertEmployeeScopedDocument = (document: any, employeeId?: string) => {
@@ -113,10 +114,30 @@ const assertEmployeeScopedDocument = (document: any, employeeId?: string) => {
 };
 
 export const listDocuments = async (env: Env, context: AuthActor, filters: DocumentFilters): Promise<DocumentListResult<any>> => {
-  const total = await repository.countDocuments(env, context.companyId, filters, scope(context));
+  const selfServiceOnly =
+    !permissionService.isSuperAdmin(context) &&
+    !permissionService.hasPermission(context, "documents.view") &&
+    permissionService.hasPermission(context, "self.documents.view");
+  const actorDocumentEmployee = selfServiceOnly ? await repository.findEmployeeByUserId(env, context.companyId, context.actorUserId) : null;
+  const effectiveFilters = actorDocumentEmployee?.id
+    ? { ...filters, employee_id: actorDocumentEmployee.id }
+    : filters;
+  const effectiveScope = actorDocumentEmployee?.id
+    ? { isSuperAdmin: true, outletIds: [] as string[] }
+    : scope(context);
+  const baseRows = await repository.listDocuments(env, context.companyId, effectiveFilters, effectiveScope, actorDocumentEmployee?.id ? true : includeSensitive(context));
+  const visibleRows = [];
+  for (const document of baseRows) {
+    try {
+      await accessService.canViewEmployeeDocument(env, context, document, "view");
+      visibleRows.push(document);
+    } catch (error) {
+      if (!(error instanceof OutletAccessError) && !(error instanceof AppError && error.statusCode === 403)) throw error;
+    }
+  }
   return {
-    rows: (await repository.listDocuments(env, context.companyId, filters, scope(context), includeSensitive(context))).map(sanitizeDocumentForResponse),
-    pagination: pagination(filters.page, filters.page_size, total),
+    rows: visibleRows.map(sanitizeDocumentForResponse),
+    pagination: pagination(effectiveFilters.page, effectiveFilters.page_size, visibleRows.length),
   };
 };
 

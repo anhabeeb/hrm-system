@@ -89,6 +89,7 @@ const nav = read("frontend/src/lib/navigation.ts");
 const page = read("frontend/src/features/imports/ImportCenterPage.tsx");
 const tests = read("tests/imports.test.ts");
 const packageJson = read("package.json");
+const buildRunner = read("scripts/run-production-build-checks.mjs");
 
 if (!app.includes("importsRoutes") || !app.includes('"/imports"')) fail("import routes are not registered under /api/v1/imports");
 mustInclude(routes, [
@@ -298,6 +299,6 @@ mustInclude(tests, [
 ], "import tests");
 
 if (!packageJson.includes("verify:imports-schema")) fail("package.json is missing verify:imports-schema");
-if (!packageJson.includes("npm run verify:imports-schema")) fail("build:all must run verify:imports-schema");
+if (!buildRunner.includes('"verify:imports-schema"')) fail("production build runner must run verify:imports-schema");
 
 console.log("verify:imports-schema passed");

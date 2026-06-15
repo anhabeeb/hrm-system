@@ -30,6 +30,7 @@ const attendancePage = read("frontend/src/features/attendance/AttendanceReportsP
 const employeePage = read("frontend/src/features/employees/Employee360Page.tsx");
 const tests = read("tests/export-print.test.ts");
 const packageJson = read("package.json");
+const buildRunner = read("scripts/run-production-build-checks.mjs");
 const between = (source, start, end) => {
   const startIndex = source.indexOf(start);
   if (startIndex === -1) return "";
@@ -141,6 +142,6 @@ mustInclude(tests, [
 ], "export/print tests");
 
 if (!packageJson.includes("verify:export-print-schema")) fail("package.json is missing verify:export-print-schema");
-if (!packageJson.includes("npm run verify:export-print-schema")) fail("build:all must run verify:export-print-schema");
+if (!buildRunner.includes('"verify:export-print-schema"')) fail("production build runner must run verify:export-print-schema");
 
 console.log("verify:export-print-schema passed");

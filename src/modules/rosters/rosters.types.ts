@@ -12,6 +12,37 @@ export type RosterConflictType = (typeof ROSTER_CONFLICT_TYPES)[number];
 export type RosterConflictSeverity = (typeof ROSTER_CONFLICT_SEVERITIES)[number];
 export type RosterConflictStatus = (typeof ROSTER_CONFLICT_STATUSES)[number];
 
+export const ROSTER_CHANGE_TYPES = [
+  "SHIFT_CREATE",
+  "SHIFT_UPDATE",
+  "SHIFT_DELETE",
+  "SHIFT_SWAP",
+  "DAY_OFF_REQUEST",
+  "DAY_OFF_CHANGE",
+  "SHIFT_TIME_CHANGE",
+  "OUTLET_SHIFT_CHANGE",
+  "ROSTER_PUBLISH_CHANGE",
+  "ROSTER_UNPUBLISH_CHANGE",
+  "BULK_ROSTER_CHANGE",
+  "GENERAL_ROSTER_CHANGE",
+] as const;
+
+export const ROSTER_CHANGE_STATUSES = [
+  "DRAFT",
+  "PENDING",
+  "PENDING_DEPARTMENT_APPROVAL",
+  "PENDING_HR_APPROVAL",
+  "PENDING_MANUAL_REVIEW",
+  "APPROVED",
+  "REJECTED",
+  "CANCELLED",
+  "APPLIED",
+  "FAILED_TO_APPLY",
+] as const;
+
+export type RosterChangeType = (typeof ROSTER_CHANGE_TYPES)[number];
+export type RosterChangeStatus = (typeof ROSTER_CHANGE_STATUSES)[number];
+
 export interface ShiftTemplateRecord {
   id: string;
   company_id: string;
@@ -99,10 +130,104 @@ export interface RosterEmployeeRecord {
   primary_outlet_id: string | null;
   department_id?: string | null;
   position_id?: string | null;
+  level?: number | null;
   joined_at?: string | null;
   resigned_at?: string | null;
   terminated_at?: string | null;
   deleted_at?: string | null;
+}
+
+export interface RosterChangeRequestRecord {
+  id: string;
+  company_id: string;
+  employee_id: string | null;
+  employee_name?: string | null;
+  employee_code?: string | null;
+  requester_employee_id: string | null;
+  requester_user_id: string | null;
+  department_id: string | null;
+  department_name?: string | null;
+  position_id: string | null;
+  position_title?: string | null;
+  level: number | null;
+  outlet_id: string | null;
+  outlet_name?: string | null;
+  store_id: string | null;
+  roster_id: string | null;
+  shift_id: string | null;
+  source_roster_id: string | null;
+  target_roster_id: string | null;
+  source_shift_id: string | null;
+  target_shift_id: string | null;
+  change_type: RosterChangeType;
+  requested_date: string | null;
+  requested_start_at: string | null;
+  requested_end_at: string | null;
+  requested_break_start: string | null;
+  requested_break_end: string | null;
+  current_value_json: string | null;
+  requested_value_json: string | null;
+  reason: string;
+  employee_note: string | null;
+  manager_note: string | null;
+  hr_note: string | null;
+  approval_request_id: string | null;
+  approval_status: string | null;
+  approval_current_step: string | null;
+  status: RosterChangeStatus;
+  department_approved_at: string | null;
+  department_approved_by: string | null;
+  hr_approved_at: string | null;
+  hr_approved_by: string | null;
+  rejected_at: string | null;
+  rejected_by: string | null;
+  rejection_reason: string | null;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
+  approval_submitted_at: string | null;
+  approval_completed_at: string | null;
+  applied_at: string | null;
+  applied_by: string | null;
+  apply_error_code: string | null;
+  apply_error_message: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
+  archived_at: string | null;
+  current_step_name?: string | null;
+}
+
+export interface RosterChangeRequestInput {
+  employee_id?: string | null;
+  roster_id?: string | null;
+  shift_id?: string | null;
+  source_roster_id?: string | null;
+  target_roster_id?: string | null;
+  source_shift_id?: string | null;
+  target_shift_id?: string | null;
+  change_type: RosterChangeType;
+  requested_date?: string | null;
+  requested_start_at?: string | null;
+  requested_end_at?: string | null;
+  requested_break_start?: string | null;
+  requested_break_end?: string | null;
+  requested_value_json?: Record<string, unknown> | null;
+  reason: string;
+  employee_note?: string | null;
+  manager_note?: string | null;
+  override_warnings?: boolean;
+}
+
+export interface RosterChangeFilters {
+  employee_id?: string;
+  department_id?: string;
+  outlet_id?: string;
+  status?: string;
+  approval_status?: string;
+  requested_date?: string;
+  page: number;
+  page_size: number;
 }
 
 export interface ShiftTemplateInput {

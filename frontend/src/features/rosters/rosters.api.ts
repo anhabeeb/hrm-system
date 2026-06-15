@@ -1,6 +1,6 @@
 import { api } from "@/lib/api-client";
 import { buildQueryString } from "@/lib/query-string";
-import type { BulkRosterPayload, RosterConflict, RosterFilters, RosterPayload, RosterShift, ShiftTemplate, ShiftTemplatePayload } from "./rosters.types";
+import type { BulkRosterPayload, RosterChangePayload, RosterChangeRequest, RosterChangeTimeline, RosterConflict, RosterFilters, RosterPayload, RosterShift, ShiftTemplate, ShiftTemplatePayload } from "./rosters.types";
 
 export const rostersApi = {
   list: (filters: RosterFilters = {}) => api.get<RosterShift[]>(`/rosters${buildQueryString(filters)}`),
@@ -14,6 +14,14 @@ export const rostersApi = {
   conflicts: (filters: RosterFilters = {}) => api.get<RosterConflict[]>(`/rosters/conflicts${buildQueryString(filters)}`),
   resolveConflict: (id: string, payload: { reason: string }) => api.post<{ conflict: RosterConflict }>(`/rosters/conflicts/${id}/resolve`, payload),
   overrideConflict: (id: string, payload: { reason: string }) => api.post<{ conflict: RosterConflict }>(`/rosters/conflicts/${id}/override`, payload),
+  listChanges: (filters: RosterFilters = {}) => api.get<RosterChangeRequest[]>(`/rosters/changes${buildQueryString(filters)}`),
+  getChange: (id: string) => api.get<{ roster_change: RosterChangeRequest }>(`/rosters/changes/${id}`),
+  createChange: (payload: RosterChangePayload) => api.post<{ roster_change: RosterChangeRequest }>("/rosters/changes", payload),
+  submitChange: (id: string) => api.post<{ roster_change: RosterChangeRequest; already_submitted?: boolean }>(`/rosters/changes/${id}/submit`, {}),
+  approveChange: (id: string, payload: { reason: string }) => api.post<{ roster_change: RosterChangeRequest }>(`/rosters/changes/${id}/approve`, payload),
+  rejectChange: (id: string, payload: { reason: string }) => api.post<{ roster_change: RosterChangeRequest }>(`/rosters/changes/${id}/reject`, payload),
+  cancelChange: (id: string, payload: { reason: string }) => api.post<{ roster_change: RosterChangeRequest }>(`/rosters/changes/${id}/cancel`, payload),
+  changeTimeline: (id: string) => api.get<RosterChangeTimeline>(`/rosters/changes/${id}/approval-timeline`),
 };
 
 export const shiftTemplatesApi = {

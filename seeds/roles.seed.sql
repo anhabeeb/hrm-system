@@ -128,6 +128,41 @@ WHERE permission_key IN (
 );
 
 INSERT OR IGNORE INTO role_permissions (id, company_id, role_id, permission_key, created_at)
+SELECT 'rp_operation_ownership_admin_' || replace(permission_key, '.', '_'), 'company_seed_default', 'role_admin', permission_key, '2026-01-01T00:00:00Z'
+FROM permissions
+WHERE permission_key IN (
+  'operationOwnership.view', 'operationOwnership.manage',
+  'operationOwnership.businessFunctions.view', 'operationOwnership.businessFunctions.manage',
+  'operationOwnership.matrix.view', 'operationOwnership.matrix.manage',
+  'operationOwnership.catalog.view', 'operationOwnership.catalog.manage',
+  'operationOwnership.assignments.view', 'operationOwnership.assignments.manage',
+  'operationOwnership.audit.view', 'operationOwnership.sensitive.manage',
+  'operationOwnership.superadminFallback.manage'
+);
+
+INSERT OR IGNORE INTO role_permissions (id, company_id, role_id, permission_key, created_at)
+SELECT 'rp_operation_ownership_hr_' || replace(permission_key, '.', '_'), 'company_seed_default', 'role_hr_officer', permission_key, '2026-01-01T00:00:00Z'
+FROM permissions
+WHERE permission_key IN (
+  'operationOwnership.view',
+  'operationOwnership.businessFunctions.view',
+  'operationOwnership.matrix.view',
+  'operationOwnership.catalog.view',
+  'operationOwnership.assignments.view'
+);
+
+INSERT OR IGNORE INTO role_permissions (id, company_id, role_id, permission_key, created_at)
+SELECT 'rp_operation_ownership_hr_admin_' || replace(permission_key, '.', '_'), 'company_seed_default', 'role_hr_admin', permission_key, '2026-01-01T00:00:00Z'
+FROM permissions
+WHERE permission_key IN (
+  'operationOwnership.view',
+  'operationOwnership.businessFunctions.view',
+  'operationOwnership.matrix.view',
+  'operationOwnership.catalog.view',
+  'operationOwnership.assignments.view'
+);
+
+INSERT OR IGNORE INTO role_permissions (id, company_id, role_id, permission_key, created_at)
 SELECT 'rp_accountant_' || replace(permission_key, '.', '_'), 'company_seed_default', 'role_accountant', permission_key, '2026-01-01T00:00:00Z'
 FROM permissions
 WHERE module IN ('my_profile', 'payroll', 'payroll_settings', 'salary', 'payslips', 'advances', 'salary_loans', 'long_leave', 'dashboard', 'reports', 'export', 'notifications')
@@ -564,6 +599,113 @@ JOIN permissions ON permission_key IN (
   'department.leave.view',
   'department.requests.view',
   'department.approvals.view'
+)
+WHERE roles.company_id = 'company_seed_default'
+  AND roles.role_key IN ('supervisor', 'outlet_manager', 'hr_officer', 'hr_admin', 'admin', 'owner', 'super_admin');
+
+INSERT OR IGNORE INTO role_permissions (id, company_id, role_id, permission_key, created_at)
+SELECT 'rp_employee_lifecycle_self_' || roles.role_key || '_' || replace(permission_key, '.', '_'), 'company_seed_default', roles.id, permission_key, '2026-01-01T00:00:00Z'
+FROM roles
+JOIN permissions ON permission_key IN (
+  'employeeLifecycle.resignations.viewOwn',
+  'employeeLifecycle.resignations.create',
+  'employeeLifecycle.resignations.cancel',
+  'employeeLifecycle.offboarding.viewOwn'
+)
+WHERE roles.company_id = 'company_seed_default'
+  AND roles.role_key IN ('employee', 'staff', 'supervisor', 'outlet_manager', 'hr_officer', 'hr_admin', 'admin', 'owner', 'super_admin');
+
+INSERT OR IGNORE INTO role_permissions (id, company_id, role_id, permission_key, created_at)
+SELECT 'rp_employee_lifecycle_manage_' || roles.role_key || '_' || replace(permission_key, '.', '_'), 'company_seed_default', roles.id, permission_key, '2026-01-01T00:00:00Z'
+FROM roles
+JOIN permissions ON permission_key IN (
+  'employeeLifecycle.resignations.view',
+  'employeeLifecycle.exitRequests.viewAll',
+  'employeeLifecycle.resignations.createForOthers',
+  'employeeLifecycle.resignations.review',
+  'employeeLifecycle.resignations.finalApprove',
+  'employeeLifecycle.resignations.reject',
+  'employeeLifecycle.resignations.cancelAny',
+  'employeeLifecycle.resignations.apply',
+  'employeeLifecycle.offboarding.view',
+  'employeeLifecycle.offboarding.create',
+  'employeeLifecycle.offboarding.createForOthers',
+  'employeeLifecycle.offboarding.review',
+  'employeeLifecycle.offboarding.finalApprove',
+  'employeeLifecycle.offboarding.reject',
+  'employeeLifecycle.offboarding.cancel',
+  'employeeLifecycle.offboarding.cancelAny',
+  'employeeLifecycle.offboarding.manage',
+  'employeeLifecycle.offboarding.apply',
+  'employeeLifecycle.offboarding.complete',
+  'employeeLifecycle.offboarding.tasks.view',
+  'employeeLifecycle.offboarding.tasks.complete',
+  'employeeLifecycle.offboarding.tasks.waive',
+  'employeeLifecycle.tasks.manage',
+  'employeeLifecycle.audit.view'
+)
+WHERE roles.company_id = 'company_seed_default'
+  AND roles.role_key IN ('hr_officer', 'hr_admin', 'admin', 'owner', 'super_admin');
+
+INSERT OR IGNORE INTO role_permissions (id, company_id, role_id, permission_key, created_at)
+SELECT 'rp_employee_discipline_self_' || roles.role_key || '_' || replace(permission_key, '.', '_'), 'company_seed_default', roles.id, permission_key, '2026-01-01T00:00:00Z'
+FROM roles
+JOIN permissions ON permission_key IN (
+  'employeeDiscipline.actions.viewOwn',
+  'employeeDiscipline.records.viewOwn',
+  'employeeDiscipline.acknowledge'
+)
+WHERE roles.company_id = 'company_seed_default'
+  AND roles.role_key IN ('employee', 'staff', 'supervisor', 'outlet_manager', 'hr_officer', 'hr_admin', 'admin', 'owner', 'super_admin');
+
+INSERT OR IGNORE INTO role_permissions (id, company_id, role_id, permission_key, created_at)
+SELECT 'rp_employee_discipline_manage_' || roles.role_key || '_' || replace(permission_key, '.', '_'), 'company_seed_default', roles.id, permission_key, '2026-01-01T00:00:00Z'
+FROM roles
+JOIN permissions ON permission_key IN (
+  'employeeDiscipline.actions.view',
+  'employeeDiscipline.actions.create',
+  'employeeDiscipline.actions.createForOthers',
+  'employeeDiscipline.actions.review',
+  'employeeDiscipline.actions.investigate',
+  'employeeDiscipline.actions.finalApprove',
+  'employeeDiscipline.actions.reject',
+  'employeeDiscipline.actions.cancel',
+  'employeeDiscipline.actions.cancelAny',
+  'employeeDiscipline.actions.apply',
+  'employeeDiscipline.actions.close',
+  'employeeDiscipline.actions.manage',
+  'employeeDiscipline.records.view',
+  'employeeDiscipline.records.viewOwn',
+  'employeeDiscipline.records.viewAll',
+  'employeeDiscipline.tasks.view',
+  'employeeDiscipline.tasks.complete',
+  'employeeDiscipline.tasks.waive',
+  'employeeDiscipline.audit.view'
+)
+WHERE roles.company_id = 'company_seed_default'
+  AND roles.role_key IN ('hr_officer', 'hr_admin', 'admin', 'owner', 'super_admin');
+
+INSERT OR IGNORE INTO role_permissions (id, company_id, role_id, permission_key, created_at)
+SELECT 'rp_roster_changes_self_' || roles.role_key || '_' || replace(permission_key, '.', '_'), 'company_seed_default', roles.id, permission_key, '2026-01-01T00:00:00Z'
+FROM roles
+JOIN permissions ON permission_key IN (
+  'roster.changes.create',
+  'roster.changes.cancel'
+)
+WHERE roles.company_id = 'company_seed_default'
+  AND roles.role_key IN ('employee', 'staff', 'supervisor', 'outlet_manager', 'hr_officer', 'hr_admin', 'admin', 'owner', 'super_admin');
+
+INSERT OR IGNORE INTO role_permissions (id, company_id, role_id, permission_key, created_at)
+SELECT 'rp_roster_changes_manage_' || roles.role_key || '_' || replace(permission_key, '.', '_'), 'company_seed_default', roles.id, permission_key, '2026-01-01T00:00:00Z'
+FROM roles
+JOIN permissions ON permission_key IN (
+  'roster.changes.view',
+  'roster.changes.createForOthers',
+  'roster.changes.cancelAny',
+  'roster.changes.approve',
+  'roster.changes.reject',
+  'roster.changes.audit.view',
+  'roster.changes.apply'
 )
 WHERE roles.company_id = 'company_seed_default'
   AND roles.role_key IN ('supervisor', 'outlet_manager', 'hr_officer', 'hr_admin', 'admin', 'owner', 'super_admin');

@@ -55,6 +55,9 @@ export const verifyCriticalRoutes = (baseDir = rootDir) => {
   const wrangler = normalize(readText(wranglerPath, baseDir));
   const packageJson = JSON.parse(readText(packagePath, baseDir));
   const scripts = packageJson.scripts ?? {};
+  const buildRunner = exists("scripts/run-production-build-checks.mjs", baseDir)
+    ? readText("scripts/run-production-build-checks.mjs", baseDir)
+    : "";
 
   assertContains(
     failures,
@@ -153,8 +156,8 @@ export const verifyCriticalRoutes = (baseDir = rootDir) => {
     "assets.run_worker_first must be true so frontend HTML/static asset responses pass through Worker security headers.",
   );
 
-  if (scripts.build !== "npm run build:all") {
-    failures.push('package.json: "build" must be "npm run build:all".');
+  if (scripts.build !== "node scripts/run-production-build-checks.mjs") {
+    failures.push('package.json: "build" must use scripts/run-production-build-checks.mjs.');
   }
   const frontendBuildScript = scripts["build:frontend"] ?? "";
   const usesFrontendBuild = frontendBuildScript.includes("npm --prefix frontend") && frontendBuildScript.includes("run build");
@@ -171,17 +174,23 @@ export const verifyCriticalRoutes = (baseDir = rootDir) => {
   ) {
     failures.push('frontend/package.json: "build" must run typecheck and the Vite native production build directly.');
   }
-  if (!scripts["build:all"]?.includes("npm run build:api")) {
-    failures.push('package.json: "build:all" must include API typecheck/build.');
+  if (scripts["build:all"] !== "node scripts/run-production-build-checks.mjs") {
+    failures.push('package.json: "build:all" must use scripts/run-production-build-checks.mjs.');
   }
-  if (!scripts["build:all"]?.includes("npm run build:frontend")) {
-    failures.push('package.json: "build:all" must include frontend build.');
+  if (!buildRunner.includes('"build:api"')) {
+    failures.push("scripts/run-production-build-checks.mjs must include API typecheck/build.");
   }
-  if (!scripts["build:all"]?.includes("npm run verify:frontend-assets")) {
-    failures.push('package.json: "build:all" must verify frontend assets.');
+  if (!buildRunner.includes('"build:frontend"')) {
+    failures.push("scripts/run-production-build-checks.mjs must include frontend build.");
   }
-  if (!scripts["build:all"]?.includes("npm run verify:critical-routes")) {
-    failures.push('package.json: "build:all" must run verify:critical-routes.');
+  if (!buildRunner.includes('"verify:frontend-assets"')) {
+    failures.push("scripts/run-production-build-checks.mjs must verify frontend assets.");
+  }
+  if (!buildRunner.includes('"verify:critical-routes"')) {
+    failures.push("scripts/run-production-build-checks.mjs must run verify:critical-routes.");
+  }
+  if (!buildRunner.includes("timeout")) {
+    failures.push("scripts/run-production-build-checks.mjs must apply deterministic per-command timeouts.");
   }
   if (!scripts.deploy?.includes("wrangler deploy")) {
     failures.push('package.json: "deploy" must deploy the Worker script with wrangler deploy.');

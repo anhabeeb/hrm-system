@@ -1,18 +1,26 @@
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 
 const failures = [];
+const AUDIT_TIMEOUT_MS = 30_000;
 
 let audit;
 try {
-  const command = process.platform === "win32"
-    ? "cmd /c npm audit --json --audit-level=critical"
-    : "npm audit --json --audit-level=critical";
-  const output = execSync(command, {
+  const command = process.platform === "win32" ? (process.env.ComSpec ?? "cmd.exe") : "npm";
+  const args = process.platform === "win32"
+    ? ["/d", "/s", "/c", "npm audit --json --audit-level=critical"]
+    : ["audit", "--json", "--audit-level=critical"];
+  const output = execFileSync(command, args, {
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
+    timeout: AUDIT_TIMEOUT_MS,
+    windowsHide: true,
   });
   audit = JSON.parse(output);
 } catch (error) {
+  if (error?.code === "ETIMEDOUT" || error?.signal === "SIGTERM") {
+    failures.push(`npm audit did not finish within ${AUDIT_TIMEOUT_MS / 1000} seconds.`);
+  }
+
   const stdout = error?.stdout?.toString?.() ?? "";
   if (stdout.trim()) {
     try {
@@ -20,7 +28,7 @@ try {
     } catch {
       failures.push("npm audit returned non-JSON output.");
     }
-  } else {
+  } else if (failures.length === 0) {
     failures.push(`npm audit could not be executed: ${error?.message ?? String(error)}`);
   }
 }

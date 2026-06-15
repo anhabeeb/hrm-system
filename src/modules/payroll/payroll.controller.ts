@@ -1,6 +1,12 @@
 import type { Context } from "hono";
 
 import * as service from "./payroll.service";
+import * as adjustmentService from "./payroll-adjustments.service";
+import {
+  validatePayrollAdjustmentAction,
+  validatePayrollAdjustmentFilters,
+  validatePayrollAdjustmentInput,
+} from "./payroll-adjustments.validators";
 import {
   requirePayrollMonth,
   validateExceptionFilters,
@@ -29,6 +35,9 @@ const query = (c: Context<AppContext>) => ({
   payroll_month: c.req.query("payroll_month"),
   status: c.req.query("status"),
   outlet_id: c.req.query("outlet_id"),
+  payroll_run_id: c.req.query("payroll_run_id"),
+  effective_payroll_month: c.req.query("effective_payroll_month"),
+  approval_status: c.req.query("approval_status"),
   date_from: c.req.query("date_from"),
   date_to: c.req.query("date_to"),
   employee_id: c.req.query("employee_id"),
@@ -106,3 +115,32 @@ export const reopen = async (c: Context<AppContext>) =>
 
 export const exportPayroll = async (c: Context<AppContext>) =>
   ok(await service.exportPayroll(c.env, actor(c), id(c), c.req.query("outlet_id")), "Payroll export prepared successfully.", { requestId: c.get("requestId") });
+
+export const listAdjustments = async (c: Context<AppContext>) => {
+  const result = await adjustmentService.listPayrollAdjustments(c.env, actor(c), validatePayrollAdjustmentFilters(query(c)));
+  return paginated(result.rows, result.pagination, "Payroll adjustment requests loaded successfully.", { requestId: c.get("requestId") });
+};
+
+export const createAdjustment = async (c: Context<AppContext>) =>
+  created(await adjustmentService.createPayrollAdjustment(c.env, actor(c), validatePayrollAdjustmentInput(await body(c))), "Payroll adjustment request created successfully.", { requestId: c.get("requestId") });
+
+export const getAdjustment = async (c: Context<AppContext>) =>
+  ok(await adjustmentService.getPayrollAdjustment(c.env, actor(c), id(c)), "Payroll adjustment request loaded successfully.", { requestId: c.get("requestId") });
+
+export const submitAdjustment = async (c: Context<AppContext>) =>
+  ok(await adjustmentService.submitPayrollAdjustmentForApproval(c.env, actor(c), id(c)), "Payroll adjustment submitted for approval.", { requestId: c.get("requestId") });
+
+export const approveAdjustment = async (c: Context<AppContext>) =>
+  ok(await adjustmentService.approvePayrollAdjustmentStep(c.env, actor(c), id(c), validatePayrollAdjustmentAction(await body(c))), "Payroll adjustment approval recorded successfully.", { requestId: c.get("requestId") });
+
+export const rejectAdjustment = async (c: Context<AppContext>) =>
+  ok(await adjustmentService.rejectPayrollAdjustmentStep(c.env, actor(c), id(c), validatePayrollAdjustmentAction(await body(c))), "Payroll adjustment rejected successfully.", { requestId: c.get("requestId") });
+
+export const cancelAdjustment = async (c: Context<AppContext>) =>
+  ok(await adjustmentService.cancelPayrollAdjustment(c.env, actor(c), id(c), validatePayrollAdjustmentAction(await body(c))), "Payroll adjustment cancelled successfully.", { requestId: c.get("requestId") });
+
+export const applyAdjustment = async (c: Context<AppContext>) =>
+  ok(await adjustmentService.applyApprovedPayrollAdjustment(c.env, actor(c), id(c), validatePayrollAdjustmentAction(await body(c))), "Payroll adjustment apply action completed.", { requestId: c.get("requestId") });
+
+export const adjustmentTimeline = async (c: Context<AppContext>) =>
+  ok(await adjustmentService.getPayrollAdjustmentTimeline(c.env, actor(c), id(c)), "Payroll adjustment approval timeline loaded successfully.", { requestId: c.get("requestId") });

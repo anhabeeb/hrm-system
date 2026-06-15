@@ -1,10 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Calculator } from "lucide-react";
+import { Calculator, Plus } from "lucide-react";
 
 import { EmptyState } from "@/components/data/EmptyState";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { useToast } from "@/components/feedback/useToast";
 import { PageActionBar } from "@/components/layout/PageActionBar";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -13,6 +14,9 @@ import { friendlyHrmError } from "@/lib/hrm-errors";
 import { searchParamNumber } from "@/lib/query-string";
 import { payrollApi } from "./payroll.api";
 import { PayrollActionDialog } from "./PayrollActionDialog";
+import { PayrollAdjustmentDetailDrawer } from "./PayrollAdjustmentDetailDrawer";
+import { PayrollAdjustmentDialog } from "./PayrollAdjustmentDialog";
+import { PayrollAdjustmentsTable } from "./PayrollAdjustmentsTable";
 import { PayrollExceptionsTable } from "./PayrollExceptionsTable";
 import { PayrollFilters } from "./PayrollFilters";
 import { PayrollFlowStepper } from "./PayrollFlowStepper";
@@ -21,22 +25,28 @@ import { PayrollItemsTable } from "./PayrollItemsTable";
 import { PayrollRunDetailDrawer } from "./PayrollRunDetailDrawer";
 import { PayrollRunForm } from "./PayrollRunForm";
 import { PayrollRunsTable } from "./PayrollRunsTable";
-import type { PayrollCalculatePayload, PayrollException, PayrollFilters as PayrollFilterValues, PayrollItem, PayrollRun } from "./payroll.types";
+import type { PayrollAdjustment, PayrollCalculatePayload, PayrollException, PayrollFilters as PayrollFilterValues, PayrollItem, PayrollRun } from "./payroll.types";
 
 type PayrollAction = "recalculate" | "submit" | "approve" | "reject" | "finalize" | "resolveException" | null;
+type PayrollAdjustmentAction = "approveAdjustment" | "rejectAdjustment" | "cancelAdjustment" | "applyAdjustment" | null;
 
 export const PayrollPage = () => {
   const auth = useAuth();
+  const toast = useToast();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = useState(searchParams.get("tab") ?? "runs");
   const [formOpen, setFormOpen] = useState(false);
+  const [adjustmentOpen, setAdjustmentOpen] = useState(false);
   const [selectedRun, setSelectedRun] = useState<PayrollRun | null>(null);
   const [selectedItem, setSelectedItem] = useState<PayrollItem | null>(null);
   const [selectedException, setSelectedException] = useState<PayrollException | null>(null);
+  const [selectedAdjustment, setSelectedAdjustment] = useState<PayrollAdjustment | null>(null);
   const [runDrawerOpen, setRunDrawerOpen] = useState(false);
   const [itemDrawerOpen, setItemDrawerOpen] = useState(false);
+  const [adjustmentDrawerOpen, setAdjustmentDrawerOpen] = useState(false);
   const [action, setAction] = useState<PayrollAction>(null);
+  const [adjustmentAction, setAdjustmentAction] = useState<PayrollAdjustmentAction>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const filters = useMemo<PayrollFilterValues>(() => ({
@@ -66,6 +76,12 @@ export const PayrollPage = () => {
   const runsQuery = useQuery({ queryKey: ["payroll", "runs", filters], queryFn: () => payrollApi.list(filters) });
   const itemsQuery = useQuery({ queryKey: ["payroll", "items", selectedRun?.id, filters], queryFn: () => payrollApi.listItems(selectedRun!.id, filters), enabled: Boolean(selectedRun?.id) });
   const exceptionsQuery = useQuery({ queryKey: ["payroll", "exceptions", selectedRun?.id, filters], queryFn: () => payrollApi.listExceptions(selectedRun!.id, filters), enabled: Boolean(selectedRun?.id) });
+  const adjustmentsQuery = useQuery({ queryKey: ["payroll", "adjustments", filters], queryFn: () => payrollApi.listAdjustments(filters), enabled: tab === "adjustments" });
+  const adjustmentTimelineQuery = useQuery({
+    queryKey: ["payroll", "adjustment-timeline", selectedAdjustment?.id],
+    queryFn: () => payrollApi.adjustmentTimeline(selectedAdjustment!.id),
+    enabled: Boolean(selectedAdjustment?.id && adjustmentDrawerOpen),
+  });
   const refresh = async () => queryClient.invalidateQueries({ queryKey: ["payroll"] });
 
   const calculateMutation = useMutation({
@@ -98,16 +114,41 @@ export const PayrollPage = () => {
       await refresh();
     },
   });
+  const adjustmentMutation = useMutation<unknown, unknown, { reason: string }>({
+    mutationFn: ({ reason }: { reason: string }) => {
+      if (!selectedAdjustment || !adjustmentAction) throw new Error("Select a payroll adjustment first.");
+      if (adjustmentAction === "approveAdjustment") return payrollApi.approveAdjustment(selectedAdjustment.id, reason || "Approved from payroll adjustments page.");
+      if (adjustmentAction === "rejectAdjustment") return payrollApi.rejectAdjustment(selectedAdjustment.id, reason);
+      if (adjustmentAction === "cancelAdjustment") return payrollApi.cancelAdjustment(selectedAdjustment.id, reason);
+      return payrollApi.applyAdjustment(selectedAdjustment.id, reason);
+    },
+    onSuccess: async () => {
+      toast.success(
+        adjustmentAction === "approveAdjustment" ? "Payroll adjustment approved." :
+          adjustmentAction === "rejectAdjustment" ? "Payroll adjustment rejected." :
+            adjustmentAction === "cancelAdjustment" ? "Payroll adjustment cancelled." :
+              "Payroll adjustment apply action completed.",
+      );
+      setAdjustmentAction(null);
+      await refresh();
+    },
+    onError: (error) => toast.error(friendlyHrmError(error, "Payroll adjustment action could not be completed.", "payroll")),
+  });
 
-  const error = runsQuery.error ?? itemsQuery.error ?? exceptionsQuery.error ?? calculateMutation.error ?? actionMutation.error;
+  const error = runsQuery.error ?? itemsQuery.error ?? exceptionsQuery.error ?? adjustmentsQuery.error ?? calculateMutation.error ?? actionMutation.error ?? adjustmentMutation.error;
   const hasPayrollPermission = (permission: string) => auth.isSuperAdmin || auth.hasPermission(permission);
   const canCalculate = hasPayrollPermission("payroll.calculate");
+  const canCreateAdjustment = hasPayrollPermission("payroll.adjustments.create") || hasPayrollPermission("payroll.adjustments.createForOthers");
   const canRecalculate = hasPayrollPermission("payroll.recalculate");
   const canSubmitForApproval = hasPayrollPermission("payroll.review");
   const canApprove = hasPayrollPermission("payroll.approve");
   const canReject = hasPayrollPermission("payroll.reject");
   const canFinalize = hasPayrollPermission("payroll.finalize");
   const canResolve = auth.hasPermission("payroll.resolve_exceptions");
+  const canApproveAdjustment = hasPayrollPermission("payroll.adjustments.approve") || hasPayrollPermission("payroll.adjustments.review") || hasPayrollPermission("payroll.adjustments.finalApprove") || hasPayrollPermission("approvals.department.approve") || hasPayrollPermission("approvals.financeFinal.approve");
+  const canRejectAdjustment = hasPayrollPermission("payroll.adjustments.reject") || hasPayrollPermission("approvals.department.reject") || hasPayrollPermission("approvals.financeFinal.reject");
+  const canCancelAdjustment = hasPayrollPermission("payroll.adjustments.cancel") || hasPayrollPermission("payroll.adjustments.cancelAny");
+  const canApplyAdjustment = hasPayrollPermission("payroll.adjustments.apply");
 
   const actionCopy = {
     recalculate: ["Recalculate payroll", "Recalculate this draft payroll run using current attendance, leave, and deduction data.", "Recalculate"],
@@ -121,14 +162,21 @@ export const PayrollPage = () => {
 
   return (
     <div>
-      {canCalculate ? <PageActionBar label="Payroll page actions"><Button onClick={() => setFormOpen(true)}><Calculator className="h-4 w-4" />Calculate draft</Button></PageActionBar> : null}
+      {canCalculate || canCreateAdjustment ? (
+        <PageActionBar label="Payroll page actions">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {canCreateAdjustment ? <Button variant="outline" onClick={() => setAdjustmentOpen(true)}><Plus className="h-4 w-4" />Request adjustment</Button> : null}
+            {canCalculate ? <Button onClick={() => setFormOpen(true)}><Calculator className="h-4 w-4" />Calculate draft</Button> : null}
+          </div>
+        </PageActionBar>
+      ) : null}
       <div className="space-y-4 p-4 md:p-6">
         {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
         {error ? <InlineAlert title={friendlyHrmError(error, "Payroll action could not be completed.", "payroll")} variant="error" /> : null}
         <PayrollFlowStepper status={selectedRun?.status} />
         <PayrollFilters filters={filters} onChange={updateFilters} onClear={() => setSearchParams(new URLSearchParams({ page: "1", page_size: String(filters.page_size), tab }))} />
         <Tabs value={tab} onValueChange={setActiveTab}>
-          <TabsList><TabsTrigger value="runs">Runs</TabsTrigger><TabsTrigger value="items">Items</TabsTrigger><TabsTrigger value="exceptions">Exceptions</TabsTrigger></TabsList>
+          <TabsList><TabsTrigger value="runs">Runs</TabsTrigger><TabsTrigger value="items">Items</TabsTrigger><TabsTrigger value="exceptions">Exceptions</TabsTrigger><TabsTrigger value="adjustments">Adjustments</TabsTrigger></TabsList>
           <TabsContent value="runs">
             <PayrollRunsTable
               rows={runsQuery.data?.data ?? []}
@@ -155,12 +203,42 @@ export const PayrollPage = () => {
           <TabsContent value="exceptions">
             {selectedRun ? <PayrollExceptionsTable rows={exceptionsQuery.data?.data ?? []} loading={exceptionsQuery.isLoading} pagination={exceptionsQuery.data?.pagination} canResolve={canResolve} onResolve={(row) => { setSelectedException(row); setAction("resolveException"); }} onPageChange={(page) => updateFilters({ page })} onPageSizeChange={(page_size) => updateFilters({ page: 1, page_size })} /> : <EmptyState title="Select a payroll run" description="Open a payroll run first to review exceptions and blockers." />}
           </TabsContent>
+          <TabsContent value="adjustments">
+            <PayrollAdjustmentsTable
+              rows={adjustmentsQuery.data?.data ?? []}
+              loading={adjustmentsQuery.isLoading}
+              pagination={adjustmentsQuery.data?.pagination}
+              canApprove={canApproveAdjustment}
+              canReject={canRejectAdjustment}
+              canCancel={canCancelAdjustment}
+              canApply={canApplyAdjustment}
+              onView={(row) => { setSelectedAdjustment(row); setAdjustmentDrawerOpen(true); }}
+              onApprove={(row) => { setSelectedAdjustment(row); setAdjustmentAction("approveAdjustment"); }}
+              onReject={(row) => { setSelectedAdjustment(row); setAdjustmentAction("rejectAdjustment"); }}
+              onCancel={(row) => { setSelectedAdjustment(row); setAdjustmentAction("cancelAdjustment"); }}
+              onApply={(row) => { setSelectedAdjustment(row); setAdjustmentAction("applyAdjustment"); }}
+              onPageChange={(page) => updateFilters({ page })}
+              onPageSizeChange={(page_size) => updateFilters({ page: 1, page_size })}
+            />
+          </TabsContent>
         </Tabs>
       </div>
       <PayrollRunForm open={formOpen} loading={calculateMutation.isPending} error={calculateMutation.error ? friendlyHrmError(calculateMutation.error, "Payroll calculation could not be started.", "payroll") : null} onOpenChange={setFormOpen} onSubmit={(payload: PayrollCalculatePayload) => calculateMutation.mutate(payload)} />
+      <PayrollAdjustmentDialog open={adjustmentOpen} onOpenChange={setAdjustmentOpen} currentEmployeeId={auth.user?.employee_id ?? null} canSelectEmployee={hasPayrollPermission("payroll.adjustments.createForOthers")} onSubmitted={refresh} />
       <PayrollRunDetailDrawer run={selectedRun} open={runDrawerOpen} onOpenChange={setRunDrawerOpen} />
       <PayrollItemDetailDrawer item={selectedItem} open={itemDrawerOpen} onOpenChange={setItemDrawerOpen} />
+      <PayrollAdjustmentDetailDrawer adjustment={selectedAdjustment} timeline={adjustmentTimelineQuery.data?.data ?? null} open={adjustmentDrawerOpen} onOpenChange={setAdjustmentDrawerOpen} />
       <PayrollActionDialog open={Boolean(action)} title={selectedActionCopy[0]} description={selectedActionCopy[1]} confirmLabel={selectedActionCopy[2]} loading={actionMutation.isPending} error={actionMutation.error ? friendlyHrmError(actionMutation.error, "Payroll action could not be completed.", "payroll") : null} onOpenChange={(open) => !open && setAction(null)} onSubmit={(reason) => actionMutation.mutate({ reason })} />
+      <PayrollActionDialog
+        open={Boolean(adjustmentAction)}
+        title={adjustmentAction === "approveAdjustment" ? "Approve payroll adjustment" : adjustmentAction === "rejectAdjustment" ? "Reject payroll adjustment" : adjustmentAction === "cancelAdjustment" ? "Cancel payroll adjustment" : "Apply payroll adjustment"}
+        description={adjustmentAction === "applyAdjustment" ? "Apply this approved adjustment to the payroll adjustment ledger. Locked payroll records will be sent to manual review." : "A reason is required for this payroll adjustment action."}
+        confirmLabel={adjustmentAction === "applyAdjustment" ? "Apply adjustment" : adjustmentAction === "rejectAdjustment" ? "Reject" : adjustmentAction === "cancelAdjustment" ? "Cancel request" : "Approve"}
+        loading={adjustmentMutation.isPending}
+        error={adjustmentMutation.error ? friendlyHrmError(adjustmentMutation.error, "Payroll adjustment action could not be completed.", "payroll") : null}
+        onOpenChange={(open) => !open && setAdjustmentAction(null)}
+        onSubmit={(reason) => adjustmentMutation.mutate({ reason })}
+      />
     </div>
   );
 };

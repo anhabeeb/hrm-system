@@ -278,6 +278,7 @@ describe("salary and promotion approval workflow", () => {
   it("approval schema hardening is guarded before deployment", () => {
     const script = read("scripts/verify-approval-schema.mjs");
     const packageJson = read("package.json");
+    const buildRunner = read("scripts/run-production-build-checks.mjs");
     const checklist = read("docs/deployment-checklist.md");
 
     expect(script).toContain("Approval schema verification passed.");
@@ -285,7 +286,7 @@ describe("salary and promotion approval workflow", () => {
     expect(script).toContain("applying_started_at");
     expect(script).toContain("idx_approval_actions_unique_final_apply");
     expect(packageJson).toContain("verify:approval-schema");
-    expect(packageJson).toContain("npm run verify:approval-schema");
+    expect(buildRunner).toContain('"verify:approval-schema"');
     expect(checklist).toContain("PRAGMA table_info(approval_requests)");
     expect(checklist).toContain("do not blindly rerun");
   });

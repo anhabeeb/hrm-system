@@ -1,6 +1,8 @@
 import type {
   RosterConflictFilters,
   RosterConflictRecord,
+  RosterChangeFilters,
+  RosterChangeRequestRecord,
   RosterEmployeeRecord,
   RosterListFilters,
   RosterShiftRecord,
@@ -22,10 +24,22 @@ export const findEmployee = (env: Env, companyId: string, employeeId: string) =>
   one<RosterEmployeeRecord>(
     env,
     `SELECT id, company_id, employee_code, full_name, employee_type, employment_status, primary_outlet_id,
-      department_id, position_id, joined_at, resigned_at, terminated_at, deleted_at
+      department_id, position_id, level, joined_at, resigned_at, terminated_at, deleted_at
      FROM employees
      WHERE company_id = ? AND id = ? LIMIT 1`,
     [companyId, employeeId],
+  );
+
+export const findEmployeeByUserId = (env: Env, companyId: string, userId: string) =>
+  one<RosterEmployeeRecord>(
+    env,
+    `SELECT e.id, e.company_id, e.employee_code, e.full_name, e.employee_type, e.employment_status, e.primary_outlet_id,
+      e.department_id, e.position_id, e.level, e.joined_at, e.resigned_at, e.terminated_at, e.deleted_at
+     FROM users u
+     JOIN employees e ON e.company_id = u.company_id AND e.id = u.employee_id
+     WHERE u.company_id = ? AND u.id = ? AND u.deleted_at IS NULL
+     LIMIT 1`,
+    [companyId, userId],
   );
 
 export const findShiftTemplate = (env: Env, companyId: string, id: string) =>
@@ -381,6 +395,26 @@ export const updateRosterShift = (env: Env, companyId: string, id: string, input
   return run(env, `UPDATE roster_shifts SET ${sets.join(", ")} WHERE company_id = ? AND id = ?`, values);
 };
 
+export const updateRosterShiftForEmployee = (env: Env, companyId: string, id: string, employeeId: string, input: Record<string, unknown>, actorUserId: string) => {
+  const allowed = ["outlet_id", "department_id", "position_id", "shift_template_id", "roster_date", "start_time", "end_time", "break_minutes", "status", "notes"] as const;
+  const sets: string[] = [];
+  const values: unknown[] = [];
+  for (const key of allowed) {
+    if (input[key] !== undefined) {
+      sets.push(`${key} = ?`);
+      values.push(input[key] ?? null);
+      if (key === "roster_date") {
+        sets.push("shift_date = ?");
+        values.push(input[key]);
+      }
+    }
+  }
+  if (sets.length === 0) return Promise.resolve();
+  sets.push("updated_by = ?", "updated_at = ?");
+  values.push(actorUserId, new Date().toISOString(), companyId, id, employeeId);
+  return run(env, `UPDATE roster_shifts SET ${sets.join(", ")} WHERE company_id = ? AND id = ? AND employee_id = ?`, values);
+};
+
 export const cancelRosterShift = (env: Env, companyId: string, id: string, actorUserId: string, reason: string) =>
   run(
     env,
@@ -389,6 +423,16 @@ export const cancelRosterShift = (env: Env, companyId: string, id: string, actor
          updated_by = ?, updated_at = ?
      WHERE company_id = ? AND id = ?`,
     [actorUserId, new Date().toISOString(), reason, actorUserId, new Date().toISOString(), companyId, id],
+  );
+
+export const cancelRosterShiftForEmployee = (env: Env, companyId: string, id: string, employeeId: string, actorUserId: string, reason: string) =>
+  run(
+    env,
+    `UPDATE roster_shifts
+     SET status = 'cancelled', cancelled_by = ?, cancelled_at = ?, cancellation_reason = ?,
+         updated_by = ?, updated_at = ?
+     WHERE company_id = ? AND id = ? AND employee_id = ?`,
+    [actorUserId, new Date().toISOString(), reason, actorUserId, new Date().toISOString(), companyId, id, employeeId],
   );
 
 export const clearOpenConflictsForShift = (env: Env, companyId: string, rosterShiftId: string) =>
@@ -718,3 +762,204 @@ export const getExpectedRosterForEmployeeDate = (env: Env, companyId: string, em
      ORDER BY r.start_time ASC`,
     [companyId, employeeId, date],
   );
+
+const rosterChangeSelect = `
+  SELECT rc.*,
+    e.full_name AS employee_name,
+    e.employee_code,
+    o.name AS outlet_name,
+    d.name AS department_name,
+    p.title AS position_title,
+    ars.step_name AS current_step_name
+  FROM roster_change_requests rc
+  LEFT JOIN employees e ON e.company_id = rc.company_id AND e.id = rc.employee_id
+  LEFT JOIN outlets o ON o.company_id = rc.company_id AND o.id = rc.outlet_id
+  LEFT JOIN departments d ON d.company_id = rc.company_id AND d.id = rc.department_id
+  LEFT JOIN positions p ON p.company_id = rc.company_id AND p.id = rc.position_id
+  LEFT JOIN approval_request_steps ars ON ars.company_id = rc.company_id AND ars.id = rc.approval_current_step
+`;
+
+const applyRosterChangeFilters = (clauses: string[], values: unknown[], filters: Partial<RosterChangeFilters>) => {
+  if (filters.employee_id) {
+    clauses.push("rc.employee_id = ?");
+    values.push(filters.employee_id);
+  }
+  if (filters.department_id) {
+    clauses.push("rc.department_id = ?");
+    values.push(filters.department_id);
+  }
+  if (filters.outlet_id) {
+    clauses.push("rc.outlet_id = ?");
+    values.push(filters.outlet_id);
+  }
+  if (filters.status) {
+    clauses.push("rc.status = ?");
+    values.push(filters.status);
+  }
+  if (filters.approval_status) {
+    clauses.push("rc.approval_status = ?");
+    values.push(filters.approval_status);
+  }
+  if (filters.requested_date) {
+    clauses.push("rc.requested_date = ?");
+    values.push(filters.requested_date);
+  }
+};
+
+export const listRosterChanges = async (
+  env: Env,
+  companyId: string,
+  filters: RosterChangeFilters,
+  visibilitySql?: string,
+  visibilityValues: unknown[] = [],
+) => {
+  const clauses = ["rc.company_id = ?", "rc.archived_at IS NULL"];
+  const values: unknown[] = [companyId];
+  applyRosterChangeFilters(clauses, values, filters);
+  if (visibilitySql) {
+    clauses.push(`(${visibilitySql})`);
+    values.push(...visibilityValues);
+  }
+  const where = clauses.join(" AND ");
+  const total = await one<{ total: number }>(env, `SELECT COUNT(*) AS total FROM roster_change_requests rc WHERE ${where}`, values);
+  const rows = await many<RosterChangeRequestRecord>(
+    env,
+    `${rosterChangeSelect}
+     WHERE ${where}
+     ORDER BY COALESCE(rc.approval_submitted_at, rc.created_at) DESC
+     LIMIT ? OFFSET ?`,
+    [...values, filters.page_size, (filters.page - 1) * filters.page_size],
+  );
+  return { rows, total: total?.total ?? 0 };
+};
+
+export const findRosterChangeById = (env: Env, companyId: string, id: string) =>
+  one<RosterChangeRequestRecord>(
+    env,
+    `${rosterChangeSelect}
+     WHERE rc.company_id = ? AND rc.id = ? AND rc.archived_at IS NULL
+     LIMIT 1`,
+    [companyId, id],
+  );
+
+export const findDuplicatePendingRosterChange = (env: Env, input: {
+  companyId: string;
+  employeeId: string;
+  requestedDate: string | null;
+  changeType: string;
+  shiftId?: string | null;
+  rosterId?: string | null;
+}) =>
+  one<{ id: string }>(
+    env,
+    `SELECT id
+       FROM roster_change_requests
+      WHERE company_id = ? AND employee_id = ? AND COALESCE(requested_date, '') = COALESCE(?, '')
+        AND change_type = ? AND COALESCE(shift_id, '') = COALESCE(?, '') AND COALESCE(roster_id, '') = COALESCE(?, '')
+        AND status IN ('DRAFT', 'PENDING', 'PENDING_DEPARTMENT_APPROVAL', 'PENDING_HR_APPROVAL', 'PENDING_MANUAL_REVIEW')
+      LIMIT 1`,
+    [input.companyId, input.employeeId, input.requestedDate, input.changeType, input.shiftId ?? null, input.rosterId ?? null],
+  );
+
+export const createRosterChangeRequest = (env: Env, input: {
+  id: string;
+  companyId: string;
+  actorUserId: string;
+  payload: Record<string, unknown>;
+}) => {
+  const now = new Date().toISOString();
+  return run(
+    env,
+    `INSERT INTO roster_change_requests (
+      id, company_id, employee_id, requester_employee_id, requester_user_id, department_id, position_id, level,
+      outlet_id, store_id, roster_id, shift_id, source_roster_id, target_roster_id, source_shift_id, target_shift_id,
+      change_type, requested_date, requested_start_at, requested_end_at, requested_break_start, requested_break_end,
+      current_value_json, requested_value_json, reason, employee_note, manager_note, status, created_at, updated_at,
+      created_by, updated_by
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DRAFT', ?, ?, ?, ?)`,
+    [
+      input.id,
+      input.companyId,
+      input.payload.employee_id ?? null,
+      input.payload.requester_employee_id ?? null,
+      input.payload.requester_user_id ?? null,
+      input.payload.department_id ?? null,
+      input.payload.position_id ?? null,
+      input.payload.level ?? null,
+      input.payload.outlet_id ?? null,
+      input.payload.store_id ?? null,
+      input.payload.roster_id ?? null,
+      input.payload.shift_id ?? null,
+      input.payload.source_roster_id ?? null,
+      input.payload.target_roster_id ?? null,
+      input.payload.source_shift_id ?? null,
+      input.payload.target_shift_id ?? null,
+      input.payload.change_type,
+      input.payload.requested_date ?? null,
+      input.payload.requested_start_at ?? null,
+      input.payload.requested_end_at ?? null,
+      input.payload.requested_break_start ?? null,
+      input.payload.requested_break_end ?? null,
+      input.payload.current_value_json ?? null,
+      input.payload.requested_value_json ?? null,
+      input.payload.reason,
+      input.payload.employee_note ?? null,
+      input.payload.manager_note ?? null,
+      now,
+      now,
+      input.actorUserId,
+      input.actorUserId,
+    ],
+  );
+};
+
+export const updateRosterChangeApprovalLink = (env: Env, companyId: string, id: string, input: {
+  approvalRequestId: string;
+  approvalStatus?: string | null;
+  currentStepId?: string | null;
+  status: string;
+  actorUserId: string;
+}) =>
+  run(
+    env,
+    `UPDATE roster_change_requests
+        SET approval_request_id = ?, approval_status = ?, approval_current_step = ?, status = ?,
+            approval_submitted_at = COALESCE(approval_submitted_at, ?), updated_by = ?, updated_at = ?
+      WHERE company_id = ? AND id = ? AND approval_request_id IS NULL`,
+    [input.approvalRequestId, input.approvalStatus ?? null, input.currentStepId ?? null, input.status, new Date().toISOString(), input.actorUserId, new Date().toISOString(), companyId, id],
+  );
+
+export const updateRosterChangeStatus = (env: Env, companyId: string, id: string, input: Record<string, unknown>) => {
+  const allowed = [
+    "status",
+    "approval_status",
+    "approval_current_step",
+    "department_approved_at",
+    "department_approved_by",
+    "hr_approved_at",
+    "hr_approved_by",
+    "rejected_at",
+    "rejected_by",
+    "rejection_reason",
+    "cancelled_at",
+    "cancelled_by",
+    "approval_completed_at",
+    "applied_at",
+    "applied_by",
+    "apply_error_code",
+    "apply_error_message",
+    "updated_by",
+  ] as const;
+  const sets: string[] = [];
+  const values: unknown[] = [];
+  for (const key of allowed) {
+    if (input[key] !== undefined) {
+      sets.push(`${key} = ?`);
+      values.push(input[key] ?? null);
+    }
+  }
+  if (sets.length === 0) return Promise.resolve();
+  sets.push("updated_at = ?");
+  values.push(new Date().toISOString(), companyId, id);
+  return run(env, `UPDATE roster_change_requests SET ${sets.join(", ")} WHERE company_id = ? AND id = ?`, values);
+};

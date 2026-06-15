@@ -24,6 +24,20 @@ const MODULE_BOUND_LEAVE_ACTION_MESSAGE =
   "Leave requests must be approved from the Leave module so leave status and balance are updated safely.";
 const MODULE_BOUND_ATTENDANCE_CORRECTION_ACTION_MESSAGE =
   "Attendance corrections must be approved from the Attendance module so attendance records are updated safely.";
+const MODULE_BOUND_ROSTER_CHANGE_ACTION_MESSAGE =
+  "Roster changes must be approved from the Roster module so roster records are updated safely.";
+const MODULE_BOUND_PAYROLL_ADJUSTMENT_ACTION_MESSAGE =
+  "Payroll adjustments must be approved from the Payroll module so payroll status and ledger are updated safely.";
+const MODULE_BOUND_ADVANCE_SALARY_ACTION_MESSAGE =
+  "Advance salary requests must be approved from the Advances module so payment and deduction records are updated safely.";
+const MODULE_BOUND_DOCUMENT_KYC_ACTION_MESSAGE =
+  "Document/KYC requests must be approved from the Documents module so verification and profile records are updated safely.";
+const MODULE_BOUND_EMPLOYEE_STRUCTURE_ACTION_MESSAGE =
+  "Employee transfer/structure change requests must be approved from the Employee Structure module so employee structure and history are updated safely.";
+const MODULE_BOUND_EMPLOYEE_LIFECYCLE_ACTION_MESSAGE =
+  "Resignation and offboarding requests must be approved from the Employee Lifecycle module so employee status, offboarding tasks, login access, and sessions are updated safely.";
+const MODULE_BOUND_DISCIPLINARY_ACTION_MESSAGE =
+  "Disciplinary actions must be approved from the Disciplinary Actions module so official records, acknowledgements, and follow-up tasks are updated safely.";
 type ApprovalEngineActionOptions = {
   allowModuleBoundAction?: boolean;
   moduleCancelPermission?: string;
@@ -223,7 +237,23 @@ const canCancelApprovalRequest = async (env: Env, context: AuthActor, request: A
     options.moduleOperationType === request.operation_type &&
     (
       options.moduleCancelPermission === "attendance.corrections.cancel" ||
-      options.moduleCancelAnyPermission === "attendance.corrections.cancelAny"
+      options.moduleCancelAnyPermission === "attendance.corrections.cancelAny" ||
+      options.moduleCancelPermission === "roster.changes.cancel" ||
+      options.moduleCancelAnyPermission === "roster.changes.cancelAny"
+      || options.moduleCancelPermission === "payroll.adjustments.cancel"
+      || options.moduleCancelAnyPermission === "payroll.adjustments.cancelAny"
+      || options.moduleCancelPermission === "advanceSalary.requests.cancel"
+      || options.moduleCancelAnyPermission === "advanceSalary.requests.cancelAny"
+      || options.moduleCancelPermission === "documentKyc.requests.cancel"
+      || options.moduleCancelAnyPermission === "documentKyc.requests.cancelAny"
+      || options.moduleCancelPermission === "employees.structureRequests.cancel"
+      || options.moduleCancelAnyPermission === "employees.structureRequests.cancelAny"
+      || options.moduleCancelPermission === "employeeLifecycle.resignations.cancel"
+      || options.moduleCancelAnyPermission === "employeeLifecycle.resignations.cancelAny"
+      || options.moduleCancelPermission === "employeeLifecycle.offboarding.cancel"
+      || options.moduleCancelAnyPermission === "employeeLifecycle.offboarding.cancelAny"
+      || options.moduleCancelPermission === "employeeDiscipline.actions.cancel"
+      || options.moduleCancelAnyPermission === "employeeDiscipline.actions.cancelAny"
     );
   if (moduleBoundCancel && (isRequesterUser || isRequesterEmployee) && options.moduleCancelPermission && permissionService.hasPermission(context, options.moduleCancelPermission)) return true;
   if (moduleBoundCancel && options.moduleCancelAnyPermission && (permissionService.isSuperAdmin(context) || permissionService.hasPermission(context, options.moduleCancelAnyPermission))) {
@@ -454,6 +484,48 @@ const canUseModuleBoundCreateForOthers = (context: AuthActor, input: ApprovalReq
         input.operation_type === "ATTENDANCE_CORRECTION" &&
         options.modulePermission === "attendance.corrections.createForOthers" &&
         (permissionService.isSuperAdmin(context) || permissionService.hasPermission(context, "attendance.corrections.createForOthers"))
+      ) ||
+      (
+        options.moduleOperationType === "ROSTER_CHANGE" &&
+        input.operation_type === "ROSTER_CHANGE" &&
+        options.modulePermission === "roster.changes.createForOthers" &&
+        (permissionService.isSuperAdmin(context) || permissionService.hasPermission(context, "roster.changes.createForOthers"))
+      ) ||
+      (
+        options.moduleOperationType === "PAYROLL_ADJUSTMENT" &&
+        input.operation_type === "PAYROLL_ADJUSTMENT" &&
+        options.modulePermission === "payroll.adjustments.createForOthers" &&
+        (permissionService.isSuperAdmin(context) || permissionService.hasPermission(context, "payroll.adjustments.createForOthers"))
+      ) ||
+      (
+        options.moduleOperationType === "ADVANCE_SALARY_REQUEST" &&
+        input.operation_type === "ADVANCE_SALARY_REQUEST" &&
+        options.modulePermission === "advanceSalary.requests.createForOthers" &&
+        (permissionService.isSuperAdmin(context) || permissionService.hasPermission(context, "advanceSalary.requests.createForOthers"))
+      ) ||
+      (
+        options.moduleOperationType === "DOCUMENT_KYC_UPDATE" &&
+        input.operation_type === "DOCUMENT_KYC_UPDATE" &&
+        options.modulePermission === "documentKyc.requests.createForOthers" &&
+        (permissionService.isSuperAdmin(context) || permissionService.hasPermission(context, "documentKyc.requests.createForOthers"))
+      ) ||
+      (
+        (options.moduleOperationType === "EMPLOYEE_TRANSFER" || options.moduleOperationType === "EMPLOYEE_STRUCTURE_CHANGE") &&
+        options.moduleOperationType === input.operation_type &&
+        options.modulePermission === "employees.structureRequests.createForOthers" &&
+        (permissionService.isSuperAdmin(context) || permissionService.hasPermission(context, "employees.structureRequests.createForOthers"))
+      ) ||
+      (
+        (options.moduleOperationType === "RESIGNATION" || options.moduleOperationType === "OFFBOARDING") &&
+        options.moduleOperationType === input.operation_type &&
+        (options.modulePermission === "employeeLifecycle.resignations.createForOthers" || options.modulePermission === "employeeLifecycle.offboarding.createForOthers") &&
+        (permissionService.isSuperAdmin(context) || permissionService.hasPermission(context, options.modulePermission))
+      ) ||
+      (
+        options.moduleOperationType === "DISCIPLINARY_ACTION" &&
+        input.operation_type === "DISCIPLINARY_ACTION" &&
+        options.modulePermission === "employeeDiscipline.actions.createForOthers" &&
+        (permissionService.isSuperAdmin(context) || permissionService.hasPermission(context, "employeeDiscipline.actions.createForOthers"))
       )
     ),
   );
@@ -601,6 +673,29 @@ const assertGenericActionAllowed = (request: ApprovalRequestEngineRecord, option
   }
   if (request.operation_type === "ATTENDANCE_CORRECTION" && !options?.allowModuleBoundAction) {
     throw new ConflictError(MODULE_BOUND_ATTENDANCE_CORRECTION_ACTION_MESSAGE);
+  }
+  if (request.operation_type === "ROSTER_CHANGE" && !options?.allowModuleBoundAction) {
+    throw new ConflictError(MODULE_BOUND_ROSTER_CHANGE_ACTION_MESSAGE);
+  }
+  if (request.operation_type === "PAYROLL_ADJUSTMENT" && !options?.allowModuleBoundAction) {
+    throw new ConflictError(MODULE_BOUND_PAYROLL_ADJUSTMENT_ACTION_MESSAGE);
+  }
+  if (request.operation_type === "ADVANCE_SALARY_REQUEST" && !options?.allowModuleBoundAction) {
+    throw new ConflictError(MODULE_BOUND_ADVANCE_SALARY_ACTION_MESSAGE);
+  }
+  if ((request.operation_type === "DOCUMENT_KYC_UPDATE" || request.operation_type === "DOCUMENT_APPROVAL") && !options?.allowModuleBoundAction) {
+    throw new ConflictError(MODULE_BOUND_DOCUMENT_KYC_ACTION_MESSAGE);
+  }
+  if ((request.operation_type === "EMPLOYEE_TRANSFER" || request.operation_type === "EMPLOYEE_STRUCTURE_CHANGE") && !options?.allowModuleBoundAction) {
+    throw new ConflictError(MODULE_BOUND_EMPLOYEE_STRUCTURE_ACTION_MESSAGE);
+  }
+  // Contract coverage: generic approval route blocks RESIGNATION and OFFBOARDING.
+  if ((request.operation_type === "RESIGNATION" || request.operation_type === "OFFBOARDING") && !options?.allowModuleBoundAction) {
+    throw new ConflictError(MODULE_BOUND_EMPLOYEE_LIFECYCLE_ACTION_MESSAGE);
+  }
+  // Contract coverage: generic approval route blocks DISCIPLINARY_ACTION.
+  if (request.operation_type === "DISCIPLINARY_ACTION" && !options?.allowModuleBoundAction) {
+    throw new ConflictError(MODULE_BOUND_DISCIPLINARY_ACTION_MESSAGE);
   }
 };
 

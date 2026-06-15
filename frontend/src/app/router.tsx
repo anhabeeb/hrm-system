@@ -27,10 +27,13 @@ const OutletsPage = lazyNamed(() => import("@/features/outlets/OutletsPage"), "O
 const DepartmentsPage = lazyNamed(() => import("@/features/departments/DepartmentsPage"), "DepartmentsPage");
 const PositionsPage = lazyNamed(() => import("@/features/positions/PositionsPage"), "PositionsPage");
 const LevelRoleTemplatesPage = lazyNamed(() => import("@/features/organization/LevelRoleTemplatesPage"), "LevelRoleTemplatesPage");
+const OperationOwnershipPage = lazyNamed(() => import("@/features/operation-ownership/OperationOwnershipPage"), "OperationOwnershipPage");
+const EmployeeStructureChangeRequestsPage = lazyNamed(() => import("@/features/employee-structure-change/EmployeeStructureChangeRequestsPage"), "EmployeeStructureChangeRequestsPage");
 const EmployeesPage = lazyNamed(() => import("@/features/employees/EmployeesPage"), "EmployeesPage");
 const Employee360Page = lazyNamed(() => import("@/features/employees/Employee360Page"), "Employee360Page");
 const ContractsPage = lazyNamed(() => import("@/features/contracts/ContractsPage"), "ContractsPage");
 const OffboardingPage = lazyNamed(() => import("@/features/offboarding/OffboardingPage"), "OffboardingPage");
+const DisciplinaryActionsPage = lazyNamed(() => import("@/features/discipline/DisciplinaryActionsPage"), "DisciplinaryActionsPage");
 const AttendancePage = lazyNamed(() => import("@/features/attendance/AttendancePage"), "AttendancePage");
 const AttendanceCorrectionsPage = lazyNamed(() => import("@/features/attendance/AttendanceCorrectionsPage"), "AttendanceCorrectionsPage");
 const AttendanceReportsPage = lazyNamed(() => import("@/features/attendance/AttendanceReportsPage"), "AttendanceReportsPage");
@@ -48,6 +51,7 @@ const SalaryLoansPage = lazyNamed(() => import("@/features/salary-loans/SalaryLo
 const AssetsPage = lazyNamed(() => import("@/features/assets/AssetsPage"), "AssetsPage");
 const UniformsPage = lazyNamed(() => import("@/features/uniforms/UniformsPage"), "UniformsPage");
 const DocumentsPage = lazyNamed(() => import("@/features/documents/DocumentsPage"), "DocumentsPage");
+const MyDocumentsKycPage = lazyNamed(() => import("@/features/documents/MyDocumentsKycPage"), "MyDocumentsKycPage");
 const ApprovalsPage = lazyNamed(() => import("@/features/approvals/ApprovalsPage"), "ApprovalsPage");
 const ReportsPage = lazyNamed(() => import("@/features/reports/ReportsPage"), "ReportsPage");
 const NotificationsPage = lazyNamed(() => import("@/features/notifications/NotificationsPage"), "NotificationsPage");
@@ -126,7 +130,7 @@ export const AppRouter = () => (
         <Route path="/self/attendance" element={guarded(<SelfServiceModulePage moduleKey="attendance" />, { permission: "self.attendance.view", feature: "attendance" })} />
         <Route path="/self/roster" element={guarded(<SelfServiceModulePage moduleKey="roster" />, { permission: "self.roster.view", feature: "roster" })} />
         <Route path="/self/leave" element={guarded(<SelfServiceModulePage moduleKey="leave" />, { permission: "self.leave.view", feature: "leave_management" })} />
-        <Route path="/self/documents" element={guarded(<SelfServiceModulePage moduleKey="documents" />, { permission: "self.documents.view", feature: "documents" })} />
+        <Route path="/self/documents" element={guarded(<MyDocumentsKycPage />, { permission: "self.documents.view", feature: "documents" })} />
         <Route path="/self/payslips" element={guarded(<SelfServiceModulePage moduleKey="payslips" />, { permission: "self.payslips.view", feature: "payslips" })} />
         <Route path="/self/department-dashboard" element={guarded(<SelfServiceModulePage moduleKey="department-dashboard" />, { permission: "department.dashboard.view" })} />
         <Route path="/profile" element={<ProfilePage />} />
@@ -137,12 +141,15 @@ export const AppRouter = () => (
         <Route path="/employees" element={guarded(<EmployeesPage />, { permission: "employees.view", feature: "employee_management" })} />
         <Route path="/employees/:employeeId" element={guarded(<Employee360Page />, { permission: "employees.view", feature: "employee_management" })} />
         <Route path="/contracts" element={guarded(<ContractsPage />, { permissionsAny: ["contracts.view", "employees.contracts.view", "employees.view"], feature: "employee_management" })} />
-        <Route path="/offboarding" element={guarded(<OffboardingPage />, { permissionsAny: ["employees.offboarding.view", "employees.view"], feature: "employee_management" })} />
+        <Route path="/offboarding" element={guarded(<OffboardingPage />, { permissionsAny: ["employeeLifecycle.resignations.viewOwn", "employeeLifecycle.resignations.view", "employeeLifecycle.resignations.create", "employeeLifecycle.offboarding.viewOwn", "employeeLifecycle.offboarding.view", "employeeLifecycle.offboarding.create", "employeeLifecycle.exitRequests.viewAll", "approvals.operationOwner.view", "approvals.operationFinal.view", "approvals.operationExecutor.view", "employees.offboarding.view", "employees.view"], feature: "employee_management" })} />
+        <Route path="/disciplinary-actions" element={guarded(<DisciplinaryActionsPage />, { permissionsAny: ["employeeDiscipline.actions.view", "employeeDiscipline.actions.viewOwn", "employeeDiscipline.actions.create", "employeeDiscipline.actions.review", "employeeDiscipline.actions.apply", "employeeDiscipline.tasks.view", "approvals.operationOwner.view", "approvals.operationFinal.view", "approvals.operationExecutor.view"], feature: "employee_management" })} />
         <Route path="/users-access" element={guarded(<UsersAccessPage />, { permission: "users.view", feature: "user_management" })} />
         <Route path="/outlets" element={guarded(<OutletsPage />, { permission: "outlets.view", feature: "employee_management" })} />
         <Route path="/departments" element={guarded(<DepartmentsPage />, { permissionsAny: ["organization.departments.view", "departments.view"], feature: "employee_management" })} />
         <Route path="/positions" element={guarded(<PositionsPage />, { permissionsAny: ["organization.positions.view", "positions.view"], feature: "employee_management" })} />
         <Route path="/organization/level-role-templates" element={guarded(<LevelRoleTemplatesPage />, { permissionsAny: ["organization.levelRoleTemplates.view", "organization.levelRoleTemplates.manage"], feature: "employee_management" })} />
+        <Route path="/organization/structure-change-requests" element={guarded(<EmployeeStructureChangeRequestsPage />, { permissionsAny: ["employees.structureRequests.view", "employees.structureRequests.create", "employees.structureRequests.review", "employees.structureRequests.apply"], feature: "employee_management" })} />
+        <Route path="/organization/operation-ownership" element={guarded(<OperationOwnershipPage />, { permissionsAny: ["operationOwnership.view", "operationOwnership.matrix.view", "operationOwnership.businessFunctions.view"] })} />
         <Route path="/attendance" element={guarded(<AttendancePage />, { permission: "attendance.view", feature: "attendance" })} />
         <Route path="/attendance/corrections" element={guarded(<AttendanceCorrectionsPage />, { permission: "attendance.view", feature: "attendance" })} />
         <Route path="/attendance/reports" element={guarded(<AttendanceReportsPage />, { permission: "attendance.reports.view", feature: "attendance" })} />

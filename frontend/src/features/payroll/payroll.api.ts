@@ -1,6 +1,6 @@
 import { api } from "@/lib/api-client";
 import { buildQueryString } from "@/lib/query-string";
-import type { PayrollCalculatePayload, PayrollException, PayrollFilters, PayrollItem, PayrollRun } from "./payroll.types";
+import type { PayrollAdjustment, PayrollAdjustmentPayload, PayrollCalculatePayload, PayrollException, PayrollFilters, PayrollItem, PayrollRun } from "./payroll.types";
 
 export const payrollApi = {
   list: (filters: PayrollFilters = {}) => api.get<PayrollRun[]>(`/payroll${buildQueryString(filters)}`),
@@ -18,4 +18,13 @@ export const payrollApi = {
   lock: (id: string, reason: string) => api.post<{ locked: boolean }>(`/payroll/${id}/lock`, { reason }),
   requestReopen: (id: string, reason: string) => api.post<{ requested: boolean }>(`/payroll/${id}/request-reopen`, { reason }),
   reopen: (id: string, reason: string) => api.post<{ reopened: boolean }>(`/payroll/${id}/reopen`, { reason }),
+  listAdjustments: (filters: PayrollFilters = {}) => api.get<PayrollAdjustment[]>(`/payroll/adjustments${buildQueryString(filters)}`),
+  createAdjustment: (payload: PayrollAdjustmentPayload) => api.post<{ payroll_adjustment: PayrollAdjustment }>("/payroll/adjustments", payload),
+  getAdjustment: (id: string) => api.get<{ payroll_adjustment: PayrollAdjustment }>(`/payroll/adjustments/${id}`),
+  submitAdjustment: (id: string) => api.post<{ payroll_adjustment: PayrollAdjustment; already_submitted?: boolean }>(`/payroll/adjustments/${id}/submit`, {}),
+  approveAdjustment: (id: string, reason: string) => api.post<{ payroll_adjustment: PayrollAdjustment }>(`/payroll/adjustments/${id}/approve`, { reason }),
+  rejectAdjustment: (id: string, reason: string) => api.post<{ payroll_adjustment: PayrollAdjustment }>(`/payroll/adjustments/${id}/reject`, { reason }),
+  cancelAdjustment: (id: string, reason: string) => api.post<{ payroll_adjustment: PayrollAdjustment }>(`/payroll/adjustments/${id}/cancel`, { reason }),
+  applyAdjustment: (id: string, reason: string) => api.post<{ payroll_adjustment: PayrollAdjustment; applied?: boolean; manual_review_required?: boolean }>(`/payroll/adjustments/${id}/apply`, { reason }),
+  adjustmentTimeline: (id: string) => api.get<{ payroll_adjustment: PayrollAdjustment; request: unknown | null; steps: Array<Record<string, unknown>>; actions: Array<Record<string, unknown>> }>(`/payroll/adjustments/${id}/approval-timeline`),
 };

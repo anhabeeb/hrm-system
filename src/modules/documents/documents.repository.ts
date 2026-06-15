@@ -77,6 +77,7 @@ export const listDocuments = (env: Env, companyId: string, filters: DocumentFilt
       d.file_name, d.mime_type, d.expiry_date, d.status, d.is_sensitive,
       d.driving_license_category, d.driving_license_category_other,
       d.version_number, d.previous_document_id, d.replaced_by_document_id,
+      d.verification_status, d.source_kyc_request_id, d.verified_at, d.verified_by,
       d.notes, d.uploaded_by, d.created_by, d.updated_by, d.created_at, d.updated_at
      FROM employee_documents d
      JOIN employees e ON e.id = d.employee_id
@@ -101,8 +102,19 @@ export const findDocumentById = (env: Env, companyId: string, id: string) =>
 export const findEmployee = (env: Env, companyId: string, id: string) =>
   one<any>(
     env,
-    "SELECT id, employee_code, full_name, employee_type, primary_outlet_id, employment_status, deleted_at FROM employees WHERE company_id = ? AND id = ? LIMIT 1",
+    "SELECT id, employee_code, full_name, employee_type, primary_outlet_id, employment_status, deleted_at, archived_at FROM employees WHERE company_id = ? AND id = ? LIMIT 1",
     [companyId, id],
+  );
+
+export const findEmployeeByUserId = (env: Env, companyId: string, userId: string) =>
+  one<any>(
+    env,
+    `SELECT e.id, e.employee_code, e.full_name, e.employee_type, e.primary_outlet_id,
+            e.employment_status, e.deleted_at, e.archived_at
+       FROM users u
+       JOIN employees e ON e.id = u.employee_id AND e.company_id = u.company_id
+      WHERE u.company_id = ? AND u.id = ? LIMIT 1`,
+    [companyId, userId],
   );
 
 export const createDocument = (env: Env, input: {

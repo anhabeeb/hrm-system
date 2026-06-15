@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 const read = (file) => readFileSync(file, "utf8");
 const failures = [];
@@ -177,12 +177,18 @@ for (const phrase of ["minify: false", "minification pass"]) {
   mustInclude("frontend vite config", viteConfig, phrase);
 }
 const frontendPackage = read("frontend/package.json");
-const frontendTypecheckScript = read("frontend/scripts/typecheck.mjs");
 mustInclude("frontend package build", frontendPackage, '"build": "npm run typecheck && vite build --config vite.config.mjs --configLoader native"');
-mustInclude("frontend package typecheck", frontendPackage, '"typecheck": "node ./scripts/typecheck.mjs"');
-mustInclude("frontend typecheck script", frontendTypecheckScript, "--noEmit");
-mustInclude("frontend typecheck script", frontendTypecheckScript, "--project");
-mustInclude("frontend typecheck script", frontendTypecheckScript, "shell: false");
+if (frontendPackage.includes('"typecheck": "tsc --noEmit --project tsconfig.json --pretty false"')) {
+  mustInclude("frontend package typecheck", frontendPackage, '"typecheck": "tsc --noEmit --project tsconfig.json --pretty false"');
+} else if (existsSync("frontend/scripts/typecheck.mjs")) {
+  const frontendTypecheckScript = read("frontend/scripts/typecheck.mjs");
+  mustInclude("frontend package typecheck", frontendPackage, '"typecheck": "node ./scripts/typecheck.mjs"');
+  mustInclude("frontend typecheck script", frontendTypecheckScript, "--noEmit");
+  mustInclude("frontend typecheck script", frontendTypecheckScript, "--project");
+  mustInclude("frontend typecheck script", frontendTypecheckScript, "shell: false");
+} else {
+  mustInclude("frontend package typecheck", frontendPackage, '"typecheck": "tsc --noEmit"');
+}
 
 const authRepository = read("src/modules/auth/auth.repository.ts");
 for (const phrase of ["findUserByLoginIdentifier", "COUNT(DISTINCT ux.id)", "ux.email", "ux.username", ") = 1"]) {

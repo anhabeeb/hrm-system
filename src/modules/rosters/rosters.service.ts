@@ -4,8 +4,9 @@ import { createAuditLog } from "../../services/audit.service";
 import { assertPayrollMonthUnlocked, getPayrollMonthFromDate } from "../payroll/payroll-lock.service";
 import * as holidayCalculation from "../holidays/holiday-calculation.service";
 import * as holidayService from "../holidays/holidays.service";
+import * as approvalEngineService from "../approvals/approval-workflow-engine.service";
 import type { AuthActor, PaginationMeta } from "../../types/api.types";
-import { AppError, ConflictError, LockedRecordError, NotFoundError, OutletAccessError, PermissionError } from "../../utils/errors";
+import { AppError, ConflictError, LockedRecordError, NotFoundError, OutletAccessError, PermissionError, ValidationError } from "../../utils/errors";
 import { createPrefixedId } from "../../utils/ids";
 import {
   APPROVED_LEAVE_STATUSES,
@@ -16,6 +17,9 @@ import * as repository from "./rosters.repository";
 import type {
   RosterActionInput,
   RosterBulkInput,
+  RosterChangeFilters,
+  RosterChangeRequestInput,
+  RosterChangeRequestRecord,
   RosterConflictFilters,
   RosterEmployeeRecord,
   RosterListFilters,
@@ -376,6 +380,177 @@ const assertNoBlockingConflicts = (conflicts: DetectedConflict[], overrideWarnin
   }
 };
 
+const ROSTER_CHANGE_OPERATION = "ROSTER_CHANGE" as const;
+const ROSTER_CHANGE_SUBJECT_TYPE = "ROSTER_CHANGE";
+
+const hasRosterChangePermission = (context: AuthActor, permission: string) =>
+  context.isSuperAdmin || permissionService.hasPermission(context, permission);
+
+const isGlobalRosterChangeManager = (context: AuthActor) =>
+  permissionService.isSuperAdmin(context) ||
+  context.isAdmin ||
+  context.roleKeys.some((role) => ["admin", "owner", "super_admin", "hr_admin", "hr_officer"].includes(role));
+
+const assertViewRosterChanges = (context: AuthActor) => {
+  if (
+    hasRosterChangePermission(context, "roster.changes.view") ||
+    hasRosterChangePermission(context, "roster.changes.audit.view") ||
+    hasRosterChangePermission(context, "roster.changes.create") ||
+    hasRosterChangePermission(context, "roster.changes.cancel") ||
+    hasRosterChangePermission(context, "approvals.department.view") ||
+    hasRosterChangePermission(context, "approvals.hrFinal.view")
+  ) return;
+  throw new PermissionError("You do not have permission to view roster change requests.", "ROSTER_CHANGE_PERMISSION_DENIED");
+};
+
+const assertCreateRosterChange = (context: AuthActor) => {
+  if (hasRosterChangePermission(context, "roster.changes.create") || hasRosterChangePermission(context, "roster.changes.createForOthers")) return;
+  throw new PermissionError("You do not have permission to create roster change requests.", "ROSTER_CHANGE_PERMISSION_DENIED");
+};
+
+const actorEmployee = (env: Env, context: AuthActor) =>
+  repository.findEmployeeByUserId(env, context.companyId, context.actorUserId);
+
+const activeEmployee = (employee: RosterEmployeeRecord | null | undefined) =>
+  Boolean(employee && !employee.deleted_at && !LEAVING_STATUSES.includes(employee.employment_status as any));
+
+const assertRosterChangeSubjectAllowed = async (env: Env, context: AuthActor, employeeId?: string | null) => {
+  const requesterEmployee = await actorEmployee(env, context);
+  const canCreateForOthers = hasRosterChangePermission(context, "roster.changes.createForOthers");
+  const subjectEmployeeId = employeeId ?? requesterEmployee?.id ?? null;
+  if (!subjectEmployeeId) {
+    throw new PermissionError("Your employee profile is not linked to this login. Please contact HR.", "EMPLOYEE_PROFILE_NOT_LINKED");
+  }
+  if (!canCreateForOthers && !activeEmployee(requesterEmployee)) {
+    throw new PermissionError("Your employee profile is not active. Please contact HR.", "EMPLOYEE_PROFILE_NOT_ACTIVE");
+  }
+  if (!canCreateForOthers && requesterEmployee?.id !== subjectEmployeeId) {
+    throw new PermissionError("You cannot create roster change requests for another employee.", "ROSTER_CHANGE_CREATE_FOR_OTHERS_REQUIRED");
+  }
+  const subject = await assertEmployeeAccess(env, context, subjectEmployeeId);
+  if (!activeEmployee(subject)) {
+    throw new ValidationError("Please choose an active employee for this roster change request.");
+  }
+  if (canCreateForOthers && requesterEmployee?.id !== subject.id && !isGlobalRosterChangeManager(context)) {
+    if (!activeEmployee(requesterEmployee)) {
+      throw new PermissionError("Your employee profile is not active. Please contact HR.", "EMPLOYEE_PROFILE_NOT_ACTIVE");
+    }
+    if (requesterEmployee?.department_id !== subject.department_id) {
+      throw new PermissionError("Department managers can create roster change requests only for employees in their own department.", "ROSTER_CHANGE_DEPARTMENT_SCOPE_REQUIRED");
+    }
+    const actorLevel = requesterEmployee?.level ?? 0;
+    const subjectLevel = subject.level ?? 99;
+    if (actorLevel <= subjectLevel) {
+      throw new PermissionError("Department managers can create roster change requests only for lower-level employees.", "ROSTER_CHANGE_LOWER_LEVEL_REQUIRED");
+    }
+  }
+  return { requesterEmployee, subject };
+};
+
+const rosterChangeStatusFromApproval = (approval: any) => {
+  if (!approval) return "PENDING";
+  if (approval.status === "NEEDS_MANUAL_ASSIGNMENT" || approval.status === "ESCALATED") return "PENDING_MANUAL_REVIEW";
+  if (approval.status === "APPROVED") return "APPROVED";
+  if (approval.status === "REJECTED") return "REJECTED";
+  if (approval.status === "CANCELLED") return "CANCELLED";
+  if (approval.current_step_name?.toLowerCase().includes("hr")) return "PENDING_HR_APPROVAL";
+  return "PENDING_DEPARTMENT_APPROVAL";
+};
+
+const buildRosterChangeVisibilityFilter = async (env: Env, context: AuthActor) => {
+  if (
+    permissionService.isSuperAdmin(context) ||
+    permissionService.hasPermission(context, "roster.changes.view") ||
+    permissionService.hasPermission(context, "approvals.requests.view")
+  ) return { sql: undefined, values: [] as unknown[] };
+
+  const clauses = ["rc.requester_user_id = ?"];
+  const values: unknown[] = [context.actorUserId];
+  const employee = await actorEmployee(env, context);
+  if (employee?.id) {
+    clauses.push("rc.employee_id = ?", "rc.requester_employee_id = ?");
+    values.push(employee.id, employee.id);
+  }
+  if (employee?.department_id && permissionService.hasAnyPermission(context, ["approvals.department.view", "approvals.department.approve", "approvals.department.reject"])) {
+    clauses.push(`(rc.department_id = ? AND EXISTS (
+      SELECT 1 FROM approval_request_steps s
+       WHERE s.company_id = rc.company_id AND s.approval_request_id = rc.approval_request_id
+         AND s.approver_resolver_type IN ('DEPARTMENT_HEAD', 'DEPARTMENT_LEVEL', 'DEPARTMENT_ROLE')
+         AND s.status IN ('PENDING', 'ESCALATED', 'WAITING_FOR_APPROVER')
+         AND (s.required_min_level IS NULL OR ? >= s.required_min_level)
+         AND (s.required_max_level IS NULL OR ? <= s.required_max_level)
+    ))`);
+    values.push(employee.department_id, employee.level ?? 0, employee.level ?? 99);
+  }
+  if (permissionService.hasAnyPermission(context, ["approvals.hrFinal.view", "approvals.hrFinal.approve", "approvals.hrFinal.reject"])) {
+    clauses.push(`EXISTS (
+      SELECT 1 FROM approval_request_steps s
+       WHERE s.company_id = rc.company_id AND s.approval_request_id = rc.approval_request_id
+         AND s.approver_resolver_type = 'HR_FINAL_APPROVER'
+         AND s.status IN ('PENDING', 'ESCALATED', 'WAITING_FOR_APPROVER')
+    )`);
+  }
+  return { sql: `(${clauses.join(" OR ")})`, values };
+};
+
+const assertCanViewRosterChange = async (env: Env, context: AuthActor, change: RosterChangeRequestRecord) => {
+  if (permissionService.isSuperAdmin(context) || permissionService.hasPermission(context, "roster.changes.view")) return;
+  if (change.requester_user_id === context.actorUserId) return;
+  const employee = await actorEmployee(env, context);
+  if (employee?.id && (change.employee_id === employee.id || change.requester_employee_id === employee.id)) return;
+  if (change.approval_request_id) {
+    try {
+      await approvalEngineService.getTimeline(env, context, change.approval_request_id);
+      return;
+    } catch (error) {
+      if (!(error instanceof PermissionError)) throw error;
+    }
+  }
+  // Department visibility policy: department view/approve/reject permissions allow
+  // same-department roster-change visibility; approval actions remain separately gated.
+  if (employee?.department_id && employee.department_id === change.department_id && permissionService.hasAnyPermission(context, ["approvals.department.view", "approvals.department.approve", "approvals.department.reject"])) return;
+  throw new PermissionError("You do not have access to this roster change request.");
+};
+
+const parseRequestedValue = (change: RosterChangeRequestRecord) =>
+  parseJson<Record<string, any>>(change.requested_value_json, {});
+
+const prevalidateRosterChangeApplication = async (env: Env, context: AuthActor, change: RosterChangeRequestRecord) => {
+  if (!change.employee_id) throw new ValidationError("Roster change employee is required.");
+  const employee = await assertEmployeeAccess(env, context, change.employee_id);
+  const requested = parseRequestedValue(change);
+  const rosterDate = change.requested_date ?? requested.roster_date;
+  if (!rosterDate) throw new ValidationError("Requested roster date is required.");
+  const startTime = change.requested_start_at ?? requested.start_time;
+  const endTime = change.requested_end_at ?? requested.end_time;
+  if (["SHIFT_CREATE", "SHIFT_UPDATE", "SHIFT_TIME_CHANGE"].includes(change.change_type) && (!startTime || !endTime)) {
+    throw new ValidationError("Requested start and end times are required.");
+  }
+  if (change.shift_id) {
+    const shift = await repository.findRosterShift(env, context.companyId, change.shift_id);
+    if (!shift || shift.employee_id !== change.employee_id) {
+      throw new ConflictError("The roster shift does not belong to the selected employee.");
+    }
+    assertOutletAccess(context, shift.outlet_id);
+  }
+  if (startTime && endTime) {
+    const outletId = change.outlet_id ?? requested.outlet_id ?? employee.primary_outlet_id;
+    if (!outletId) throw new ValidationError("An outlet is required for this roster change request.");
+    const settings = await getRosterSettings(env, context.companyId);
+    const conflicts = await detectConflicts(env, context, {
+      employee,
+      outletId,
+      departmentId: change.department_id ?? employee.department_id,
+      rosterDate,
+      startTime,
+      endTime,
+      excludeRosterShiftId: change.shift_id ?? undefined,
+    }, settings);
+    assertNoBlockingConflicts(conflicts, Boolean(requested.override_warnings));
+  }
+  return { employee, requested, rosterDate, startTime, endTime };
+};
+
 const conflictRows = (
   context: AuthActor,
   rosterShiftId: string,
@@ -485,6 +660,264 @@ export const getRosterShift = async (env: Env, context: AuthActor, id: string) =
   if (!shift) throw new NotFoundError("The requested roster shift could not be found.");
   assertOutletAccess(context, shift.outlet_id);
   return { roster_shift: shift };
+};
+
+export const listRosterChangeRequests = async (env: Env, context: AuthActor, filters: RosterChangeFilters) => {
+  assertViewRosterChanges(context);
+  if (filters.outlet_id) assertOutletAccess(context, filters.outlet_id);
+  const visibility = await buildRosterChangeVisibilityFilter(env, context);
+  const result = await repository.listRosterChanges(env, context.companyId, filters, visibility.sql, visibility.values);
+  return { rows: result.rows, pagination: pagination(filters, result.total) };
+};
+
+export const getRosterChangeRequest = async (env: Env, context: AuthActor, id: string) => {
+  const change = await repository.findRosterChangeById(env, context.companyId, id);
+  if (!change) throw new NotFoundError("The requested roster change request could not be found.");
+  await assertCanViewRosterChange(env, context, change);
+  if (change.outlet_id) assertOutletAccess(context, change.outlet_id);
+  return { roster_change: change };
+};
+
+export const createRosterChangeRequest = async (env: Env, context: AuthActor, payload: RosterChangeRequestInput) => {
+  assertCreateRosterChange(context);
+  const { requesterEmployee, subject } = await assertRosterChangeSubjectAllowed(env, context, payload.employee_id);
+  const existingShift = payload.shift_id ? await repository.findRosterShift(env, context.companyId, payload.shift_id) : null;
+  if (payload.shift_id && (!existingShift || existingShift.employee_id !== subject.id)) {
+    throw new ConflictError("The roster shift does not belong to the selected employee.");
+  }
+  if (existingShift?.outlet_id) assertOutletAccess(context, existingShift.outlet_id);
+  const requestedValue: Record<string, unknown> = {
+    ...(payload.requested_value_json ?? {}),
+    override_warnings: payload.override_warnings === true,
+  };
+  const requestedDate = payload.requested_date ?? existingShift?.roster_date ?? (requestedValue.roster_date as string | undefined) ?? null;
+  const outletId = existingShift?.outlet_id ?? (requestedValue.outlet_id as string | undefined) ?? subject.primary_outlet_id;
+  if (!outletId) throw new ValidationError("An outlet is required for this roster change request.");
+  assertOutletAccess(context, outletId);
+  const duplicate = await repository.findDuplicatePendingRosterChange(env, {
+    companyId: context.companyId,
+    employeeId: subject.id,
+    requestedDate,
+    changeType: payload.change_type,
+    shiftId: payload.shift_id ?? null,
+    rosterId: payload.roster_id ?? null,
+  });
+  if (duplicate) throw new ConflictError("A pending roster change already exists for this date/shift.");
+
+  const id = createPrefixedId("roster_change");
+  await repository.createRosterChangeRequest(env, {
+    id,
+    companyId: context.companyId,
+    actorUserId: context.actorUserId,
+    payload: {
+      employee_id: subject.id,
+      requester_employee_id: requesterEmployee?.id ?? null,
+      requester_user_id: context.actorUserId,
+      department_id: subject.department_id ?? null,
+      position_id: subject.position_id ?? null,
+      level: subject.level ?? null,
+      outlet_id: outletId,
+      store_id: outletId,
+      roster_id: payload.roster_id ?? null,
+      shift_id: payload.shift_id ?? null,
+      source_roster_id: payload.source_roster_id ?? null,
+      target_roster_id: payload.target_roster_id ?? null,
+      source_shift_id: payload.source_shift_id ?? null,
+      target_shift_id: payload.target_shift_id ?? null,
+      change_type: payload.change_type,
+      requested_date: requestedDate,
+      requested_start_at: payload.requested_start_at ?? (requestedValue.start_time as string | undefined) ?? null,
+      requested_end_at: payload.requested_end_at ?? (requestedValue.end_time as string | undefined) ?? null,
+      requested_break_start: payload.requested_break_start ?? null,
+      requested_break_end: payload.requested_break_end ?? null,
+      current_value_json: existingShift ? JSON.stringify(existingShift) : null,
+      requested_value_json: JSON.stringify(requestedValue),
+      reason: payload.reason,
+      employee_note: payload.employee_note ?? null,
+      manager_note: payload.manager_note ?? null,
+    },
+  });
+  const change = await repository.findRosterChangeById(env, context.companyId, id);
+  if (!change) throw new NotFoundError("The roster change request could not be created.");
+  await prevalidateRosterChangeApplication(env, context, change);
+  await audit(env, context, { action: "ROSTER_CHANGE_REQUEST_CREATED", entityType: "roster_change_request", entityId: id, employeeId: subject.id, outletId, reason: payload.reason, newValue: change });
+  return { roster_change: change };
+};
+
+export const submitRosterChangeForApproval = async (env: Env, context: AuthActor, id: string) => {
+  const change = (await getRosterChangeRequest(env, context, id)).roster_change;
+  if (["APPROVED", "REJECTED", "CANCELLED", "APPLIED", "FAILED_TO_APPLY"].includes(change.status)) {
+    throw new ConflictError("This roster change request has already been approved/rejected/cancelled.");
+  }
+  if (change.approval_request_id) {
+    return { roster_change: change, already_submitted: true };
+  }
+  await prevalidateRosterChangeApplication(env, context, change);
+  const draft = await approvalEngineService.createApprovalRequestDraft(env, context, {
+    operation_type: ROSTER_CHANGE_OPERATION,
+    subject_type: ROSTER_CHANGE_SUBJECT_TYPE,
+    subject_id: change.id,
+    requester_employee_id: change.requester_employee_id,
+    subject_employee_id: change.employee_id,
+    department_id: change.department_id,
+    position_id: change.position_id,
+    level: change.level,
+    title: `Roster change ${change.change_type}`,
+    summary: change.reason,
+    payload_json: {
+      roster_change_request_id: change.id,
+      change_type: change.change_type,
+      requested_date: change.requested_date,
+      shift_id: change.shift_id,
+    },
+  }, {
+    allowModuleBoundCreateForOthers: true,
+    modulePermission: "roster.changes.createForOthers",
+    moduleOperationType: ROSTER_CHANGE_OPERATION,
+  });
+  if (!draft) throw new ValidationError("No active roster change approval workflow is configured.");
+  const submitted = await approvalEngineService.submitApprovalRequest(env, context, draft.id);
+  const status = rosterChangeStatusFromApproval(submitted);
+  await repository.updateRosterChangeApprovalLink(env, context.companyId, change.id, {
+    approvalRequestId: draft.id,
+    approvalStatus: submitted?.status ?? "IN_REVIEW",
+    currentStepId: submitted?.current_step_id ?? null,
+    status,
+    actorUserId: context.actorUserId,
+  });
+  const updated = await repository.findRosterChangeById(env, context.companyId, change.id);
+  await audit(env, context, { action: "ROSTER_CHANGE_SUBMITTED_FOR_APPROVAL", entityType: "roster_change_request", entityId: change.id, employeeId: change.employee_id ?? undefined, outletId: change.outlet_id, reason: change.reason, newValue: { approval_request_id: draft.id, status } });
+  return { roster_change: updated, already_submitted: false };
+};
+
+const applyApprovedRosterChange = async (env: Env, context: AuthActor, change: RosterChangeRequestRecord) => {
+  const { employee, requested, rosterDate, startTime, endTime } = await prevalidateRosterChangeApplication(env, context, change);
+  const outletId = change.outlet_id ?? requested.outlet_id ?? employee.primary_outlet_id;
+  if (!outletId) throw new ValidationError("An outlet is required before this roster change can be applied.");
+  if (change.change_type === "SHIFT_CREATE") {
+    const rosterId = createPrefixedId("roster_shift");
+    await repository.createRosterShift(env, {
+      id: rosterId,
+      companyId: context.companyId,
+      actorUserId: context.actorUserId,
+      payload: {
+        outlet_id: outletId,
+        department_id: change.department_id,
+        position_id: change.position_id,
+        employee_id: employee.id,
+        shift_template_id: requested.shift_template_id ?? null,
+        roster_date: rosterDate,
+        start_time: startTime,
+        end_time: endTime,
+        break_minutes: Number(requested.break_minutes ?? 0),
+        notes: requested.notes ?? change.employee_note ?? null,
+        source: "approval_roster_change",
+      },
+    });
+    return rosterId;
+  }
+  if ((change.change_type === "SHIFT_UPDATE" || change.change_type === "SHIFT_TIME_CHANGE") && change.shift_id) {
+    await repository.updateRosterShiftForEmployee(env, context.companyId, change.shift_id, employee.id, {
+      outlet_id: outletId,
+      department_id: change.department_id,
+      position_id: change.position_id,
+      roster_date: rosterDate,
+      start_time: startTime,
+      end_time: endTime,
+      break_minutes: requested.break_minutes === undefined ? undefined : Number(requested.break_minutes),
+      notes: requested.notes ?? undefined,
+    }, context.actorUserId);
+    return change.shift_id;
+  }
+  if (change.change_type === "SHIFT_DELETE" && change.shift_id) {
+    await repository.cancelRosterShiftForEmployee(env, context.companyId, change.shift_id, employee.id, context.actorUserId, change.reason);
+    return change.shift_id;
+  }
+  throw new ValidationError("This roster change type needs manual assignment before it can be applied.");
+};
+
+export const approveRosterChangeStep = async (env: Env, context: AuthActor, id: string, input: RosterActionInput) => {
+  const change = (await getRosterChangeRequest(env, context, id)).roster_change;
+  if (!change.approval_request_id) throw new ConflictError("This roster change request has not been submitted for approval.");
+  await prevalidateRosterChangeApplication(env, context, change);
+  const approval = await approvalEngineService.approveStep(env, context, change.approval_request_id, input.reason, { allowModuleBoundAction: true, moduleOperationType: ROSTER_CHANGE_OPERATION });
+  const status = rosterChangeStatusFromApproval(approval);
+  const update: Record<string, unknown> = {
+    approval_status: approval?.status ?? null,
+    approval_current_step: approval?.current_step_id ?? null,
+    status,
+    updated_by: context.actorUserId,
+  };
+  if (status === "PENDING_HR_APPROVAL") {
+    update.department_approved_at = new Date().toISOString();
+    update.department_approved_by = context.actorUserId;
+  }
+  if (approval?.status === "APPROVED") {
+    update.hr_approved_at = new Date().toISOString();
+    update.hr_approved_by = context.actorUserId;
+    update.approval_completed_at = new Date().toISOString();
+    try {
+      await applyApprovedRosterChange(env, context, change);
+      update.status = "APPLIED";
+      update.applied_at = new Date().toISOString();
+      update.applied_by = context.actorUserId;
+    } catch (error) {
+      update.status = "FAILED_TO_APPLY";
+      update.apply_error_code = error instanceof AppError ? error.code : "ROSTER_CHANGE_APPLY_FAILED";
+      update.apply_error_message = error instanceof Error ? error.message : "Roster change could not be applied.";
+      await audit(env, context, { action: "roster_change_apply_failed", entityType: "roster_change_request", entityId: change.id, employeeId: change.employee_id ?? undefined, outletId: change.outlet_id, reason: input.reason, newValue: { error: update.apply_error_message } });
+    }
+  }
+  await repository.updateRosterChangeStatus(env, context.companyId, change.id, update);
+  return { roster_change: await repository.findRosterChangeById(env, context.companyId, change.id), approval_request: approval };
+};
+
+export const rejectRosterChangeStep = async (env: Env, context: AuthActor, id: string, input: RosterActionInput) => {
+  const change = (await getRosterChangeRequest(env, context, id)).roster_change;
+  if (!change.approval_request_id) throw new ConflictError("This roster change request has not been submitted for approval.");
+  const approval = await approvalEngineService.rejectStep(env, context, change.approval_request_id, input.reason, input.reason, { allowModuleBoundAction: true, moduleOperationType: ROSTER_CHANGE_OPERATION });
+  await repository.updateRosterChangeStatus(env, context.companyId, change.id, {
+    status: "REJECTED",
+    approval_status: approval?.status ?? "REJECTED",
+    approval_current_step: null,
+    rejected_at: new Date().toISOString(),
+    rejected_by: context.actorUserId,
+    rejection_reason: input.reason,
+    approval_completed_at: new Date().toISOString(),
+    updated_by: context.actorUserId,
+  });
+  return { roster_change: await repository.findRosterChangeById(env, context.companyId, change.id), approval_request: approval };
+};
+
+export const cancelRosterChangeRequest = async (env: Env, context: AuthActor, id: string, input: RosterActionInput) => {
+  const change = (await getRosterChangeRequest(env, context, id)).roster_change;
+  if (["APPROVED", "REJECTED", "CANCELLED", "APPLIED", "FAILED_TO_APPLY"].includes(change.status)) {
+    throw new ConflictError("This roster change request has already been approved/rejected/cancelled.");
+  }
+  const approval = change.approval_request_id
+    ? await approvalEngineService.cancelRequest(env, context, change.approval_request_id, input.reason, {
+      allowModuleBoundAction: true,
+      moduleCancelPermission: "roster.changes.cancel",
+      moduleCancelAnyPermission: "roster.changes.cancelAny",
+      moduleOperationType: ROSTER_CHANGE_OPERATION,
+    })
+    : null;
+  await repository.updateRosterChangeStatus(env, context.companyId, change.id, {
+    status: "CANCELLED",
+    approval_status: approval?.status ?? "CANCELLED",
+    approval_current_step: null,
+    cancelled_at: new Date().toISOString(),
+    cancelled_by: context.actorUserId,
+    updated_by: context.actorUserId,
+  });
+  return { roster_change: await repository.findRosterChangeById(env, context.companyId, change.id), approval_request: approval };
+};
+
+export const getRosterChangeApprovalTimeline = async (env: Env, context: AuthActor, id: string) => {
+  const change = (await getRosterChangeRequest(env, context, id)).roster_change;
+  if (!change.approval_request_id) return { roster_change: change, request: null, steps: [], actions: [] };
+  const timeline = await approvalEngineService.getTimeline(env, context, change.approval_request_id);
+  return { roster_change: change, ...timeline };
 };
 
 export const createRosterShift = async (env: Env, context: AuthActor, payload: RosterShiftInput) => {

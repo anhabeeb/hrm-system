@@ -5,7 +5,9 @@ import { requireFeature } from "../middleware/feature.middleware";
 import { requireAnyPermission, requireAnyPermissionOrError, requirePermission } from "../middleware/permission.middleware";
 import { requireReason } from "../middleware/reason-required.middleware";
 import * as employeesController from "../modules/employees/employees.controller";
+import * as employeeExitController from "../modules/employee-lifecycle/employee-exit.controller";
 import * as structureController from "../modules/employee-structure/employee-structure.controller";
+import * as structureChangeController from "../modules/employee-structure/employee-structure-change.controller";
 import * as contractsController from "../modules/employee-contracts/employee-contracts.controller";
 import * as offboardingController from "../modules/offboarding/offboarding.controller";
 import * as payslipsController from "../modules/payslips/payslips.controller";
@@ -25,6 +27,364 @@ employeesRoutes.get(
     message: "You do not have permission to link existing users to employees.",
   }),
   employeesController.listEmployeeLoginLinkCandidates,
+);
+employeesRoutes.get(
+  "/structure-change-requests",
+  requireAnyPermissionOrError([
+    "employees.structureRequests.view",
+    "employees.structureRequests.create",
+    "employees.structureRequests.review",
+    "employees.structureRequests.finalApprove",
+    "employees.structureRequests.apply",
+    "employees.structureRequests.audit.view",
+    "approvals.operationOwner.view",
+    "approvals.operationOwner.approve",
+    "approvals.operationFinal.view",
+    "approvals.operationFinal.approve",
+    "approvals.operationExecutor.view",
+    "approvals.operationExecutor.apply",
+    "employees.structure.view",
+  ], {
+    code: "EMPLOYEE_STRUCTURE_REQUEST_PERMISSION_DENIED",
+    message: "You do not have permission to view employee transfer or structure change requests.",
+  }),
+  structureChangeController.listEmployeeStructureChangeRequests,
+);
+employeesRoutes.post(
+  "/structure-change-requests",
+  requireAnyPermissionOrError(["employees.structureRequests.create", "employees.structureRequests.createForOthers"], {
+    code: "EMPLOYEE_STRUCTURE_REQUEST_PERMISSION_DENIED",
+    message: "You do not have permission to create employee transfer or structure change requests.",
+  }),
+  requireReason(),
+  structureChangeController.createEmployeeStructureChangeRequest,
+);
+employeesRoutes.get(
+  "/structure-change-requests/:requestId",
+  requireAnyPermissionOrError([
+    "employees.structureRequests.view",
+    "employees.structureRequests.create",
+    "employees.structureRequests.review",
+    "employees.structureRequests.finalApprove",
+    "employees.structureRequests.apply",
+    "employees.structureRequests.audit.view",
+    "approvals.operationOwner.view",
+    "approvals.operationOwner.approve",
+    "approvals.operationFinal.view",
+    "approvals.operationFinal.approve",
+    "approvals.operationExecutor.view",
+    "approvals.operationExecutor.apply",
+    "employees.structure.view",
+  ], {
+    code: "EMPLOYEE_STRUCTURE_REQUEST_PERMISSION_DENIED",
+    message: "You do not have permission to view this employee transfer or structure change request.",
+  }),
+  structureChangeController.getEmployeeStructureChangeRequest,
+);
+employeesRoutes.post(
+  "/structure-change-requests/:requestId/submit",
+  requireAnyPermissionOrError(["employees.structureRequests.create", "employees.structureRequests.createForOthers"], {
+    code: "EMPLOYEE_STRUCTURE_REQUEST_PERMISSION_DENIED",
+    message: "You do not have permission to submit employee transfer or structure change requests.",
+  }),
+  structureChangeController.submitEmployeeStructureChangeRequest,
+);
+employeesRoutes.post(
+  "/structure-change-requests/:requestId/approve",
+  requireAnyPermissionOrError([
+    "employees.structureRequests.review",
+    "employees.structureRequests.finalApprove",
+    "approvals.operationOwner.approve",
+    "approvals.operationFinal.approve",
+    "approvals.department.approve",
+    "approvals.hrFinal.approve",
+  ], {
+    code: "EMPLOYEE_STRUCTURE_REQUEST_PERMISSION_DENIED",
+    message: "You do not have permission to approve employee transfer or structure change requests.",
+  }),
+  requireReason(),
+  structureChangeController.approveEmployeeStructureChangeRequest,
+);
+employeesRoutes.post(
+  "/structure-change-requests/:requestId/reject",
+  requireAnyPermissionOrError([
+    "employees.structureRequests.reject",
+    "approvals.operationOwner.reject",
+    "approvals.operationFinal.reject",
+    "approvals.department.reject",
+    "approvals.hrFinal.reject",
+  ], {
+    code: "EMPLOYEE_STRUCTURE_REQUEST_PERMISSION_DENIED",
+    message: "You do not have permission to reject employee transfer or structure change requests.",
+  }),
+  requireReason(),
+  structureChangeController.rejectEmployeeStructureChangeRequest,
+);
+employeesRoutes.post(
+  "/structure-change-requests/:requestId/cancel",
+  requireAnyPermissionOrError(["employees.structureRequests.cancel", "employees.structureRequests.cancelAny", "approvals.requests.cancel", "approvals.requests.cancelAny"], {
+    code: "EMPLOYEE_STRUCTURE_REQUEST_PERMISSION_DENIED",
+    message: "You do not have permission to cancel employee transfer or structure change requests.",
+  }),
+  requireReason(),
+  structureChangeController.cancelEmployeeStructureChangeRequest,
+);
+employeesRoutes.post(
+  "/structure-change-requests/:requestId/apply",
+  requireAnyPermissionOrError(["employees.structureRequests.apply", "approvals.operationExecutor.apply", "employees.structure.manage"], {
+    code: "EMPLOYEE_STRUCTURE_REQUEST_PERMISSION_DENIED",
+    message: "You do not have permission to apply employee transfer or structure changes.",
+  }),
+  requireReason(),
+  structureChangeController.applyEmployeeStructureChangeRequest,
+);
+employeesRoutes.get(
+  "/structure-change-requests/:requestId/timeline",
+  requireAnyPermissionOrError([
+    "employees.structureRequests.view",
+    "employees.structureRequests.audit.view",
+    "employees.structureRequests.review",
+    "employees.structureRequests.finalApprove",
+    "employees.structureRequests.apply",
+    "approvals.operationOwner.view",
+    "approvals.operationOwner.approve",
+    "approvals.operationFinal.view",
+    "approvals.operationFinal.approve",
+    "approvals.operationExecutor.view",
+    "approvals.operationExecutor.apply",
+    "approvals.requests.audit.view",
+    "employees.structure.view",
+  ], {
+    code: "EMPLOYEE_STRUCTURE_REQUEST_PERMISSION_DENIED",
+    message: "You do not have permission to view this employee transfer or structure change timeline.",
+  }),
+  structureChangeController.employeeStructureChangeTimeline,
+);
+employeesRoutes.get(
+  "/structure-change-requests/:requestId/items",
+  requireAnyPermissionOrError([
+    "employees.structureRequests.view",
+    "employees.structureRequests.audit.view",
+    "employees.structureRequests.review",
+    "employees.structureRequests.finalApprove",
+    "employees.structureRequests.apply",
+    "approvals.operationOwner.view",
+    "approvals.operationOwner.approve",
+    "approvals.operationFinal.view",
+    "approvals.operationFinal.approve",
+    "approvals.operationExecutor.view",
+    "approvals.operationExecutor.apply",
+    "employees.structure.view",
+  ], {
+    code: "EMPLOYEE_STRUCTURE_REQUEST_PERMISSION_DENIED",
+    message: "You do not have permission to view this employee transfer or structure change request.",
+  }),
+  structureChangeController.employeeStructureChangeItems,
+);
+employeesRoutes.get(
+  "/structure-change-requests/:requestId/audit",
+  requireAnyPermissionOrError([
+    "employees.structureRequests.view",
+    "employees.structureRequests.audit.view",
+    "approvals.operationOwner.view",
+    "approvals.operationFinal.view",
+    "approvals.operationExecutor.view",
+    "approvals.requests.audit.view",
+    "employees.structure.view",
+  ], {
+    code: "EMPLOYEE_STRUCTURE_REQUEST_PERMISSION_DENIED",
+    message: "You do not have permission to view this employee transfer or structure change audit.",
+  }),
+  structureChangeController.employeeStructureChangeAudit,
+);
+const employeeLifecycleViewPermissions = [
+  "employeeLifecycle.resignations.view",
+  "employeeLifecycle.resignations.viewOwn",
+  "employeeLifecycle.resignations.create",
+  "employeeLifecycle.resignations.review",
+  "employeeLifecycle.resignations.finalApprove",
+  "employeeLifecycle.resignations.apply",
+  "employeeLifecycle.offboarding.view",
+  "employeeLifecycle.offboarding.viewOwn",
+  "employeeLifecycle.offboarding.create",
+  "employeeLifecycle.offboarding.review",
+  "employeeLifecycle.offboarding.finalApprove",
+  "employeeLifecycle.offboarding.apply",
+  "employeeLifecycle.offboarding.complete",
+  "employeeLifecycle.offboarding.tasks.view",
+  "employeeLifecycle.offboarding.tasks.complete",
+  "employeeLifecycle.offboarding.tasks.waive",
+  "employeeLifecycle.exitRequests.viewAll",
+  "employeeLifecycle.audit.view",
+  "approvals.operationOwner.view",
+  "approvals.operationOwner.approve",
+  "approvals.operationFinal.view",
+  "approvals.operationFinal.approve",
+  "approvals.operationExecutor.view",
+  "approvals.operationExecutor.apply",
+  "approvals.requests.audit.view",
+  "employees.view",
+];
+
+employeesRoutes.get(
+  "/exit-requests",
+  requireAnyPermissionOrError(employeeLifecycleViewPermissions, {
+    code: "EMPLOYEE_LIFECYCLE_PERMISSION_DENIED",
+    message: "You do not have permission to view resignation or offboarding requests.",
+  }),
+  employeeExitController.listEmployeeExitRequests,
+);
+employeesRoutes.post(
+  "/exit-requests",
+  requireAnyPermissionOrError([
+    "employeeLifecycle.resignations.create",
+    "employeeLifecycle.resignations.createForOthers",
+    "employeeLifecycle.offboarding.create",
+    "employeeLifecycle.offboarding.createForOthers",
+  ], {
+    code: "EMPLOYEE_LIFECYCLE_PERMISSION_DENIED",
+    message: "You do not have permission to create resignation or offboarding requests.",
+  }),
+  requireReason(),
+  employeeExitController.createEmployeeExitRequest,
+);
+employeesRoutes.get(
+  "/exit-requests/:requestId",
+  requireAnyPermissionOrError(employeeLifecycleViewPermissions, {
+    code: "EMPLOYEE_LIFECYCLE_PERMISSION_DENIED",
+    message: "You do not have permission to view this resignation or offboarding request.",
+  }),
+  employeeExitController.getEmployeeExitRequest,
+);
+employeesRoutes.post(
+  "/exit-requests/:requestId/submit",
+  requireAnyPermissionOrError([
+    "employeeLifecycle.resignations.create",
+    "employeeLifecycle.resignations.createForOthers",
+    "employeeLifecycle.offboarding.create",
+    "employeeLifecycle.offboarding.createForOthers",
+  ], {
+    code: "EMPLOYEE_LIFECYCLE_PERMISSION_DENIED",
+    message: "You do not have permission to submit resignation or offboarding requests.",
+  }),
+  employeeExitController.submitEmployeeExitRequest,
+);
+employeesRoutes.post(
+  "/exit-requests/:requestId/approve",
+  requireAnyPermissionOrError([
+    "employeeLifecycle.resignations.review",
+    "employeeLifecycle.resignations.finalApprove",
+    "employeeLifecycle.offboarding.review",
+    "employeeLifecycle.offboarding.finalApprove",
+    "approvals.operationOwner.approve",
+    "approvals.operationFinal.approve",
+    "approvals.department.approve",
+  ], {
+    code: "EMPLOYEE_LIFECYCLE_PERMISSION_DENIED",
+    message: "You do not have permission to approve resignation or offboarding requests.",
+  }),
+  requireReason(),
+  employeeExitController.approveEmployeeExitRequest,
+);
+employeesRoutes.post(
+  "/exit-requests/:requestId/reject",
+  requireAnyPermissionOrError([
+    "employeeLifecycle.resignations.reject",
+    "employeeLifecycle.offboarding.reject",
+    "approvals.operationOwner.reject",
+    "approvals.operationFinal.reject",
+    "approvals.department.reject",
+  ], {
+    code: "EMPLOYEE_LIFECYCLE_PERMISSION_DENIED",
+    message: "You do not have permission to reject resignation or offboarding requests.",
+  }),
+  requireReason(),
+  employeeExitController.rejectEmployeeExitRequest,
+);
+employeesRoutes.post(
+  "/exit-requests/:requestId/cancel",
+  requireAnyPermissionOrError([
+    "employeeLifecycle.resignations.cancel",
+    "employeeLifecycle.resignations.cancelAny",
+    "employeeLifecycle.offboarding.cancel",
+    "employeeLifecycle.offboarding.cancelAny",
+    "approvals.requests.cancel",
+    "approvals.requests.cancelAny",
+  ], {
+    code: "EMPLOYEE_LIFECYCLE_PERMISSION_DENIED",
+    message: "You do not have permission to cancel or withdraw resignation or offboarding requests.",
+  }),
+  requireReason(),
+  employeeExitController.cancelEmployeeExitRequest,
+);
+employeesRoutes.post(
+  "/exit-requests/:requestId/apply",
+  requireAnyPermissionOrError([
+    "employeeLifecycle.resignations.apply",
+    "employeeLifecycle.offboarding.apply",
+    "employeeLifecycle.offboarding.manage",
+    "approvals.operationExecutor.apply",
+  ], {
+    code: "EMPLOYEE_LIFECYCLE_PERMISSION_DENIED",
+    message: "You do not have permission to apply resignation or offboarding requests.",
+  }),
+  requireReason(),
+  employeeExitController.applyEmployeeExitRequest,
+);
+employeesRoutes.post(
+  "/exit-requests/:requestId/complete",
+  requireAnyPermissionOrError([
+    "employeeLifecycle.offboarding.complete",
+    "employeeLifecycle.offboarding.apply",
+    "employeeLifecycle.offboarding.manage",
+    "approvals.operationExecutor.apply",
+  ], {
+    code: "EMPLOYEE_LIFECYCLE_PERMISSION_DENIED",
+    message: "You do not have permission to complete offboarding.",
+  }),
+  requireReason(),
+  employeeExitController.completeEmployeeExitRequest,
+);
+employeesRoutes.get(
+  "/exit-requests/:requestId/timeline",
+  requireAnyPermissionOrError(employeeLifecycleViewPermissions, {
+    code: "EMPLOYEE_LIFECYCLE_PERMISSION_DENIED",
+    message: "You do not have permission to view this resignation or offboarding timeline.",
+  }),
+  employeeExitController.employeeExitTimeline,
+);
+employeesRoutes.get(
+  "/exit-requests/:requestId/tasks",
+  requireAnyPermissionOrError(employeeLifecycleViewPermissions, {
+    code: "EMPLOYEE_LIFECYCLE_PERMISSION_DENIED",
+    message: "You do not have permission to view offboarding tasks.",
+  }),
+  employeeExitController.employeeExitTasks,
+);
+employeesRoutes.post(
+  "/exit-requests/:requestId/tasks/:taskId/complete",
+  requireAnyPermissionOrError(["employeeLifecycle.offboarding.tasks.complete", "employeeLifecycle.tasks.manage", "employeeLifecycle.offboarding.manage"], {
+    code: "EMPLOYEE_LIFECYCLE_PERMISSION_DENIED",
+    message: "You do not have permission to complete offboarding tasks.",
+  }),
+  employeeExitController.completeEmployeeExitTask,
+);
+employeesRoutes.post(
+  "/exit-requests/:requestId/tasks/:taskId/waive",
+  requireAnyPermissionOrError(["employeeLifecycle.offboarding.tasks.waive", "employeeLifecycle.tasks.manage", "employeeLifecycle.offboarding.manage"], {
+    code: "EMPLOYEE_LIFECYCLE_PERMISSION_DENIED",
+    message: "You do not have permission to waive offboarding tasks.",
+  }),
+  requireReason(),
+  employeeExitController.waiveEmployeeExitTask,
+);
+employeesRoutes.get(
+  "/exit-requests/:requestId/audit",
+  requireAnyPermissionOrError([...employeeLifecycleViewPermissions, "employeeLifecycle.audit.view"], {
+    code: "EMPLOYEE_LIFECYCLE_PERMISSION_DENIED",
+    message: "You do not have permission to view this resignation or offboarding audit.",
+  }),
+  employeeExitController.employeeExitAudit,
 );
 employeesRoutes.get(
   "/:id/payslips",

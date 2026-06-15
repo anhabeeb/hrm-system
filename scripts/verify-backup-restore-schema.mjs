@@ -25,6 +25,7 @@ const page = read("frontend/src/features/backup-recovery/BackupRecoveryPage.tsx"
 const api = read("frontend/src/features/backup-recovery/backup-recovery.api.ts");
 const tests = read("tests/backup-recovery.test.ts");
 const packageJson = read("package.json");
+const buildRunner = read("scripts/run-production-build-checks.mjs");
 
 if (!app.includes("backupRecoveryRoutes") || !app.includes('"/backup-recovery"')) fail("backup/restore routes are not registered");
 mustInclude(routes, [
@@ -190,6 +191,6 @@ mustInclude(tests, [
 ], "backup/restore tests");
 
 if (!packageJson.includes("verify:backup-restore-schema")) fail("package.json missing verify:backup-restore-schema");
-if (!packageJson.includes("npm run verify:backup-restore-schema")) fail("build:all must run verify:backup-restore-schema");
+if (!buildRunner.includes('"verify:backup-restore-schema"')) fail("production build runner must run verify:backup-restore-schema");
 
 console.log("verify:backup-restore-schema passed");

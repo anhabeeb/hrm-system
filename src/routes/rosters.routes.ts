@@ -74,6 +74,72 @@ rostersRoutes.get(
 rostersRoutes.get("/calendar", controller.listRosters);
 rostersRoutes.get("/week", controller.listRosters);
 rostersRoutes.get("/month", controller.listRosters);
+rostersRoutes.get(
+  "/changes",
+  requireAnyPermissionOrError(["roster.changes.view", "roster.changes.audit.view", "roster.changes.create", "roster.changes.cancel", "approvals.department.view", "approvals.hrFinal.view", "approvals.requests.view"], {
+    code: "ROSTER_CHANGE_PERMISSION_DENIED",
+    message: "You do not have permission to view roster change requests.",
+  }),
+  controller.listRosterChanges,
+);
+rostersRoutes.post(
+  "/changes",
+  requireAnyPermissionOrError(["roster.changes.create", "roster.changes.createForOthers"], {
+    code: "ROSTER_CHANGE_PERMISSION_DENIED",
+    message: "You do not have permission to create roster change requests.",
+  }),
+  controller.createRosterChange,
+);
+rostersRoutes.get(
+  "/changes/:id/approval-timeline",
+  requireAnyPermissionOrError(["roster.changes.view", "roster.changes.audit.view", "roster.changes.create", "roster.changes.cancel", "approvals.department.view", "approvals.hrFinal.view", "approvals.department.approve", "approvals.hrFinal.approve", "approvals.department.reject", "approvals.hrFinal.reject", "approvals.requests.audit.view"], {
+    code: "ROSTER_CHANGE_PERMISSION_DENIED",
+    message: "You do not have permission to view this roster change timeline.",
+  }),
+  controller.getRosterChangeTimeline,
+);
+rostersRoutes.post(
+  "/changes/:id/submit",
+  requireAnyPermissionOrError(["roster.changes.create", "roster.changes.createForOthers"], {
+    code: "ROSTER_CHANGE_PERMISSION_DENIED",
+    message: "You do not have permission to submit roster change requests.",
+  }),
+  controller.submitRosterChange,
+);
+rostersRoutes.post(
+  "/changes/:id/cancel",
+  requireAnyPermissionOrError(["roster.changes.cancel", "roster.changes.cancelAny"], {
+    code: "ROSTER_CHANGE_PERMISSION_DENIED",
+    message: "You do not have permission to cancel roster change requests.",
+  }),
+  requireReason(),
+  controller.cancelRosterChange,
+);
+rostersRoutes.post(
+  "/changes/:id/approve",
+  requireAnyPermissionOrError(["roster.changes.approve", "approvals.department.approve", "approvals.hrFinal.approve"], {
+    code: "ROSTER_CHANGE_PERMISSION_DENIED",
+    message: "You do not have permission to approve roster change requests.",
+  }),
+  controller.approveRosterChange,
+);
+rostersRoutes.post(
+  "/changes/:id/reject",
+  requireAnyPermissionOrError(["roster.changes.reject", "approvals.department.reject", "approvals.hrFinal.reject"], {
+    code: "ROSTER_CHANGE_PERMISSION_DENIED",
+    message: "You do not have permission to reject roster change requests.",
+  }),
+  requireReason(),
+  controller.rejectRosterChange,
+);
+rostersRoutes.get(
+  "/changes/:id",
+  requireAnyPermissionOrError(["roster.changes.view", "roster.changes.audit.view", "roster.changes.create", "roster.changes.cancel", "approvals.department.view", "approvals.hrFinal.view", "approvals.requests.view"], {
+    code: "ROSTER_CHANGE_PERMISSION_DENIED",
+    message: "You do not have permission to view roster change requests.",
+  }),
+  controller.getRosterChange,
+);
 rostersRoutes.get("/:id", controller.getRoster);
 rostersRoutes.patch(
   "/:id",

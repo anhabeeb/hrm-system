@@ -507,13 +507,9 @@ describe("Users & Access API routes", () => {
   it("frontend production build config avoids the hanging minifier without skipping typecheck", () => {
     const viteConfig = readFileSync("frontend/vite.config.ts", "utf8");
     const packageJson = readFileSync("frontend/package.json", "utf8");
-    const typecheckScript = readFileSync("frontend/scripts/typecheck.mjs", "utf8");
 
     expect(packageJson).toContain('"build": "npm run typecheck && vite build --config vite.config.mjs --configLoader native"');
-    expect(packageJson).toContain('"typecheck": "node ./scripts/typecheck.mjs"');
-    expect(typecheckScript).toContain("--noEmit");
-    expect(typecheckScript).toContain("--project");
-    expect(typecheckScript).toContain("shell: false");
+    expect(packageJson).toContain('"typecheck": "tsc --noEmit --project tsconfig.json --pretty false"');
     expect(viteConfig).toContain("minify: false");
     expect(viteConfig).toContain("minification pass");
   });

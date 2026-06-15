@@ -71,7 +71,8 @@ export const navigationGroups: NavGroup[] = [
     items: [
       { label: "Employees", path: "/employees", icon: Users, requiredFeature: "employee_management", requiredPermission: "employees.view" },
       { label: "Contracts", path: "/contracts", icon: FileSignature, requiredFeature: "employee_management", requiredPermissionsAny: ["contracts.view", "employees.contracts.view", "employees.view"] },
-      { label: "Offboarding", path: "/offboarding", icon: FileCheck2, requiredFeature: "employee_management", requiredPermissionsAny: ["employees.offboarding.view", "employees.view"] },
+      { label: "Offboarding", path: "/offboarding", icon: FileCheck2, requiredFeature: "employee_management", requiredPermissionsAny: ["employeeLifecycle.resignations.viewOwn", "employeeLifecycle.resignations.view", "employeeLifecycle.resignations.create", "employeeLifecycle.offboarding.viewOwn", "employeeLifecycle.offboarding.view", "employeeLifecycle.offboarding.create", "employeeLifecycle.exitRequests.viewAll", "approvals.operationOwner.view", "approvals.operationFinal.view", "approvals.operationExecutor.view", "employees.offboarding.view", "employees.view"] },
+      { label: "Disciplinary Actions", path: "/disciplinary-actions", icon: FileCog, requiredFeature: "employee_management", requiredPermissionsAny: ["employeeDiscipline.actions.view", "employeeDiscipline.actions.viewOwn", "employeeDiscipline.actions.create", "employeeDiscipline.actions.review", "employeeDiscipline.actions.apply", "employeeDiscipline.tasks.view", "approvals.operationOwner.view", "approvals.operationFinal.view", "approvals.operationExecutor.view"] },
       { label: "Outlets", path: "/outlets", icon: Building2, requiredFeature: "employee_management", requiredPermission: "outlets.view" },
     ],
   },
@@ -81,6 +82,8 @@ export const navigationGroups: NavGroup[] = [
       { label: "Departments", path: "/departments", icon: BriefcaseBusiness, requiredFeature: "employee_management", requiredPermissionsAny: ["organization.departments.view", "departments.view"] },
       { label: "Positions / Titles", path: "/positions", icon: BadgeCheck, requiredFeature: "employee_management", requiredPermissionsAny: ["organization.positions.view", "positions.view"] },
       { label: "Level Role Templates", path: "/organization/level-role-templates", icon: ShieldCheck, requiredFeature: "employee_management", requiredPermissionsAny: ["organization.levelRoleTemplates.view", "organization.levelRoleTemplates.manage"] },
+      { label: "Structure Change Requests", path: "/organization/structure-change-requests", icon: FileCheck2, requiredFeature: "employee_management", requiredPermissionsAny: ["employees.structureRequests.view", "employees.structureRequests.create", "employees.structureRequests.review", "employees.structureRequests.apply"] },
+      { label: "Operation Ownership", path: "/organization/operation-ownership", icon: ShieldCheck, requiredPermissionsAny: ["operationOwnership.view", "operationOwnership.matrix.view", "operationOwnership.businessFunctions.view"] },
     ],
   },
   {

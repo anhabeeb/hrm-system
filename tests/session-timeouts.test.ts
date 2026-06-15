@@ -100,11 +100,14 @@ const baseSession = (overrides: Partial<SessionRecord> = {}): SessionRecord => (
   ...overrides,
 });
 
+let app: Hono<AppContext> | null = null;
+
 const createApp = async () => {
+  if (app) return app;
   const { authMiddleware } = await import("../src/middleware/auth.middleware");
-  const app = new Hono<AppContext>();
-  app.onError(async (error, c) => {
-    const { errorMiddleware } = await import("../src/middleware/error.middleware");
+  const { errorMiddleware } = await import("../src/middleware/error.middleware");
+  app = new Hono<AppContext>();
+  app.onError((error, c) => {
     return errorMiddleware(error, c);
   });
   app.get("/protected", authMiddleware, (c) => c.json({ ok: true, user: c.get("authUser")?.actorUserId }));
@@ -124,7 +127,6 @@ const requestProtected = async (headers: Record<string, string> = {}, method = "
 };
 
 beforeEach(() => {
-  vi.resetModules();
   vi.useFakeTimers();
   vi.setSystemTime(now);
   vi.clearAllMocks();
@@ -135,6 +137,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.clearAllTimers();
+  vi.clearAllMocks();
   vi.useRealTimers();
 });
 

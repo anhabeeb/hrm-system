@@ -6,6 +6,8 @@ import { created, ok, paginated } from "../../utils/response";
 import * as service from "./rosters.service";
 import {
   validateRosterActionInput,
+  validateRosterChangeFilters,
+  validateRosterChangeRequestInput,
   validateRosterBulkInput,
   validateRosterConflictFilters,
   validateRosterListFilters,
@@ -78,6 +80,41 @@ export const createRoster = async (c: Context<AppContext>) =>
 
 export const getRoster = async (c: Context<AppContext>) =>
   ok(await service.getRosterShift(c.env, actor(c), idParam(c)), "Roster shift loaded successfully.", { requestId: c.get("requestId") });
+
+export const listRosterChanges = async (c: Context<AppContext>) => {
+  const result = await service.listRosterChangeRequests(c.env, actor(c), validateRosterChangeFilters({
+    employee_id: c.req.query("employee_id"),
+    department_id: c.req.query("department_id"),
+    outlet_id: c.req.query("outlet_id"),
+    status: c.req.query("status"),
+    approval_status: c.req.query("approval_status"),
+    requested_date: c.req.query("requested_date"),
+    page: c.req.query("page"),
+    page_size: c.req.query("page_size"),
+  }));
+  return paginated(result.rows, result.pagination, "Roster change requests loaded successfully.", { requestId: c.get("requestId") });
+};
+
+export const createRosterChange = async (c: Context<AppContext>) =>
+  created(await service.createRosterChangeRequest(c.env, actor(c), validateRosterChangeRequestInput(await readJson(c))), "Roster change request created successfully.", { requestId: c.get("requestId") });
+
+export const getRosterChange = async (c: Context<AppContext>) =>
+  ok(await service.getRosterChangeRequest(c.env, actor(c), idParam(c)), "Roster change request loaded successfully.", { requestId: c.get("requestId") });
+
+export const submitRosterChange = async (c: Context<AppContext>) =>
+  ok(await service.submitRosterChangeForApproval(c.env, actor(c), idParam(c)), "Roster change request submitted for approval.", { requestId: c.get("requestId") });
+
+export const approveRosterChange = async (c: Context<AppContext>) =>
+  ok(await service.approveRosterChangeStep(c.env, actor(c), idParam(c), validateRosterActionInput(await readJson(c))), "Roster change approval recorded successfully.", { requestId: c.get("requestId") });
+
+export const rejectRosterChange = async (c: Context<AppContext>) =>
+  ok(await service.rejectRosterChangeStep(c.env, actor(c), idParam(c), validateRosterActionInput(await readJson(c))), "Roster change rejected successfully.", { requestId: c.get("requestId") });
+
+export const cancelRosterChange = async (c: Context<AppContext>) =>
+  ok(await service.cancelRosterChangeRequest(c.env, actor(c), idParam(c), validateRosterActionInput(await readJson(c))), "Roster change cancelled successfully.", { requestId: c.get("requestId") });
+
+export const getRosterChangeTimeline = async (c: Context<AppContext>) =>
+  ok(await service.getRosterChangeApprovalTimeline(c.env, actor(c), idParam(c)), "Roster change approval timeline loaded successfully.", { requestId: c.get("requestId") });
 
 export const updateRoster = async (c: Context<AppContext>) =>
   ok(await service.updateRosterShift(c.env, actor(c), idParam(c), validateRosterShiftUpdateInput(await readJson(c))), "Roster shift updated successfully.", { requestId: c.get("requestId") });

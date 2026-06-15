@@ -1,6 +1,7 @@
 import type { Context } from "hono";
 
 import * as service from "./documents.service";
+import * as kycService from "./document-kyc-approval.service";
 import {
   validateCategoryFilters,
   validateCategoryInput,
@@ -12,6 +13,7 @@ import {
   validateDocumentUpdate,
   validateDocumentUpload,
 } from "./documents.validators";
+import { validateDocumentKycAction, validateDocumentKycFilters, validateDocumentKycRequest } from "./document-kyc.validators";
 import type { AppContext, AuthActor } from "../../types/api.types";
 import { AuthError, ValidationError } from "../../utils/errors";
 import { created, ok, paginated } from "../../utils/response";
@@ -89,3 +91,34 @@ export const createCategory = async (c: Context<AppContext>) =>
   created(await service.createCategory(c.env, actor(c), validateCategoryInput(await body(c))), "Document category created successfully.", { requestId: c.get("requestId") });
 export const updateCategory = async (c: Context<AppContext>) =>
   ok(await service.updateCategory(c.env, actor(c), id(c), validateCategoryUpdate(await body(c))), "Document category updated successfully.", { requestId: c.get("requestId") });
+
+const kycQuery = (c: Context<AppContext>) => ({
+  employee_id: c.req.query("employee_id"),
+  request_type: c.req.query("request_type"),
+  status: c.req.query("status"),
+  document_type: c.req.query("document_type"),
+  page: c.req.query("page"),
+  page_size: c.req.query("page_size"),
+});
+const kycId = (c: Context<AppContext>) => id(c, "requestId");
+
+export const listKycRequests = async (c: Context<AppContext>) => {
+  const result = await kycService.listDocumentKycRequests(c.env, actor(c), validateDocumentKycFilters(kycQuery(c)));
+  return paginated(result.rows, result.pagination, "Document/KYC requests loaded successfully.", { requestId: c.get("requestId") });
+};
+export const createKycRequest = async (c: Context<AppContext>) =>
+  created(await kycService.createDocumentKycRequest(c.env, actor(c), validateDocumentKycRequest(await body(c))), "Document/KYC request created successfully.", { requestId: c.get("requestId") });
+export const getKycRequest = async (c: Context<AppContext>) =>
+  ok(await kycService.getDocumentKycRequest(c.env, actor(c), kycId(c)), "Document/KYC request loaded successfully.", { requestId: c.get("requestId") });
+export const submitKycRequest = async (c: Context<AppContext>) =>
+  ok(await kycService.submitDocumentKycRequestForApproval(c.env, actor(c), kycId(c)), "Document/KYC request submitted for approval.", { requestId: c.get("requestId") });
+export const approveKycRequest = async (c: Context<AppContext>) =>
+  ok(await kycService.approveDocumentKycStep(c.env, actor(c), kycId(c), validateDocumentKycAction(await body(c))), "Document/KYC request approved.", { requestId: c.get("requestId") });
+export const rejectKycRequest = async (c: Context<AppContext>) =>
+  ok(await kycService.rejectDocumentKycStep(c.env, actor(c), kycId(c), validateDocumentKycAction(await body(c))), "Document/KYC request rejected.", { requestId: c.get("requestId") });
+export const cancelKycRequest = async (c: Context<AppContext>) =>
+  ok(await kycService.cancelDocumentKycRequest(c.env, actor(c), kycId(c), validateDocumentKycAction(await body(c))), "Document/KYC request cancelled.", { requestId: c.get("requestId") });
+export const applyKycRequest = async (c: Context<AppContext>) =>
+  ok(await kycService.applyApprovedDocumentKycRequest(c.env, actor(c), kycId(c), validateDocumentKycAction(await body(c))), "Document/KYC request applied.", { requestId: c.get("requestId") });
+export const kycRequestTimeline = async (c: Context<AppContext>) =>
+  ok(await kycService.getDocumentKycTimeline(c.env, actor(c), kycId(c)), "Document/KYC request timeline loaded successfully.", { requestId: c.get("requestId") });

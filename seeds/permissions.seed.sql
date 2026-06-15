@@ -149,6 +149,18 @@ INSERT OR IGNORE INTO permissions (id, permission_key, module, action, descripti
 ('perm_payroll_view_exceptions', 'payroll.view_exceptions', 'payroll', 'view_exceptions', 'View payroll exceptions.', '2026-01-01T00:00:00Z'),
 ('perm_payroll_resolve_exceptions', 'payroll.resolve_exceptions', 'payroll', 'resolve_exceptions', 'Resolve payroll exceptions.', '2026-01-01T00:00:00Z'),
 ('perm_payroll_manual_adjustment', 'payroll.manual_adjustment', 'payroll', 'manual_adjustment', 'Create payroll manual adjustments.', '2026-01-01T00:00:00Z'),
+('perm_payroll_adjustments_view', 'payroll.adjustments.view', 'payroll', 'adjustments_view', 'View payroll adjustment requests.', '2026-01-01T00:00:00Z'),
+('perm_payroll_adjustments_create', 'payroll.adjustments.create', 'payroll', 'adjustments_create', 'Create own payroll adjustment requests.', '2026-01-01T00:00:00Z'),
+('perm_payroll_adjustments_create_for_others', 'payroll.adjustments.createForOthers', 'payroll', 'adjustments_create_for_others', 'Create payroll adjustment requests for another employee.', '2026-01-01T00:00:00Z'),
+('perm_payroll_adjustments_submit', 'payroll.adjustments.submit', 'payroll', 'adjustments_submit', 'Submit payroll adjustment requests for approval.', '2026-01-01T00:00:00Z'),
+('perm_payroll_adjustments_review', 'payroll.adjustments.review', 'payroll', 'adjustments_review', 'Review payroll adjustment request steps.', '2026-01-01T00:00:00Z'),
+('perm_payroll_adjustments_approve', 'payroll.adjustments.approve', 'payroll', 'adjustments_approve', 'Approve payroll adjustment request steps.', '2026-01-01T00:00:00Z'),
+('perm_payroll_adjustments_reject', 'payroll.adjustments.reject', 'payroll', 'adjustments_reject', 'Reject payroll adjustment request steps.', '2026-01-01T00:00:00Z'),
+('perm_payroll_adjustments_final_approve', 'payroll.adjustments.finalApprove', 'payroll', 'adjustments_final_approve', 'Final-approve payroll adjustment requests.', '2026-01-01T00:00:00Z'),
+('perm_payroll_adjustments_cancel', 'payroll.adjustments.cancel', 'payroll', 'adjustments_cancel', 'Cancel own payroll adjustment requests.', '2026-01-01T00:00:00Z'),
+('perm_payroll_adjustments_cancel_any', 'payroll.adjustments.cancelAny', 'payroll', 'adjustments_cancel_any', 'Cancel payroll adjustment requests for another employee.', '2026-01-01T00:00:00Z'),
+('perm_payroll_adjustments_apply', 'payroll.adjustments.apply', 'payroll', 'adjustments_apply', 'Apply approved payroll adjustment requests through execution controls.', '2026-01-01T00:00:00Z'),
+('perm_payroll_adjustments_audit_view', 'payroll.adjustments.audit.view', 'payroll', 'adjustments_audit_view', 'View payroll adjustment approval timeline and audit.', '2026-01-01T00:00:00Z'),
 ('perm_payroll_settings_view', 'payroll_settings.view', 'payroll_settings', 'view', 'View payroll settings.', '2026-01-01T00:00:00Z'),
 ('perm_payroll_settings_manage', 'payroll_settings.manage', 'payroll_settings', 'manage', 'Manage payroll settings.', '2026-01-01T00:00:00Z'),
 ('perm_salary_view', 'salary.view', 'salary', 'view', 'View salary records.', '2026-01-01T00:00:00Z'),
@@ -169,6 +181,18 @@ INSERT OR IGNORE INTO permissions (id, permission_key, module, action, descripti
 ('perm_advances_approve', 'advances.approve', 'advances', 'approve', 'Approve advance payments.', '2026-01-01T00:00:00Z'),
 ('perm_advances_reject', 'advances.reject', 'advances', 'reject', 'Reject advance payments.', '2026-01-01T00:00:00Z'),
 ('perm_advances_export', 'advances.export', 'advances', 'export', 'Export advance payment records.', '2026-01-01T00:00:00Z'),
+('perm_advance_salary_requests_view', 'advanceSalary.requests.view', 'advances', 'salary_requests_view', 'View advance salary requests.', '2026-01-01T00:00:00Z'),
+('perm_advance_salary_requests_create', 'advanceSalary.requests.create', 'advances', 'salary_requests_create', 'Create own advance salary requests.', '2026-01-01T00:00:00Z'),
+('perm_advance_salary_requests_create_for_others', 'advanceSalary.requests.createForOthers', 'advances', 'salary_requests_create_for_others', 'Create advance salary requests for another employee.', '2026-01-01T00:00:00Z'),
+('perm_advance_salary_requests_submit', 'advanceSalary.requests.submit', 'advances', 'salary_requests_submit', 'Submit advance salary requests for approval.', '2026-01-01T00:00:00Z'),
+('perm_advance_salary_requests_review', 'advanceSalary.requests.review', 'advances', 'salary_requests_review', 'Review advance salary request steps.', '2026-01-01T00:00:00Z'),
+('perm_advance_salary_requests_approve', 'advanceSalary.requests.approve', 'advances', 'salary_requests_approve', 'Approve advance salary request steps.', '2026-01-01T00:00:00Z'),
+('perm_advance_salary_requests_reject', 'advanceSalary.requests.reject', 'advances', 'salary_requests_reject', 'Reject advance salary request steps.', '2026-01-01T00:00:00Z'),
+('perm_advance_salary_requests_final_approve', 'advanceSalary.requests.finalApprove', 'advances', 'salary_requests_final_approve', 'Final-approve advance salary requests.', '2026-01-01T00:00:00Z'),
+('perm_advance_salary_requests_cancel', 'advanceSalary.requests.cancel', 'advances', 'salary_requests_cancel', 'Cancel own advance salary requests.', '2026-01-01T00:00:00Z'),
+('perm_advance_salary_requests_cancel_any', 'advanceSalary.requests.cancelAny', 'advances', 'salary_requests_cancel_any', 'Cancel advance salary requests for another employee.', '2026-01-01T00:00:00Z'),
+('perm_advance_salary_payments_execute', 'advanceSalary.payments.execute', 'advances', 'salary_payments_execute', 'Execute approved advance salary payments.', '2026-01-01T00:00:00Z'),
+('perm_advance_salary_audit_view', 'advanceSalary.audit.view', 'advances', 'salary_audit_view', 'View advance salary timelines and audit.', '2026-01-01T00:00:00Z'),
 ('perm_salary_loans_view', 'salary_loans.view', 'salary_loans', 'view', 'View salary loans.', '2026-01-01T00:00:00Z'),
 ('perm_salary_loans_create', 'salary_loans.create', 'salary_loans', 'create', 'Create salary loans.', '2026-01-01T00:00:00Z'),
 ('perm_salary_loans_edit', 'salary_loans.edit', 'salary_loans', 'edit', 'Edit salary loans.', '2026-01-01T00:00:00Z'),
@@ -544,7 +568,15 @@ INSERT OR IGNORE INTO permissions (id, permission_key, module, action, descripti
 ('perm_approval_engine_hr_reject', 'approvals.hrFinal.reject', 'approvals', 'hr_final_reject', 'Reject HR final approval steps.', '2026-01-01T00:00:00Z'),
 ('perm_approval_engine_finance_view', 'approvals.financeFinal.view', 'approvals', 'finance_final_view', 'View finance final approval queues.', '2026-01-01T00:00:00Z'),
 ('perm_approval_engine_finance_approve', 'approvals.financeFinal.approve', 'approvals', 'finance_final_approve', 'Approve finance final approval steps.', '2026-01-01T00:00:00Z'),
-('perm_approval_engine_finance_reject', 'approvals.financeFinal.reject', 'approvals', 'finance_final_reject', 'Reject finance final approval steps.', '2026-01-01T00:00:00Z');
+('perm_approval_engine_finance_reject', 'approvals.financeFinal.reject', 'approvals', 'finance_final_reject', 'Reject finance final approval steps.', '2026-01-01T00:00:00Z'),
+('perm_approval_engine_operation_owner_view', 'approvals.operationOwner.view', 'approvals', 'operation_owner_view', 'View approval requests assigned to operation owners.', '2026-01-01T00:00:00Z'),
+('perm_approval_engine_operation_owner_approve', 'approvals.operationOwner.approve', 'approvals', 'operation_owner_approve', 'Approve operation-owner approval steps when eligible.', '2026-01-01T00:00:00Z'),
+('perm_approval_engine_operation_owner_reject', 'approvals.operationOwner.reject', 'approvals', 'operation_owner_reject', 'Reject operation-owner approval steps when eligible.', '2026-01-01T00:00:00Z'),
+('perm_approval_engine_operation_final_view', 'approvals.operationFinal.view', 'approvals', 'operation_final_view', 'View operation-final approval queues.', '2026-01-01T00:00:00Z'),
+('perm_approval_engine_operation_final_approve', 'approvals.operationFinal.approve', 'approvals', 'operation_final_approve', 'Approve operation-final approval steps when eligible.', '2026-01-01T00:00:00Z'),
+('perm_approval_engine_operation_final_reject', 'approvals.operationFinal.reject', 'approvals', 'operation_final_reject', 'Reject operation-final approval steps when eligible.', '2026-01-01T00:00:00Z'),
+('perm_approval_engine_operation_executor_view', 'approvals.operationExecutor.view', 'approvals', 'operation_executor_view', 'View approval requests awaiting operation-owned execution.', '2026-01-01T00:00:00Z'),
+('perm_approval_engine_operation_executor_apply', 'approvals.operationExecutor.apply', 'approvals', 'operation_executor_apply', 'Execute approved operation-owned approval requests when eligible.', '2026-01-01T00:00:00Z');
 
 -- Employee self-service dashboard and access foundation permissions.
 INSERT OR IGNORE INTO permissions (id, permission_key, module, action, description, created_at) VALUES
@@ -562,3 +594,118 @@ INSERT OR IGNORE INTO permissions (id, permission_key, module, action, descripti
 ('perm_department_leave_view', 'department.leave.view', 'self_service', 'department_leave_view', 'View department leave widgets when role permissions allow.', '2026-01-01T00:00:00Z'),
 ('perm_department_requests_view', 'department.requests.view', 'self_service', 'department_requests_view', 'View department request widgets when role permissions allow.', '2026-01-01T00:00:00Z'),
 ('perm_department_approvals_view', 'department.approvals.view', 'self_service', 'department_approvals_view', 'View own eligible department approval queue.', '2026-01-01T00:00:00Z');
+
+-- Document / KYC approval engine permissions.
+INSERT OR IGNORE INTO permissions (id, permission_key, module, action, description, created_at) VALUES
+('perm_document_kyc_requests_view', 'documentKyc.requests.view', 'documents', 'kyc_requests_view', 'View employee document and KYC update requests.', '2026-01-01T00:00:00Z'),
+('perm_document_kyc_requests_create', 'documentKyc.requests.create', 'documents', 'kyc_requests_create', 'Create own document and KYC update requests.', '2026-01-01T00:00:00Z'),
+('perm_document_kyc_requests_create_for_others', 'documentKyc.requests.createForOthers', 'documents', 'kyc_requests_create_for_others', 'Create document and KYC update requests for another employee.', '2026-01-01T00:00:00Z'),
+('perm_document_kyc_requests_submit', 'documentKyc.requests.submit', 'documents', 'kyc_requests_submit', 'Submit document and KYC update requests for approval.', '2026-01-01T00:00:00Z'),
+('perm_document_kyc_requests_review', 'documentKyc.requests.review', 'documents', 'kyc_requests_review', 'Review document and KYC update request steps.', '2026-01-01T00:00:00Z'),
+('perm_document_kyc_requests_approve', 'documentKyc.requests.approve', 'documents', 'kyc_requests_approve', 'Approve document and KYC update request steps.', '2026-01-01T00:00:00Z'),
+('perm_document_kyc_requests_reject', 'documentKyc.requests.reject', 'documents', 'kyc_requests_reject', 'Reject document and KYC update request steps.', '2026-01-01T00:00:00Z'),
+('perm_document_kyc_requests_final_approve', 'documentKyc.requests.finalApprove', 'documents', 'kyc_requests_final_approve', 'Final-approve document and KYC update requests.', '2026-01-01T00:00:00Z'),
+('perm_document_kyc_requests_cancel', 'documentKyc.requests.cancel', 'documents', 'kyc_requests_cancel', 'Cancel own document and KYC update requests.', '2026-01-01T00:00:00Z'),
+('perm_document_kyc_requests_cancel_any', 'documentKyc.requests.cancelAny', 'documents', 'kyc_requests_cancel_any', 'Cancel document and KYC update requests for another employee.', '2026-01-01T00:00:00Z'),
+('perm_document_kyc_requests_apply', 'documentKyc.requests.apply', 'documents', 'kyc_requests_apply', 'Apply approved document and KYC update requests.', '2026-01-01T00:00:00Z'),
+('perm_document_kyc_requests_audit_view', 'documentKyc.requests.audit.view', 'documents', 'kyc_requests_audit_view', 'View document and KYC approval timelines and audit.', '2026-01-01T00:00:00Z'),
+('perm_employee_documents_verify', 'employeeDocuments.verify', 'documents', 'employee_documents_verify', 'Verify employee documents after approval.', '2026-01-01T00:00:00Z');
+INSERT OR IGNORE INTO permissions (id, permission_key, module, action, description, created_at) VALUES
+('perm_employee_documents_download', 'employeeDocuments.download', 'documents', 'employee_documents_download', 'Download employee documents when row-level access allows.', '2026-01-01T00:00:00Z');
+
+-- Employee transfer / structure change approval engine permissions.
+INSERT OR IGNORE INTO permissions (id, permission_key, module, action, description, created_at) VALUES
+('perm_employees_structure_requests_view', 'employees.structureRequests.view', 'employee_management', 'structure_requests_view', 'View employee transfer and structure change requests.', '2026-01-01T00:00:00Z'),
+('perm_employees_structure_requests_create', 'employees.structureRequests.create', 'employee_management', 'structure_requests_create', 'Create own employee transfer and structure change requests.', '2026-01-01T00:00:00Z'),
+('perm_employees_structure_requests_create_for_others', 'employees.structureRequests.createForOthers', 'employee_management', 'structure_requests_create_for_others', 'Create employee transfer and structure change requests for another employee.', '2026-01-01T00:00:00Z'),
+('perm_employees_structure_requests_review', 'employees.structureRequests.review', 'employee_management', 'structure_requests_review', 'Review employee transfer and structure change requests.', '2026-01-01T00:00:00Z'),
+('perm_employees_structure_requests_final_approve', 'employees.structureRequests.finalApprove', 'employee_management', 'structure_requests_final_approve', 'Final approve employee transfer and structure change requests.', '2026-01-01T00:00:00Z'),
+('perm_employees_structure_requests_reject', 'employees.structureRequests.reject', 'employee_management', 'structure_requests_reject', 'Reject employee transfer and structure change requests.', '2026-01-01T00:00:00Z'),
+('perm_employees_structure_requests_cancel', 'employees.structureRequests.cancel', 'employee_management', 'structure_requests_cancel', 'Cancel own employee transfer and structure change requests.', '2026-01-01T00:00:00Z'),
+('perm_employees_structure_requests_cancel_any', 'employees.structureRequests.cancelAny', 'employee_management', 'structure_requests_cancel_any', 'Cancel another employee transfer and structure change request with a required reason.', '2026-01-01T00:00:00Z'),
+('perm_employees_structure_requests_apply', 'employees.structureRequests.apply', 'employee_management', 'structure_requests_apply', 'Apply final-approved employee transfer and structure changes.', '2026-01-01T00:00:00Z'),
+('perm_employees_structure_requests_audit_view', 'employees.structureRequests.audit.view', 'employee_management', 'structure_requests_audit_view', 'View employee transfer and structure change request timelines.', '2026-01-01T00:00:00Z');
+
+-- Employee lifecycle resignation / offboarding approval engine permissions.
+INSERT OR IGNORE INTO permissions (id, permission_key, module, action, description, created_at) VALUES
+('perm_employee_lifecycle_resignations_view', 'employeeLifecycle.resignations.view', 'employee_lifecycle', 'resignations_view', 'View resignation requests.', '2026-01-01T00:00:00Z'),
+('perm_employee_lifecycle_resignations_view_own', 'employeeLifecycle.resignations.viewOwn', 'employee_lifecycle', 'resignations_view_own', 'View own resignation requests and requests created on behalf of the linked employee.', '2026-01-01T00:00:00Z'),
+('perm_employee_lifecycle_resignations_create', 'employeeLifecycle.resignations.create', 'employee_lifecycle', 'resignations_create', 'Create own resignation requests.', '2026-01-01T00:00:00Z'),
+('perm_employee_lifecycle_resignations_create_for_others', 'employeeLifecycle.resignations.createForOthers', 'employee_lifecycle', 'resignations_create_for_others', 'Create resignation requests for another employee.', '2026-01-01T00:00:00Z'),
+('perm_employee_lifecycle_resignations_review', 'employeeLifecycle.resignations.review', 'employee_lifecycle', 'resignations_review', 'Review resignation requests.', '2026-01-01T00:00:00Z'),
+('perm_employee_lifecycle_resignations_final_approve', 'employeeLifecycle.resignations.finalApprove', 'employee_lifecycle', 'resignations_final_approve', 'Final approve resignation requests.', '2026-01-01T00:00:00Z'),
+('perm_employee_lifecycle_resignations_reject', 'employeeLifecycle.resignations.reject', 'employee_lifecycle', 'resignations_reject', 'Reject resignation requests.', '2026-01-01T00:00:00Z'),
+('perm_employee_lifecycle_resignations_cancel', 'employeeLifecycle.resignations.cancel', 'employee_lifecycle', 'resignations_cancel', 'Cancel or withdraw own resignation requests.', '2026-01-01T00:00:00Z'),
+('perm_employee_lifecycle_resignations_cancel_any', 'employeeLifecycle.resignations.cancelAny', 'employee_lifecycle', 'resignations_cancel_any', 'Cancel resignation requests for another employee.', '2026-01-01T00:00:00Z'),
+('perm_employee_lifecycle_resignations_apply', 'employeeLifecycle.resignations.apply', 'employee_lifecycle', 'resignations_apply', 'Apply approved resignation lifecycle updates.', '2026-01-01T00:00:00Z'),
+('perm_employee_lifecycle_offboarding_view', 'employeeLifecycle.offboarding.view', 'employee_lifecycle', 'offboarding_view', 'View offboarding requests.', '2026-01-01T00:00:00Z'),
+('perm_employee_lifecycle_offboarding_view_own', 'employeeLifecycle.offboarding.viewOwn', 'employee_lifecycle', 'offboarding_view_own', 'View own offboarding requests and requests created on behalf of the linked employee.', '2026-01-01T00:00:00Z'),
+('perm_employee_lifecycle_offboarding_create', 'employeeLifecycle.offboarding.create', 'employee_lifecycle', 'offboarding_create', 'Create own offboarding requests.', '2026-01-01T00:00:00Z'),
+('perm_employee_lifecycle_offboarding_create_for_others', 'employeeLifecycle.offboarding.createForOthers', 'employee_lifecycle', 'offboarding_create_for_others', 'Create offboarding requests for another employee.', '2026-01-01T00:00:00Z'),
+('perm_employee_lifecycle_offboarding_review', 'employeeLifecycle.offboarding.review', 'employee_lifecycle', 'offboarding_review', 'Review offboarding requests.', '2026-01-01T00:00:00Z'),
+('perm_employee_lifecycle_offboarding_final_approve', 'employeeLifecycle.offboarding.finalApprove', 'employee_lifecycle', 'offboarding_final_approve', 'Final approve offboarding requests.', '2026-01-01T00:00:00Z'),
+('perm_employee_lifecycle_offboarding_reject', 'employeeLifecycle.offboarding.reject', 'employee_lifecycle', 'offboarding_reject', 'Reject offboarding requests.', '2026-01-01T00:00:00Z'),
+('perm_employee_lifecycle_offboarding_cancel', 'employeeLifecycle.offboarding.cancel', 'employee_lifecycle', 'offboarding_cancel', 'Cancel own offboarding requests.', '2026-01-01T00:00:00Z'),
+('perm_employee_lifecycle_offboarding_cancel_any', 'employeeLifecycle.offboarding.cancelAny', 'employee_lifecycle', 'offboarding_cancel_any', 'Cancel offboarding requests for another employee.', '2026-01-01T00:00:00Z'),
+('perm_employee_lifecycle_offboarding_manage', 'employeeLifecycle.offboarding.manage', 'employee_lifecycle', 'offboarding_manage', 'Manage offboarding checklist and lifecycle handoff.', '2026-01-01T00:00:00Z'),
+('perm_employee_lifecycle_offboarding_apply', 'employeeLifecycle.offboarding.apply', 'employee_lifecycle', 'offboarding_apply', 'Apply approved offboarding lifecycle updates.', '2026-01-01T00:00:00Z'),
+('perm_employee_lifecycle_offboarding_complete', 'employeeLifecycle.offboarding.complete', 'employee_lifecycle', 'offboarding_complete', 'Complete approved offboarding after checklist clearance.', '2026-01-01T00:00:00Z'),
+('perm_employee_lifecycle_tasks_manage', 'employeeLifecycle.tasks.manage', 'employee_lifecycle', 'tasks_manage', 'Complete or waive offboarding tasks.', '2026-01-01T00:00:00Z'),
+('perm_employee_lifecycle_exit_requests_view_all', 'employeeLifecycle.exitRequests.viewAll', 'employee_lifecycle', 'exit_requests_view_all', 'View all company resignation and offboarding requests.', '2026-01-01T00:00:00Z'),
+('perm_employee_lifecycle_offboarding_tasks_view', 'employeeLifecycle.offboarding.tasks.view', 'employee_lifecycle', 'offboarding_tasks_view', 'View assigned or owned offboarding tasks.', '2026-01-01T00:00:00Z'),
+('perm_employee_lifecycle_offboarding_tasks_complete', 'employeeLifecycle.offboarding.tasks.complete', 'employee_lifecycle', 'offboarding_tasks_complete', 'Complete assigned or owned offboarding tasks.', '2026-01-01T00:00:00Z'),
+('perm_employee_lifecycle_offboarding_tasks_waive', 'employeeLifecycle.offboarding.tasks.waive', 'employee_lifecycle', 'offboarding_tasks_waive', 'Waive assigned or owned offboarding tasks with a reason.', '2026-01-01T00:00:00Z'),
+('perm_employee_lifecycle_audit_view', 'employeeLifecycle.audit.view', 'employee_lifecycle', 'audit_view', 'View resignation and offboarding timelines and audit.', '2026-01-01T00:00:00Z');
+
+-- Disciplinary action approval engine permissions.
+INSERT OR IGNORE INTO permissions (id, permission_key, module, action, description, created_at) VALUES
+('perm_employee_discipline_actions_view', 'employeeDiscipline.actions.view', 'employee_discipline', 'actions_view', 'View disciplinary action requests when row-level access allows.', '2026-01-01T00:00:00Z'),
+('perm_employee_discipline_actions_view_own', 'employeeDiscipline.actions.viewOwn', 'employee_discipline', 'actions_view_own', 'View own disciplinary records and requests when policy allows.', '2026-01-01T00:00:00Z'),
+('perm_employee_discipline_actions_create', 'employeeDiscipline.actions.create', 'employee_discipline', 'actions_create', 'Create own disciplinary reports when policy allows.', '2026-01-01T00:00:00Z'),
+('perm_employee_discipline_actions_create_for_others', 'employeeDiscipline.actions.createForOthers', 'employee_discipline', 'actions_create_for_others', 'Create disciplinary action requests for another employee.', '2026-01-01T00:00:00Z'),
+('perm_employee_discipline_actions_review', 'employeeDiscipline.actions.review', 'employee_discipline', 'actions_review', 'Review disciplinary action requests.', '2026-01-01T00:00:00Z'),
+('perm_employee_discipline_actions_investigate', 'employeeDiscipline.actions.investigate', 'employee_discipline', 'actions_investigate', 'Investigate disciplinary action requests.', '2026-01-01T00:00:00Z'),
+('perm_employee_discipline_actions_final_approve', 'employeeDiscipline.actions.finalApprove', 'employee_discipline', 'actions_final_approve', 'Final approve disciplinary action requests.', '2026-01-01T00:00:00Z'),
+('perm_employee_discipline_actions_reject', 'employeeDiscipline.actions.reject', 'employee_discipline', 'actions_reject', 'Reject disciplinary action requests.', '2026-01-01T00:00:00Z'),
+('perm_employee_discipline_actions_cancel', 'employeeDiscipline.actions.cancel', 'employee_discipline', 'actions_cancel', 'Cancel own disciplinary action requests.', '2026-01-01T00:00:00Z'),
+('perm_employee_discipline_actions_cancel_any', 'employeeDiscipline.actions.cancelAny', 'employee_discipline', 'actions_cancel_any', 'Cancel disciplinary action requests for another employee.', '2026-01-01T00:00:00Z'),
+('perm_employee_discipline_actions_apply', 'employeeDiscipline.actions.apply', 'employee_discipline', 'actions_apply', 'Apply final-approved disciplinary outcomes.', '2026-01-01T00:00:00Z'),
+('perm_employee_discipline_actions_close', 'employeeDiscipline.actions.close', 'employee_discipline', 'actions_close', 'Close applied disciplinary actions after acknowledgement and required follow-ups.', '2026-01-01T00:00:00Z'),
+('perm_employee_discipline_actions_manage', 'employeeDiscipline.actions.manage', 'employee_discipline', 'actions_manage', 'Manage disciplinary action lifecycle and follow-ups.', '2026-01-01T00:00:00Z'),
+('perm_employee_discipline_actions_sensitive_manage', 'employeeDiscipline.actions.sensitive.manage', 'employee_discipline', 'actions_sensitive_manage', 'Manage sensitive disciplinary outcomes and investigation details.', '2026-01-01T00:00:00Z'),
+('perm_employee_discipline_records_view', 'employeeDiscipline.records.view', 'employee_discipline', 'records_view', 'View official disciplinary records when row-level access allows.', '2026-01-01T00:00:00Z'),
+('perm_employee_discipline_records_view_own', 'employeeDiscipline.records.viewOwn', 'employee_discipline', 'records_view_own', 'View own official disciplinary records.', '2026-01-01T00:00:00Z'),
+('perm_employee_discipline_records_view_all', 'employeeDiscipline.records.viewAll', 'employee_discipline', 'records_view_all', 'View all official disciplinary records within company scope.', '2026-01-01T00:00:00Z'),
+('perm_employee_discipline_tasks_view', 'employeeDiscipline.tasks.view', 'employee_discipline', 'tasks_view', 'View assigned disciplinary follow-up tasks.', '2026-01-01T00:00:00Z'),
+('perm_employee_discipline_tasks_complete', 'employeeDiscipline.tasks.complete', 'employee_discipline', 'tasks_complete', 'Complete assigned disciplinary follow-up tasks.', '2026-01-01T00:00:00Z'),
+('perm_employee_discipline_tasks_waive', 'employeeDiscipline.tasks.waive', 'employee_discipline', 'tasks_waive', 'Waive assigned disciplinary follow-up tasks with reason.', '2026-01-01T00:00:00Z'),
+('perm_employee_discipline_acknowledge', 'employeeDiscipline.acknowledge', 'employee_discipline', 'acknowledge', 'Acknowledge own disciplinary action records.', '2026-01-01T00:00:00Z'),
+('perm_employee_discipline_audit_view', 'employeeDiscipline.audit.view', 'employee_discipline', 'audit_view', 'View disciplinary action approval timeline and audit.', '2026-01-01T00:00:00Z');
+
+-- Roster change approval engine permissions.
+INSERT OR IGNORE INTO permissions (id, permission_key, module, action, description, created_at) VALUES
+('perm_roster_changes_view', 'roster.changes.view', 'roster', 'changes_view', 'View roster change approval requests.', '2026-01-01T00:00:00Z'),
+('perm_roster_changes_create', 'roster.changes.create', 'roster', 'changes_create', 'Create own roster change approval requests.', '2026-01-01T00:00:00Z'),
+('perm_roster_changes_create_for_others', 'roster.changes.createForOthers', 'roster', 'changes_create_for_others', 'Create roster change approval requests for another employee.', '2026-01-01T00:00:00Z'),
+('perm_roster_changes_cancel', 'roster.changes.cancel', 'roster', 'changes_cancel', 'Cancel own pending roster change approval requests.', '2026-01-01T00:00:00Z'),
+('perm_roster_changes_cancel_any', 'roster.changes.cancelAny', 'roster', 'changes_cancel_any', 'Cancel another employee roster change approval request with a required reason.', '2026-01-01T00:00:00Z'),
+('perm_roster_changes_approve', 'roster.changes.approve', 'roster', 'changes_approve', 'Approve eligible roster change approval steps from the roster module.', '2026-01-01T00:00:00Z'),
+('perm_roster_changes_reject', 'roster.changes.reject', 'roster', 'changes_reject', 'Reject eligible roster change approval steps from the roster module.', '2026-01-01T00:00:00Z'),
+('perm_roster_changes_audit_view', 'roster.changes.audit.view', 'roster', 'changes_audit_view', 'View roster change approval timeline and audit details.', '2026-01-01T00:00:00Z'),
+('perm_roster_changes_apply', 'roster.changes.apply', 'roster', 'changes_apply', 'Apply approved roster changes safely after final approval.', '2026-01-01T00:00:00Z');
+
+-- Operation ownership / responsibility matrix foundation permissions.
+INSERT OR IGNORE INTO permissions (id, permission_key, module, action, description, created_at) VALUES
+('perm_operation_ownership_view', 'operationOwnership.view', 'operation_ownership', 'view', 'View operation ownership setup and responsibility matrix.', '2026-01-01T00:00:00Z'),
+('perm_operation_ownership_manage', 'operationOwnership.manage', 'operation_ownership', 'manage', 'Manage operation ownership setup and responsibility matrix.', '2026-01-01T00:00:00Z'),
+('perm_operation_ownership_business_functions_view', 'operationOwnership.businessFunctions.view', 'operation_ownership', 'business_functions_view', 'View business function ownership definitions.', '2026-01-01T00:00:00Z'),
+('perm_operation_ownership_business_functions_manage', 'operationOwnership.businessFunctions.manage', 'operation_ownership', 'business_functions_manage', 'Manage business function ownership definitions.', '2026-01-01T00:00:00Z'),
+('perm_operation_ownership_matrix_view', 'operationOwnership.matrix.view', 'operation_ownership', 'matrix_view', 'View operation responsibility matrix.', '2026-01-01T00:00:00Z'),
+('perm_operation_ownership_matrix_manage', 'operationOwnership.matrix.manage', 'operation_ownership', 'matrix_manage', 'Manage operation responsibility matrix.', '2026-01-01T00:00:00Z'),
+('perm_operation_ownership_catalog_view', 'operationOwnership.catalog.view', 'operation_ownership', 'catalog_view', 'View operation catalog.', '2026-01-01T00:00:00Z'),
+('perm_operation_ownership_catalog_manage', 'operationOwnership.catalog.manage', 'operation_ownership', 'catalog_manage', 'Manage operation catalog.', '2026-01-01T00:00:00Z'),
+('perm_operation_ownership_assignments_view', 'operationOwnership.assignments.view', 'operation_ownership', 'assignments_view', 'View business function department assignments.', '2026-01-01T00:00:00Z'),
+('perm_operation_ownership_assignments_manage', 'operationOwnership.assignments.manage', 'operation_ownership', 'assignments_manage', 'Manage business function department assignments.', '2026-01-01T00:00:00Z'),
+('perm_operation_ownership_audit_view', 'operationOwnership.audit.view', 'operation_ownership', 'audit_view', 'View operation ownership audit history.', '2026-01-01T00:00:00Z'),
+('perm_operation_ownership_sensitive_manage', 'operationOwnership.sensitive.manage', 'operation_ownership', 'sensitive_manage', 'Manage sensitive operation ownership responsibilities.', '2026-01-01T00:00:00Z'),
+('perm_operation_ownership_superadmin_fallback_manage', 'operationOwnership.superadminFallback.manage', 'operation_ownership', 'superadmin_fallback_manage', 'Manage Super Admin fallback rules for operation ownership.', '2026-01-01T00:00:00Z');
