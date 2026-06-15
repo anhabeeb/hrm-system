@@ -35,7 +35,9 @@ mustInclude("session timeout tests", "tests/session-timeouts.test.ts", "remember
 mustInclude("module aliases", "frontend/src/lib/features.ts", "MODULE_FEATURE_ALIASES");
 mustInclude("module access helper", "frontend/src/lib/features.ts", "isModuleEnabled");
 mustInclude("frontend route guard", "frontend/src/features/auth/route-guards.tsx", "isModuleEnabled(user, moduleCode ?? requiredFeature)");
-mustInclude("frontend navigation", "frontend/src/lib/navigation.ts", "isModuleEnabled(user, item.moduleCode ?? item.requiredFeature)");
+mustInclude("frontend navigation", "frontend/src/lib/navigation.ts", "canShowModuleItem");
+mustInclude("frontend module access", "frontend/src/lib/moduleAccess.ts", "isModuleEnabled(user, moduleCode)");
+mustInclude("frontend module access", "frontend/src/lib/moduleAccess.ts", "canAccessSelfService(user)");
 mustInclude("backend feature middleware", "src/middleware/feature.middleware.ts", "resolveModuleFeatureAliases");
 mustInclude("backend feature middleware", "src/middleware/feature.middleware.ts", "This module is currently disabled.");
 mustInclude("module visibility migration", "migrations/0077_module_visibility_feature_settings.sql", "disciplinary_actions");

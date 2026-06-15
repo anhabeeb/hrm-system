@@ -39,8 +39,7 @@ import {
 import type { CurrentUser } from "@/types/auth";
 import type { NavGroup, NavItem } from "@/types/navigation";
 
-import { isModuleEnabled } from "./features";
-import { hasAnyPermission, hasPermission } from "./permissions";
+import { canShowModuleItem } from "./moduleAccess";
 
 export const navigationGroups: NavGroup[] = [
   {
@@ -163,10 +162,11 @@ export const navigationGroups: NavGroup[] = [
 ];
 
 export const canAccessNavItem = (user: CurrentUser | null, item: NavItem) =>
-  (!item.requiresLinkedEmployee || Boolean(user?.employee_id)) &&
-  isModuleEnabled(user, item.moduleCode ?? item.requiredFeature) &&
-  hasPermission(user, item.requiredPermission) &&
-  hasAnyPermission(user, item.requiredPermissionsAny);
+  canShowModuleItem(user, item.moduleCode ?? item.requiredFeature, item.requiredPermission, {
+    requiredPermissionsAny: item.requiredPermissionsAny,
+    requiresLinkedEmployee: item.requiresLinkedEmployee,
+    accountType: item.accountType,
+  });
 
 export const getVisibleNavigation = (user: CurrentUser | null): NavGroup[] =>
   navigationGroups

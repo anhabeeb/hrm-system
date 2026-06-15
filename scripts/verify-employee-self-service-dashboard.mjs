@@ -96,7 +96,7 @@ if (/navigate\(\s*["']\/dashboard["']/.test(twoFactor)) failures.push("TwoFactor
 
 mustInclude("public route landing", routeGuards, "getDefaultLandingPath(user)");
 mustInclude("self route linked employee guard", routeGuards, "requiresLinkedEmployee && !user?.employee_id");
-mustInclude("standalone admin self-service redirect", routeGuards, '<Navigate to="/dashboard" replace />');
+mustInclude("standalone account self-service guard", routeGuards, "LinkedEmployeeOnlyGuard");
 
 mustInclude("router landing", router, "DefaultLandingRedirect");
 mustInclude("permission denied landing", permissionDenied, "getDefaultLandingPath(user)");
@@ -136,8 +136,9 @@ if (/password_hash|session_token|reset_token|totp_secret/i.test(repository)) {
   "self.dashboard.view",
   "department.dashboard.view",
   "requiresLinkedEmployee: true",
-  "!item.requiresLinkedEmployee || Boolean(user?.employee_id)",
+  "canShowModuleItem",
 ].forEach((token) => mustInclude("frontend navigation", navigation, token));
+mustInclude("module access helper", read("frontend/src/lib/moduleAccess.ts"), "canAccessSelfService");
 
 [
   "self.dashboard.view",

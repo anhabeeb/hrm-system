@@ -6,7 +6,7 @@ const read = (file: string) => readFileSync(resolve(process.cwd(), file), "utf8"
 
 describe("module-enabled visibility controls", () => {
   it("uses module enabled state without a Super Admin frontend bypass", () => {
-    const features = read("frontend/src/lib/features.ts");
+    const features = `${read("frontend/src/lib/features.ts")}\n${read("frontend/src/config/moduleCodes.ts")}`;
 
     expect(features).toContain("MODULE_FEATURE_ALIASES");
     expect(features).toContain("isModuleEnabled");
@@ -18,7 +18,8 @@ describe("module-enabled visibility controls", () => {
   it("hides disabled modules in sidebar navigation before permission checks pass the link", () => {
     const navigation = read("frontend/src/lib/navigation.ts");
 
-    expect(navigation).toContain("isModuleEnabled(user, item.moduleCode ?? item.requiredFeature)");
+    expect(navigation).toContain("canShowModuleItem");
+    expect(read("frontend/src/lib/moduleAccess.ts")).toContain("isModuleEnabled(user, moduleCode)");
     expect(navigation).toContain('label: "My Leave"');
     expect(navigation).toContain('moduleCode: "leave"');
     expect(navigation).toContain('label: "My Attendance"');
@@ -35,7 +36,7 @@ describe("module-enabled visibility controls", () => {
     expect(navigation).toContain('moduleCode: "resignation_offboarding"');
     expect(navigation).toContain('label: "Disciplinary Actions"');
     expect(navigation).toContain('moduleCode: "disciplinary_actions"');
-    expect(navigation).toContain("!item.requiresLinkedEmployee || Boolean(user?.employee_id)");
+    expect(read("frontend/src/lib/moduleAccess.ts")).toContain("!requiresLinkedEmployee(options) || canAccessSelfService(user)");
   });
 
   it("blocks disabled module routes even when URLs are opened manually", () => {

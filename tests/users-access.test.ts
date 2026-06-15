@@ -508,7 +508,7 @@ describe("Users & Access API routes", () => {
     const viteConfig = readFileSync("frontend/vite.config.ts", "utf8");
     const packageJson = readFileSync("frontend/package.json", "utf8");
 
-    expect(packageJson).toContain('"build": "npm run typecheck && vite build --config vite.config.mjs --configLoader native"');
+    expect(packageJson).toContain('"build": "npm run typecheck && node ./node_modules/vite/bin/vite.js build --config vite.config.mjs --configLoader native"');
     expect(packageJson).toContain('"typecheck": "tsc --noEmit --project tsconfig.json --pretty false"');
     expect(viteConfig).toContain("minify: false");
     expect(viteConfig).toContain("minification pass");

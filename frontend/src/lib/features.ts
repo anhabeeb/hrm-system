@@ -1,28 +1,6 @@
 import type { CurrentUser, FeatureKey } from "@/types/auth";
 
-export const MODULE_FEATURE_ALIASES: Record<string, FeatureKey[]> = {
-  employees: ["employees", "employee_management"],
-  employee_structure: ["employee_structure", "employee_management"],
-  employee_login: ["employee_login", "employee_management", "user_management"],
-  approvals: ["approvals"],
-  operation_ownership: ["operation_ownership"],
-  leave: ["leave", "leave_management"],
-  attendance: ["attendance"],
-  roster: ["roster"],
-  payroll: ["payroll"],
-  payroll_adjustments: ["payroll_adjustments"],
-  advance_salary: ["advance_salary"],
-  payslips: ["payslips"],
-  documents_kyc: ["documents_kyc", "documents", "kyc_update_requests"],
-  employee_structure_changes: ["employee_structure_changes"],
-  resignation_offboarding: ["resignation_offboarding", "employee_lifecycle"],
-  disciplinary_actions: ["disciplinary_actions", "employee_discipline"],
-  biometric: ["biometric", "biometric_attendance"],
-  kiosk: ["kiosk", "offline_sync", "kiosk_attendance"],
-  reports: ["reports"],
-  settings: ["settings"],
-  audit: ["audit", "audit_logs"],
-};
+import { MODULE_FEATURE_ALIASES } from "@/config/moduleCodes";
 
 export const hasFeature = (user: CurrentUser | null, feature?: FeatureKey) => {
   if (!feature) return true;

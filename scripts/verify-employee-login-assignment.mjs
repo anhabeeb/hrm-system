@@ -177,7 +177,7 @@ for (const phrase of ["minify: false", "minification pass"]) {
   mustInclude("frontend vite config", viteConfig, phrase);
 }
 const frontendPackage = read("frontend/package.json");
-mustInclude("frontend package build", frontendPackage, '"build": "npm run typecheck && vite build --config vite.config.mjs --configLoader native"');
+mustInclude("frontend package build", frontendPackage, '"build": "npm run typecheck && node ./node_modules/vite/bin/vite.js build --config vite.config.mjs --configLoader native"');
 if (frontendPackage.includes('"typecheck": "tsc --noEmit --project tsconfig.json --pretty false"')) {
   mustInclude("frontend package typecheck", frontendPackage, '"typecheck": "tsc --noEmit --project tsconfig.json --pretty false"');
 } else if (existsSync("frontend/scripts/typecheck.mjs")) {

@@ -58,6 +58,7 @@ const criticalFiles = [
   "frontend/src/lib/features.ts",
   "frontend/src/lib/default-landing.ts",
   "frontend/src/lib/navigation.ts",
+  "scripts/build-frontend.mjs",
   "scripts/run-production-build-checks.mjs",
   "scripts/verify-dependency-security.mjs",
   "wrangler.jsonc",
@@ -72,12 +73,14 @@ const packageJson = readIfExists("package.json");
 const frontendPackageJson = readIfExists("frontend/package.json");
 const vitestConfig = readIfExists("vitest.config.mjs") || readIfExists("vitest.config.ts");
 const productionBuildRunner = readIfExists("scripts/run-production-build-checks.mjs");
+const frontendBuildRunner = readIfExists("scripts/build-frontend.mjs");
 const dependencySecurityVerifier = readIfExists("scripts/verify-dependency-security.mjs");
 const approvalEngine = readIfExists("src/modules/approvals/approval-workflow-engine.service.ts");
 const operationOwnership = `${readIfExists("migrations/0065_operation_ownership_responsibility_matrix.sql")}\n${readIfExists("migrations/0066_operation_ownership_matrix_completion.sql")}\n${readIfExists("src/modules/operation-ownership/operation-ownership.service.ts")}\n${readIfExists("src/modules/operation-ownership/operation-ownership.types.ts")}`;
 const router = readIfExists("frontend/src/app/router.tsx");
 const navigation = readIfExists("frontend/src/lib/navigation.ts");
 const frontendFeatures = readIfExists("frontend/src/lib/features.ts");
+const frontendModuleAccess = readIfExists("frontend/src/lib/moduleAccess.ts");
 const backendFeatureMiddleware = readIfExists("src/middleware/feature.middleware.ts");
 const moduleCodes = readIfExists("src/config/module-codes.ts");
 const wrangler = readIfExists("wrangler.jsonc");
@@ -114,7 +117,7 @@ requireIncludes("package scripts", packageJson, [
   '"build": "node scripts/run-production-build-checks.mjs"',
   '"build:all": "node scripts/run-production-build-checks.mjs"',
   "build:api",
-  '"build:frontend": "npm --prefix frontend ci --include=dev --no-audit --no-fund && npm --prefix frontend run build"',
+  '"build:frontend": "node scripts/build-frontend.mjs"',
   "verify:no-todo-tests",
   "verify:disciplinary-action-approval-engine",
   "verify:employee-lifecycle-approval-engine",
@@ -135,6 +138,15 @@ requireIncludes("production build runner", productionBuildRunner, [
   "Production build checks passed.",
 ]);
 
+requireIncludes("frontend build runner", frontendBuildRunner, [
+  "spawnSync",
+  "timeout",
+  '"ci", "--include=dev", "--no-audit", "--no-fund"',
+  '"run", "typecheck"',
+  "./node_modules/vite/bin/vite.js",
+  "Frontend build completed.",
+]);
+
 requireIncludes("dependency security verifier timeout", dependencySecurityVerifier, [
   "execFileSync",
   "AUDIT_TIMEOUT_MS",
@@ -144,7 +156,7 @@ requireIncludes("dependency security verifier timeout", dependencySecurityVerifi
 ]);
 
 requireIncludes("frontend package scripts", frontendPackageJson, [
-  "npm run typecheck && vite build --config vite.config.mjs --configLoader native",
+  "npm run typecheck && node ./node_modules/vite/bin/vite.js build --config vite.config.mjs --configLoader native",
   "tsc --noEmit --project tsconfig.json --pretty false",
 ]);
 
@@ -289,10 +301,10 @@ requireIncludes("frontend navigation", navigation, [
   "operationOwnership.view",
   "employeeDiscipline.actions",
   "moduleCode",
-  "isModuleEnabled",
+  "canShowModuleItem",
 ]);
 
-requireIncludes("module visibility controls", `${frontendFeatures}\n${backendFeatureMiddleware}\n${moduleCodes}\n${router}`, [
+requireIncludes("module visibility controls", `${frontendFeatures}\n${frontendModuleAccess}\n${backendFeatureMiddleware}\n${moduleCodes}\n${router}`, [
   "MODULE_FEATURE_ALIASES",
   "isModuleEnabled",
   "resolveModuleFeatureAliases",

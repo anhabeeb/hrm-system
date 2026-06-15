@@ -15,7 +15,7 @@ This checklist is for the Cloudflare Workers + D1 + R2 deployment path used by t
 - Root frontend wrapper: `npm run build:frontend`
 - Full configured build: `npm run build`
 
-The frontend build script must remain a terminating production build: `npm run typecheck && vite build --config vite.config.mjs --configLoader native`.
+The frontend build script must remain a terminating production build: `npm run typecheck && node ./node_modules/vite/bin/vite.js build --config vite.config.mjs --configLoader native`.
 
 ## Cloudflare Configuration
 

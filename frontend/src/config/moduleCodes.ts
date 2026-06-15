@@ -1,0 +1,51 @@
+import type { FeatureKey } from "@/types/auth";
+
+export const MODULE_CODES = {
+  employees: "employees",
+  employeeStructure: "employee_structure",
+  employeeLogin: "employee_login",
+  approvals: "approvals",
+  operationOwnership: "operation_ownership",
+  leave: "leave",
+  attendance: "attendance",
+  roster: "roster",
+  payroll: "payroll",
+  payrollAdjustments: "payroll_adjustments",
+  advanceSalary: "advance_salary",
+  payslips: "payslips",
+  documentsKyc: "documents_kyc",
+  employeeStructureChanges: "employee_structure_changes",
+  resignationOffboarding: "resignation_offboarding",
+  disciplinaryActions: "disciplinary_actions",
+  biometric: "biometric",
+  kiosk: "kiosk",
+  reports: "reports",
+  settings: "settings",
+  audit: "audit",
+} as const;
+
+export type ModuleCode = (typeof MODULE_CODES)[keyof typeof MODULE_CODES];
+
+export const MODULE_FEATURE_ALIASES: Record<ModuleCode | string, FeatureKey[]> = {
+  employees: ["employees", "employee_management"],
+  employee_structure: ["employee_structure", "employee_management"],
+  employee_login: ["employee_login", "employee_management", "user_management"],
+  approvals: ["approvals"],
+  operation_ownership: ["operation_ownership"],
+  leave: ["leave", "leave_management"],
+  attendance: ["attendance"],
+  roster: ["roster"],
+  payroll: ["payroll"],
+  payroll_adjustments: ["payroll_adjustments"],
+  advance_salary: ["advance_salary"],
+  payslips: ["payslips"],
+  documents_kyc: ["documents_kyc", "documents", "kyc_update_requests"],
+  employee_structure_changes: ["employee_structure_changes"],
+  resignation_offboarding: ["resignation_offboarding", "employee_lifecycle"],
+  disciplinary_actions: ["disciplinary_actions", "employee_discipline"],
+  biometric: ["biometric", "biometric_attendance"],
+  kiosk: ["kiosk", "offline_sync", "kiosk_attendance"],
+  reports: ["reports"],
+  settings: ["settings"],
+  audit: ["audit", "audit_logs"],
+};

@@ -157,11 +157,12 @@ describe("employee self-service dashboard foundation", () => {
     const router = read("frontend/src/app/router.tsx");
     const guards = read("frontend/src/features/auth/route-guards.tsx");
 
-    expect(navigation).toContain("!item.requiresLinkedEmployee || Boolean(user?.employee_id)");
+    expect(navigation).toContain("canShowModuleItem");
+    expect(read("frontend/src/lib/moduleAccess.ts")).toContain("canAccessSelfService");
     expect(router).toContain('path="/self/dashboard"');
     expect(router).toContain("requiresLinkedEmployee: true");
     expect(guards).toContain("requiresLinkedEmployee && !user?.employee_id");
-    expect(guards).toContain('<Navigate to="/dashboard" replace />');
+    expect(guards).toContain("LinkedEmployeeOnlyGuard");
   });
 
   it("uses professional request empty-state text", () => {

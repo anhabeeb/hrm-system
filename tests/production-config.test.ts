@@ -85,16 +85,19 @@ describe("production config safety checks", () => {
     const pkg = JSON.parse(readText("package.json")) as { scripts?: Record<string, string> };
     const frontendPkg = JSON.parse(readText("frontend/package.json")) as { scripts?: Record<string, string> };
     const buildRunner = readText("scripts/run-production-build-checks.mjs");
+    const frontendBuildRunner = readText("scripts/build-frontend.mjs");
 
     expect(pkg.scripts?.["build:api"]).toBe("tsc --noEmit");
-    expect(pkg.scripts?.["build:frontend"]).toBe(
-      "npm --prefix frontend ci --include=dev --no-audit --no-fund && npm --prefix frontend run build",
-    );
+    expect(pkg.scripts?.["build:frontend"]).toBe("node scripts/build-frontend.mjs");
     expect(pkg.scripts?.build).toBe("node scripts/run-production-build-checks.mjs");
     expect(pkg.scripts?.["build:all"]).toBe("node scripts/run-production-build-checks.mjs");
-    expect(frontendPkg.scripts?.build).toBe("npm run typecheck && vite build --config vite.config.mjs --configLoader native");
+    expect(frontendPkg.scripts?.build).toBe("npm run typecheck && node ./node_modules/vite/bin/vite.js build --config vite.config.mjs --configLoader native");
     expect(pkg.scripts?.["verify:frontend-assets"]).toBe("node scripts/verify-frontend-assets.mjs");
     expect(pkg.scripts?.["verify:critical-routes"]).toBe("node scripts/verify-critical-routes.mjs");
+    expect(frontendBuildRunner).toContain('"ci", "--include=dev", "--no-audit", "--no-fund"');
+    expect(frontendBuildRunner).toContain('"run", "typecheck"');
+    expect(frontendBuildRunner).toContain("./node_modules/vite/bin/vite.js");
+    expect(frontendBuildRunner).toContain("timeout");
     expect(buildRunner).toContain('"build:api"');
     expect(buildRunner).toContain('"build:frontend"');
     expect(buildRunner).toContain('"verify:frontend-assets"');

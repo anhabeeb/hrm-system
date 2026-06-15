@@ -58,6 +58,9 @@ export const verifyCriticalRoutes = (baseDir = rootDir) => {
   const buildRunner = exists("scripts/run-production-build-checks.mjs", baseDir)
     ? readText("scripts/run-production-build-checks.mjs", baseDir)
     : "";
+  const frontendBuildRunner = exists("scripts/build-frontend.mjs", baseDir)
+    ? readText("scripts/build-frontend.mjs", baseDir)
+    : "";
 
   assertContains(
     failures,
@@ -159,20 +162,24 @@ export const verifyCriticalRoutes = (baseDir = rootDir) => {
   if (scripts.build !== "node scripts/run-production-build-checks.mjs") {
     failures.push('package.json: "build" must use scripts/run-production-build-checks.mjs.');
   }
-  const frontendBuildScript = scripts["build:frontend"] ?? "";
-  const frontendInstallIndex = frontendBuildScript.indexOf("npm --prefix frontend ci --include=dev --no-audit --no-fund");
-  const frontendBuildIndex = frontendBuildScript.indexOf("npm --prefix frontend run build");
-  const usesFrontendBuild = frontendInstallIndex >= 0 && frontendBuildIndex > frontendInstallIndex;
-  if (!usesFrontendBuild) {
-    failures.push(
-      'package.json: "build:frontend" must install frontend dependencies with npm ci before building frontend/dist.',
-    );
+  if (scripts["build:frontend"] !== "node scripts/build-frontend.mjs") {
+    failures.push('package.json: "build:frontend" must use scripts/build-frontend.mjs.');
+  }
+  for (const [marker, hint] of [
+    ["ci\", \"--include=dev\", \"--no-audit\", \"--no-fund", "install frontend dependencies with npm ci."],
+    ["run\", \"typecheck", "run frontend typecheck."],
+    ["./node_modules/vite/bin/vite.js", "run Vite directly through Node."],
+    ["timeout", "apply deterministic frontend build timeouts."],
+  ]) {
+    if (!frontendBuildRunner.includes(marker)) {
+      failures.push(`scripts/build-frontend.mjs must ${hint}`);
+    }
   }
   const frontendPackage = JSON.parse(readText("frontend/package.json", baseDir));
   const frontendPackageBuild = frontendPackage.scripts?.build ?? "";
   if (
     !frontendPackageBuild.includes("npm run typecheck") ||
-    !frontendPackageBuild.includes("vite build") ||
+    !frontendPackageBuild.includes("node ./node_modules/vite/bin/vite.js build") ||
     !frontendPackageBuild.includes("vite.config.mjs") ||
     !frontendPackageBuild.includes("--configLoader native")
   ) {
