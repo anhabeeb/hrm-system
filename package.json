@@ -7,7 +7,7 @@
     "dev": "wrangler dev",
     "build": "node scripts/run-production-build-checks.mjs",
     "build:api": "tsc --noEmit",
-    "build:frontend": "npm --prefix frontend run build",
+    "build:frontend": "npm --prefix frontend ci --include=dev --no-audit --no-fund && npm --prefix frontend run build",
     "build:all": "node scripts/run-production-build-checks.mjs",
     "verify:frontend-assets": "node scripts/verify-frontend-assets.mjs",
     "verify:critical-routes": "node scripts/verify-critical-routes.mjs",

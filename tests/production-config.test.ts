@@ -87,7 +87,9 @@ describe("production config safety checks", () => {
     const buildRunner = readText("scripts/run-production-build-checks.mjs");
 
     expect(pkg.scripts?.["build:api"]).toBe("tsc --noEmit");
-    expect(pkg.scripts?.["build:frontend"]).toBe("npm --prefix frontend run build");
+    expect(pkg.scripts?.["build:frontend"]).toBe(
+      "npm --prefix frontend ci --include=dev --no-audit --no-fund && npm --prefix frontend run build",
+    );
     expect(pkg.scripts?.build).toBe("node scripts/run-production-build-checks.mjs");
     expect(pkg.scripts?.["build:all"]).toBe("node scripts/run-production-build-checks.mjs");
     expect(frontendPkg.scripts?.build).toBe("npm run typecheck && vite build --config vite.config.mjs --configLoader native");

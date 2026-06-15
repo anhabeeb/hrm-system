@@ -160,9 +160,13 @@ export const verifyCriticalRoutes = (baseDir = rootDir) => {
     failures.push('package.json: "build" must use scripts/run-production-build-checks.mjs.');
   }
   const frontendBuildScript = scripts["build:frontend"] ?? "";
-  const usesFrontendBuild = frontendBuildScript.includes("npm --prefix frontend") && frontendBuildScript.includes("run build");
+  const frontendInstallIndex = frontendBuildScript.indexOf("npm --prefix frontend ci --include=dev --no-audit --no-fund");
+  const frontendBuildIndex = frontendBuildScript.indexOf("npm --prefix frontend run build");
+  const usesFrontendBuild = frontendInstallIndex >= 0 && frontendBuildIndex > frontendInstallIndex;
   if (!usesFrontendBuild) {
-    failures.push('package.json: "build:frontend" must build frontend/dist.');
+    failures.push(
+      'package.json: "build:frontend" must install frontend dependencies with npm ci before building frontend/dist.',
+    );
   }
   const frontendPackage = JSON.parse(readText("frontend/package.json", baseDir));
   const frontendPackageBuild = frontendPackage.scripts?.build ?? "";

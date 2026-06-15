@@ -106,7 +106,7 @@ requireIncludes("package scripts", packageJson, [
   '"build": "node scripts/run-production-build-checks.mjs"',
   '"build:all": "node scripts/run-production-build-checks.mjs"',
   "build:api",
-  "build:frontend",
+  '"build:frontend": "npm --prefix frontend ci --include=dev --no-audit --no-fund && npm --prefix frontend run build"',
   "verify:no-todo-tests",
   "verify:disciplinary-action-approval-engine",
   "verify:employee-lifecycle-approval-engine",
