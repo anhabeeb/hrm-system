@@ -273,7 +273,7 @@ describe("feature middleware", () => {
 
     expect(response.status).toBe(403);
     expect(body.error.code).toBe("FEATURE_DISABLED");
-    expect(body.error.message).toBe("This feature is currently disabled.");
+    expect(body.error.message).toBe("This module is currently disabled.");
   });
 });
 

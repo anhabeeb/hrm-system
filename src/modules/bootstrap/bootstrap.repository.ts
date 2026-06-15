@@ -482,6 +482,12 @@ export const ensureProductionFallbackDefaults = async (env: Env, companyId: stri
     ["payroll", "Payroll"],
     ["attendance", "Attendance"],
     ["approvals", "Approvals"],
+    ["operation_ownership", "Operation Ownership"],
+    ["payroll_adjustments", "Payroll Adjustments"],
+    ["advance_salary", "Advance Salary"],
+    ["employee_structure_changes", "Employee Structure Changes"],
+    ["resignation_offboarding", "Resignation / Offboarding"],
+    ["disciplinary_actions", "Disciplinary Actions"],
   ];
 
   await copyOptionalBootstrapDefaults(env, "fallback_company_settings", [

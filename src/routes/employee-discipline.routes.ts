@@ -10,7 +10,7 @@ import type { AppContext } from "../types/api.types";
 const employeeDisciplineRoutes = new Hono<AppContext>();
 
 employeeDisciplineRoutes.use("*", authMiddleware);
-employeeDisciplineRoutes.use("*", requireFeature("employee_management"));
+employeeDisciplineRoutes.use("*", requireFeature("disciplinary_actions"));
 
 const viewPermissions = [
   "employeeDiscipline.actions.view",

@@ -52,6 +52,6 @@ export const payrollReadiness = async (c: Context<AppContext>) =>
   });
 
 export const quickActions = async (c: Context<AppContext>) =>
-  ok(withGeneratedAt(service.getQuickActions(actor(c))), "Dashboard quick actions loaded successfully.", {
+  ok(withGeneratedAt(await service.getQuickActionsForEnabledModules(c.env, actor(c))), "Dashboard quick actions loaded successfully.", {
     requestId: c.get("requestId"),
   });

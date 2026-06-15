@@ -53,7 +53,9 @@ const criticalFiles = [
   "src/modules/employee-structure/employee-structure-change.service.ts",
   "src/modules/employee-lifecycle/employee-exit.service.ts",
   "src/modules/employee-discipline/employee-discipline.service.ts",
+  "src/config/module-codes.ts",
   "frontend/src/app/router.tsx",
+  "frontend/src/lib/features.ts",
   "frontend/src/lib/default-landing.ts",
   "frontend/src/lib/navigation.ts",
   "scripts/run-production-build-checks.mjs",
@@ -75,6 +77,9 @@ const approvalEngine = readIfExists("src/modules/approvals/approval-workflow-eng
 const operationOwnership = `${readIfExists("migrations/0065_operation_ownership_responsibility_matrix.sql")}\n${readIfExists("migrations/0066_operation_ownership_matrix_completion.sql")}\n${readIfExists("src/modules/operation-ownership/operation-ownership.service.ts")}\n${readIfExists("src/modules/operation-ownership/operation-ownership.types.ts")}`;
 const router = readIfExists("frontend/src/app/router.tsx");
 const navigation = readIfExists("frontend/src/lib/navigation.ts");
+const frontendFeatures = readIfExists("frontend/src/lib/features.ts");
+const backendFeatureMiddleware = readIfExists("src/middleware/feature.middleware.ts");
+const moduleCodes = readIfExists("src/config/module-codes.ts");
 const wrangler = readIfExists("wrangler.jsonc");
 
 for (let index = 0; index < primaryMigrations.length; index += 1) {
@@ -100,6 +105,7 @@ for (let index = 0; index < primaryMigrations.length; index += 1) {
   "0073_employee_lifecycle_approval_engine.sql",
   "0075_employee_disciplinary_action_approval_engine.sql",
   "0076_disciplinary_action_lifecycle_hardening.sql",
+  "0077_module_visibility_feature_settings.sql",
 ].forEach((file) => {
   if (!migrations.includes(`migrations/${file}`)) fail(`Critical migration is missing: ${file}.`);
 });
@@ -282,6 +288,20 @@ requireIncludes("frontend navigation", navigation, [
   "self.dashboard.view",
   "operationOwnership.view",
   "employeeDiscipline.actions",
+  "moduleCode",
+  "isModuleEnabled",
+]);
+
+requireIncludes("module visibility controls", `${frontendFeatures}\n${backendFeatureMiddleware}\n${moduleCodes}\n${router}`, [
+  "MODULE_FEATURE_ALIASES",
+  "isModuleEnabled",
+  "resolveModuleFeatureAliases",
+  "This module is currently disabled.",
+  "disciplinary_actions",
+  "resignation_offboarding",
+  "advance_salary",
+  "employee_structure_changes",
+  "operation_ownership",
 ]);
 
 const frontendApiFiles = [

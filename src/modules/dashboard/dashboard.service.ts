@@ -1,4 +1,5 @@
 import * as permissionService from "../../services/permission.service";
+import { resolveModuleFeatureAliases } from "../../config/module-codes";
 import type { AuthActor } from "../../types/api.types";
 import * as repository from "./dashboard.repository";
 import type { DashboardAttentionItem, DashboardMeta, DashboardQueryContext, DashboardQuickAction } from "./dashboard.types";
@@ -29,6 +30,8 @@ const meta = (ctx: DashboardQueryContext): DashboardMeta => ({
 
 const can = (actor: AuthActor, permissions: string[]) =>
   permissionService.hasAnyPermission(actor, permissions);
+const moduleEnabled = (features: Set<string>, moduleCode: string) =>
+  resolveModuleFeatureAliases(moduleCode).some((feature) => features.has(feature));
 
 const emptyExpiryCounts = () => ({
   critical: 0,
@@ -203,6 +206,7 @@ export const getPayrollReadiness = async (env: Env, ctx: DashboardQueryContext) 
 
 export const getSummary = async (env: Env, actor: AuthActor) => {
   const ctx = makeContext(actor);
+  const features = new Set(await repository.listEnabledFeatureKeys(env, actor.companyId));
   const [
     employee_summary,
     attendance_today,
@@ -214,15 +218,15 @@ export const getSummary = async (env: Env, actor: AuthActor) => {
     holiday_roster_context,
     payroll_readiness,
   ] = await Promise.all([
-    getEmployeeSummary(env, ctx),
-    getAttendanceToday(env, ctx),
-    getApprovals(env, ctx),
-    getLongLeave(env, ctx),
+    moduleEnabled(features, "employees") ? getEmployeeSummary(env, ctx) : Promise.resolve(null),
+    moduleEnabled(features, "attendance") ? getAttendanceToday(env, ctx) : Promise.resolve(null),
+    moduleEnabled(features, "leave") ? getApprovals(env, ctx) : Promise.resolve(null),
+    moduleEnabled(features, "leave") ? getLongLeave(env, ctx) : Promise.resolve(null),
     getExpiryAlerts(env, ctx),
     getNotificationHealth(env, ctx),
-    getDeviceHealth(env, ctx),
-    getHolidayRoster(env, ctx),
-    getPayrollReadiness(env, ctx),
+    moduleEnabled(features, "biometric") || moduleEnabled(features, "kiosk") ? getDeviceHealth(env, ctx) : Promise.resolve(null),
+    moduleEnabled(features, "roster") ? getHolidayRoster(env, ctx) : Promise.resolve(null),
+    moduleEnabled(features, "payroll") ? getPayrollReadiness(env, ctx) : Promise.resolve(null),
   ]);
 
   return {
@@ -254,6 +258,33 @@ export const getAttention = async (env: Env, actor: AuthActor) => {
   const visibleRows = rows.filter((row) => row.count > 0);
 
   return { data: visibleRows, meta: summary.meta };
+};
+
+export const getQuickActionsForEnabledModules = async (env: Env, actor: AuthActor) => {
+  const features = new Set(await repository.listEnabledFeatureKeys(env, actor.companyId));
+  const actions: Array<DashboardQuickAction & { moduleCode?: string }> = [
+    { key: "add-employee", label: "Add employee", description: "Create a new employee profile", href: "/employees", permission: "employees.create", category: "Employees", moduleCode: "employees" },
+    { key: "create-leave", label: "Create leave request", description: "Submit employee leave", href: "/leave", permission: "leave.create", category: "Leave", moduleCode: "leave" },
+    { key: "approval-inbox", label: "Open approval inbox", description: "Review pending approvals", href: "/leave", permission: "leave.approvals.view", category: "Approvals", moduleCode: "leave" },
+    { key: "expiry-scan", label: "Run expiry scan", description: "Refresh document and contract alerts", href: "/expiry-alerts", permission: "expiry_alerts.scan", category: "Alerts" },
+    { key: "attendance-exceptions", label: "Review attendance exceptions", description: "Open missing punch and exception queues", href: "/attendance/reports", permission: "attendance.reports.view", category: "Attendance", moduleCode: "attendance" },
+    { key: "biometric-review", label: "Review biometric punches", description: "Resolve unmatched or ambiguous punches", href: "/biometric", permission: "biometric.resolve_punches", category: "Biometric", moduleCode: "biometric" },
+    { key: "long-leave-payroll", label: "Preview long leave payroll", description: "Review long leave salary impact", href: "/long-leave", permission: "long_leave.payroll_preview", category: "Payroll" },
+    { key: "holiday-calendar", label: "Open holiday calendar", description: "Check upcoming holidays", href: "/holidays", permission: "holidays.calendar.view", category: "Holidays" },
+    { key: "employee-360", label: "Open Employee 360 search", description: "Find an employee profile", href: "/employees", permission: "employees.view", category: "Employees", moduleCode: "employees" },
+  ];
+  const filtered = actions
+    .filter((action) => !action.moduleCode || moduleEnabled(features, action.moduleCode))
+    .filter((action) => permissionService.hasPermission(actor, action.permission));
+  return {
+    data: filtered,
+    meta: {
+      scope: actor.isSuperAdmin || actor.isAdmin ? "company" : "outlet",
+      outlet_ids: actor.isSuperAdmin || actor.isAdmin ? [] : actor.outletIds,
+      today: dateOnly(new Date()),
+      generated_at: new Date().toISOString(),
+    },
+  };
 };
 
 export const getQuickActions = (actor: AuthActor) => {

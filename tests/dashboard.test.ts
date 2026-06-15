@@ -60,6 +60,17 @@ const rowForSql = (sql: string) => {
 };
 
 const rowsForSql = (sql: string) => {
+  if (sql.includes("FROM feature_settings")) {
+    return [
+      { feature_key: "employee_management" },
+      { feature_key: "attendance" },
+      { feature_key: "leave_management" },
+      { feature_key: "long_leave" },
+      { feature_key: "biometric_attendance" },
+      { feature_key: "roster" },
+      { feature_key: "payroll" },
+    ];
+  }
   if (sql.includes("GROUP BY e.primary_outlet_id")) return [{ outlet_id: "outlet_1", outlet_name: "Main", total: 12 }];
   if (sql.includes("GROUP BY e.department_id")) return [{ department_id: "dept_1", department_name: "Ops", total: 8 }];
   if (sql.includes("FROM holidays h")) return [{ id: "holiday_1", name: "Company Day", date: new Date().toISOString().slice(0, 10), holiday_type: "company_holiday" }];

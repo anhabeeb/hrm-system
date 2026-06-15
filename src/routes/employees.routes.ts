@@ -30,6 +30,7 @@ employeesRoutes.get(
 );
 employeesRoutes.get(
   "/structure-change-requests",
+  requireFeature("employee_structure_changes"),
   requireAnyPermissionOrError([
     "employees.structureRequests.view",
     "employees.structureRequests.create",
@@ -52,6 +53,7 @@ employeesRoutes.get(
 );
 employeesRoutes.post(
   "/structure-change-requests",
+  requireFeature("employee_structure_changes"),
   requireAnyPermissionOrError(["employees.structureRequests.create", "employees.structureRequests.createForOthers"], {
     code: "EMPLOYEE_STRUCTURE_REQUEST_PERMISSION_DENIED",
     message: "You do not have permission to create employee transfer or structure change requests.",
@@ -61,6 +63,7 @@ employeesRoutes.post(
 );
 employeesRoutes.get(
   "/structure-change-requests/:requestId",
+  requireFeature("employee_structure_changes"),
   requireAnyPermissionOrError([
     "employees.structureRequests.view",
     "employees.structureRequests.create",
@@ -83,6 +86,7 @@ employeesRoutes.get(
 );
 employeesRoutes.post(
   "/structure-change-requests/:requestId/submit",
+  requireFeature("employee_structure_changes"),
   requireAnyPermissionOrError(["employees.structureRequests.create", "employees.structureRequests.createForOthers"], {
     code: "EMPLOYEE_STRUCTURE_REQUEST_PERMISSION_DENIED",
     message: "You do not have permission to submit employee transfer or structure change requests.",
@@ -91,6 +95,7 @@ employeesRoutes.post(
 );
 employeesRoutes.post(
   "/structure-change-requests/:requestId/approve",
+  requireFeature("employee_structure_changes"),
   requireAnyPermissionOrError([
     "employees.structureRequests.review",
     "employees.structureRequests.finalApprove",
@@ -107,6 +112,7 @@ employeesRoutes.post(
 );
 employeesRoutes.post(
   "/structure-change-requests/:requestId/reject",
+  requireFeature("employee_structure_changes"),
   requireAnyPermissionOrError([
     "employees.structureRequests.reject",
     "approvals.operationOwner.reject",
@@ -122,6 +128,7 @@ employeesRoutes.post(
 );
 employeesRoutes.post(
   "/structure-change-requests/:requestId/cancel",
+  requireFeature("employee_structure_changes"),
   requireAnyPermissionOrError(["employees.structureRequests.cancel", "employees.structureRequests.cancelAny", "approvals.requests.cancel", "approvals.requests.cancelAny"], {
     code: "EMPLOYEE_STRUCTURE_REQUEST_PERMISSION_DENIED",
     message: "You do not have permission to cancel employee transfer or structure change requests.",
@@ -131,6 +138,7 @@ employeesRoutes.post(
 );
 employeesRoutes.post(
   "/structure-change-requests/:requestId/apply",
+  requireFeature("employee_structure_changes"),
   requireAnyPermissionOrError(["employees.structureRequests.apply", "approvals.operationExecutor.apply", "employees.structure.manage"], {
     code: "EMPLOYEE_STRUCTURE_REQUEST_PERMISSION_DENIED",
     message: "You do not have permission to apply employee transfer or structure changes.",
@@ -140,6 +148,7 @@ employeesRoutes.post(
 );
 employeesRoutes.get(
   "/structure-change-requests/:requestId/timeline",
+  requireFeature("employee_structure_changes"),
   requireAnyPermissionOrError([
     "employees.structureRequests.view",
     "employees.structureRequests.audit.view",
@@ -162,6 +171,7 @@ employeesRoutes.get(
 );
 employeesRoutes.get(
   "/structure-change-requests/:requestId/items",
+  requireFeature("employee_structure_changes"),
   requireAnyPermissionOrError([
     "employees.structureRequests.view",
     "employees.structureRequests.audit.view",
@@ -183,6 +193,7 @@ employeesRoutes.get(
 );
 employeesRoutes.get(
   "/structure-change-requests/:requestId/audit",
+  requireFeature("employee_structure_changes"),
   requireAnyPermissionOrError([
     "employees.structureRequests.view",
     "employees.structureRequests.audit.view",
@@ -228,6 +239,7 @@ const employeeLifecycleViewPermissions = [
 
 employeesRoutes.get(
   "/exit-requests",
+  requireFeature("resignation_offboarding"),
   requireAnyPermissionOrError(employeeLifecycleViewPermissions, {
     code: "EMPLOYEE_LIFECYCLE_PERMISSION_DENIED",
     message: "You do not have permission to view resignation or offboarding requests.",
@@ -236,6 +248,7 @@ employeesRoutes.get(
 );
 employeesRoutes.post(
   "/exit-requests",
+  requireFeature("resignation_offboarding"),
   requireAnyPermissionOrError([
     "employeeLifecycle.resignations.create",
     "employeeLifecycle.resignations.createForOthers",
@@ -250,6 +263,7 @@ employeesRoutes.post(
 );
 employeesRoutes.get(
   "/exit-requests/:requestId",
+  requireFeature("resignation_offboarding"),
   requireAnyPermissionOrError(employeeLifecycleViewPermissions, {
     code: "EMPLOYEE_LIFECYCLE_PERMISSION_DENIED",
     message: "You do not have permission to view this resignation or offboarding request.",
@@ -258,6 +272,7 @@ employeesRoutes.get(
 );
 employeesRoutes.post(
   "/exit-requests/:requestId/submit",
+  requireFeature("resignation_offboarding"),
   requireAnyPermissionOrError([
     "employeeLifecycle.resignations.create",
     "employeeLifecycle.resignations.createForOthers",
@@ -271,6 +286,7 @@ employeesRoutes.post(
 );
 employeesRoutes.post(
   "/exit-requests/:requestId/approve",
+  requireFeature("resignation_offboarding"),
   requireAnyPermissionOrError([
     "employeeLifecycle.resignations.review",
     "employeeLifecycle.resignations.finalApprove",
@@ -288,6 +304,7 @@ employeesRoutes.post(
 );
 employeesRoutes.post(
   "/exit-requests/:requestId/reject",
+  requireFeature("resignation_offboarding"),
   requireAnyPermissionOrError([
     "employeeLifecycle.resignations.reject",
     "employeeLifecycle.offboarding.reject",
@@ -303,6 +320,7 @@ employeesRoutes.post(
 );
 employeesRoutes.post(
   "/exit-requests/:requestId/cancel",
+  requireFeature("resignation_offboarding"),
   requireAnyPermissionOrError([
     "employeeLifecycle.resignations.cancel",
     "employeeLifecycle.resignations.cancelAny",
@@ -319,6 +337,7 @@ employeesRoutes.post(
 );
 employeesRoutes.post(
   "/exit-requests/:requestId/apply",
+  requireFeature("resignation_offboarding"),
   requireAnyPermissionOrError([
     "employeeLifecycle.resignations.apply",
     "employeeLifecycle.offboarding.apply",
@@ -333,6 +352,7 @@ employeesRoutes.post(
 );
 employeesRoutes.post(
   "/exit-requests/:requestId/complete",
+  requireFeature("resignation_offboarding"),
   requireAnyPermissionOrError([
     "employeeLifecycle.offboarding.complete",
     "employeeLifecycle.offboarding.apply",
@@ -347,6 +367,7 @@ employeesRoutes.post(
 );
 employeesRoutes.get(
   "/exit-requests/:requestId/timeline",
+  requireFeature("resignation_offboarding"),
   requireAnyPermissionOrError(employeeLifecycleViewPermissions, {
     code: "EMPLOYEE_LIFECYCLE_PERMISSION_DENIED",
     message: "You do not have permission to view this resignation or offboarding timeline.",
@@ -355,6 +376,7 @@ employeesRoutes.get(
 );
 employeesRoutes.get(
   "/exit-requests/:requestId/tasks",
+  requireFeature("resignation_offboarding"),
   requireAnyPermissionOrError(employeeLifecycleViewPermissions, {
     code: "EMPLOYEE_LIFECYCLE_PERMISSION_DENIED",
     message: "You do not have permission to view offboarding tasks.",
@@ -363,6 +385,7 @@ employeesRoutes.get(
 );
 employeesRoutes.post(
   "/exit-requests/:requestId/tasks/:taskId/complete",
+  requireFeature("resignation_offboarding"),
   requireAnyPermissionOrError(["employeeLifecycle.offboarding.tasks.complete", "employeeLifecycle.tasks.manage", "employeeLifecycle.offboarding.manage"], {
     code: "EMPLOYEE_LIFECYCLE_PERMISSION_DENIED",
     message: "You do not have permission to complete offboarding tasks.",
@@ -371,6 +394,7 @@ employeesRoutes.post(
 );
 employeesRoutes.post(
   "/exit-requests/:requestId/tasks/:taskId/waive",
+  requireFeature("resignation_offboarding"),
   requireAnyPermissionOrError(["employeeLifecycle.offboarding.tasks.waive", "employeeLifecycle.tasks.manage", "employeeLifecycle.offboarding.manage"], {
     code: "EMPLOYEE_LIFECYCLE_PERMISSION_DENIED",
     message: "You do not have permission to waive offboarding tasks.",
@@ -380,6 +404,7 @@ employeesRoutes.post(
 );
 employeesRoutes.get(
   "/exit-requests/:requestId/audit",
+  requireFeature("resignation_offboarding"),
   requireAnyPermissionOrError([...employeeLifecycleViewPermissions, "employeeLifecycle.audit.view"], {
     code: "EMPLOYEE_LIFECYCLE_PERMISSION_DENIED",
     message: "You do not have permission to view this resignation or offboarding audit.",
@@ -394,6 +419,7 @@ employeesRoutes.get(
 );
 employeesRoutes.get(
   "/:id/offboarding",
+  requireFeature("resignation_offboarding"),
   requireAnyPermissionOrError(["employees.offboarding.view", "offboarding.view", "employees.view"], {
     code: "OFFBOARDING_PERMISSION_DENIED",
     message: "You do not have permission to view employee offboarding.",

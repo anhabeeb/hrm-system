@@ -90,12 +90,13 @@ const routeFallback = (
 
 const guarded = (
   element: ReactNode,
-  options: { permission?: string; permissionsAny?: string[]; feature?: string; requiresLinkedEmployee?: boolean } = {},
+  options: { permission?: string; permissionsAny?: string[]; feature?: string; moduleCode?: string; requiresLinkedEmployee?: boolean } = {},
 ) => (
   <ModuleRoute
     requiredPermission={options.permission}
     requiredPermissionsAny={options.permissionsAny}
     requiredFeature={options.feature}
+    moduleCode={options.moduleCode}
     requiresLinkedEmployee={options.requiresLinkedEmployee}
   >
     {element}
@@ -128,11 +129,11 @@ export const AppRouter = () => (
         <Route path="/self/profile" element={guarded(<MyProfilePage />, { permissionsAny: ["self.profile.view", "self.dashboard.view"], requiresLinkedEmployee: true })} />
         <Route path="/self/requests" element={guarded(<MyRequestsPage />, { permission: "self.requests.view", requiresLinkedEmployee: true })} />
         <Route path="/self/pending-approvals" element={guarded(<MyPendingApprovalsPage />, { permissionsAny: ["department.approvals.view", "approvals.department.approve", "approvals.hrFinal.approve", "approvals.financeFinal.approve"], requiresLinkedEmployee: true })} />
-        <Route path="/self/attendance" element={guarded(<SelfServiceModulePage moduleKey="attendance" />, { permission: "self.attendance.view", feature: "attendance", requiresLinkedEmployee: true })} />
-        <Route path="/self/roster" element={guarded(<SelfServiceModulePage moduleKey="roster" />, { permission: "self.roster.view", feature: "roster", requiresLinkedEmployee: true })} />
-        <Route path="/self/leave" element={guarded(<SelfServiceModulePage moduleKey="leave" />, { permission: "self.leave.view", feature: "leave_management", requiresLinkedEmployee: true })} />
-        <Route path="/self/documents" element={guarded(<MyDocumentsKycPage />, { permission: "self.documents.view", feature: "documents", requiresLinkedEmployee: true })} />
-        <Route path="/self/payslips" element={guarded(<SelfServiceModulePage moduleKey="payslips" />, { permission: "self.payslips.view", feature: "payslips", requiresLinkedEmployee: true })} />
+        <Route path="/self/attendance" element={guarded(<SelfServiceModulePage moduleKey="attendance" />, { permission: "self.attendance.view", feature: "attendance", moduleCode: "attendance", requiresLinkedEmployee: true })} />
+        <Route path="/self/roster" element={guarded(<SelfServiceModulePage moduleKey="roster" />, { permission: "self.roster.view", feature: "roster", moduleCode: "roster", requiresLinkedEmployee: true })} />
+        <Route path="/self/leave" element={guarded(<SelfServiceModulePage moduleKey="leave" />, { permission: "self.leave.view", feature: "leave_management", moduleCode: "leave", requiresLinkedEmployee: true })} />
+        <Route path="/self/documents" element={guarded(<MyDocumentsKycPage />, { permission: "self.documents.view", feature: "documents", moduleCode: "documents_kyc", requiresLinkedEmployee: true })} />
+        <Route path="/self/payslips" element={guarded(<SelfServiceModulePage moduleKey="payslips" />, { permission: "self.payslips.view", feature: "payslips", moduleCode: "payslips", requiresLinkedEmployee: true })} />
         <Route path="/self/department-dashboard" element={guarded(<SelfServiceModulePage moduleKey="department-dashboard" />, { permission: "department.dashboard.view", requiresLinkedEmployee: true })} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/profile/security" element={<SecurityPage />} />
@@ -142,15 +143,15 @@ export const AppRouter = () => (
         <Route path="/employees" element={guarded(<EmployeesPage />, { permission: "employees.view", feature: "employee_management" })} />
         <Route path="/employees/:employeeId" element={guarded(<Employee360Page />, { permission: "employees.view", feature: "employee_management" })} />
         <Route path="/contracts" element={guarded(<ContractsPage />, { permissionsAny: ["contracts.view", "employees.contracts.view", "employees.view"], feature: "employee_management" })} />
-        <Route path="/offboarding" element={guarded(<OffboardingPage />, { permissionsAny: ["employeeLifecycle.resignations.viewOwn", "employeeLifecycle.resignations.view", "employeeLifecycle.resignations.create", "employeeLifecycle.offboarding.viewOwn", "employeeLifecycle.offboarding.view", "employeeLifecycle.offboarding.create", "employeeLifecycle.exitRequests.viewAll", "approvals.operationOwner.view", "approvals.operationFinal.view", "approvals.operationExecutor.view", "employees.offboarding.view", "employees.view"], feature: "employee_management" })} />
-        <Route path="/disciplinary-actions" element={guarded(<DisciplinaryActionsPage />, { permissionsAny: ["employeeDiscipline.actions.view", "employeeDiscipline.actions.viewOwn", "employeeDiscipline.actions.create", "employeeDiscipline.actions.review", "employeeDiscipline.actions.apply", "employeeDiscipline.tasks.view", "approvals.operationOwner.view", "approvals.operationFinal.view", "approvals.operationExecutor.view"], feature: "employee_management" })} />
+        <Route path="/offboarding" element={guarded(<OffboardingPage />, { permissionsAny: ["employeeLifecycle.resignations.viewOwn", "employeeLifecycle.resignations.view", "employeeLifecycle.resignations.create", "employeeLifecycle.offboarding.viewOwn", "employeeLifecycle.offboarding.view", "employeeLifecycle.offboarding.create", "employeeLifecycle.exitRequests.viewAll", "approvals.operationOwner.view", "approvals.operationFinal.view", "approvals.operationExecutor.view", "employees.offboarding.view", "employees.view"], feature: "employee_lifecycle", moduleCode: "resignation_offboarding" })} />
+        <Route path="/disciplinary-actions" element={guarded(<DisciplinaryActionsPage />, { permissionsAny: ["employeeDiscipline.actions.view", "employeeDiscipline.actions.viewOwn", "employeeDiscipline.actions.create", "employeeDiscipline.actions.review", "employeeDiscipline.actions.apply", "employeeDiscipline.tasks.view", "approvals.operationOwner.view", "approvals.operationFinal.view", "approvals.operationExecutor.view"], feature: "employee_discipline", moduleCode: "disciplinary_actions" })} />
         <Route path="/users-access" element={guarded(<UsersAccessPage />, { permission: "users.view", feature: "user_management" })} />
         <Route path="/outlets" element={guarded(<OutletsPage />, { permission: "outlets.view", feature: "employee_management" })} />
         <Route path="/departments" element={guarded(<DepartmentsPage />, { permissionsAny: ["organization.departments.view", "departments.view"], feature: "employee_management" })} />
         <Route path="/positions" element={guarded(<PositionsPage />, { permissionsAny: ["organization.positions.view", "positions.view"], feature: "employee_management" })} />
         <Route path="/organization/level-role-templates" element={guarded(<LevelRoleTemplatesPage />, { permissionsAny: ["organization.levelRoleTemplates.view", "organization.levelRoleTemplates.manage"], feature: "employee_management" })} />
-        <Route path="/organization/structure-change-requests" element={guarded(<EmployeeStructureChangeRequestsPage />, { permissionsAny: ["employees.structureRequests.view", "employees.structureRequests.create", "employees.structureRequests.review", "employees.structureRequests.apply"], feature: "employee_management" })} />
-        <Route path="/organization/operation-ownership" element={guarded(<OperationOwnershipPage />, { permissionsAny: ["operationOwnership.view", "operationOwnership.matrix.view", "operationOwnership.businessFunctions.view"] })} />
+        <Route path="/organization/structure-change-requests" element={guarded(<EmployeeStructureChangeRequestsPage />, { permissionsAny: ["employees.structureRequests.view", "employees.structureRequests.create", "employees.structureRequests.review", "employees.structureRequests.apply"], feature: "employee_structure_changes", moduleCode: "employee_structure_changes" })} />
+        <Route path="/organization/operation-ownership" element={guarded(<OperationOwnershipPage />, { permissionsAny: ["operationOwnership.view", "operationOwnership.matrix.view", "operationOwnership.businessFunctions.view"], feature: "operation_ownership", moduleCode: "operation_ownership" })} />
         <Route path="/attendance" element={guarded(<AttendancePage />, { permission: "attendance.view", feature: "attendance" })} />
         <Route path="/attendance/corrections" element={guarded(<AttendanceCorrectionsPage />, { permission: "attendance.view", feature: "attendance" })} />
         <Route path="/attendance/reports" element={guarded(<AttendanceReportsPage />, { permission: "attendance.reports.view", feature: "attendance" })} />
@@ -163,12 +164,12 @@ export const AppRouter = () => (
         <Route path="/long-leave" element={guarded(<LongLeavePage />, { permission: "long_leave.view", feature: "long_leave" })} />
         <Route path="/payroll" element={guarded(<PayrollPage />, { permission: "payroll.view", feature: "payroll" })} />
         <Route path="/payslips" element={guarded(<PayslipsPage />, { permission: "payslips.view", feature: "payslips" })} />
-        <Route path="/advances" element={guarded(<AdvancesPage />, { permission: "advances.view", feature: "payroll" })} />
+        <Route path="/advances" element={guarded(<AdvancesPage />, { permission: "advances.view", feature: "advance_salary", moduleCode: "advance_salary" })} />
         <Route path="/salary-loans" element={guarded(<SalaryLoansPage />, { permission: "salary_loans.view", feature: "payroll" })} />
         <Route path="/assets" element={guarded(<AssetsPage />, { permission: "assets.view", feature: "assets_uniforms" })} />
         <Route path="/uniforms" element={guarded(<UniformsPage />, { permission: "uniforms.view", feature: "assets_uniforms" })} />
-        <Route path="/documents" element={guarded(<DocumentsPage />, { permission: "documents.view", feature: "documents" })} />
-        <Route path="/approvals" element={guarded(<ApprovalsPage />, { permission: "approvals.view", feature: "approvals" })} />
+        <Route path="/documents" element={guarded(<DocumentsPage />, { permission: "documents.view", feature: "documents", moduleCode: "documents_kyc" })} />
+        <Route path="/approvals" element={guarded(<ApprovalsPage />, { permission: "approvals.view", feature: "approvals", moduleCode: "approvals" })} />
         <Route path="/reports" element={guarded(<ReportsPage />, { permission: "reports.view", feature: "reports" })} />
         <Route path="/hr-reports" element={guarded(<HrReportsPage />, { permissionsAny: ["hr_reports.view", "hr_reports.catalog.view"], feature: "reports" })} />
         <Route path="/payroll-reports" element={guarded(<PayrollReportsPage />, { permissionsAny: ["payroll_reports.view", "payroll_reports.catalog.view"], feature: "reports" })} />
@@ -189,7 +190,7 @@ export const AppRouter = () => (
         <Route path="/settings/reports" element={guarded(<ReportsSettingsPage />, { permissionsAny: ["reports.settings.view", "settings.view"], feature: "settings" })} />
         <Route path="/settings/import-export" element={guarded(<ImportExportSettingsPage />, { permissionsAny: ["import_export.settings.view", "import_export_settings.view", "settings.view"], feature: "settings" })} />
         <Route path="/settings/devices-sync" element={guarded(<DevicesSyncSettingsPage />, { permissionsAny: ["devices.settings.view", "sync_settings.view", "settings.view"], feature: "settings" })} />
-        <Route path="/profile-update-requests" element={guarded(<ProfileUpdateRequestsPage />, { permissionsAny: ["profile_updates.view", "profile_update_requests.view"], feature: "kyc_update_requests" })} />
+        <Route path="/profile-update-requests" element={guarded(<ProfileUpdateRequestsPage />, { permissionsAny: ["profile_updates.view", "profile_update_requests.view"], feature: "kyc_update_requests", moduleCode: "documents_kyc" })} />
         <Route path="/audit-logs" element={guarded(<AuditLogsPage />, { permission: "audit_logs.view", feature: "audit_logs" })} />
         <Route path="*" element={<PermissionDenied />} />
       </Route>

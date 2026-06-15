@@ -115,7 +115,7 @@ export class PermissionError extends AppError {
 export class AuthorizationError extends PermissionError {}
 
 export class FeatureDisabledError extends AppError {
-  constructor(message = "This feature is currently disabled.") {
+  constructor(message = "This module is currently disabled.") {
     super({
       message,
       code: "FEATURE_DISABLED",

@@ -18,6 +18,17 @@ export const many = async <T>(
   return result.results ?? [];
 };
 
+export const listEnabledFeatureKeys = (env: Env, companyId: string): Promise<string[]> =>
+  many<{ feature_key: string }>(
+    env,
+    `SELECT feature_key
+     FROM feature_settings
+     WHERE company_id = ?
+       AND is_enabled = 1
+       AND status IN ('active', 'enabled')`,
+    [companyId],
+  ).then((rows) => rows.map((row) => row.feature_key));
+
 export const employeeOutletClause = (
   context: AuthActor,
   employeeAlias = "e",

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 
 import { authMiddleware } from "../middleware/auth.middleware";
+import { requireFeature } from "../middleware/feature.middleware";
 import { requireAnyPermissionOrError } from "../middleware/permission.middleware";
 import * as controller from "../modules/operation-ownership/operation-ownership.controller";
 import type { AppContext } from "../types/api.types";
@@ -8,6 +9,7 @@ import type { AppContext } from "../types/api.types";
 const operationOwnershipRoutes = new Hono<AppContext>();
 
 operationOwnershipRoutes.use("*", authMiddleware);
+operationOwnershipRoutes.use("*", requireFeature("operation_ownership"));
 
 const viewPermissions = [
   "operationOwnership.view",

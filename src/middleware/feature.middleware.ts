@@ -1,5 +1,6 @@
 import { createMiddleware } from "hono/factory";
 
+import { resolveModuleFeatureAliases } from "../config/module-codes";
 import * as settingsService from "../services/settings.service";
 import type { AppContext } from "../types/api.types";
 import { AuthError, DeviceAuthError, FeatureDisabledError } from "../utils/errors";
@@ -8,28 +9,29 @@ export const requireFeature = (featureKey: string) =>
   createMiddleware<AppContext>(async (c, next) => {
     const authUser = c.get("authUser");
     const deviceAuth = c.get("deviceAuth");
+    const featureKeys = resolveModuleFeatureAliases(featureKey);
     let enabled = false;
 
     if (authUser) {
-      enabled = await settingsService.isFeatureEnabled(
-        c.env,
-        authUser.companyId,
-        featureKey,
-        authUser,
+      const checks = await Promise.all(
+        featureKeys.map((key) =>
+          settingsService.isFeatureEnabled(c.env, authUser.companyId, key, authUser),
+        ),
       );
+      enabled = checks.some(Boolean);
     } else if (deviceAuth) {
-      enabled = await settingsService.isFeatureEnabledForDevice(
-        c.env,
-        deviceAuth.companyId,
-        featureKey,
-        deviceAuth,
+      const checks = await Promise.all(
+        featureKeys.map((key) =>
+          settingsService.isFeatureEnabledForDevice(c.env, deviceAuth.companyId, key, deviceAuth),
+        ),
       );
+      enabled = checks.some(Boolean);
     } else {
       throw new AuthError("Please sign in to continue.");
     }
 
     if (!enabled) {
-      throw new FeatureDisabledError();
+      throw new FeatureDisabledError("This module is currently disabled.");
     }
 
     await next();
@@ -41,9 +43,11 @@ export const requireAnyFeature = (featureKeys: string[]) =>
     const deviceAuth = c.get("deviceAuth");
     let checks: boolean[];
 
+    const expandedFeatureKeys = featureKeys.flatMap(resolveModuleFeatureAliases);
+
     if (authUser) {
       checks = await Promise.all(
-        featureKeys.map((featureKey) =>
+        expandedFeatureKeys.map((featureKey) =>
           settingsService.isFeatureEnabled(
             c.env,
             authUser.companyId,
@@ -54,7 +58,7 @@ export const requireAnyFeature = (featureKeys: string[]) =>
       );
     } else if (deviceAuth) {
       checks = await Promise.all(
-        featureKeys.map((featureKey) =>
+        expandedFeatureKeys.map((featureKey) =>
           settingsService.isFeatureEnabledForDevice(
             c.env,
             deviceAuth.companyId,
@@ -68,7 +72,7 @@ export const requireAnyFeature = (featureKeys: string[]) =>
     }
 
     if (!checks.some(Boolean)) {
-      throw new FeatureDisabledError();
+      throw new FeatureDisabledError("This module is currently disabled.");
     }
 
     await next();

@@ -10,7 +10,7 @@ import type { AppContext } from "../types/api.types";
 const advancesRoutes = new Hono<AppContext>();
 
 advancesRoutes.use("*", authMiddleware);
-advancesRoutes.use("*", requireFeature("payroll"));
+advancesRoutes.use("*", requireFeature("advance_salary"));
 
 advancesRoutes.get("/salary-requests", requireAnyPermission(["advanceSalary.requests.view", "advanceSalary.requests.create", "advanceSalary.requests.cancel", "advanceSalary.requests.review", "advanceSalary.requests.approve", "advanceSalary.requests.finalApprove", "advanceSalary.requests.reject", "advanceSalary.payments.execute", "approvals.operationExecutor.view", "approvals.operationExecutor.apply", "advanceSalary.audit.view", "approvals.requests.view"]), controller.listSalaryRequests);
 advancesRoutes.post("/salary-requests", requireAnyPermission(["advanceSalary.requests.create", "advanceSalary.requests.createForOthers"]), requireReason(), controller.createSalaryRequest);

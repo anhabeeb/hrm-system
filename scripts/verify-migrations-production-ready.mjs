@@ -115,6 +115,7 @@ const latestExpected = [
   "0074_employee_lifecycle_safety_hardening.sql",
   "0075_employee_disciplinary_action_approval_engine.sql",
   "0076_disciplinary_action_lifecycle_hardening.sql",
+  "0077_module_visibility_feature_settings.sql",
 ];
 
 for (const file of latestExpected) {

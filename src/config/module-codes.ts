@@ -1,6 +1,4 @@
-import type { CurrentUser, FeatureKey } from "@/types/auth";
-
-export const MODULE_FEATURE_ALIASES: Record<string, FeatureKey[]> = {
+export const MODULE_FEATURE_ALIASES: Record<string, string[]> = {
   employees: ["employees", "employee_management"],
   employee_structure: ["employee_structure", "employee_management"],
   employee_login: ["employee_login", "employee_management", "user_management"],
@@ -24,13 +22,5 @@ export const MODULE_FEATURE_ALIASES: Record<string, FeatureKey[]> = {
   audit: ["audit", "audit_logs"],
 };
 
-export const hasFeature = (user: CurrentUser | null, feature?: FeatureKey) => {
-  if (!feature) return true;
-  return Boolean(user?.features?.includes(feature));
-};
-
-export const isModuleEnabled = (user: CurrentUser | null, moduleCode?: FeatureKey) => {
-  if (!moduleCode) return true;
-  const aliases = MODULE_FEATURE_ALIASES[moduleCode] ?? [moduleCode];
-  return aliases.some((feature) => hasFeature(user, feature));
-};
+export const resolveModuleFeatureAliases = (featureKey: string): string[] =>
+  MODULE_FEATURE_ALIASES[featureKey] ?? [featureKey];

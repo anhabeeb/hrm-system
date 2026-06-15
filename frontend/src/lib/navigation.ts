@@ -39,7 +39,7 @@ import {
 import type { CurrentUser } from "@/types/auth";
 import type { NavGroup, NavItem } from "@/types/navigation";
 
-import { hasFeature } from "./features";
+import { isModuleEnabled } from "./features";
 import { hasAnyPermission, hasPermission } from "./permissions";
 
 export const navigationGroups: NavGroup[] = [
@@ -56,12 +56,12 @@ export const navigationGroups: NavGroup[] = [
     items: [
       { label: "Employee Dashboard", path: "/self/dashboard", icon: LayoutDashboard, requiredPermission: "self.dashboard.view", requiresLinkedEmployee: true },
       { label: "My Profile", path: "/self/profile", icon: UserCircle, requiredPermissionsAny: ["self.profile.view", "self.dashboard.view"], requiresLinkedEmployee: true },
-      { label: "My Attendance", path: "/self/attendance", icon: Clock3, requiredFeature: "attendance", requiredPermission: "self.attendance.view", requiresLinkedEmployee: true },
-      { label: "My Roster", path: "/self/roster", icon: CalendarDays, requiredFeature: "roster", requiredPermission: "self.roster.view", requiresLinkedEmployee: true },
-      { label: "My Leave", path: "/self/leave", icon: CalendarClock, requiredFeature: "leave_management", requiredPermission: "self.leave.view", requiresLinkedEmployee: true },
+      { label: "My Attendance", path: "/self/attendance", icon: Clock3, moduleCode: "attendance", requiredFeature: "attendance", requiredPermission: "self.attendance.view", requiresLinkedEmployee: true },
+      { label: "My Roster", path: "/self/roster", icon: CalendarDays, moduleCode: "roster", requiredFeature: "roster", requiredPermission: "self.roster.view", requiresLinkedEmployee: true },
+      { label: "My Leave", path: "/self/leave", icon: CalendarClock, moduleCode: "leave", requiredFeature: "leave_management", requiredPermission: "self.leave.view", requiresLinkedEmployee: true },
       { label: "My Requests", path: "/self/requests", icon: ClipboardCheck, requiredPermission: "self.requests.view", requiresLinkedEmployee: true },
-      { label: "My Documents / KYC", path: "/self/documents", icon: FileText, requiredFeature: "documents", requiredPermission: "self.documents.view", requiresLinkedEmployee: true },
-      { label: "My Payslips", path: "/self/payslips", icon: ReceiptText, requiredFeature: "payslips", requiredPermission: "self.payslips.view", requiresLinkedEmployee: true },
+      { label: "My Documents / KYC", path: "/self/documents", icon: FileText, moduleCode: "documents_kyc", requiredFeature: "documents", requiredPermission: "self.documents.view", requiresLinkedEmployee: true },
+      { label: "My Payslips", path: "/self/payslips", icon: ReceiptText, moduleCode: "payslips", requiredFeature: "payslips", requiredPermission: "self.payslips.view", requiresLinkedEmployee: true },
       { label: "My Pending Approvals", path: "/self/pending-approvals", icon: FileCheck2, requiredPermissionsAny: ["department.approvals.view", "approvals.department.approve", "approvals.hrFinal.approve", "approvals.financeFinal.approve"], requiresLinkedEmployee: true },
       { label: "Department Dashboard", path: "/self/department-dashboard", icon: Building2, requiredPermission: "department.dashboard.view", requiresLinkedEmployee: true },
     ],
@@ -69,21 +69,21 @@ export const navigationGroups: NavGroup[] = [
   {
     label: "People",
     items: [
-      { label: "Employees", path: "/employees", icon: Users, requiredFeature: "employee_management", requiredPermission: "employees.view" },
-      { label: "Contracts", path: "/contracts", icon: FileSignature, requiredFeature: "employee_management", requiredPermissionsAny: ["contracts.view", "employees.contracts.view", "employees.view"] },
-      { label: "Offboarding", path: "/offboarding", icon: FileCheck2, requiredFeature: "employee_management", requiredPermissionsAny: ["employeeLifecycle.resignations.viewOwn", "employeeLifecycle.resignations.view", "employeeLifecycle.resignations.create", "employeeLifecycle.offboarding.viewOwn", "employeeLifecycle.offboarding.view", "employeeLifecycle.offboarding.create", "employeeLifecycle.exitRequests.viewAll", "approvals.operationOwner.view", "approvals.operationFinal.view", "approvals.operationExecutor.view", "employees.offboarding.view", "employees.view"] },
-      { label: "Disciplinary Actions", path: "/disciplinary-actions", icon: FileCog, requiredFeature: "employee_management", requiredPermissionsAny: ["employeeDiscipline.actions.view", "employeeDiscipline.actions.viewOwn", "employeeDiscipline.actions.create", "employeeDiscipline.actions.review", "employeeDiscipline.actions.apply", "employeeDiscipline.tasks.view", "approvals.operationOwner.view", "approvals.operationFinal.view", "approvals.operationExecutor.view"] },
+      { label: "Employees", path: "/employees", icon: Users, moduleCode: "employees", requiredFeature: "employee_management", requiredPermission: "employees.view" },
+      { label: "Contracts", path: "/contracts", icon: FileSignature, moduleCode: "employees", requiredFeature: "employee_management", requiredPermissionsAny: ["contracts.view", "employees.contracts.view", "employees.view"] },
+      { label: "Offboarding", path: "/offboarding", icon: FileCheck2, moduleCode: "resignation_offboarding", requiredFeature: "employee_lifecycle", requiredPermissionsAny: ["employeeLifecycle.resignations.viewOwn", "employeeLifecycle.resignations.view", "employeeLifecycle.resignations.create", "employeeLifecycle.offboarding.viewOwn", "employeeLifecycle.offboarding.view", "employeeLifecycle.offboarding.create", "employeeLifecycle.exitRequests.viewAll", "approvals.operationOwner.view", "approvals.operationFinal.view", "approvals.operationExecutor.view", "employees.offboarding.view", "employees.view"] },
+      { label: "Disciplinary Actions", path: "/disciplinary-actions", icon: FileCog, moduleCode: "disciplinary_actions", requiredFeature: "employee_discipline", requiredPermissionsAny: ["employeeDiscipline.actions.view", "employeeDiscipline.actions.viewOwn", "employeeDiscipline.actions.create", "employeeDiscipline.actions.review", "employeeDiscipline.actions.apply", "employeeDiscipline.tasks.view", "approvals.operationOwner.view", "approvals.operationFinal.view", "approvals.operationExecutor.view"] },
       { label: "Outlets", path: "/outlets", icon: Building2, requiredFeature: "employee_management", requiredPermission: "outlets.view" },
     ],
   },
   {
     label: "Organization",
     items: [
-      { label: "Departments", path: "/departments", icon: BriefcaseBusiness, requiredFeature: "employee_management", requiredPermissionsAny: ["organization.departments.view", "departments.view"] },
-      { label: "Positions / Titles", path: "/positions", icon: BadgeCheck, requiredFeature: "employee_management", requiredPermissionsAny: ["organization.positions.view", "positions.view"] },
-      { label: "Level Role Templates", path: "/organization/level-role-templates", icon: ShieldCheck, requiredFeature: "employee_management", requiredPermissionsAny: ["organization.levelRoleTemplates.view", "organization.levelRoleTemplates.manage"] },
-      { label: "Structure Change Requests", path: "/organization/structure-change-requests", icon: FileCheck2, requiredFeature: "employee_management", requiredPermissionsAny: ["employees.structureRequests.view", "employees.structureRequests.create", "employees.structureRequests.review", "employees.structureRequests.apply"] },
-      { label: "Operation Ownership", path: "/organization/operation-ownership", icon: ShieldCheck, requiredPermissionsAny: ["operationOwnership.view", "operationOwnership.matrix.view", "operationOwnership.businessFunctions.view"] },
+      { label: "Departments", path: "/departments", icon: BriefcaseBusiness, moduleCode: "employee_structure", requiredFeature: "employee_management", requiredPermissionsAny: ["organization.departments.view", "departments.view"] },
+      { label: "Positions / Titles", path: "/positions", icon: BadgeCheck, moduleCode: "employee_structure", requiredFeature: "employee_management", requiredPermissionsAny: ["organization.positions.view", "positions.view"] },
+      { label: "Level Role Templates", path: "/organization/level-role-templates", icon: ShieldCheck, moduleCode: "employee_structure", requiredFeature: "employee_management", requiredPermissionsAny: ["organization.levelRoleTemplates.view", "organization.levelRoleTemplates.manage"] },
+      { label: "Structure Change Requests", path: "/organization/structure-change-requests", icon: FileCheck2, moduleCode: "employee_structure_changes", requiredFeature: "employee_structure_changes", requiredPermissionsAny: ["employees.structureRequests.view", "employees.structureRequests.create", "employees.structureRequests.review", "employees.structureRequests.apply"] },
+      { label: "Operation Ownership", path: "/organization/operation-ownership", icon: ShieldCheck, moduleCode: "operation_ownership", requiredFeature: "operation_ownership", requiredPermissionsAny: ["operationOwnership.view", "operationOwnership.matrix.view", "operationOwnership.businessFunctions.view"] },
     ],
   },
   {
@@ -92,21 +92,21 @@ export const navigationGroups: NavGroup[] = [
       { label: "Attendance", path: "/attendance", icon: Clock3, requiredFeature: "attendance", requiredPermission: "attendance.view" },
       { label: "Time Corrections", path: "/attendance/corrections", icon: FileClock, requiredFeature: "attendance", requiredPermission: "attendance.view" },
       { label: "Attendance Reports", path: "/attendance/reports", icon: BarChart3, requiredFeature: "attendance", requiredPermission: "attendance.reports.view" },
-      { label: "Duty Rosters", path: "/rosters", icon: CalendarDays, requiredFeature: "roster", requiredPermissionsAny: ["rosters.view", "roster.view"] },
+      { label: "Duty Rosters", path: "/rosters", icon: CalendarDays, moduleCode: "roster", requiredFeature: "roster", requiredPermissionsAny: ["rosters.view", "roster.view"] },
       { label: "Kiosk Devices", path: "/kiosk-devices", icon: TabletSmartphone, requiredFeature: "offline_sync", requiredPermissionsAny: ["devices.view", "kiosk.view"] },
       { label: "Sync Status", path: "/sync-status", icon: Repeat, requiredFeature: "offline_sync", requiredPermission: "sync.view" },
-      { label: "Biometric", path: "/biometric", icon: Fingerprint, requiredFeature: "biometric_attendance", requiredPermission: "biometric.view" },
+      { label: "Biometric", path: "/biometric", icon: Fingerprint, moduleCode: "biometric", requiredFeature: "biometric_attendance", requiredPermission: "biometric.view" },
     ],
   },
   {
     label: "Leave & Payroll",
     items: [
-      { label: "Leave", path: "/leave", icon: CalendarClock, requiredFeature: "leave_management", requiredPermission: "leave.view" },
+      { label: "Leave", path: "/leave", icon: CalendarClock, moduleCode: "leave", requiredFeature: "leave_management", requiredPermission: "leave.view" },
       { label: "Holiday Calendar", path: "/holidays", icon: CalendarDays, requiredFeature: "holidays", requiredPermissionsAny: ["holidays.view", "holidays.calendar.view"] },
       { label: "Long Leave", path: "/long-leave", icon: FileArchive, requiredFeature: "long_leave", requiredPermission: "long_leave.view" },
-      { label: "Payroll", path: "/payroll", icon: Landmark, requiredFeature: "payroll", requiredPermission: "payroll.view" },
-      { label: "Payslips", path: "/payslips", icon: ReceiptText, requiredFeature: "payslips", requiredPermission: "payslips.view" },
-      { label: "Advances", path: "/advances", icon: WalletCards, requiredFeature: "payroll", requiredPermission: "advances.view" },
+      { label: "Payroll", path: "/payroll", icon: Landmark, moduleCode: "payroll", requiredFeature: "payroll", requiredPermission: "payroll.view" },
+      { label: "Payslips", path: "/payslips", icon: ReceiptText, moduleCode: "payslips", requiredFeature: "payslips", requiredPermission: "payslips.view" },
+      { label: "Advances", path: "/advances", icon: WalletCards, moduleCode: "advance_salary", requiredFeature: "advance_salary", requiredPermission: "advances.view" },
       { label: "Salary Loans", path: "/salary-loans", icon: Banknote, requiredFeature: "payroll", requiredPermission: "salary_loans.view" },
     ],
   },
@@ -115,12 +115,12 @@ export const navigationGroups: NavGroup[] = [
     items: [
       { label: "Assets", path: "/assets", icon: PackageCheck, requiredFeature: "assets_uniforms", requiredPermission: "assets.view" },
       { label: "Uniforms", path: "/uniforms", icon: Shirt, requiredFeature: "assets_uniforms", requiredPermission: "uniforms.view" },
-      { label: "Documents", path: "/documents", icon: FileText, requiredFeature: "documents", requiredPermission: "documents.view" },
+      { label: "Documents", path: "/documents", icon: FileText, moduleCode: "documents_kyc", requiredFeature: "documents", requiredPermission: "documents.view" },
     ],
   },
   {
     label: "Workflow",
-    items: [{ label: "Approvals", path: "/approvals", icon: ClipboardCheck, requiredFeature: "approvals", requiredPermission: "approvals.view" }],
+    items: [{ label: "Approvals", path: "/approvals", icon: ClipboardCheck, moduleCode: "approvals", requiredFeature: "approvals", requiredPermission: "approvals.view" }],
   },
   {
     label: "Reports & Data",
@@ -139,8 +139,8 @@ export const navigationGroups: NavGroup[] = [
     label: "Administration",
     items: [
       { label: "Users & Access", path: "/users-access", icon: ShieldCheck, requiredFeature: "user_management", requiredPermission: "users.view" },
-      { label: "Profile Update Requests", path: "/profile-update-requests", icon: IdCard, requiredFeature: "kyc_update_requests", requiredPermissionsAny: ["profile_updates.view", "profile_update_requests.view"] },
-      { label: "Audit Logs", path: "/audit-logs", icon: History, requiredFeature: "audit_logs", requiredPermission: "audit_logs.view" },
+      { label: "Profile Update Requests", path: "/profile-update-requests", icon: IdCard, moduleCode: "documents_kyc", requiredFeature: "kyc_update_requests", requiredPermissionsAny: ["profile_updates.view", "profile_update_requests.view"] },
+      { label: "Audit Logs", path: "/audit-logs", icon: History, moduleCode: "audit", requiredFeature: "audit_logs", requiredPermission: "audit_logs.view" },
     ],
   },
   {
@@ -164,9 +164,9 @@ export const navigationGroups: NavGroup[] = [
 
 export const canAccessNavItem = (user: CurrentUser | null, item: NavItem) =>
   (!item.requiresLinkedEmployee || Boolean(user?.employee_id)) &&
+  isModuleEnabled(user, item.moduleCode ?? item.requiredFeature) &&
   hasPermission(user, item.requiredPermission) &&
-  hasAnyPermission(user, item.requiredPermissionsAny) &&
-  hasFeature(user, item.requiredFeature);
+  hasAnyPermission(user, item.requiredPermissionsAny);
 
 export const getVisibleNavigation = (user: CurrentUser | null): NavGroup[] =>
   navigationGroups

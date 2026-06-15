@@ -9,7 +9,7 @@ import type { AppContext } from "../types/api.types";
 const offboardingRoutes = new Hono<AppContext>();
 
 offboardingRoutes.use("*", authMiddleware);
-offboardingRoutes.use("*", requireFeature("employee_management"));
+offboardingRoutes.use("*", requireFeature("resignation_offboarding"));
 
 offboardingRoutes.get(
   "/",

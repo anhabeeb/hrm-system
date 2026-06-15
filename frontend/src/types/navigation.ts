@@ -6,10 +6,12 @@ export interface NavItem {
   label: string;
   path: string;
   icon: LucideIcon;
+  moduleCode?: FeatureKey;
   requiredPermission?: PermissionKey;
   requiredPermissionsAny?: PermissionKey[];
   requiredFeature?: FeatureKey;
   requiresLinkedEmployee?: boolean;
+  accountType?: "employee" | "admin" | "any";
   children?: NavItem[];
   badge?: string;
 }
