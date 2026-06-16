@@ -8,6 +8,7 @@ import { RowActions } from "@/components/data/RowActions";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { useToast } from "@/components/feedback/useToast";
 import { PageActionBar } from "@/components/layout/PageActionBar";
+import { ModuleAttentionPanel, ModuleLandingHeader, ModuleLandingShell, ModuleQuickActions, ModuleSummaryGrid, ModuleSummaryTile } from "@/components/module-landing";
 import { DepartmentCombobox, EmployeeCombobox, OutletCombobox, PositionCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -22,6 +23,7 @@ import { useAuth } from "@/features/auth/auth.store";
 import { friendlyHrmError } from "@/lib/hrm-errors";
 import { searchParamNumber } from "@/lib/query-string";
 import type { TableColumn } from "@/types/common";
+import { RosterWeeklyMatrixPage } from "@/features/roster-matrix/RosterWeeklyMatrixPage";
 import { RosterChangeRequestDialog } from "./RosterChangeRequestDialog";
 import { conflictBadge, formatTimeRange, label, severityBadge, statusBadge } from "./roster-format";
 import { rostersApi, shiftTemplatesApi } from "./rosters.api";
@@ -268,6 +270,12 @@ export const RostersPage = () => {
 
   const terminalRosterChangeStatuses = ["APPROVED", "APPLIED", "REJECTED", "CANCELLED", "FAILED_TO_APPLY"];
   const has = (permission: string) => auth.isSuperAdmin || auth.hasPermission(permission);
+  const canViewWeeklyMatrix = auth.hasFeature("roster") && auth.hasFeature("employee_management") && auth.hasAnyPermission(["rosters.weeklyMatrix.view", "rosters.weeklyMatrix.viewTeam", "rosters.weeklyMatrix.viewAll", "rosters.view", "rosters.manage"]);
+  const canCreateRoster = auth.hasAnyPermission(["roster.create", "roster.edit", "rosters.manage"]);
+  const canBulkRoster = auth.hasAnyPermission(["rosters.weeklyMatrix.bulkAssign", "rosters.weeklyMatrix.copyWeek", "rosters.manage"]);
+  const canCreateShiftTemplate = auth.hasAnyPermission(["shift_templates.manage", "rosters.manage", "roster.create", "roster.edit"]);
+  const canRequestRosterChange = auth.hasAnyPermission(["roster.changes.create", "roster.changes.createForOthers", "rosters.manage"]);
+  const canViewLeaveConflictOverlay = auth.hasFeature("leave") && auth.hasAnyPermission(["leave.view", "leave.approvals.view"]);
   const canCreateChangeForOthers = has("roster.changes.createForOthers");
   const canApproveChange = (row: RosterChangeRequest) => {
     if (terminalRosterChangeStatuses.includes(row.status)) return false;
@@ -290,6 +298,17 @@ export const RostersPage = () => {
     if (has("roster.changes.cancelAny")) return true;
     return has("roster.changes.cancel") && Boolean(auth.user?.employee_id && (row.employee_id === auth.user.employee_id || row.requester_employee_id === auth.user.employee_id));
   };
+  const rosterRows = rostersQuery.data?.data ?? [];
+  const conflictRows = conflictsQuery.data?.data ?? [];
+  const changeRows = rosterChangesQuery.data?.data ?? [];
+  const templateRows = templatesQuery.data?.data ?? [];
+  const todayKey = isoDate(today);
+  const scheduledToday = rosterRows.filter((row) => row.roster_date === todayKey).length;
+  const openConflicts = conflictRows.filter((row) => String(row.status ?? "").toLowerCase() !== "resolved").length;
+  const pendingChanges = changeRows.filter((row) => !terminalRosterChangeStatuses.includes(String(row.status ?? "").toUpperCase())).length;
+  const draftRows = rosterRows.filter((row) => String(row.status ?? "").toLowerCase() === "draft").length;
+  const publishedRows = rosterRows.filter((row) => String(row.status ?? "").toLowerCase() === "published").length;
+  const visibleTab = tab === "weekly-matrix" && !canViewWeeklyMatrix ? "list" : tab;
 
   const changeColumns: TableColumn<RosterChangeRequest>[] = [
     { key: "requested_date", header: "Date", cell: (row) => row.requested_date ?? "-" },
@@ -303,12 +322,44 @@ export const RostersPage = () => {
 
   return (
     <div>
-      <PageActionBar label="Duty rosters page actions"><div className="flex flex-wrap items-center justify-end gap-2"><Button onClick={() => setChangeRequestOpen(true)} variant="outline">Request change</Button><Button onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4" /> Create shift</Button><Button variant="outline" onClick={() => setBulkOpen(true)}>Bulk create</Button><Button variant="outline" onClick={() => setTemplateOpen(true)}>New template</Button></div></PageActionBar>
+      {(canRequestRosterChange || canCreateRoster || canBulkRoster || canCreateShiftTemplate) ? <PageActionBar label="Duty rosters page actions"><div className="flex flex-wrap items-center justify-end gap-2">{canRequestRosterChange ? <Button onClick={() => setChangeRequestOpen(true)} variant="outline">Request change</Button> : null}{canCreateRoster ? <Button onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4" /> Create shift</Button> : null}{canBulkRoster ? <Button variant="outline" onClick={() => setBulkOpen(true)}>Bulk create</Button> : null}{canCreateShiftTemplate ? <Button variant="outline" onClick={() => setTemplateOpen(true)}>New template</Button> : null}</div></PageActionBar> : null}
       <div className="space-y-4 p-4 md:p-6">
         {success ? <InlineAlert variant="success" title={success} /> : null}
         {(rostersQuery.error || templatesQuery.error || conflictsQuery.error || rosterChangesQuery.error) ? (
           <InlineAlert variant="error" title={friendlyHrmError(rostersQuery.error ?? templatesQuery.error ?? conflictsQuery.error ?? rosterChangesQuery.error, "Roster data could not be loaded.")} />
         ) : null}
+        <ModuleLandingShell>
+          <ModuleLandingHeader
+            title="Roster"
+            description="Plan weekly schedules, review roster changes, and resolve conflicts."
+            status="Roster"
+            actions={(
+              <ModuleQuickActions>
+                {canViewWeeklyMatrix ? <Button variant="outline" onClick={() => setActiveTab("weekly-matrix")}>Open Weekly Matrix</Button> : null}
+                {canRequestRosterChange ? <Button variant="outline" onClick={() => setChangeRequestOpen(true)}>View / Request Changes</Button> : null}
+                {canCreateRoster ? <Button onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4" />Create Roster</Button> : null}
+                {canBulkRoster ? <Button variant="outline" onClick={() => setBulkOpen(true)}>Copy / Bulk Create</Button> : null}
+              </ModuleQuickActions>
+            )}
+          />
+          <ModuleSummaryGrid>
+            <ModuleSummaryTile label="Scheduled today" value={scheduledToday} helperText="Visible roster rows" />
+            <ModuleSummaryTile label="Published shifts" value={publishedRows} status="success" />
+            <ModuleSummaryTile label="Draft shifts" value={draftRows} status={draftRows ? "info" : "neutral"} />
+            <ModuleSummaryTile label="Open conflicts" value={openConflicts} status={openConflicts ? "danger" : "success"} />
+            <ModuleSummaryTile label="Pending changes" value={pendingChanges} status={pendingChanges ? "warning" : "success"} />
+            <ModuleSummaryTile label="Shift templates" value={templateRows.length} />
+          </ModuleSummaryGrid>
+          <ModuleAttentionPanel
+            description="Roster planning issues from your current filter scope."
+            items={[
+              openConflicts ? `${openConflicts} roster conflict(s) need review.` : null,
+              pendingChanges ? `${pendingChanges} roster change request(s) are not terminal.` : null,
+              draftRows ? `${draftRows} draft roster shift(s) are visible in this range.` : null,
+              canViewLeaveConflictOverlay ? "Leave and sick conflicts are checked by roster validation when available." : null,
+            ]}
+          />
+        </ModuleLandingShell>
 
         <div className="grid gap-3 rounded-lg border bg-card p-4 md:grid-cols-4">
           <Label className="space-y-1 text-xs font-medium text-muted-foreground">Outlet<OutletCombobox value={filters.outlet_id} onChange={(value) => updateFilters({ outlet_id: value, employee_id: undefined })} placeholder="All accessible outlets" /></Label>
@@ -321,10 +372,11 @@ export const RostersPage = () => {
           <div className="flex items-end gap-2"><Button variant="outline" onClick={() => setSearchParams(new URLSearchParams({ tab, page: "1", page_size: String(filters.page_size ?? 25) }))}>Clear</Button></div>
         </div>
 
-        <Tabs value={tab} onValueChange={setActiveTab}>
+        <Tabs value={visibleTab} onValueChange={setActiveTab}>
           <TabsList>
             <TabsTrigger value="list">Roster List</TabsTrigger>
             <TabsTrigger value="week">Week View</TabsTrigger>
+            {canViewWeeklyMatrix ? <TabsTrigger value="weekly-matrix">Weekly Matrix</TabsTrigger> : null}
             <TabsTrigger value="templates">Shift Templates</TabsTrigger>
             <TabsTrigger value="conflicts">Conflicts</TabsTrigger>
             <TabsTrigger value="changes">Change Requests</TabsTrigger>
@@ -350,6 +402,12 @@ export const RostersPage = () => {
           </TabsContent>
           <TabsContent value="week">
             <DataTable rows={rostersQuery.data?.data ?? []} columns={columns} loading={rostersQuery.isLoading} getRowId={(row) => row.id} compact emptyTitle="No shifts in this range" emptyDescription="Use the filters above to move across weeks or outlets." />
+          </TabsContent>
+          <TabsContent value="weekly-matrix">
+            <RosterWeeklyMatrixPage
+              filters={{ week_start: filters.date_from, department_id: filters.department_id, outlet_id: filters.outlet_id }}
+              onFiltersChange={(next) => updateFilters({ date_from: next.week_start, department_id: next.department_id, outlet_id: next.outlet_id })}
+            />
           </TabsContent>
           <TabsContent value="templates">
             <DataTable

@@ -7,9 +7,11 @@ import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { toastError, toastSuccess } from "@/components/feedback/toast-helpers";
 import { useToast } from "@/components/feedback/useToast";
 import { PageActionBar } from "@/components/layout/PageActionBar";
+import { ModuleAttentionPanel, ModuleLandingHeader, ModuleLandingShell, ModuleQuickActions, ModuleSummaryGrid, ModuleSummaryTile } from "@/components/module-landing";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/features/auth/auth.store";
+import { isModuleEnabled } from "@/lib/features";
 import { friendlyHrmError } from "@/lib/hrm-errors";
 import { searchParamNumber } from "@/lib/query-string";
 import { DocumentCategoriesPanel } from "./DocumentCategoriesPanel";
@@ -130,12 +132,53 @@ export const DocumentsPage = () => {
   const activeQueryError = activeTab === "expiring" ? expiringQuery.error : activeTab === "missing" ? missingQuery.error : activeTab === "categories" ? categoriesQuery.error : activeTab === "kyc" ? kycQuery.error : listQuery.error;
   const error = activeQueryError;
   const canViewSensitive = has("documents.view_sensitive");
+  const documentsKycEnabled = isModuleEnabled(auth.user, "documents_kyc");
+  const canUploadDocument = documentsKycEnabled && has("documents.upload");
+  const canCreateKycRequest = documentsKycEnabled && (has("documentKyc.requests.create") || has("documentKyc.requests.createForOthers"));
+  const documentRows = listQuery.data?.data ?? [];
+  const expiringRows = expiringQuery.data?.data ?? [];
+  const missingRows = missingQuery.data?.data ?? [];
+  const kycRows = kycQuery.data?.data ?? [];
+  const verifiedDocuments = documentRows.filter((row) => String(row.status ?? "").toLowerCase().includes("verified")).length;
+  const pendingKyc = kycRows.filter((row) => String(row.status ?? "").toLowerCase().includes("pending")).length;
 
   return (
     <div>
-      {has("documents.upload") || has("documentKyc.requests.create") || has("documentKyc.requests.createForOthers") ? <PageActionBar label="Documents page actions"><div className="flex flex-wrap items-center justify-end gap-2">{has("documentKyc.requests.create") || has("documentKyc.requests.createForOthers") ? <Button variant="outline" onClick={() => setKycOpen(true)}>Request KYC update</Button> : null}{has("documents.upload") ? <Button onClick={() => setUploadOpen(true)}><Upload className="h-4 w-4" />Upload document</Button> : null}</div></PageActionBar> : null}
+      {canUploadDocument || canCreateKycRequest ? <PageActionBar label="Documents page actions"><div className="flex flex-wrap items-center justify-end gap-2">{canCreateKycRequest ? <Button variant="outline" onClick={() => setKycOpen(true)}>Request KYC update</Button> : null}{canUploadDocument ? <Button onClick={() => setUploadOpen(true)}><Upload className="h-4 w-4" />Upload document</Button> : null}</div></PageActionBar> : null}
       <div className="space-y-4 p-4 md:p-6">
         {error ? <InlineAlert title={friendlyHrmError(error, "Document action could not be completed.")} variant="error" /> : null}
+        <ModuleLandingShell>
+          <ModuleLandingHeader
+            title="Documents & KYC"
+            description="Manage employee documents, expiries, KYC updates, and approvals."
+            status="Documents/KYC"
+            actions={(
+              <ModuleQuickActions>
+                {canUploadDocument ? <Button onClick={() => setUploadOpen(true)}><Upload className="h-4 w-4" />Upload Document</Button> : null}
+                {canCreateKycRequest ? <Button variant="outline" onClick={() => setKycOpen(true)}>KYC Requests</Button> : null}
+                {canViewExpiring ? <Button variant="outline" onClick={() => setActiveTab("expiring")}>View Expiry Alerts</Button> : null}
+                {canViewMissing ? <Button variant="outline" onClick={() => setActiveTab("missing")}>Missing Documents</Button> : null}
+              </ModuleQuickActions>
+            )}
+          />
+          <ModuleSummaryGrid>
+            <ModuleSummaryTile label="Visible documents" value={listQuery.isFetched ? (listQuery.data?.pagination?.total ?? documentRows.length) : "—"} helperText={listQuery.isFetched ? "Loaded document rows" : "Open Documents tab to load details."} />
+            <ModuleSummaryTile label="Verified documents" value={listQuery.isFetched ? verifiedDocuments : "—"} helperText={listQuery.isFetched ? "Loaded document rows" : "Open Documents tab to load details."} status={verifiedDocuments ? "success" : "neutral"} />
+            <ModuleSummaryTile label="Expiring alerts" value={expiringQuery.isFetched ? (expiringQuery.data?.pagination?.total ?? expiringRows.length) : "—"} helperText={canViewExpiring ? "Open Expiring tab to load details." : "Expiry alerts require document expiry permission."} status={expiringRows.length ? "warning" : "neutral"} />
+            <ModuleSummaryTile label="Missing critical" value={missingQuery.isFetched ? (missingQuery.data?.pagination?.total ?? missingRows.length) : "—"} helperText={canViewMissing ? "Open Missing tab to load details." : "Missing-document view requires permission."} status={missingRows.length ? "danger" : "neutral"} />
+            <ModuleSummaryTile label="Pending KYC" value={kycQuery.isFetched ? pendingKyc : "—"} helperText={canViewKyc ? "Open KYC tab to load details." : "KYC requests require permission."} status={pendingKyc ? "warning" : "neutral"} />
+            <ModuleSummaryTile label="KYC requests" value={kycQuery.isFetched ? (kycQuery.data?.pagination?.total ?? kycRows.length) : "—"} helperText={canViewKyc ? "Open KYC tab to load details." : "KYC requests require permission."} />
+          </ModuleSummaryGrid>
+          <ModuleAttentionPanel
+            description="Document attention is scoped to the tab data you are allowed to load."
+            items={[
+              expiringRows.length ? `${expiringRows.length} loaded document(s) are expiring soon.` : null,
+              missingRows.length ? `${missingRows.length} loaded required document row(s) are missing.` : null,
+              pendingKyc ? `${pendingKyc} loaded KYC request(s) are pending.` : null,
+              !canViewSensitive ? "Sensitive document details remain hidden without permission." : null,
+            ]}
+          />
+        </ModuleLandingShell>
         <DocumentFilters filters={filters} onChange={updateFilters} onClear={() => setSearchParams(new URLSearchParams({ page: "1", page_size: String(filters.page_size), tab: activeTab }))} />
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList><TabsTrigger value="documents">Documents</TabsTrigger>{canViewKyc ? <TabsTrigger value="kyc">KYC Requests</TabsTrigger> : null}{canViewExpiring ? <TabsTrigger value="expiring">Expiring</TabsTrigger> : null}{canViewMissing ? <TabsTrigger value="missing">Missing</TabsTrigger> : null}{canViewCategories ? <TabsTrigger value="categories">Categories</TabsTrigger> : null}</TabsList>

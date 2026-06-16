@@ -1,11 +1,13 @@
 import type { CurrentUser, PermissionKey } from "@/types/auth";
 
-import { isModuleEnabled } from "./features";
+import { areModulesEnabled, isModuleEnabled } from "./features";
 import { hasAnyPermission, hasPermission } from "./permissions";
 
 export interface ModuleAccessOptions {
   requiredPermission?: PermissionKey;
   requiredPermissionsAny?: PermissionKey[];
+  moduleCodesAll?: string[];
+  requiredFeaturesAll?: string[];
   requiresLinkedEmployee?: boolean;
   accountType?: "employee" | "admin" | "any";
 }
@@ -34,6 +36,7 @@ export const canShowModuleItem = (
   options: ModuleAccessOptions = {},
 ) =>
   isModuleEnabled(user, moduleCode) &&
+  areModulesEnabled(user, options.moduleCodesAll ?? options.requiredFeaturesAll) &&
   hasRequiredPermission(user, permission ?? options.requiredPermission, options.requiredPermissionsAny) &&
   (!requiresLinkedEmployee(options) || canAccessSelfService(user)) &&
   accountTypeAllowed(user, options.accountType);

@@ -5,6 +5,7 @@ import { UserPlus } from "lucide-react";
 
 import { toastError, toastSuccess } from "@/components/feedback/toast-helpers";
 import { useToast } from "@/components/feedback/useToast";
+import { ModuleAttentionPanel, ModuleLandingHeader, ModuleLandingShell, ModuleQuickActions, ModuleSummaryGrid, ModuleSummaryTile } from "@/components/module-landing";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/auth.store";
 import { departmentsApi } from "@/features/departments/departments.api";
@@ -12,6 +13,7 @@ import { outletsApi } from "@/features/outlets/outlets.api";
 import { positionsApi } from "@/features/positions/positions.api";
 import { rolesApi } from "@/features/roles/roles.api";
 import { ApiError } from "@/lib/api-errors";
+import { isModuleEnabled } from "@/lib/features";
 import { searchParamNumber } from "@/lib/query-string";
 import { EmployeeDetailDrawer } from "./EmployeeDetailDrawer";
 import { EmployeeFilters, type EmployeeFilterValues } from "./EmployeeFilters";
@@ -264,23 +266,57 @@ export const EmployeesPage = () => {
   const canLinkExistingLogin = auth.hasAnyPermission(["employees.login.link", "users.edit"]);
   const canManageStructure = auth.hasAnyPermission(["employees.structure.manage"]);
   const canApplyLevelRoleTemplate = auth.hasAnyPermission(["employees.structure.manage"]) && auth.hasAnyPermission(["users.edit", "roles.edit"]);
+  const canUseEmployeeLoginModule = isModuleEnabled(auth.user, "employee_login") && canCreateLogin;
+  const canViewStructureChanges = isModuleEnabled(auth.user, "employee_structure_changes") && auth.hasAnyPermission(["employees.structureRequests.view", "employees.structureRequests.create", "employees.structureRequests.review", "employees.structure.manage"]);
+  const canViewDocumentKycAttention = isModuleEnabled(auth.user, "documents_kyc") && auth.hasAnyPermission(["documents.view", "documents.view_missing", "documentKyc.requests.view", "documentKyc.requests.review"]);
+  const canViewLifecycleAttention = isModuleEnabled(auth.user, "resignation_offboarding") && auth.hasAnyPermission(["employeeLifecycle.resignations.view", "employeeLifecycle.resignations.viewOwn", "employeeLifecycle.exitRequests.viewAll", "employeeLifecycle.offboarding.view", "employeeLifecycle.offboarding.manage"]);
+  const employeeRows = employeesQuery.data?.data ?? [];
+  const activeEmployees = employeeRows.filter((employee) => String(employee.employment_status ?? "").toLowerCase() === "active").length;
+  const missingLogin = employeeRows.filter((employee) => !employee.has_login && !employee.linked_user_id).length;
+  const missingStructure = employeeRows.filter((employee) => !employee.department_id || !employee.position_id).length;
+  const missingLevel = employeeRows.filter((employee) => !employee.level).length;
+  const lifecycleAttention = canViewLifecycleAttention ? employeeRows.filter((employee) => ["notice_period", "resigned", "terminated"].includes(String(employee.employment_status ?? "").toLowerCase())).length : null;
 
   return (
     <div>
       <div className="space-y-4 p-4 md:p-6">
         {employeesQuery.isError ? <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">Employees could not be loaded. Please adjust filters or try again.</div> : null}
-        <div className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h2 className="text-base font-semibold">Employee Directory</h2>
-            <p className="text-sm text-muted-foreground">Backend-paginated table scoped by your outlet access.</p>
-          </div>
-          {canCreate ? (
-            <Button onClick={openCreate}>
-              <UserPlus className="h-4 w-4" />
-              Add Employee
-            </Button>
-          ) : null}
-        </div>
+        <ModuleLandingShell>
+          <ModuleLandingHeader
+            title="Employees"
+            description="Manage employee profiles, structure, login access, and lifecycle status."
+            status="Employee Management"
+            actions={(
+              <ModuleQuickActions>
+                {canViewStructureChanges ? <Button variant="outline" onClick={() => navigate("/organization/structure-change-requests")}>Structure Change Requests</Button> : null}
+                {canUseEmployeeLoginModule ? <Button variant="outline" onClick={() => navigate("/users/access")}>Assign Login</Button> : null}
+                {canCreate ? (
+                  <Button onClick={openCreate}>
+                    <UserPlus className="h-4 w-4" />
+                    Add Employee
+                  </Button>
+                ) : null}
+              </ModuleQuickActions>
+            )}
+          />
+          <ModuleSummaryGrid>
+            <ModuleSummaryTile label="Active employees" value={activeEmployees} helperText="Active rows in current scoped result" status="info" />
+            <ModuleSummaryTile label="Visible new hires" value={employeeRows.filter((employee) => employee.joined_at?.slice(0, 7) === new Date().toISOString().slice(0, 7)).length} helperText="This month in current view" />
+            <ModuleSummaryTile label="Without login" value={missingLogin} status={missingLogin ? "warning" : "success"} />
+            <ModuleSummaryTile label="Missing structure" value={missingStructure} status={missingStructure ? "warning" : "success"} />
+            <ModuleSummaryTile label="Missing level" value={missingLevel} status={missingLevel ? "warning" : "success"} />
+            {canViewLifecycleAttention ? <ModuleSummaryTile label="Lifecycle attention" value={lifecycleAttention ?? 0} helperText="Visible lifecycle statuses only" status={lifecycleAttention ? "warning" : "neutral"} /> : null}
+          </ModuleSummaryGrid>
+          <ModuleAttentionPanel
+            description="Focused setup items from the currently loaded employee rows."
+            items={[
+              missingLogin ? `${missingLogin} visible employee(s) need login assignment.` : null,
+              missingStructure ? `${missingStructure} visible employee(s) need department or position setup.` : null,
+              missingLevel ? `${missingLevel} visible employee(s) need level assignment.` : null,
+              canViewDocumentKycAttention ? "Document/KYC attention is available from Documents & KYC." : null,
+            ]}
+          />
+        </ModuleLandingShell>
         <EmployeeFilters
           filters={filters}
           outlets={outletsQuery.data?.data ?? []}

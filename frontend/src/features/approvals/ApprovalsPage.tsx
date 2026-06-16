@@ -6,6 +6,7 @@ import { useSearchParams } from "react-router-dom";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { useToast } from "@/components/feedback/useToast";
 import { ReasonDialog } from "@/components/forms/ReasonDialog";
+import { ModuleAttentionPanel, ModuleLandingHeader, ModuleLandingShell, ModuleQuickActions, ModuleSummaryGrid, ModuleSummaryTile } from "@/components/module-landing";
 import { Button } from "@/components/ui/button";
 import { attendanceApi } from "@/features/attendance/attendance.api";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -65,6 +66,7 @@ export const ApprovalsPage = () => {
   const canViewThresholds = has("approval_thresholds.view");
   const canViewEngineRequests = has("approvals.requests.view") || has("approvals.department.view") || has("approvals.hrFinal.view") || has("approvals.financeFinal.view") || has("employeeDiscipline.actions.view") || has("employeeDiscipline.actions.viewOwn") || has("employeeDiscipline.actions.review") || has("employeeDiscipline.actions.finalApprove") || has("employeeDiscipline.actions.apply") || canViewInbox;
   const canViewSettings = canViewInbox || canViewWorkflows || canViewThresholds;
+  const canViewMyPendingApprovals = canViewEngineRequests || canViewInbox || has("approvals.requests.approve") || has("approvals.department.approve") || has("approvals.operationOwner.approve");
   const activeTab = tab === "workflows" && canViewWorkflows ? "workflows" : tab === "requests" && canViewEngineRequests ? "requests" : tab === "my-pending" ? "my-pending" : tab === "my-requests" ? "my-requests" : tab === "thresholds" && canViewThresholds ? "thresholds" : tab === "settings" && canViewSettings ? "settings" : "inbox";
   const filters = useMemo<ApprovalFilterValues>(() => ({
     status: searchParams.get("status") || undefined,
@@ -206,12 +208,55 @@ export const ApprovalsPage = () => {
   });
   const activeQueryError = activeTab === "workflows" ? workflowsQuery.error ?? stepsQuery.error : activeTab === "thresholds" ? thresholdsQuery.error : activeTab === "settings" ? settingsQuery.error : activeTab === "requests" || activeTab === "my-pending" || activeTab === "my-requests" ? engineRequestsQuery.error : listQuery.error;
   const error = activeQueryError ?? approvalMutation.error ?? workflowMutation.error ?? stepMutation.error ?? thresholdMutation.error ?? statusMutation.error;
+  const inboxRows = listQuery.data?.data ?? [];
+  const engineRows = engineRequestsQuery.data?.data ?? [];
+  const workflowRows = workflowsQuery.data?.data ?? [];
+  const thresholdRows = thresholdsQuery.data?.data ?? [];
+  const pendingInbox = inboxRows.filter((row) => String(row.status ?? "").toLowerCase().includes("pending")).length;
+  const pendingEngine = engineRows.filter((row) => String(row.status ?? "").toLowerCase().includes("pending")).length;
+  const manualAssignmentRows = engineRows.filter((row) => String(row.status ?? "").toLowerCase().includes("manual")).length;
+  const highPriorityRows = engineRows.filter((row) => {
+    const request = row as ApprovalEngineRequest & { priority?: string | null; severity?: string | null };
+    return ["high", "critical"].includes(String(request.priority ?? request.severity ?? "").toLowerCase());
+  }).length;
 
   return (
     <div>
       <div className="space-y-4 p-4 md:p-6">
         {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
         {error ? <InlineAlert title={friendlyHrmError(error, "Approval action could not be completed.", "approval")} variant="error" /> : null}
+        <ModuleLandingShell>
+          <ModuleLandingHeader
+            title="Approvals"
+            description="Review pending requests across HR, payroll, attendance, documents, lifecycle, and discipline."
+            status="Approval workflow"
+            actions={(
+              <ModuleQuickActions>
+                {canViewMyPendingApprovals ? <Button variant="outline" onClick={() => setActiveTab("my-pending")}>My Assigned Approvals</Button> : null}
+                {canViewEngineRequests ? <Button variant="outline" onClick={() => setActiveTab("requests")}>All Approval Requests</Button> : null}
+                {canViewWorkflows ? <Button variant="outline" onClick={() => setActiveTab("workflows")}>Workflow Setup</Button> : null}
+                {canViewSettings ? <Button variant="outline" onClick={() => setActiveTab("settings")}>Settings Summary</Button> : null}
+              </ModuleQuickActions>
+            )}
+          />
+          <ModuleSummaryGrid>
+            <ModuleSummaryTile label="Pending inbox" value={listQuery.isFetched ? pendingInbox : "—"} helperText={canViewInbox ? "Open Inbox tab to load details." : "Inbox requires approval view permission."} status={pendingInbox ? "warning" : "neutral"} />
+            <ModuleSummaryTile label="Approval queue" value={engineRequestsQuery.isFetched ? pendingEngine : "—"} helperText="Open approval queue tab to load details." status={pendingEngine ? "warning" : "neutral"} />
+            <ModuleSummaryTile label="High priority" value={engineRequestsQuery.isFetched ? highPriorityRows : "—"} helperText="Open approval queue tab to load details." status={highPriorityRows ? "danger" : "neutral"} />
+            <ModuleSummaryTile label="Manual assignment" value={engineRequestsQuery.isFetched ? manualAssignmentRows : "—"} helperText="Open approval queue tab to load details." status={manualAssignmentRows ? "warning" : "neutral"} />
+            <ModuleSummaryTile label="Workflows" value={workflowsQuery.isFetched ? (workflowsQuery.data?.pagination?.total ?? workflowRows.length) : "—"} helperText={canViewWorkflows ? "Open Workflows tab to load details." : "Workflow setup requires permission."} />
+            <ModuleSummaryTile label="Thresholds" value={thresholdsQuery.isFetched ? (thresholdsQuery.data?.pagination?.total ?? thresholdRows.length) : "—"} helperText={canViewThresholds ? "Open Thresholds tab to load details." : "Threshold setup requires permission."} />
+          </ModuleSummaryGrid>
+          <ModuleAttentionPanel
+            description="Approval workload from visible inbox and engine request rows."
+            items={[
+              pendingInbox ? `${pendingInbox} inbox approval(s) need action.` : null,
+              pendingEngine ? `${pendingEngine} engine approval request(s) are pending in the loaded queue.` : null,
+              manualAssignmentRows ? `${manualAssignmentRows} approval request(s) need assignment or manual review.` : null,
+              highPriorityRows ? `${highPriorityRows} loaded approval request(s) are high priority.` : null,
+            ]}
+          />
+        </ModuleLandingShell>
         <ApprovalFilters filters={filters} onChange={updateFilters} onClear={() => setSearchParams(new URLSearchParams({ page: "1", page_size: String(filters.page_size), tab: activeTab }))} />
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList><TabsTrigger value="inbox">Inbox</TabsTrigger>{canViewEngineRequests ? <TabsTrigger value="requests">Approval Requests</TabsTrigger> : null}<TabsTrigger value="my-pending">My Pending</TabsTrigger><TabsTrigger value="my-requests">My Requests</TabsTrigger>{canViewWorkflows ? <TabsTrigger value="workflows">Workflows</TabsTrigger> : null}{canViewThresholds ? <TabsTrigger value="thresholds">Thresholds</TabsTrigger> : null}{canViewSettings ? <TabsTrigger value="settings">Settings Summary</TabsTrigger> : null}</TabsList>

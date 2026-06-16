@@ -26,6 +26,11 @@ const employeeRepository = read("src/modules/employees/employees.repository.ts")
 const permissions = read("seeds/permissions.seed.sql");
 const roles = read("seeds/roles.seed.sql");
 const dashboardPage = read("frontend/src/features/dashboard/DashboardPage.tsx");
+const adminCommandCenterPage = read("frontend/src/features/dashboard/AdminCommandCenterPage.tsx");
+const peopleSnapshotWidget = read("frontend/src/features/dashboard/PeopleSnapshotWidget.tsx");
+const attendancePulseWidget = read("frontend/src/features/dashboard/AttendancePulseWidget.tsx");
+const payrollReadinessWidget = read("frontend/src/features/dashboard/PayrollReadinessWidget.tsx");
+const commandCenterHeader = read("frontend/src/features/dashboard/CommandCenterHeader.tsx");
 const employee360Page = read("frontend/src/features/employees/Employee360Page.tsx");
 const router = read("frontend/src/app/router.tsx");
 const employeeList = read("frontend/src/features/employees/EmployeeList.tsx");
@@ -116,7 +121,11 @@ if (/metadata_json|raw_payload_json|api_token_hash|token_hash|password_hash/.tes
 
 if (!router.includes('"/dashboard"') || !router.includes("dashboard.view")) fail("dashboard frontend route is missing or unguarded");
 if (!router.includes('"/employees/:employeeId"') || !router.includes("Employee360Page")) fail("Employee 360 frontend route is missing");
-mustInclude(dashboardPage, ["Employee Summary", "Attendance Today", "Payroll Readiness", "Employee 360", "Quick Action"], "dashboard page");
+mustInclude(dashboardPage + adminCommandCenterPage, ["AdminCommandCenterPage", "CommandCenterHeader"], "dashboard page");
+mustInclude(peopleSnapshotWidget, ["PeopleSnapshotWidget", "Active Employees", "Without Login"], "People Snapshot widget");
+mustInclude(attendancePulseWidget, ["AttendancePulseWidget", "StatusStrip"], "Attendance Pulse widget");
+mustInclude(payrollReadinessWidget, ["PayrollReadinessWidget", "Missing Punches", "Adjustments"], "Payroll Readiness widget");
+mustInclude(commandCenterHeader, ["quick_actions", "Pending Approvals"], "Command Center header");
 mustInclude(employee360Page, [
   "Overview",
   "Attendance",

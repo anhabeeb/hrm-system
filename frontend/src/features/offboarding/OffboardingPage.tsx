@@ -7,6 +7,7 @@ import { toastError, toastSuccess } from "@/components/feedback/toast-helpers";
 import { useToast } from "@/components/feedback/useToast";
 import { ReasonDialog } from "@/components/forms/ReasonDialog";
 import { PageActionBar } from "@/components/layout/PageActionBar";
+import { ModuleAttentionPanel, ModuleLandingHeader, ModuleLandingShell, ModuleQuickActions, ModuleSummaryGrid, ModuleSummaryTile } from "@/components/module-landing";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -84,16 +85,48 @@ export const OffboardingPage = () => {
     onError: (error) => toastError(toast, error, "Lifecycle action could not be completed."),
   });
   const error = query.error ?? createMutation.error ?? actionMutation.error;
+  const exitRows = query.data?.data ?? [];
+  const noticeRows = exitRows.filter((row) => ["NOTICE_PERIOD", "APPROVED_PENDING_LAST_WORKING_DATE"].includes(row.status));
+  const inProgressRows = exitRows.filter((row) => ["OFFBOARDING_IN_PROGRESS", "PENDING_CLEARANCE"].includes(row.status));
+  const pendingApprovalRows = exitRows.filter((row) => String(row.status ?? "").startsWith("PENDING"));
+  const finalSettlementRows = exitRows.filter((row) => String(row.final_settlement_status ?? "").toLowerCase().includes("pending"));
+  const accessReviewRows = exitRows.filter((row) => String(row.access_disable_status ?? "").toLowerCase().includes("pending"));
+  const exitInterviewRows = exitRows.filter((row) => String(row.offboarding_checklist_status ?? "").toLowerCase().includes("interview"));
 
   return (
     <div>
       {canCreate ? <PageActionBar label="Exit and offboarding actions"><Button onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4" />New exit request</Button></PageActionBar> : null}
       <div className="space-y-4 p-4 md:p-6">
         {error ? <InlineAlert variant="error" title={friendlyHrmError(error, "Exit/offboarding action could not be completed.")} /> : null}
-        <div>
-          <h1 className="text-xl font-semibold">Resignation / Offboarding</h1>
-          <p className="text-sm text-muted-foreground">Operation Ownership driven resignation, offboarding, checklist, and lifecycle execution requests.</p>
-        </div>
+        <ModuleLandingShell>
+          <ModuleLandingHeader
+            title="Resignation & Offboarding"
+            description="Manage resignation approvals, notice periods, offboarding tasks, and access closure."
+            status="Lifecycle"
+            actions={(
+              <ModuleQuickActions>
+                {canCreate ? <Button onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4" />Create Exit Request</Button> : null}
+              </ModuleQuickActions>
+            )}
+          />
+          <ModuleSummaryGrid>
+            <ModuleSummaryTile label="Notice period" value={noticeRows.length} status={noticeRows.length ? "info" : "neutral"} />
+            <ModuleSummaryTile label="Offboarding in progress" value={inProgressRows.length} status={inProgressRows.length ? "warning" : "success"} />
+            <ModuleSummaryTile label="Pending approvals" value={pendingApprovalRows.length} status={pendingApprovalRows.length ? "warning" : "success"} />
+            <ModuleSummaryTile label="Settlement reviews" value={finalSettlementRows.length} status={finalSettlementRows.length ? "warning" : "success"} />
+            <ModuleSummaryTile label="Access reviews" value={accessReviewRows.length} status={accessReviewRows.length ? "warning" : "success"} />
+            <ModuleSummaryTile label="Exit interviews" value={exitInterviewRows.length} helperText="Loaded checklist status" />
+          </ModuleSummaryGrid>
+          <ModuleAttentionPanel
+            description="Lifecycle attention from visible resignation and offboarding requests."
+            items={[
+              noticeRows.length ? `${noticeRows.length} employee(s) are in notice-period tracking.` : null,
+              pendingApprovalRows.length ? `${pendingApprovalRows.length} lifecycle request(s) need approval review.` : null,
+              inProgressRows.length ? `${inProgressRows.length} offboarding case(s) are in progress.` : null,
+              "Login disable remains tied to approved offboarding completion policy.",
+            ]}
+          />
+        </ModuleLandingShell>
         <Table>
           <TableHeader>
             <TableRow>

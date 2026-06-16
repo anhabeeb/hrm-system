@@ -12,6 +12,7 @@ dashboardRoutes.use("*", authMiddleware);
 
 dashboardRoutes.get("/", requireAnyPermission(["dashboard.view", "dashboard.view_company", "dashboard.view_outlet"]), controller.summary);
 dashboardRoutes.get("/summary", requireAnyPermission(["dashboard.view", "dashboard.view_company", "dashboard.view_outlet"]), controller.summary);
+dashboardRoutes.get("/command-center", requireAnyPermission(["dashboard.view", "dashboard.view_company", "dashboard.view_outlet"]), controller.commandCenter);
 dashboardRoutes.get("/attention", requireAnyPermission(["dashboard.view", "dashboard.view_company", "dashboard.view_outlet"]), controller.attention);
 dashboardRoutes.get("/attendance-today", requireFeature("attendance"), requireAnyPermission(["dashboard.attendance.view", "attendance.view", "attendance.reports.view"]), controller.attendanceToday);
 dashboardRoutes.get("/approvals", requireFeature("leave"), requireAnyPermission(["dashboard.leave.view", "leave.view", "leave.approvals.view"]), controller.approvals);

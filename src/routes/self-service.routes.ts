@@ -2,7 +2,10 @@ import { Hono } from "hono";
 import { createMiddleware } from "hono/factory";
 
 import { authMiddleware } from "../middleware/auth.middleware";
+import { requireFeature } from "../middleware/feature.middleware";
 import { requireAnyPermission, requirePermission } from "../middleware/permission.middleware";
+import * as attendanceCalendarController from "../modules/attendance/attendance-calendar.controller";
+import * as weeklyTeamController from "../modules/dashboard/department-weekly-team.controller";
 import * as controller from "../modules/self-service/self-service.controller";
 import * as repository from "../modules/self-service/self-service.repository";
 import { SELF_SERVICE_LINKED_EMPLOYEE_REQUIRED_MESSAGE } from "../modules/self-service/self-service.service";
@@ -36,6 +39,9 @@ selfServiceRoutes.get("/dashboard", requirePermission("self.dashboard.view"), co
 selfServiceRoutes.get("/profile", requireAnyPermission(["self.profile.view", "self.dashboard.view"]), controller.profile);
 selfServiceRoutes.get("/access-summary", requirePermission("self.accessSummary.view"), controller.accessSummary);
 selfServiceRoutes.get("/requests", requirePermission("self.requests.view"), controller.requests);
+selfServiceRoutes.get("/attendance-calendar", requireFeature("attendance"), requireAnyPermission(["self.attendance.calendar.view", "self.attendance.view"]), attendanceCalendarController.selfAttendanceCalendar);
+selfServiceRoutes.get("/department-dashboard/weekly-team-view", requireFeature("employee_management"), requireFeature("attendance"), requireAnyPermission(["department.dashboard.view", "departments.dashboard.viewTeam", "attendance.teamCalendar.view", "attendance.calendar.viewTeam", "employees.team.view"]), weeklyTeamController.selfWeeklyTeamView);
+selfServiceRoutes.get("/department-dashboard/weekly-team-departments", requireFeature("employee_management"), requireFeature("attendance"), requireAnyPermission(["department.dashboard.view", "departments.dashboard.viewTeam", "attendance.teamCalendar.view", "attendance.calendar.viewTeam", "employees.team.view"]), weeklyTeamController.selfWeeklyTeamDepartments);
 selfServiceRoutes.get("/pending-approvals", requireAnyPermission(["department.approvals.view", "approvals.department.approve", "approvals.hrFinal.approve", "approvals.financeFinal.approve"]), controller.pendingApprovals);
 selfServiceRoutes.get("/navigation", requireAnyPermission(["self.dashboard.view", "self.profile.view", "self.requests.view"]), controller.navigation);
 

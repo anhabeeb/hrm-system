@@ -6,7 +6,7 @@ import { FullPagePermissionDenied } from "@/components/feedback/PermissionDenied
 import { LoadingState } from "@/components/data/LoadingState";
 import { useAuth } from "@/features/auth/auth.store";
 import { getDefaultLandingPath } from "@/lib/default-landing";
-import { isModuleEnabled } from "@/lib/features";
+import { areModulesEnabled, isModuleEnabled } from "@/lib/features";
 import { hasAnyPermission, hasPermission } from "@/lib/permissions";
 
 export const ProtectedRoute = () => {
@@ -54,14 +54,18 @@ export const ModuleRoute = ({
   requiredPermission,
   requiredPermissionsAny,
   requiredFeature,
+  requiredFeaturesAll,
   moduleCode,
+  moduleCodesAll,
   requiresLinkedEmployee,
   children,
 }: {
   requiredPermission?: string;
   requiredPermissionsAny?: string[];
   requiredFeature?: string;
+  requiredFeaturesAll?: string[];
   moduleCode?: string;
+  moduleCodesAll?: string[];
   requiresLinkedEmployee?: boolean;
   children: ReactNode;
 }) => {
@@ -71,6 +75,7 @@ export const ModuleRoute = ({
     return <LinkedEmployeeOnlyGuard>{children}</LinkedEmployeeOnlyGuard>;
   }
   if (!isModuleEnabled(user, moduleCode ?? requiredFeature)) return <ModuleDisabledPage />;
+  if (!areModulesEnabled(user, moduleCodesAll ?? requiredFeaturesAll)) return <ModuleDisabledPage />;
   if (!hasPermission(user, requiredPermission)) return <FullPagePermissionDenied />;
   if (!hasAnyPermission(user, requiredPermissionsAny)) return <FullPagePermissionDenied />;
 

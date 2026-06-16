@@ -21,6 +21,11 @@ export const summary = async (c: Context<AppContext>) =>
     requestId: c.get("requestId"),
   });
 
+export const commandCenter = async (c: Context<AppContext>) =>
+  ok(withGeneratedAt(await service.getCommandCenter(c.env, actor(c))), "Command center dashboard loaded successfully.", {
+    requestId: c.get("requestId"),
+  });
+
 export const attention = async (c: Context<AppContext>) =>
   ok(withGeneratedAt(await service.getAttention(c.env, actor(c))), "Dashboard attention items loaded successfully.", {
     requestId: c.get("requestId"),

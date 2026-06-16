@@ -368,10 +368,16 @@ describe("Phase 11A dashboard completion", () => {
 
   it("dashboard route/page exists", async () => {
     const router = await readSource("frontend/src/app/router.tsx");
-    const page = await readSource("frontend/src/features/dashboard/DashboardPage.tsx");
+    const page = [
+      await readSource("frontend/src/features/dashboard/DashboardPage.tsx"),
+      await readSource("frontend/src/features/dashboard/AdminCommandCenterPage.tsx"),
+      await readSource("frontend/src/features/dashboard/PayrollReadinessWidget.tsx"),
+      await readSource("frontend/src/features/dashboard/PeopleSnapshotWidget.tsx"),
+    ].join("\n");
     expect(router).toContain("/dashboard");
-    expect(page).toContain("Payroll Readiness");
-    expect(page).toContain("Employee 360");
+    expect(page).toContain("AdminCommandCenterPage");
+    expect(page).toContain("PayrollReadinessWidget");
+    expect(page).toContain("PeopleSnapshotWidget");
   });
 
   it("Employee 360 route/page exists", async () => {

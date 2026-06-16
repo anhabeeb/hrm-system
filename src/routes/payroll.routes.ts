@@ -4,6 +4,7 @@ import { authMiddleware } from "../middleware/auth.middleware";
 import { requireFeature } from "../middleware/feature.middleware";
 import { requireAnyPermission, requirePermission } from "../middleware/permission.middleware";
 import { requireReason } from "../middleware/reason-required.middleware";
+import * as attendanceCalendarController from "../modules/attendance/attendance-calendar.controller";
 import * as controller from "../modules/payroll/payroll.controller";
 import * as payslipsController from "../modules/payslips/payslips.controller";
 import type { AppContext } from "../types/api.types";
@@ -14,6 +15,7 @@ payrollRoutes.use("*", authMiddleware);
 payrollRoutes.use("*", requireFeature("payroll"));
 
 payrollRoutes.get("/", requirePermission("payroll.view"), controller.listPayroll);
+payrollRoutes.get("/attendance-calendar", requireFeature("attendance"), requireAnyPermission(["payroll.attendanceReview.view", "payroll.view"]), attendanceCalendarController.payrollAttendanceCalendar);
 payrollRoutes.get("/month/:payrollMonth", requirePermission("payroll.view"), controller.getPayrollByMonth);
 payrollRoutes.post("/calculate", requirePermission("payroll.calculate"), controller.calculate);
 payrollRoutes.get("/adjustments", requireAnyPermission(["payroll.adjustments.view", "payroll.adjustments.create", "payroll.adjustments.cancel", "payroll.adjustments.review", "payroll.adjustments.approve", "payroll.adjustments.finalApprove", "payroll.adjustments.reject", "payroll.adjustments.apply", "payroll.adjustments.audit.view", "approvals.department.view", "approvals.financeFinal.view", "approvals.requests.view"]), controller.listAdjustments);

@@ -7,9 +7,11 @@ import { EmptyState } from "@/components/data/EmptyState";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { useToast } from "@/components/feedback/useToast";
 import { PageActionBar } from "@/components/layout/PageActionBar";
+import { ModuleAttentionPanel, ModuleLandingHeader, ModuleLandingShell, ModuleQuickActions, ModuleSummaryGrid, ModuleSummaryTile } from "@/components/module-landing";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/features/auth/auth.store";
+import { isModuleEnabled } from "@/lib/features";
 import { friendlyHrmError } from "@/lib/hrm-errors";
 import { searchParamNumber } from "@/lib/query-string";
 import { payrollApi } from "./payroll.api";
@@ -25,6 +27,7 @@ import { PayrollItemsTable } from "./PayrollItemsTable";
 import { PayrollRunDetailDrawer } from "./PayrollRunDetailDrawer";
 import { PayrollRunForm } from "./PayrollRunForm";
 import { PayrollRunsTable } from "./PayrollRunsTable";
+import { EmployeeAttendanceCalendarWidget } from "@/features/attendance-calendar/EmployeeAttendanceCalendarWidget";
 import type { PayrollAdjustment, PayrollCalculatePayload, PayrollException, PayrollFilters as PayrollFilterValues, PayrollItem, PayrollRun } from "./payroll.types";
 
 type PayrollAction = "recalculate" | "submit" | "approve" | "reject" | "finalize" | "resolveException" | null;
@@ -149,6 +152,12 @@ export const PayrollPage = () => {
   const canRejectAdjustment = hasPayrollPermission("payroll.adjustments.reject") || hasPayrollPermission("approvals.department.reject") || hasPayrollPermission("approvals.financeFinal.reject");
   const canCancelAdjustment = hasPayrollPermission("payroll.adjustments.cancel") || hasPayrollPermission("payroll.adjustments.cancelAny");
   const canApplyAdjustment = hasPayrollPermission("payroll.adjustments.apply");
+  const canViewAttendanceReview =
+    isModuleEnabled(auth.user, "payroll") &&
+    isModuleEnabled(auth.user, "attendance") &&
+    auth.hasAnyPermission(["payroll.attendanceReview.view", "payroll.view"]);
+  const canUsePayrollAdjustments = isModuleEnabled(auth.user, "payroll_adjustments") && (canCreateAdjustment || auth.hasAnyPermission(["payroll.adjustments.view", "payroll.adjustments.review", "payroll.view"]));
+  const visibleTab = tab === "attendance-review" && !canViewAttendanceReview ? "runs" : tab;
 
   const actionCopy = {
     recalculate: ["Recalculate payroll", "Recalculate this draft payroll run using current attendance, leave, and deduction data.", "Recalculate"],
@@ -159,13 +168,21 @@ export const PayrollPage = () => {
     resolveException: ["Resolve payroll exception", "Record the resolution notes for this payroll exception.", "Resolve"],
   } as const;
   const selectedActionCopy = action ? actionCopy[action] : ["Payroll action", "A reason is required.", "Continue"];
+  const runRows = runsQuery.data?.data ?? [];
+  const adjustmentRows = adjustmentsQuery.data?.data ?? [];
+  const exceptionRows = exceptionsQuery.data?.data ?? [];
+  const currentRun = selectedRun ?? runRows[0] ?? null;
+  const currentRunSummary = currentRun as (PayrollRun & { period_label?: string | null; pay_date?: string | null }) | null;
+  const pendingAdjustments = adjustmentRows.filter((row) => String(row.status ?? "").toLowerCase().includes("pending")).length;
+  const unresolvedExceptions = exceptionRows.filter((row) => String(row.status ?? "").toLowerCase() !== "resolved").length;
+  const finalizedRuns = runRows.filter((row) => String(row.status ?? "").toLowerCase().includes("final")).length;
 
   return (
     <div>
       {canCalculate || canCreateAdjustment ? (
         <PageActionBar label="Payroll page actions">
           <div className="flex flex-wrap items-center justify-end gap-2">
-            {canCreateAdjustment ? <Button variant="outline" onClick={() => setAdjustmentOpen(true)}><Plus className="h-4 w-4" />Request adjustment</Button> : null}
+            {canUsePayrollAdjustments && canCreateAdjustment ? <Button variant="outline" onClick={() => setAdjustmentOpen(true)}><Plus className="h-4 w-4" />Request adjustment</Button> : null}
             {canCalculate ? <Button onClick={() => setFormOpen(true)}><Calculator className="h-4 w-4" />Calculate draft</Button> : null}
           </div>
         </PageActionBar>
@@ -173,10 +190,41 @@ export const PayrollPage = () => {
       <div className="space-y-4 p-4 md:p-6">
         {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
         {error ? <InlineAlert title={friendlyHrmError(error, "Payroll action could not be completed.", "payroll")} variant="error" /> : null}
+        <ModuleLandingShell>
+          <ModuleLandingHeader
+            title="Payroll"
+            description="Prepare payroll, review attendance, adjustments, advances, and payslips."
+            status="Payroll readiness"
+            actions={(
+              <ModuleQuickActions>
+                {canViewAttendanceReview ? <Button variant="outline" onClick={() => setActiveTab("attendance-review")}>Payroll Attendance Review</Button> : null}
+                {canUsePayrollAdjustments ? <Button variant="outline" onClick={() => canCreateAdjustment ? setAdjustmentOpen(true) : setActiveTab("adjustments")}><Plus className="h-4 w-4" />Payroll Adjustments</Button> : null}
+                {canCalculate ? <Button onClick={() => setFormOpen(true)}><Calculator className="h-4 w-4" />Create Payroll Run</Button> : null}
+              </ModuleQuickActions>
+            )}
+          />
+          <ModuleSummaryGrid>
+            <ModuleSummaryTile label="Current payroll period" value={currentRunSummary?.payroll_month ?? currentRunSummary?.period_label ?? "Not configured"} helperText="Latest visible run" />
+            <ModuleSummaryTile label="Pay date" value={currentRunSummary?.pay_date ?? "Not configured"} />
+            <ModuleSummaryTile label="Payroll status" value={currentRun?.status ?? "No visible run"} status={currentRun?.status ? "info" : "neutral"} />
+            <ModuleSummaryTile label="Pending adjustments" value={adjustmentsQuery.isFetched ? pendingAdjustments : "—"} helperText={adjustmentsQuery.isFetched ? "Loaded adjustment rows" : "Open the Adjustments tab to load details."} status={pendingAdjustments ? "warning" : "neutral"} />
+            <ModuleSummaryTile label="Review blockers" value={selectedRun ? unresolvedExceptions : "—"} helperText={selectedRun ? "Exceptions for selected run" : "Select a payroll run to load exception blockers."} status={unresolvedExceptions ? "danger" : "neutral"} />
+            <ModuleSummaryTile label="Finalized runs" value={finalizedRuns} status={finalizedRuns ? "success" : "neutral"} />
+          </ModuleSummaryGrid>
+          <ModuleAttentionPanel
+            description="Payroll readiness signals from selected and visible payroll records."
+            items={[
+              selectedRun ? null : "Select a payroll run to load items and exception blockers.",
+              unresolvedExceptions ? `${unresolvedExceptions} payroll exception(s) need review for the selected run.` : null,
+              pendingAdjustments ? `${pendingAdjustments} loaded payroll adjustment(s) are pending.` : null,
+              canViewAttendanceReview ? "Attendance review is available before final payroll processing." : null,
+            ]}
+          />
+        </ModuleLandingShell>
         <PayrollFlowStepper status={selectedRun?.status} />
         <PayrollFilters filters={filters} onChange={updateFilters} onClear={() => setSearchParams(new URLSearchParams({ page: "1", page_size: String(filters.page_size), tab }))} />
-        <Tabs value={tab} onValueChange={setActiveTab}>
-          <TabsList><TabsTrigger value="runs">Runs</TabsTrigger><TabsTrigger value="items">Items</TabsTrigger><TabsTrigger value="exceptions">Exceptions</TabsTrigger><TabsTrigger value="adjustments">Adjustments</TabsTrigger></TabsList>
+        <Tabs value={visibleTab} onValueChange={setActiveTab}>
+          <TabsList><TabsTrigger value="runs">Runs</TabsTrigger><TabsTrigger value="items">Items</TabsTrigger><TabsTrigger value="exceptions">Exceptions</TabsTrigger><TabsTrigger value="adjustments">Adjustments</TabsTrigger>{canViewAttendanceReview ? <TabsTrigger value="attendance-review">Attendance Review</TabsTrigger> : null}</TabsList>
           <TabsContent value="runs">
             <PayrollRunsTable
               rows={runsQuery.data?.data ?? []}
@@ -221,6 +269,11 @@ export const PayrollPage = () => {
               onPageSizeChange={(page_size) => updateFilters({ page: 1, page_size })}
             />
           </TabsContent>
+          {canViewAttendanceReview ? (
+            <TabsContent value="attendance-review">
+              <EmployeeAttendanceCalendarWidget source="payroll" />
+            </TabsContent>
+          ) : null}
         </Tabs>
       </div>
       <PayrollRunForm open={formOpen} loading={calculateMutation.isPending} error={calculateMutation.error ? friendlyHrmError(calculateMutation.error, "Payroll calculation could not be started.", "payroll") : null} onOpenChange={setFormOpen} onSubmit={(payload: PayrollCalculatePayload) => calculateMutation.mutate(payload)} />

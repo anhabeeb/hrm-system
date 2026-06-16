@@ -17,6 +17,18 @@ const mocks = vi.hoisted(() => ({
     getDocumentSummary: vi.fn(),
     getUnreadNotificationCount: vi.fn(),
     getLatestPayslip: vi.fn(),
+    listUpcomingRosterShifts: vi.fn(),
+    listLeaveBalanceRows: vi.fn(),
+    getNextApprovedLeave: vi.fn(),
+    getKycRequestSummary: vi.fn(),
+    getPayslipSummary: vi.fn(),
+    getOwnOffboardingStatus: vi.fn(),
+    listOwnOffboardingTasks: vi.fn(),
+    listOwnDisciplinaryAcknowledgements: vi.fn(),
+    listSelfRecentActivity: vi.fn(),
+  },
+  attendanceCalendar: {
+    getSelfAttendanceCalendar: vi.fn(),
   },
   permissions: {
     isSuperAdmin: vi.fn(),
@@ -26,6 +38,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../src/modules/self-service/self-service.repository", () => mocks.repository);
+vi.mock("../src/modules/attendance/attendance-calendar.service", () => mocks.attendanceCalendar);
 vi.mock("../src/services/permission.service", () => mocks.permissions);
 
 import * as service from "../src/modules/self-service/self-service.service";
@@ -108,6 +121,21 @@ beforeEach(() => {
   mocks.repository.getDocumentSummary.mockResolvedValue({ uploaded: 3, expiring_soon: 1, expired: 0 });
   mocks.repository.getUnreadNotificationCount.mockResolvedValue({ unread: 2 });
   mocks.repository.getLatestPayslip.mockResolvedValue({ id: "pay_1", payroll_month: "2026-05", status: "generated" });
+  mocks.repository.listUpcomingRosterShifts.mockResolvedValue([{ shift_date: "2026-06-12", start_time: "08:00", end_time: "16:00" }]);
+  mocks.repository.listLeaveBalanceRows.mockResolvedValue([{ leave_type_id: "annual", leave_type_name: "Annual Leave", available_days: 12 }]);
+  mocks.repository.getNextApprovedLeave.mockResolvedValue(null);
+  mocks.repository.getKycRequestSummary.mockResolvedValue({ pending: 1, latest_status: "IN_REVIEW", latest_updated_at: "2026-06-11" });
+  mocks.repository.getPayslipSummary.mockResolvedValue({ available_count: 1, latest_period: "2026-05", latest_status: "generated", latest_pay_date: "2026-05-31" });
+  mocks.repository.getOwnOffboardingStatus.mockResolvedValue(null);
+  mocks.repository.listOwnOffboardingTasks.mockResolvedValue([]);
+  mocks.repository.listOwnDisciplinaryAcknowledgements.mockResolvedValue([]);
+  mocks.repository.listSelfRecentActivity.mockResolvedValue([{ id: "act_1", operation_type: "LEAVE_REQUEST", title: "Annual leave", status: "IN_REVIEW", happened_at: "2026-06-10" }]);
+  mocks.attendanceCalendar.getSelfAttendanceCalendar.mockResolvedValue({
+    payroll_period: { start_date: "2026-06-01", end_date: "2026-06-30", pay_date: "2026-06-30", status: "OPEN", is_derived: true },
+    summary: { present_days: 10, late_days: 1, leave_days: 2, sick_days: 0, absent_days: 0, review_required_days: 1 },
+    days: [{ date: "2026-06-01", label: "Present", status: "PRESENT" }],
+    warnings: [],
+  });
 });
 
 describe("employee self-service dashboard foundation", () => {
@@ -258,6 +286,51 @@ describe("employee self-service dashboard foundation", () => {
     expect(mocks.repository.getAttendanceCorrectionCounts).not.toHaveBeenCalled();
     expect(mocks.repository.getDocumentSummary).not.toHaveBeenCalled();
     expect(mocks.repository.getLatestPayslip).not.toHaveBeenCalled();
+  });
+
+  it("modern self-service dashboard returns widget-oriented own-data sections", async () => {
+    const dashboard = await service.getSelfDashboard(env, actor());
+
+    expect(dashboard.employee).toMatchObject({ id: "emp_1", full_name: "Aisha Employee" });
+    expect(dashboard.header?.greeting_name).toBe("Aisha Employee");
+    expect(dashboard.modern_widgets?.attendance_today.visible).toBe(true);
+    expect(dashboard.modern_widgets?.attendance_calendar_preview.visible).toBe(true);
+    expect(dashboard.modern_widgets?.leave_balance.visible).toBe(true);
+    expect(dashboard.modern_widgets?.documents_kyc.visible).toBe(true);
+    expect(dashboard.modern_widgets?.payslips.visible).toBe(true);
+    expect(dashboard.modern_widgets?.pending_requests.items).toHaveLength(2);
+    expect(dashboard.modern_widgets?.recent_activity.items).toHaveLength(1);
+    expect(dashboard.quick_actions?.map((action) => action.href)).toEqual(expect.arrayContaining(["/self/attendance-calendar", "/self/requests"]));
+    expect(mocks.attendanceCalendar.getSelfAttendanceCalendar).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ actorUserId: "user_employee" }), expect.objectContaining({ month: expect.stringMatching(/^\d{4}-\d{2}$/) }));
+  });
+
+  it("modern self-service dashboard hides disabled module widgets and quick actions", async () => {
+    mocks.repository.listEnabledFeatureKeys.mockResolvedValue(["approvals"]);
+
+    const dashboard = await service.getSelfDashboard(env, actor());
+
+    expect(dashboard.modern_widgets?.attendance_today.visible).toBe(false);
+    expect(dashboard.modern_widgets?.attendance_calendar_preview.visible).toBe(false);
+    expect(dashboard.modern_widgets?.leave_balance.visible).toBe(false);
+    expect(dashboard.modern_widgets?.upcoming_roster.visible).toBe(false);
+    expect(dashboard.modern_widgets?.documents_kyc.visible).toBe(false);
+    expect(dashboard.modern_widgets?.payslips.visible).toBe(false);
+    expect(dashboard.quick_actions?.some((action) => action.href === "/self/attendance-calendar")).toBe(false);
+  });
+
+  it("modern self-service dashboard frontend uses linked-employee guard and Phase 1 widgets", () => {
+    const page = read("frontend/src/features/self-service/EmployeeDashboardPage.tsx");
+    const header = read("frontend/src/features/self-service/dashboard/SelfServiceCommandHeader.tsx");
+    const calendar = read("frontend/src/features/self-service/dashboard/MyAttendanceCalendarPreviewWidget.tsx");
+
+    expect(page).toContain("LinkedEmployeeOnlyGuard");
+    expect(page).toContain("DashboardGrid");
+    expect(page).toContain("MyAttendanceTodayWidget");
+    expect(page).toContain("MyDocumentsKycWidget");
+    expect(page).toContain("MyPayslipsWidget");
+    expect(header).toContain("quick_actions");
+    expect(calendar).toContain("MiniCalendarWidget");
+    expect(page).not.toMatch(/window\.alert|window\.confirm|dark:/);
   });
 
   it("self requests include requests created on behalf of the employee", async () => {

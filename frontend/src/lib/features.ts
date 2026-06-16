@@ -12,3 +12,6 @@ export const isModuleEnabled = (user: CurrentUser | null, moduleCode?: FeatureKe
   const aliases = MODULE_FEATURE_ALIASES[moduleCode] ?? [moduleCode];
   return aliases.some((feature) => hasFeature(user, feature));
 };
+
+export const areModulesEnabled = (user: CurrentUser | null, moduleCodes?: FeatureKey[]) =>
+  !moduleCodes || moduleCodes.length === 0 || moduleCodes.every((moduleCode) => isModuleEnabled(user, moduleCode));

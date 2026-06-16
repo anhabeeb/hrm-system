@@ -49,7 +49,7 @@ WHERE permission_key IN (
   'employees.view', 'employees.export', 'attendance.view', 'leave.view', 'long_leave.view',
   'long_leave.approve', 'long_leave.reject', 'long_leave.cancel', 'long_leave.extend',
   'long_leave.return', 'long_leave.approve_salary_impact', 'long_leave.payroll_preview', 'long_leave.payroll_apply',
-  'payroll.view', 'payroll.review', 'payroll.approve', 'payroll.reject', 'payroll.finalize', 'payroll.lock',
+  'payroll.view', 'payroll.attendanceReview.view', 'payroll.review', 'payroll.approve', 'payroll.reject', 'payroll.finalize', 'payroll.lock',
   'payroll.approve_reopen', 'payroll.export', 'salary.view', 'salary.history',
   'payslips.view', 'payslips.download', 'advances.view', 'advances.approve', 'advances.reject',
   'salary_loans.view', 'salary_loans.approve', 'holidays.view', 'roster.view',
@@ -579,6 +579,7 @@ JOIN permissions ON permission_key IN (
   'self.dashboard.view',
   'self.profile.view',
   'self.attendance.view',
+  'self.attendance.calendar.view',
   'self.roster.view',
   'self.leave.view',
   'self.requests.view',
@@ -595,6 +596,9 @@ SELECT 'rp_department_self_service_' || roles.role_key || '_' || replace(permiss
 FROM roles
 JOIN permissions ON permission_key IN (
   'department.dashboard.view',
+  'departments.dashboard.viewTeam',
+  'attendance.teamCalendar.view',
+  'employees.team.view',
   'department.attendance.view',
   'department.leave.view',
   'department.requests.view',
@@ -602,6 +606,31 @@ JOIN permissions ON permission_key IN (
 )
 WHERE roles.company_id = 'company_seed_default'
   AND roles.role_key IN ('supervisor', 'outlet_manager', 'hr_officer', 'hr_admin', 'admin', 'owner', 'super_admin');
+
+INSERT OR IGNORE INTO role_permissions (id, company_id, role_id, permission_key, created_at)
+SELECT 'rp_roster_weekly_matrix_' || roles.role_key || '_' || replace(permission_key, '.', '_'), 'company_seed_default', roles.id, permission_key, '2026-01-01T00:00:00Z'
+FROM roles
+JOIN permissions ON permission_key IN (
+  'rosters.weeklyMatrix.view',
+  'rosters.weeklyMatrix.viewTeam',
+  'rosters.weeklyMatrix.edit',
+  'rosters.weeklyMatrix.submit',
+  'rosters.weeklyMatrix.copyWeek',
+  'rosters.weeklyMatrix.bulkAssign'
+)
+WHERE roles.company_id = 'company_seed_default'
+  AND roles.role_key IN ('supervisor', 'outlet_manager', 'hr_officer', 'hr_admin', 'admin', 'owner', 'super_admin');
+
+INSERT OR IGNORE INTO role_permissions (id, company_id, role_id, permission_key, created_at)
+SELECT 'rp_roster_weekly_matrix_admin_' || roles.role_key || '_' || replace(permission_key, '.', '_'), 'company_seed_default', roles.id, permission_key, '2026-01-01T00:00:00Z'
+FROM roles
+JOIN permissions ON permission_key IN (
+  'rosters.weeklyMatrix.viewAll',
+  'rosters.weeklyMatrix.apply',
+  'rosters.weeklyMatrix.overrideConflicts'
+)
+WHERE roles.company_id = 'company_seed_default'
+  AND roles.role_key IN ('hr_admin', 'admin', 'owner', 'super_admin');
 
 INSERT OR IGNORE INTO role_permissions (id, company_id, role_id, permission_key, created_at)
 SELECT 'rp_employee_lifecycle_self_' || roles.role_key || '_' || replace(permission_key, '.', '_'), 'company_seed_default', roles.id, permission_key, '2026-01-01T00:00:00Z'

@@ -7,9 +7,11 @@ export interface NavItem {
   path: string;
   icon: LucideIcon;
   moduleCode?: FeatureKey;
+  moduleCodesAll?: FeatureKey[];
   requiredPermission?: PermissionKey;
   requiredPermissionsAny?: PermissionKey[];
   requiredFeature?: FeatureKey;
+  requiredFeaturesAll?: FeatureKey[];
   requiresLinkedEmployee?: boolean;
   accountType?: "employee" | "admin" | "any";
   children?: NavItem[];

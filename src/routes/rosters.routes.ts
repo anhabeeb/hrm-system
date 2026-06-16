@@ -4,6 +4,7 @@ import { authMiddleware } from "../middleware/auth.middleware";
 import { requireFeature } from "../middleware/feature.middleware";
 import { requireAnyPermissionOrError } from "../middleware/permission.middleware";
 import { requireReason } from "../middleware/reason-required.middleware";
+import * as weeklyMatrixController from "../modules/rosters/roster-weekly-matrix.controller";
 import * as controller from "../modules/rosters/rosters.controller";
 import type { AppContext } from "../types/api.types";
 
@@ -74,6 +75,93 @@ rostersRoutes.get(
 rostersRoutes.get("/calendar", controller.listRosters);
 rostersRoutes.get("/week", controller.listRosters);
 rostersRoutes.get("/month", controller.listRosters);
+const rosterMatrixViewPermissions = ["rosters.weeklyMatrix.view", "rosters.weeklyMatrix.viewTeam", "rosters.weeklyMatrix.viewAll", "rosters.view", "roster.view"];
+const rosterMatrixEditPermissions = ["rosters.weeklyMatrix.edit", "rosters.manage", "roster.create", "roster.edit"];
+const rosterMatrixSubmitPermissions = ["rosters.weeklyMatrix.submit", "roster.changes.create", "roster.changes.createForOthers"];
+const rosterMatrixApplyPermissions = ["rosters.weeklyMatrix.apply", "rosters.manage", "roster.publish", "roster.changes.apply"];
+rostersRoutes.get(
+  "/weekly-matrix",
+  requireFeature("employee_management"),
+  requireAnyPermissionOrError(rosterMatrixViewPermissions, {
+    code: "ROSTER_MATRIX_PERMISSION_DENIED",
+    message: "You do not have permission to view the roster weekly matrix.",
+  }),
+  weeklyMatrixController.getWeeklyMatrix,
+);
+rostersRoutes.get(
+  "/weekly-matrix/employees",
+  requireFeature("employee_management"),
+  requireAnyPermissionOrError(rosterMatrixViewPermissions, {
+    code: "ROSTER_MATRIX_PERMISSION_DENIED",
+    message: "You do not have permission to search roster matrix employees.",
+  }),
+  weeklyMatrixController.listMatrixEmployees,
+);
+rostersRoutes.get(
+  "/weekly-matrix/shifts",
+  requireFeature("employee_management"),
+  requireAnyPermissionOrError(rosterMatrixViewPermissions, {
+    code: "ROSTER_MATRIX_PERMISSION_DENIED",
+    message: "You do not have permission to view roster matrix shifts.",
+  }),
+  weeklyMatrixController.listMatrixShifts,
+);
+rostersRoutes.post(
+  "/weekly-matrix/validate",
+  requireFeature("employee_management"),
+  requireAnyPermissionOrError([...rosterMatrixViewPermissions, ...rosterMatrixEditPermissions], {
+    code: "ROSTER_MATRIX_PERMISSION_DENIED",
+    message: "You do not have permission to validate roster matrix changes.",
+  }),
+  weeklyMatrixController.validateMatrixChanges,
+);
+rostersRoutes.post(
+  "/weekly-matrix/save-draft",
+  requireFeature("employee_management"),
+  requireAnyPermissionOrError(rosterMatrixEditPermissions, {
+    code: "ROSTER_MATRIX_PERMISSION_DENIED",
+    message: "You do not have permission to save roster matrix drafts.",
+  }),
+  weeklyMatrixController.saveMatrixDraft,
+);
+rostersRoutes.post(
+  "/weekly-matrix/submit",
+  requireFeature("employee_management"),
+  requireAnyPermissionOrError(rosterMatrixSubmitPermissions, {
+    code: "ROSTER_MATRIX_PERMISSION_DENIED",
+    message: "You do not have permission to submit roster matrix changes.",
+  }),
+  requireReason(),
+  weeklyMatrixController.submitMatrixChanges,
+);
+rostersRoutes.post(
+  "/weekly-matrix/apply",
+  requireFeature("employee_management"),
+  requireAnyPermissionOrError(rosterMatrixApplyPermissions, {
+    code: "ROSTER_MATRIX_PERMISSION_DENIED",
+    message: "You do not have permission to apply roster matrix changes.",
+  }),
+  requireReason(),
+  weeklyMatrixController.applyMatrixChanges,
+);
+rostersRoutes.post(
+  "/weekly-matrix/copy-previous-week",
+  requireFeature("employee_management"),
+  requireAnyPermissionOrError(["rosters.weeklyMatrix.copyWeek", ...rosterMatrixEditPermissions], {
+    code: "ROSTER_MATRIX_PERMISSION_DENIED",
+    message: "You do not have permission to copy roster weeks.",
+  }),
+  weeklyMatrixController.copyPreviousWeek,
+);
+rostersRoutes.post(
+  "/weekly-matrix/bulk-assign",
+  requireFeature("employee_management"),
+  requireAnyPermissionOrError(["rosters.weeklyMatrix.bulkAssign", ...rosterMatrixEditPermissions], {
+    code: "ROSTER_MATRIX_PERMISSION_DENIED",
+    message: "You do not have permission to bulk assign roster shifts.",
+  }),
+  weeklyMatrixController.bulkAssign,
+);
 rostersRoutes.get(
   "/changes",
   requireAnyPermissionOrError(["roster.changes.view", "roster.changes.audit.view", "roster.changes.create", "roster.changes.cancel", "approvals.department.view", "approvals.hrFinal.view", "approvals.requests.view"], {

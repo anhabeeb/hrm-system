@@ -9,6 +9,7 @@ import { DetailSection } from "@/components/data/DetailSection";
 import { RowActions } from "@/components/data/RowActions";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { ModuleAttentionPanel, ModuleLandingHeader, ModuleLandingShell, ModuleQuickActions, ModuleSummaryGrid, ModuleSummaryTile } from "@/components/module-landing";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/features/auth/auth.store";
@@ -23,6 +24,7 @@ import { AttendanceFilters } from "./AttendanceFilters";
 import { AttendanceSummaryTable } from "./AttendanceSummaryTable";
 import { CorrectionRequestDialog } from "./CorrectionRequestDialog";
 import { ManualAttendanceBatchDialog } from "./ManualAttendanceBatchDialog";
+import { EmployeeAttendanceCalendarWidget } from "@/features/attendance-calendar/EmployeeAttendanceCalendarWidget";
 import type {
   AttendanceConflict,
   AttendanceEvent,
@@ -137,12 +139,22 @@ export const AttendancePage = () => {
   const canManualEntry = auth.hasAnyPermission(["attendance.manual_entry", "attendance.edit"]);
   const canRequestCorrection = auth.hasAnyPermission(["attendance.manual_entry", "attendance.edit"]);
   const canResolveConflict = auth.hasPermission("attendance.resolve_conflicts");
+  const canViewCalendar = auth.hasFeature("attendance") && auth.hasAnyPermission(["attendance.calendar.view", "attendance.calendar.viewTeam", "attendance.calendar.viewAll", "attendance.view", "attendance.reports.view"]);
+  const canViewReports = auth.hasFeature("attendance") && auth.hasAnyPermission(["attendance.reports.view", "attendance.view"]);
+  const canViewCorrections = auth.hasFeature("attendance") && auth.hasAnyPermission(["attendance.corrections.view", "attendance.view", "approvals.requests.view"]);
+  const visibleTab = tab === "calendar" && !canViewCalendar ? "summary" : tab;
 
   const selectedEvents = selectedSummary
     ? (eventsQuery.data?.data ?? []).filter((event) => event.employee_id === selectedSummary.employee_id || !selectedSummary.employee_id)
     : [];
 
   const actionError = resolveMutation.error;
+  const summaryRows = summaryQuery.data?.data ?? [];
+  const conflictRows = conflictsQuery.data?.data ?? [];
+  const todayRows = summaryRows.filter((row) => (row.attendance_date ?? row.date) === isoDate(today));
+  const todayStatusCount = (tokens: string[]) => todayRows.filter((row) => tokens.includes(String(row.status ?? "").toLowerCase())).length;
+  const todayMissingPunches = todayRows.filter((row) => ["missing_clock_in", "missing_clock_out", "missing_check_in", "missing_checkout", "conflict"].includes(String(row.status ?? "").toLowerCase())).length;
+  const leaveEnabled = auth.hasFeature("leave") && auth.hasAnyPermission(["leave.view", "leave.approvals.view"]);
 
   return (
     <div>
@@ -151,32 +163,42 @@ export const AttendancePage = () => {
         {(summaryQuery.isError || eventsQuery.isError || conflictsQuery.isError) ? (
           <InlineAlert title="Attendance records could not be loaded." variant="error">Please adjust filters or try again.</InlineAlert>
         ) : null}
-        <div className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h2 className="text-base font-semibold">Attendance operations</h2>
-            <p className="text-sm text-muted-foreground">
-              Daily summaries are payroll-facing; correction review is handled in Time Corrections.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" asChild>
-              <Link to="/attendance/reports">Open Attendance Reports</Link>
-            </Button>
-            <Button variant="outline" asChild>
-              <Link to="/attendance/corrections">Open Time Corrections</Link>
-            </Button>
-            {canManualEntry ? (
-              <Button onClick={() => { setSelectedSummary(null); setManualOpen(true); }}>
-                <Plus className="h-4 w-4" />
-                Manual attendance
-              </Button>
-            ) : null}
-          </div>
-        </div>
+        <ModuleLandingShell>
+          <ModuleLandingHeader
+            title="Attendance"
+            description="Track daily attendance, corrections, missing punches, and employee calendars."
+            status="Attendance"
+            actions={(
+              <ModuleQuickActions>
+                {canViewCalendar ? <Button variant="outline" onClick={() => setActiveTab("calendar")}>View Attendance Calendar</Button> : null}
+                {canViewReports ? <Button variant="outline" asChild><Link to="/attendance/reports">Open Reports</Link></Button> : null}
+                {canViewCorrections ? <Button variant="outline" asChild><Link to="/attendance/corrections">Open Corrections</Link></Button> : null}
+                {canManualEntry ? <Button onClick={() => { setSelectedSummary(null); setManualOpen(true); }}><Plus className="h-4 w-4" />Manual attendance</Button> : null}
+              </ModuleQuickActions>
+            )}
+          />
+          <ModuleSummaryGrid>
+            <ModuleSummaryTile label="Present today" value={todayStatusCount(["present", "checked_in", "checked_out"])} helperText="Today only" status="success" />
+            <ModuleSummaryTile label="Late today" value={todayRows.filter((row) => Number(row.late_minutes ?? 0) > 0 || String(row.status ?? "").toLowerCase() === "late").length} helperText="Today only" status="warning" />
+            <ModuleSummaryTile label="Absent today" value={todayStatusCount(["absent"])} helperText="Today only" status={todayStatusCount(["absent"]) ? "danger" : "neutral"} />
+            <ModuleSummaryTile label="Missing punches today" value={todayMissingPunches} helperText="Today only" status={todayMissingPunches ? "warning" : "success"} />
+            <ModuleSummaryTile label="Open conflicts" value={conflictRows.filter((row) => String(row.status ?? "").toLowerCase() === "open").length} helperText="Current filter range" status={conflictRows.length ? "warning" : "success"} />
+            {leaveEnabled ? <ModuleSummaryTile label="Leave/sick today" value={todayRows.filter((row) => ["leave", "sick", "sick_leave"].includes(String(row.status ?? "").toLowerCase())).length} helperText="Today only" /> : null}
+          </ModuleSummaryGrid>
+          <ModuleAttentionPanel
+            description="Attendance review items from the current filtered view."
+            items={[
+              todayMissingPunches ? `${todayMissingPunches} missing punch summary row(s) need review today.` : null,
+              conflictRows.length ? `${conflictRows.length} attendance conflict row(s) are loaded.` : null,
+              !summaryQuery.isLoading && summaryRows.length === 0 ? "No attendance records found for the current filter." : null,
+            ]}
+          />
+        </ModuleLandingShell>
         <AttendanceFilters filters={filters} onChange={updateFilters} onClear={() => setSearchParams(new URLSearchParams({ page: "1", page_size: String(filters.page_size), tab }))} />
-        <Tabs value={tab} onValueChange={setActiveTab}>
+        <Tabs value={visibleTab} onValueChange={setActiveTab}>
           <TabsList>
             <TabsTrigger value="summary">Daily Summary</TabsTrigger>
+            {canViewCalendar ? <TabsTrigger value="calendar">Calendar</TabsTrigger> : null}
             <TabsTrigger value="events">Events</TabsTrigger>
             <TabsTrigger value="conflicts">Conflicts</TabsTrigger>
           </TabsList>
@@ -203,6 +225,11 @@ export const AttendancePage = () => {
               onPageSizeChange={(page_size) => updateFilters({ page: 1, page_size })}
             />
           </TabsContent>
+          {canViewCalendar ? (
+            <TabsContent value="calendar">
+              <EmployeeAttendanceCalendarWidget source="attendance" />
+            </TabsContent>
+          ) : null}
           <TabsContent value="events">
             <DataTable
               columns={eventColumns}

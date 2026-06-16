@@ -6,6 +6,7 @@ import { useSearchParams } from "react-router-dom";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { useToast } from "@/components/feedback/useToast";
 import { ReasonDialog } from "@/components/forms/ReasonDialog";
+import { ModuleAttentionPanel, ModuleLandingHeader, ModuleLandingShell, ModuleQuickActions, ModuleSummaryGrid, ModuleSummaryTile } from "@/components/module-landing";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/auth.store";
 import { friendlyHrmError } from "@/lib/hrm-errors";
@@ -69,17 +70,48 @@ export const DisciplinaryActionsPage = () => {
   const canClose = has("employeeDiscipline.actions.close") || has("employeeDiscipline.actions.manage");
   const currentEmployeeId = auth.user?.employee_id ?? null;
   const error = listQuery.error ?? timelineQuery.error ?? tasksQuery.error;
+  const disciplineRows = listQuery.data?.data ?? [];
+  const pendingReviews = disciplineRows.filter((row) => ["PENDING_DEPARTMENT_REVIEW", "PENDING_OWNER_REVIEW", "PENDING_INVESTIGATION"].includes(row.status)).length;
+  const pendingFinalApprovals = disciplineRows.filter((row) => row.status === "PENDING_FINAL_APPROVAL").length;
+  const pendingAcknowledgements = disciplineRows.filter((row) => row.status === "PENDING_ACKNOWLEDGEMENT" || (!row.acknowledged_at && row.acknowledgement_required)).length;
+  const highSeverityCases = disciplineRows.filter((row) => ["high", "critical"].includes(String(row.severity ?? "").toLowerCase())).length;
+  const closedThisMonth = disciplineRows.filter((row) => {
+    const actionRow = row as DisciplinaryAction & { closed_at?: string | null };
+    return String(actionRow.status ?? "").toLowerCase() === "closed" && (actionRow.closed_at ?? actionRow.updated_at)?.slice(0, 7) === new Date().toISOString().slice(0, 7);
+  }).length;
 
   return (
     <div className="space-y-4 p-4 md:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Disciplinary Actions</h1>
-          <p className="text-sm text-muted-foreground">Manage sensitive employee relations requests through Operation Ownership approval.</p>
-        </div>
-        {canCreate ? <Button size="sm" onClick={() => setDialogOpen(true)}><Plus className="h-4 w-4" />Create request</Button> : null}
-      </div>
       {error ? <InlineAlert title={friendlyHrmError(error, "Disciplinary actions could not be loaded.")} variant="error" /> : null}
+      <ModuleLandingShell>
+        <ModuleLandingHeader
+          title="Disciplinary Actions"
+          description="Review disciplinary cases, follow-ups, acknowledgements, and official records."
+          status="Sensitive employee relations"
+          actions={(
+            <ModuleQuickActions>
+              {canCreate ? <Button size="sm" onClick={() => setDialogOpen(true)}><Plus className="h-4 w-4" />Create Disciplinary Action</Button> : null}
+            </ModuleQuickActions>
+          )}
+        />
+        <ModuleSummaryGrid>
+          <ModuleSummaryTile label="Pending reviews" value={pendingReviews} status={pendingReviews ? "warning" : "success"} />
+          <ModuleSummaryTile label="Final approvals" value={pendingFinalApprovals} status={pendingFinalApprovals ? "warning" : "success"} />
+          <ModuleSummaryTile label="Acknowledgements" value={pendingAcknowledgements} status={pendingAcknowledgements ? "warning" : "success"} />
+          <ModuleSummaryTile label="Visible cases" value={listQuery.data?.pagination?.total ?? disciplineRows.length} />
+          <ModuleSummaryTile label="High severity" value={highSeverityCases} status={highSeverityCases ? "danger" : "neutral"} />
+          <ModuleSummaryTile label="Closed this month" value={closedThisMonth} status="success" />
+        </ModuleSummaryGrid>
+        <ModuleAttentionPanel
+          description="Sensitive counts are scoped to disciplinary rows the backend permits you to load."
+          items={[
+            pendingAcknowledgements ? `${pendingAcknowledgements} acknowledgement(s) are pending receipt confirmation.` : null,
+            highSeverityCases ? `${highSeverityCases} high or critical case(s) are visible in this view.` : null,
+            pendingFinalApprovals ? `${pendingFinalApprovals} case(s) are pending final approval.` : null,
+            "Investigation notes remain inside authorized detail views only.",
+          ]}
+        />
+      </ModuleLandingShell>
       <DisciplinaryActionsTable
         rows={listQuery.data?.data ?? []}
         loading={listQuery.isLoading}

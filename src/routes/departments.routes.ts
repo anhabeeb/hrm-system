@@ -2,14 +2,27 @@ import { Hono } from "hono";
 
 import { authMiddleware } from "../middleware/auth.middleware";
 import { requireFeature } from "../middleware/feature.middleware";
-import { requirePermission } from "../middleware/permission.middleware";
+import { requireAnyPermission, requirePermission } from "../middleware/permission.middleware";
 import { requireReason } from "../middleware/reason-required.middleware";
+import * as weeklyTeamController from "../modules/dashboard/department-weekly-team.controller";
 import * as controller from "../modules/departments/departments.controller";
 import type { AppContext } from "../types/api.types";
 
 const departmentsRoutes = new Hono<AppContext>();
 departmentsRoutes.use("*", authMiddleware);
 departmentsRoutes.use("*", requireFeature("employee_management"));
+departmentsRoutes.get(
+  "/weekly-team-view",
+  requireFeature("attendance"),
+  requireAnyPermission(["departments.dashboard.view", "departments.dashboard.viewTeam", "departments.dashboard.viewAll", "attendance.teamCalendar.view", "attendance.calendar.viewTeam", "employees.team.view", "department.dashboard.view", "employees.view"]),
+  weeklyTeamController.weeklyTeamView,
+);
+departmentsRoutes.get(
+  "/weekly-team-departments",
+  requireFeature("attendance"),
+  requireAnyPermission(["departments.dashboard.view", "departments.dashboard.viewTeam", "departments.dashboard.viewAll", "attendance.teamCalendar.view", "attendance.calendar.viewTeam", "employees.team.view", "department.dashboard.view", "employees.view"]),
+  weeklyTeamController.weeklyTeamDepartments,
+);
 departmentsRoutes.get("/", requirePermission("departments.view"), controller.listDepartments);
 departmentsRoutes.post("/", requirePermission("departments.create"), controller.createDepartment);
 departmentsRoutes.get("/:id", requirePermission("departments.view"), controller.getDepartment);

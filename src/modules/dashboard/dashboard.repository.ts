@@ -100,6 +100,27 @@ export const countEmployees = async (env: Env, context: AuthActor) => {
   );
 };
 
+export const employeeSetupHealth = async (env: Env, context: AuthActor, monthStart: string) => {
+  const outlet = employeeOutletClause(context);
+  return one<Record<string, number | null>>(
+    env,
+    `SELECT
+      SUM(CASE WHEN date(e.joined_at) >= ? THEN 1 ELSE 0 END) AS new_hires_this_month,
+      SUM(CASE WHEN u.id IS NULL THEN 1 ELSE 0 END) AS employees_without_login,
+      SUM(CASE WHEN e.department_id IS NULL OR e.position_id IS NULL THEN 1 ELSE 0 END) AS employees_without_structure,
+      SUM(CASE WHEN e.level IS NULL THEN 1 ELSE 0 END) AS employees_missing_level
+     FROM employees e
+     LEFT JOIN users u ON u.company_id = e.company_id
+      AND u.employee_id = e.id
+      AND u.deleted_at IS NULL
+      AND COALESCE(u.status, 'active') NOT IN ('deleted', 'archived', 'disabled')
+     WHERE e.company_id = ?
+       AND e.deleted_at IS NULL
+       AND e.employment_status NOT IN ('terminated', 'resigned', 'archived')${outlet.sql}`,
+    [monthStart, context.companyId, ...outlet.values],
+  );
+};
+
 export const employeesByOutlet = async (env: Env, context: AuthActor) => {
   const outlet = employeeOutletClause(context);
   return many<Record<string, string | number | null>>(
@@ -145,6 +166,39 @@ export const attendanceToday = async (env: Env, context: AuthActor, today: strin
      FROM attendance_daily_summary s
      WHERE s.company_id = ? AND s.attendance_date = ?${outlet.sql}`,
     [context.companyId, today, ...outlet.values],
+  );
+};
+
+export const leaveTodayCounts = async (env: Env, context: AuthActor, today: string) => {
+  const outlet = employeeOutletClause(context);
+  return one<Record<string, number | null>>(
+    env,
+    `SELECT
+      COUNT(DISTINCT l.employee_id) AS on_leave,
+      COUNT(DISTINCT CASE
+        WHEN lower(COALESCE(lt.leave_key, lt.leave_name, '')) LIKE '%sick%'
+        THEN l.employee_id END) AS sick
+     FROM leave_requests l
+     LEFT JOIN leave_types lt ON lt.company_id = l.company_id AND lt.id = l.leave_type_id
+     JOIN employees e ON e.company_id = l.company_id AND e.id = l.employee_id
+     WHERE l.company_id = ?
+       AND l.start_date <= ?
+       AND l.end_date >= ?
+       AND l.status IN ('approved', 'APPLIED', 'APPROVED')${outlet.sql}`,
+    [context.companyId, today, today, ...outlet.values],
+  );
+};
+
+export const pendingAttendanceCorrectionCount = async (env: Env, context: AuthActor) => {
+  const outlet = employeeOutletClause(context);
+  return one<{ total: number }>(
+    env,
+    `SELECT COUNT(*) AS total
+     FROM attendance_corrections c
+     JOIN employees e ON e.company_id = c.company_id AND e.id = c.employee_id
+     WHERE c.company_id = ?
+       AND c.status IN ('pending', 'submitted', 'pending_approval', 'PENDING', 'PENDING_DEPARTMENT_APPROVAL', 'PENDING_HR_APPROVAL', 'PENDING_MANUAL_REVIEW')${outlet.sql}`,
+    [context.companyId, ...outlet.values],
   );
 };
 
@@ -238,6 +292,53 @@ export const approvalInboxCount = async (env: Env, context: AuthActor) => {
   );
 };
 
+export const approvalQueueCounts = async (env: Env, context: AuthActor, operationTypes: string[]) => {
+  if (operationTypes.length === 0) return [];
+  const operationPlaceholders = operationTypes.map(() => "?").join(", ");
+  const permissionPlaceholders = context.permissions.length ? context.permissions.map(() => "?").join(", ") : "NULL";
+  const outlet =
+    context.isSuperAdmin || context.isAdmin
+      ? { sql: "", values: [] as string[] }
+      : context.outletIds.length > 0
+        ? {
+            sql: ` AND (e.primary_outlet_id IN (${context.outletIds.map(() => "?").join(", ")}) OR r.subject_employee_id IS NULL)`,
+            values: context.outletIds,
+          }
+        : { sql: " AND r.subject_employee_id IS NULL", values: [] as string[] };
+
+  return many<Record<string, string | number | null>>(
+    env,
+    `SELECT
+      r.operation_type,
+      COUNT(DISTINCT r.id) AS total,
+      MIN(COALESCE(r.submitted_at, r.created_at)) AS oldest_submitted_at
+     FROM approval_requests r
+     LEFT JOIN approval_request_steps s ON s.company_id = r.company_id
+      AND s.approval_request_id = r.id
+      AND s.status IN ('PENDING', 'ESCALATED', 'WAITING_FOR_APPROVER', 'pending')
+     LEFT JOIN employees e ON e.company_id = r.company_id
+      AND e.id = COALESCE(r.subject_employee_id, r.employee_id)
+     WHERE r.company_id = ?
+       AND r.operation_type IN (${operationPlaceholders})
+       AND r.status IN ('PENDING', 'IN_PROGRESS', 'pending', 'in_progress', 'submitted')
+       AND (
+        ? = 1
+        OR s.assigned_approver_user_id = ?
+        OR s.required_permission IS NULL
+        OR s.required_permission IN (${permissionPlaceholders})
+       )${outlet.sql}
+     GROUP BY r.operation_type`,
+    [
+      context.companyId,
+      ...operationTypes,
+      context.isSuperAdmin || context.isAdmin ? 1 : 0,
+      context.actorUserId,
+      ...context.permissions,
+      ...outlet.values,
+    ],
+  );
+};
+
 export const leaveBalanceWarnings = async (env: Env, context: AuthActor) => {
   const outlet = employeeOutletClause(context);
   return one<Record<string, number | null>>(
@@ -313,6 +414,38 @@ export const expiryCounts = async (
      FROM expiry_alerts a
      WHERE a.company_id = ?${scope.sql}`,
     [today, today, today, today, today, today, context.companyId, ...scope.values],
+  );
+};
+
+export const expiryCountsWithinDays = async (
+  env: Env,
+  context: AuthActor,
+  today: string,
+  days: number,
+) => {
+  const scope = directOutletClause(context, "a.outlet_id");
+  return one<{ total: number }>(
+    env,
+    `SELECT COUNT(*) AS total
+     FROM expiry_alerts a
+     WHERE a.company_id = ?
+       AND a.expiry_date BETWEEN ? AND date(?, ?)
+       AND a.status IN ('open', 'acknowledged', 'snoozed')${scope.sql}`,
+    [context.companyId, today, today, `+${days} day`, ...scope.values],
+  );
+};
+
+export const documentKycCounts = async (env: Env, context: AuthActor) => {
+  const outlet = employeeOutletClause(context);
+  return one<Record<string, number | null>>(
+    env,
+    `SELECT
+      SUM(CASE WHEN r.status IN ('PENDING','PENDING_OWNER_REVIEW','PENDING_FINAL_APPROVAL','PENDING_APPLICATION','PENDING_MANUAL_REVIEW','APPROVED','pending') THEN 1 ELSE 0 END) AS pending_kyc_updates,
+      SUM(CASE WHEN r.approval_status IN ('PENDING','pending','IN_PROGRESS','in_progress') OR r.status IN ('PENDING','PENDING_OWNER_REVIEW','PENDING_FINAL_APPROVAL','pending') THEN 1 ELSE 0 END) AS pending_document_approvals
+     FROM employee_kyc_update_requests r
+     JOIN employees e ON e.company_id = r.company_id AND e.id = r.employee_id
+     WHERE r.company_id = ?${outlet.sql}`,
+    [context.companyId, ...outlet.values],
   );
 };
 
@@ -395,6 +528,59 @@ export const holidayRosterContext = async (env: Env, context: AuthActor, today: 
   return { holidays, conflicts: conflicts ?? {} };
 };
 
+export const rosterCoverage = async (env: Env, context: AuthActor, today: string) => {
+  const shiftOutlet = directOutletClause(context, "rs.outlet_id", null, false);
+  const employeeOutlet = employeeOutletClause(context);
+  const [shifts, conflicts, changes, unassigned, leave] = await Promise.all([
+    one<Record<string, number | null>>(
+      env,
+      `SELECT
+        COUNT(*) AS scheduled_today,
+        SUM(CASE WHEN rs.employee_id IS NULL OR rs.status IN ('open', 'unassigned') THEN 1 ELSE 0 END) AS open_shifts
+       FROM roster_shifts rs
+       WHERE rs.company_id = ? AND rs.shift_date = ?${shiftOutlet.sql}`,
+      [context.companyId, today, ...shiftOutlet.values],
+    ),
+    one<{ total: number }>(
+      env,
+      `SELECT COUNT(*) AS total
+       FROM roster_conflicts rc
+       WHERE rc.company_id = ? AND rc.status IN ('open', 'pending')${directOutletClause(context, "rc.outlet_id").sql}`,
+      [context.companyId, ...directOutletClause(context, "rc.outlet_id").values],
+    ),
+    one<{ total: number }>(
+      env,
+      `SELECT COUNT(*) AS total
+       FROM roster_change_requests r
+       JOIN employees e ON e.company_id = r.company_id AND e.id = r.employee_id
+       WHERE r.company_id = ?
+         AND r.status IN ('PENDING','PENDING_DEPARTMENT_APPROVAL','PENDING_HR_APPROVAL','PENDING_MANUAL_REVIEW','pending')${employeeOutlet.sql}`,
+      [context.companyId, ...employeeOutlet.values],
+    ),
+    one<{ total: number }>(
+      env,
+      `SELECT COUNT(*) AS total
+       FROM employees e
+       LEFT JOIN roster_shifts rs ON rs.company_id = e.company_id AND rs.employee_id = e.id AND rs.shift_date = ?
+       WHERE e.company_id = ?
+         AND e.deleted_at IS NULL
+         AND e.employment_status NOT IN ('terminated', 'resigned', 'archived')
+         AND rs.id IS NULL${employeeOutlet.sql}`,
+      [today, context.companyId, ...employeeOutlet.values],
+    ),
+    leaveTodayCounts(env, context, today),
+  ]);
+
+  return {
+    scheduled_today: shifts?.scheduled_today ?? 0,
+    open_shifts: shifts?.open_shifts ?? 0,
+    employees_on_leave_today: leave?.on_leave ?? 0,
+    roster_conflicts: conflicts?.total ?? 0,
+    unassigned_employees: unassigned?.total ?? 0,
+    pending_roster_changes: changes?.total ?? 0,
+  };
+};
+
 export const payrollReadiness = async (env: Env, context: AuthActor) => {
   const employeeOutlet = employeeOutletClause(context);
   const attendance = await one<Record<string, number | null>>(
@@ -416,20 +602,184 @@ export const payrollReadiness = async (env: Env, context: AuthActor) => {
      WHERE l.company_id = ?${employeeOutlet.sql}`,
     [context.companyId, ...employeeOutlet.values],
   );
-  const payroll = await one<{ unfinalized: number }>(
+  const payroll = await one<{ unfinalized: number; current_payroll_period: string | null; pay_date: string | null; locked_or_finalized: number; latest_status: string | null }>(
     env,
-    `SELECT COUNT(*) AS unfinalized
+    `SELECT
+       COUNT(*) AS unfinalized,
+       MAX(payroll_month) AS current_payroll_period,
+       NULL AS pay_date,
+       SUM(CASE WHEN status IN ('finalized', 'locked') THEN 1 ELSE 0 END) AS locked_or_finalized,
+       (SELECT pr2.status FROM payroll_runs pr2 WHERE pr2.company_id = ? ORDER BY pr2.payroll_month DESC LIMIT 1) AS latest_status
      FROM payroll_runs
      WHERE company_id = ? AND status NOT IN ('finalized', 'locked') AND payroll_month >= strftime('%Y-%m', date('now', '-2 month'))`,
-    [context.companyId],
+    [context.companyId, context.companyId],
+  );
+  const adjustments = await one<{ total: number }>(
+    env,
+    `SELECT COUNT(*) AS total
+     FROM payroll_adjustment_requests par
+     JOIN employees e ON e.company_id = par.company_id AND e.id = par.employee_id
+     WHERE par.company_id = ?
+       AND par.status IN ('PENDING','PENDING_OWNER_REVIEW','PENDING_FINAL_APPROVAL','PENDING_EXECUTION','PENDING_MANUAL_REVIEW','APPROVED','pending')${employeeOutlet.sql}`,
+    [context.companyId, ...employeeOutlet.values],
+  );
+  const advances = await one<{ total: number }>(
+    env,
+    `SELECT COUNT(*) AS total
+     FROM advance_salary_requests asr
+     JOIN employees e ON e.company_id = asr.company_id AND e.id = asr.employee_id
+     WHERE asr.company_id = ?
+       AND asr.status IN ('APPROVED','PENDING_PAYMENT','PAID','PARTIALLY_DEDUCTED')
+       AND asr.deduction_status IN ('SCHEDULED','PARTIALLY_DEDUCTED','NOT_SCHEDULED')${employeeOutlet.sql}`,
+    [context.companyId, ...employeeOutlet.values],
+  );
+  const payslips = await one<Record<string, number | null>>(
+    env,
+    `SELECT
+      COUNT(*) AS total,
+      SUM(CASE WHEN p.status IN ('generated','published','PUBLISHED') THEN 1 ELSE 0 END) AS generated
+     FROM payslips p
+     JOIN employees e ON e.company_id = p.company_id AND e.id = p.employee_id
+     WHERE p.company_id = ?${employeeOutlet.sql}`,
+    [context.companyId, ...employeeOutlet.values],
   );
   return {
+    current_payroll_period: payroll?.current_payroll_period ?? null,
+    pay_date: payroll?.pay_date ?? null,
     attendance_exceptions: attendance?.attendance_exceptions ?? 0,
     missing_punches: attendance?.missing_punches ?? 0,
     long_leave_payroll_review: longLeave?.total ?? 0,
-    pending_salary_changes: 0,
+    pending_salary_changes: adjustments?.total ?? 0,
     pending_leave_adjustments: 0,
+    approved_advances_deductions: advances?.total ?? 0,
     approved_leave_not_finalized: leave?.approved_leave_not_finalized ?? 0,
+    payslip_generation_status: payslips?.total ? `${payslips.generated ?? 0}/${payslips.total} generated` : null,
+    payroll_locked_or_finalized: (payroll?.locked_or_finalized ?? 0) > 0,
     unfinalized_payroll_warning: (payroll?.unfinalized ?? 0) > 0,
   };
+};
+
+export const lifecycleCounts = async (env: Env, context: AuthActor, today: string) => {
+  const outlet = employeeOutletClause(context);
+  const [requests, tasks] = await Promise.all([
+    one<Record<string, number | null>>(
+      env,
+      `SELECT
+        SUM(CASE WHEN r.status IN ('NOTICE_PERIOD','APPROVED_PENDING_LAST_WORKING_DATE','OFFBOARDING_IN_PROGRESS','APPROVED') AND COALESCE(r.approved_last_working_date, r.requested_last_working_date) >= ? THEN 1 ELSE 0 END) AS employees_in_notice_period,
+        SUM(CASE WHEN r.final_settlement_required = 1 AND COALESCE(r.final_settlement_status, 'PENDING') NOT IN ('COMPLETED','WAIVED','completed','waived') THEN 1 ELSE 0 END) AS final_settlement_review_pending,
+        SUM(CASE WHEN r.access_disable_required = 1 AND COALESCE(r.access_disable_status, 'PENDING') NOT IN ('COMPLETED','WAIVED','completed','waived') THEN 1 ELSE 0 END) AS access_disable_review_pending,
+        SUM(CASE WHEN r.exit_interview_required = 1 AND r.exit_interview_completed = 0 THEN 1 ELSE 0 END) AS exit_interviews_pending
+       FROM employee_exit_requests r
+       JOIN employees e ON e.company_id = r.company_id AND e.id = r.employee_id
+       WHERE r.company_id = ?
+         AND r.status NOT IN ('REJECTED','CANCELLED','WITHDRAWN','COMPLETED')${outlet.sql}`,
+      [today, context.companyId, ...outlet.values],
+    ),
+    one<{ total: number }>(
+      env,
+      `SELECT COUNT(*) AS total
+       FROM employee_offboarding_tasks t
+       JOIN employees e ON e.company_id = t.company_id AND e.id = t.employee_id
+       WHERE t.company_id = ? AND t.status IN ('pending','PENDING','in_progress','IN_PROGRESS','BLOCKED')${outlet.sql}`,
+      [context.companyId, ...outlet.values],
+    ),
+  ]);
+
+  return {
+    employees_in_notice_period: requests?.employees_in_notice_period ?? 0,
+    offboarding_tasks_pending: tasks?.total ?? 0,
+    final_settlement_review_pending: requests?.final_settlement_review_pending ?? 0,
+    access_disable_review_pending: requests?.access_disable_review_pending ?? 0,
+    exit_interviews_pending: requests?.exit_interviews_pending ?? 0,
+  };
+};
+
+export const disciplinaryCounts = async (env: Env, context: AuthActor) => {
+  const outlet = employeeOutletClause(context);
+  const [requests, tasks] = await Promise.all([
+    one<Record<string, number | null>>(
+      env,
+      `SELECT
+        SUM(CASE WHEN r.status IN ('PENDING','PENDING_DEPARTMENT_REVIEW','PENDING_OWNER_REVIEW','PENDING_INVESTIGATION','PENDING_FINAL_APPROVAL','PENDING_APPLICATION') THEN 1 ELSE 0 END) AS pending_reviews,
+        SUM(CASE WHEN r.status = 'PENDING_ACKNOWLEDGEMENT' OR (r.acknowledgement_required = 1 AND r.acknowledged_at IS NULL AND r.status IN ('APPLIED','PENDING_FOLLOW_UP')) THEN 1 ELSE 0 END) AS pending_acknowledgements,
+        SUM(CASE WHEN r.severity IN ('HIGH','CRITICAL','high','critical') AND r.status IN ('PENDING','PENDING_DEPARTMENT_REVIEW','PENDING_OWNER_REVIEW','PENDING_INVESTIGATION','PENDING_FINAL_APPROVAL') THEN 1 ELSE 0 END) AS high_severity_cases_pending
+       FROM employee_disciplinary_action_requests r
+       JOIN employees e ON e.company_id = r.company_id AND e.id = r.employee_id
+       WHERE r.company_id = ?${outlet.sql}`,
+      [context.companyId, ...outlet.values],
+    ),
+    one<{ total: number }>(
+      env,
+      `SELECT COUNT(*) AS total
+       FROM employee_disciplinary_follow_up_tasks t
+       JOIN employees e ON e.company_id = t.company_id AND e.id = t.employee_id
+       WHERE t.company_id = ? AND t.status IN ('PENDING','IN_PROGRESS','BLOCKED')${outlet.sql}`,
+      [context.companyId, ...outlet.values],
+    ),
+  ]);
+
+  return {
+    pending_reviews: requests?.pending_reviews ?? 0,
+    pending_acknowledgements: requests?.pending_acknowledgements ?? 0,
+    open_follow_up_tasks: tasks?.total ?? 0,
+    high_severity_cases_pending: requests?.high_severity_cases_pending ?? 0,
+  };
+};
+
+export const operationOwnershipHealth = async (env: Env, context: AuthActor) => {
+  const companyId = context.companyId;
+  return one<Record<string, number | null>>(
+    env,
+    `SELECT
+      SUM(CASE WHEN NOT EXISTS (
+        SELECT 1 FROM operation_responsibility_matrix orm
+        WHERE orm.company_id = ?
+          AND orm.operation_code = oc.operation_code
+          AND orm.responsibility_type = 'OWNER'
+          AND orm.is_active = 1
+          AND orm.archived_at IS NULL
+      ) THEN 1 ELSE 0 END) AS operations_missing_owner,
+      SUM(CASE WHEN NOT EXISTS (
+        SELECT 1 FROM operation_responsibility_matrix orm
+        WHERE orm.company_id = ?
+          AND orm.operation_code = oc.operation_code
+          AND orm.responsibility_type = 'FINAL_APPROVAL'
+          AND orm.is_active = 1
+          AND orm.archived_at IS NULL
+      ) THEN 1 ELSE 0 END) AS operations_missing_final_approver,
+      SUM(CASE WHEN NOT EXISTS (
+        SELECT 1 FROM operation_responsibility_matrix orm
+        WHERE orm.company_id = ?
+          AND orm.operation_code = oc.operation_code
+          AND orm.responsibility_type = 'EXECUTION'
+          AND orm.is_active = 1
+          AND orm.archived_at IS NULL
+      ) THEN 1 ELSE 0 END) AS operations_missing_executor,
+      COALESCE((SELECT COUNT(*) FROM operation_responsibility_matrix orm WHERE orm.company_id = ? AND orm.fallback_behavior IN ('USE_SUPER_ADMIN','FALLBACK_TO_SUPER_ADMIN') AND orm.is_active = 1 AND orm.archived_at IS NULL), 0) AS operations_using_super_admin_fallback,
+      COALESCE((SELECT COUNT(*) FROM operation_responsibility_matrix orm WHERE orm.company_id = ? AND orm.fallback_behavior IN ('BLOCK_OPERATION','BLOCKED') AND orm.is_active = 1 AND orm.archived_at IS NULL), 0) AS operations_blocked_by_fallback,
+      COALESCE((SELECT COUNT(*) FROM business_functions bf WHERE (bf.company_id IS NULL OR bf.company_id = ?) AND bf.is_active = 1 AND bf.archived_at IS NULL AND NOT EXISTS (
+        SELECT 1 FROM business_function_department_assignments a
+        WHERE a.company_id = ?
+          AND a.business_function_id = bf.id
+          AND a.is_active = 1
+      )), 0) AS functions_without_assigned_users
+     FROM operation_catalog oc
+     WHERE (oc.company_id IS NULL OR oc.company_id = ?)
+       AND oc.is_active = 1
+       AND oc.archived_at IS NULL`,
+    [companyId, companyId, companyId, companyId, companyId, companyId, companyId, companyId],
+  );
+};
+
+export const recentAuditActivity = async (env: Env, context: AuthActor) => {
+  const outlet = directOutletClause(context, "a.outlet_id");
+  return many<Record<string, string | number | null>>(
+    env,
+    `SELECT a.id, a.module, a.action, a.severity, a.entity_type, a.entity_id, a.created_at
+     FROM audit_logs a
+     WHERE a.company_id = ?${outlet.sql}
+     ORDER BY a.created_at DESC
+     LIMIT 8`,
+    [context.companyId, ...outlet.values],
+  );
 };

@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { ReasonDialog } from "@/components/forms/ReasonDialog";
 import { PageActionBar } from "@/components/layout/PageActionBar";
+import { ModuleAttentionPanel, ModuleLandingHeader, ModuleLandingShell, ModuleQuickActions, ModuleSummaryGrid, ModuleSummaryTile } from "@/components/module-landing";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/features/auth/auth.store";
@@ -201,7 +202,29 @@ export const LeavePage = () => {
   const canApplyAccrual = auth.hasAnyPermission(["leave.accrual.apply", "leave.balances.manage", "leave.manage_balances"]);
   const canManageLeaveTypes = auth.hasAnyPermission(["leave_settings.manage", "leave_policy_limits.edit", "leave_types.enable_disable"]);
   const canManageApprovalSettings = auth.hasAnyPermission(["leave.approvals.settings.manage", "approval_workflows.manage", "leave_settings.manage"]);
+  const canViewApprovalInbox = auth.hasAnyPermission(["leave.approvals.view", "leave.approvals.approve", "leave.approve", "approvals.requests.view", "approvals.view"]);
+  const canViewBalances = auth.hasAnyPermission(["leave.balances.view", "leave.manage_balances", "leave.view"]);
+  const canViewLeaveCalendar = auth.hasAnyPermission(["leave.view", "leave.approvals.view"]);
+  const canViewRosterConflictReview = auth.hasFeature("roster") && auth.hasAnyPermission(["rosters.view", "roster.view", "rosters.manage", "rosters.weeklyMatrix.view", "rosters.weeklyMatrix.viewTeam"]);
   const actionError = createMutation.error ?? actionMutation.error ?? delegateMutation.error ?? adjustMutation.error ?? balanceActionMutation.error ?? previewAccrualMutation.error ?? applyAccrualMutation.error ?? updateTypeMutation.error;
+  const requestRows = requestsQuery.data?.data ?? [];
+  const approvalRows = approvalInboxQuery.data?.data ?? [];
+  const balanceRows = balancesQuery.data?.data ?? [];
+  const calendarRows = calendarQuery.data?.data.calendar ?? [];
+  const pendingLeaveRequests = requestRows.filter((row) => String(row.status ?? "").toLowerCase().includes("pending")).length;
+  const approvedThisMonth = requestRows.filter((row) => {
+    const request = row as LeaveRequest & { updated_at?: string | null };
+    const approvedAt = request.approved_at ?? request.updated_at ?? request.created_at;
+    return String(row.status ?? "").toLowerCase().includes("approved") && approvedAt?.slice(0, 7) === new Date().toISOString().slice(0, 7);
+  }).length;
+  const sickLeaveRows = requestRows.filter((row) => {
+    const request = row as LeaveRequest & { leave_type?: string | null };
+    return String(request.leave_type_name ?? request.leave_type ?? "").toLowerCase().includes("sick");
+  }).length;
+  const lowBalanceRows = balanceRows.filter((row) => {
+    const balance = row as LeaveBalance & { balance_days?: number | null; remaining_days?: number | null };
+    return Number(balance.balance_days ?? balance.available_days ?? balance.remaining_days ?? 0) <= 2;
+  }).length;
   const openBalanceAction = (nextAction: LeaveBalanceAction) => (row: LeaveBalance) => {
     setActionBalance(row);
     setBalanceAction(nextAction);
@@ -214,6 +237,38 @@ export const LeavePage = () => {
         {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
         {actionError ? <InlineAlert title={friendlyHrmError(actionError, "Leave action could not be completed.", "leave")} variant="error" /> : null}
         {(requestsQuery.isError || balancesQuery.isError) ? <InlineAlert title="Leave data could not be loaded." variant="error" /> : null}
+        <ModuleLandingShell>
+          <ModuleLandingHeader
+            title="Leave"
+            description="Review leave requests, balances, sick leave, and long leave."
+            status="Leave"
+            actions={(
+              <ModuleQuickActions>
+                {canCreate ? <Button onClick={() => setFormOpen(true)}><Plus className="h-4 w-4" />Create Leave Request</Button> : null}
+                {canViewApprovalInbox ? <Button variant="outline" onClick={() => setActiveTab("approvals")}>Open Pending Approvals</Button> : null}
+                {canViewBalances ? <Button variant="outline" onClick={() => setActiveTab("balances")}>View Leave Balances</Button> : null}
+                {canViewLeaveCalendar ? <Button variant="outline" onClick={() => setActiveTab("calendar")}>Leave Calendar</Button> : null}
+              </ModuleQuickActions>
+            )}
+          />
+          <ModuleSummaryGrid>
+            <ModuleSummaryTile label="Pending requests" value={pendingLeaveRequests} status={pendingLeaveRequests ? "warning" : "success"} />
+            <ModuleSummaryTile label="Approval inbox" value={approvalRows.length} helperText="Visible assigned approvals" status={approvalRows.length ? "warning" : "success"} />
+            <ModuleSummaryTile label="Approved this month" value={approvedThisMonth} />
+            <ModuleSummaryTile label="Sick leave rows" value={sickLeaveRows} helperText="From visible requests" />
+            <ModuleSummaryTile label="Low balances" value={lowBalanceRows} status={lowBalanceRows ? "warning" : "success"} />
+            <ModuleSummaryTile label="Calendar entries" value={calendarRows.length} helperText="Loaded leave calendar rows" />
+          </ModuleSummaryGrid>
+          <ModuleAttentionPanel
+            description="Current leave workload based on your scoped rows."
+            items={[
+              approvalRows.length ? `${approvalRows.length} leave approval item(s) are waiting in your inbox.` : null,
+              pendingLeaveRequests ? `${pendingLeaveRequests} visible leave request(s) are still pending.` : null,
+              lowBalanceRows ? `${lowBalanceRows} visible leave balance row(s) are low.` : null,
+              canViewRosterConflictReview ? "Roster conflict review remains available from the Roster module." : null,
+            ]}
+          />
+        </ModuleLandingShell>
         <LeaveFilters filters={filters} onChange={updateFilters} onClear={() => setSearchParams(new URLSearchParams({ page: "1", page_size: String(filters.page_size), tab }))} />
         <Tabs value={tab} onValueChange={setActiveTab}>
           <TabsList><TabsTrigger value="requests">Requests</TabsTrigger><TabsTrigger value="approvals">Approvals</TabsTrigger><TabsTrigger value="approval-history">Approval History</TabsTrigger><TabsTrigger value="balances">Balances</TabsTrigger><TabsTrigger value="accrual">Accrual</TabsTrigger><TabsTrigger value="calendar">Calendar</TabsTrigger><TabsTrigger value="types">Leave Types / Policies</TabsTrigger><TabsTrigger value="approval-settings">Approval Settings</TabsTrigger></TabsList>

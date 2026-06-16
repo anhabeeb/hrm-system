@@ -5,6 +5,7 @@ import { requireFeature } from "../middleware/feature.middleware";
 import { requireAnyPermission, requireAnyPermissionOrError, requirePermission } from "../middleware/permission.middleware";
 import { requireReason } from "../middleware/reason-required.middleware";
 import * as employeesController from "../modules/employees/employees.controller";
+import * as attendanceCalendarController from "../modules/attendance/attendance-calendar.controller";
 import * as employeeExitController from "../modules/employee-lifecycle/employee-exit.controller";
 import * as structureController from "../modules/employee-structure/employee-structure.controller";
 import * as structureChangeController from "../modules/employee-structure/employee-structure-change.controller";
@@ -410,6 +411,15 @@ employeesRoutes.get(
     message: "You do not have permission to view this resignation or offboarding audit.",
   }),
   employeeExitController.employeeExitAudit,
+);
+employeesRoutes.get(
+  "/:employeeId/attendance-calendar",
+  requireFeature("attendance"),
+  requireAnyPermissionOrError(["attendance.calendar.view", "attendance.calendar.viewTeam", "attendance.calendar.viewAll", "attendance.view", "attendance.reports.view", "employees.view"], {
+    code: "EMPLOYEE_ATTENDANCE_CALENDAR_PERMISSION_DENIED",
+    message: "You do not have permission to view this employee attendance calendar.",
+  }),
+  attendanceCalendarController.employeeAttendanceCalendar,
 );
 employeesRoutes.get(
   "/:id/payslips",

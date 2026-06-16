@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/components/feedback/useToast";
+import { ModuleAttentionPanel, ModuleLandingHeader, ModuleLandingShell, ModuleQuickActions, ModuleSummaryGrid, ModuleSummaryTile } from "@/components/module-landing";
 import { departmentsApi } from "@/features/departments/departments.api";
 import { rolesApi } from "@/features/roles/roles.api";
 import { usersApi } from "@/features/users/users.api";
@@ -227,6 +228,7 @@ export const OperationOwnershipPage = () => {
   const operationByCode = useMemo(() => new Map(operations.map((operation) => [operation.operation_code, operation])), [operations]);
   const moduleOptions = useMemo(() => Array.from(new Set(operations.map((operation) => operation.module_key).filter(Boolean))).sort(), [operations]);
   const responsibilities = responsibilitiesQuery.data?.data ?? [];
+  const setupWarnings = warningsQuery.data?.data.warnings ?? [];
   const filteredResponsibilities = useMemo(() => responsibilities.filter((row) => {
     const operation = operationByCode.get(row.operation_code);
     if (matrixFilters.module !== "all" && operation?.module_key !== matrixFilters.module) return false;
@@ -259,34 +261,37 @@ export const OperationOwnershipPage = () => {
 
   return (
     <div className="space-y-4 p-4 md:p-6">
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        {canManage ? (
-          <>
-            <Button variant="outline" disabled={!form.operation_code || resolveMutation.isPending} onClick={() => resolveMutation.mutate()}>Resolve Preview</Button>
-            <Button onClick={openCreate}>
-              <ShieldCheck className="h-4 w-4" /> Add Responsibility
-            </Button>
-          </>
-        ) : null}
-        {canManageFunctions ? <Button variant="outline" onClick={openCreateBusinessFunction}>Create Business Function</Button> : null}
-        {canManageAssignments ? <Button variant="outline" onClick={openCreateAssignment}>Assign Function</Button> : null}
-      </div>
-
-      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
-        {[
-          ["Operations", summary?.operations_total ?? 0],
-          ["Responsibilities", summary?.active_responsibilities ?? 0],
-          ["Unassigned", summary?.unassigned_operations ?? 0],
-          ["Sensitive gaps", summary?.sensitive_unassigned_operations ?? 0],
-          ["Functions", summary?.business_functions_total ?? 0],
-          ["Assignments", summary?.department_assignments_total ?? 0],
-        ].map(([label, value]) => (
-          <div key={label} className="rounded-md border bg-background p-3">
-            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
-            <div className="mt-1 text-xl font-semibold">{value}</div>
-          </div>
-        ))}
-      </div>
+      <ModuleLandingShell>
+        <ModuleLandingHeader
+          title="Operation Ownership"
+          description="Configure who owns, reviews, approves, executes, and audits HR operations."
+          status="Responsibility Matrix"
+          actions={(
+            <ModuleQuickActions>
+              {canManage ? <Button variant="outline" disabled={!form.operation_code || resolveMutation.isPending} onClick={() => resolveMutation.mutate()}>Resolve Preview</Button> : null}
+              {canManage ? <Button onClick={openCreate}><ShieldCheck className="h-4 w-4" />Configure Matrix</Button> : null}
+              {canManageFunctions ? <Button variant="outline" onClick={openCreateBusinessFunction}>Assign Business Function</Button> : null}
+              {canManageAssignments ? <Button variant="outline" onClick={openCreateAssignment}>Resolve Warnings</Button> : null}
+            </ModuleQuickActions>
+          )}
+        />
+        <ModuleSummaryGrid>
+          <ModuleSummaryTile label="Total operations" value={summary?.operations_total ?? "Loading"} />
+          <ModuleSummaryTile label="Active responsibilities" value={summary?.active_responsibilities ?? "Loading"} />
+          <ModuleSummaryTile label="Missing owner/setup" value={summary?.unassigned_operations ?? "Loading"} status={(summary?.unassigned_operations ?? 0) > 0 ? "warning" : "success"} />
+          <ModuleSummaryTile label="Sensitive gaps" value={summary?.sensitive_unassigned_operations ?? "Loading"} status={(summary?.sensitive_unassigned_operations ?? 0) > 0 ? "danger" : "success"} />
+          <ModuleSummaryTile label="Business functions" value={summary?.business_functions_total ?? "Loading"} />
+          <ModuleSummaryTile label="Function assignments" value={summary?.department_assignments_total ?? "Loading"} />
+        </ModuleSummaryGrid>
+        <ModuleAttentionPanel
+          description="Setup warnings come from the Operation Ownership resolver and responsibility matrix."
+          items={[
+            setupWarnings.length ? `${setupWarnings.length} setup warning(s) need review.` : null,
+            (summary?.unassigned_operations ?? 0) > 0 ? `${summary?.unassigned_operations} operation(s) are missing complete responsibility coverage.` : null,
+            (summary?.sensitive_unassigned_operations ?? 0) > 0 ? `${summary?.sensitive_unassigned_operations} sensitive operation(s) have assignment gaps.` : null,
+          ]}
+        />
+      </ModuleLandingShell>
 
       <Tabs defaultValue="matrix" className="space-y-4">
         <TabsList className="flex flex-wrap">
@@ -367,7 +372,7 @@ export const OperationOwnershipPage = () => {
           />
         </TabsContent>
         <TabsContent value="catalog"><OperationCatalogTable rows={operationsQuery.data?.data ?? []} loading={operationsQuery.isLoading} /></TabsContent>
-        <TabsContent value="warnings"><SetupWarningsPanel warnings={warningsQuery.data?.data.warnings ?? []} /></TabsContent>
+        <TabsContent value="warnings"><SetupWarningsPanel warnings={setupWarnings} /></TabsContent>
       </Tabs>
 
       <OperationResponsibilityDialog

@@ -1,5 +1,6 @@
 INSERT OR IGNORE INTO permissions (id, permission_key, module, action, description, created_at) VALUES
 ('perm_employees_view', 'employees.view', 'employees', 'view', 'View employee list and employee profiles.', '2026-01-01T00:00:00Z'),
+('perm_employees_team_view', 'employees.team.view', 'employees', 'team_view', 'View lower-level employees in the actor department/team scope.', '2026-01-01T00:00:00Z'),
 ('perm_employees_profile_view', 'employees.profile.view', 'employees', 'profile_view', 'View employee profile lookup and profile selector data.', '2026-01-01T00:00:00Z'),
 ('perm_employees_create', 'employees.create', 'employees', 'create', 'Create employee records.', '2026-01-01T00:00:00Z'),
 ('perm_employees_edit', 'employees.edit', 'employees', 'edit', 'Edit employee records.', '2026-01-01T00:00:00Z'),
@@ -37,6 +38,9 @@ INSERT OR IGNORE INTO permissions (id, permission_key, module, action, descripti
 ('perm_outlets_edit', 'outlets.edit', 'outlets', 'edit', 'Edit outlets.', '2026-01-01T00:00:00Z'),
 ('perm_outlets_enable_disable', 'outlets.enable_disable', 'outlets', 'enable_disable', 'Enable or disable outlets.', '2026-01-01T00:00:00Z'),
 ('perm_departments_view', 'departments.view', 'departments', 'view', 'View departments.', '2026-01-01T00:00:00Z'),
+('perm_departments_dashboard_view', 'departments.dashboard.view', 'departments', 'dashboard_view', 'View department weekly dashboard for permitted team scope.', '2026-01-01T00:00:00Z'),
+('perm_departments_dashboard_view_team', 'departments.dashboard.viewTeam', 'departments', 'dashboard_view_team', 'View lower-level employees in own department weekly dashboard.', '2026-01-01T00:00:00Z'),
+('perm_departments_dashboard_view_all', 'departments.dashboard.viewAll', 'departments', 'dashboard_view_all', 'View department weekly dashboards across permitted company scope.', '2026-01-01T00:00:00Z'),
 ('perm_departments_create', 'departments.create', 'departments', 'create', 'Create departments.', '2026-01-01T00:00:00Z'),
 ('perm_departments_edit', 'departments.edit', 'departments', 'edit', 'Edit departments.', '2026-01-01T00:00:00Z'),
 ('perm_departments_delete', 'departments.delete', 'departments', 'delete', 'Delete departments.', '2026-01-01T00:00:00Z'),
@@ -68,6 +72,10 @@ INSERT OR IGNORE INTO permissions (id, permission_key, module, action, descripti
 ('perm_attendance_reports_export_preview', 'attendance.reports.export_preview', 'attendance', 'reports_export_preview', 'Preview attendance report export data.', '2026-01-01T00:00:00Z'),
 ('perm_attendance_exceptions_view', 'attendance.exceptions.view', 'attendance', 'exceptions_view', 'View attendance exception reports.', '2026-01-01T00:00:00Z'),
 ('perm_attendance_device_punches_view', 'attendance.device_punches.view', 'attendance', 'device_punches_view', 'View attendance device punch reports.', '2026-01-01T00:00:00Z'),
+('perm_attendance_calendar_view', 'attendance.calendar.view', 'attendance', 'calendar_view', 'View employee attendance payroll calendar records.', '2026-01-01T00:00:00Z'),
+('perm_attendance_calendar_view_team', 'attendance.calendar.viewTeam', 'attendance', 'calendar_view_team', 'View attendance payroll calendars for lower-level team employees.', '2026-01-01T00:00:00Z'),
+('perm_attendance_calendar_view_all', 'attendance.calendar.viewAll', 'attendance', 'calendar_view_all', 'View attendance payroll calendars across the company within outlet scope.', '2026-01-01T00:00:00Z'),
+('perm_attendance_team_calendar_view', 'attendance.teamCalendar.view', 'attendance', 'team_calendar_view', 'View weekly department team attendance matrix for permitted employees.', '2026-01-01T00:00:00Z'),
 ('perm_attendance_lock', 'attendance.lock', 'attendance', 'lock', 'Lock attendance records.', '2026-01-01T00:00:00Z'),
 ('perm_attendance_unlock', 'attendance.unlock', 'attendance', 'unlock', 'Unlock attendance records.', '2026-01-01T00:00:00Z'),
 ('perm_kiosk_view', 'kiosk.view', 'kiosk', 'view', 'View kiosk attendance screen.', '2026-01-01T00:00:00Z'),
@@ -135,6 +143,7 @@ INSERT OR IGNORE INTO permissions (id, permission_key, module, action, descripti
 ('perm_long_leave_settings_manage', 'long_leave.settings.manage', 'long_leave', 'settings_manage', 'Manage long leave settings.', '2026-01-01T00:00:00Z'),
 ('perm_long_leave_timeline_view', 'long_leave.timeline.view', 'long_leave', 'timeline_view', 'View long leave timelines.', '2026-01-01T00:00:00Z'),
 ('perm_payroll_view', 'payroll.view', 'payroll', 'view', 'View payroll runs.', '2026-01-01T00:00:00Z'),
+('perm_payroll_attendance_review_view', 'payroll.attendanceReview.view', 'payroll', 'attendance_review_view', 'View payroll attendance review calendars before payroll finalization.', '2026-01-01T00:00:00Z'),
 ('perm_payroll_calculate', 'payroll.calculate', 'payroll', 'calculate', 'Calculate payroll.', '2026-01-01T00:00:00Z'),
 ('perm_payroll_recalculate', 'payroll.recalculate', 'payroll', 'recalculate', 'Recalculate payroll.', '2026-01-01T00:00:00Z'),
 ('perm_payroll_review', 'payroll.review', 'payroll', 'review', 'Review payroll before approval.', '2026-01-01T00:00:00Z'),
@@ -583,6 +592,7 @@ INSERT OR IGNORE INTO permissions (id, permission_key, module, action, descripti
 ('perm_self_dashboard_view', 'self.dashboard.view', 'self_service', 'dashboard_view', 'View own employee self-service dashboard.', '2026-01-01T00:00:00Z'),
 ('perm_self_profile_view', 'self.profile.view', 'self_service', 'profile_view', 'View own employee profile summary.', '2026-01-01T00:00:00Z'),
 ('perm_self_attendance_view', 'self.attendance.view', 'self_service', 'attendance_view', 'View own attendance summary.', '2026-01-01T00:00:00Z'),
+('perm_self_attendance_calendar_view', 'self.attendance.calendar.view', 'self_service', 'attendance_calendar_view', 'View own monthly attendance payroll calendar.', '2026-01-01T00:00:00Z'),
 ('perm_self_roster_view', 'self.roster.view', 'self_service', 'roster_view', 'View own roster summary.', '2026-01-01T00:00:00Z'),
 ('perm_self_leave_view', 'self.leave.view', 'self_service', 'leave_view', 'View own leave balance and leave requests.', '2026-01-01T00:00:00Z'),
 ('perm_self_requests_view', 'self.requests.view', 'self_service', 'requests_view', 'View own approval and module requests.', '2026-01-01T00:00:00Z'),
@@ -693,6 +703,18 @@ INSERT OR IGNORE INTO permissions (id, permission_key, module, action, descripti
 ('perm_roster_changes_reject', 'roster.changes.reject', 'roster', 'changes_reject', 'Reject eligible roster change approval steps from the roster module.', '2026-01-01T00:00:00Z'),
 ('perm_roster_changes_audit_view', 'roster.changes.audit.view', 'roster', 'changes_audit_view', 'View roster change approval timeline and audit details.', '2026-01-01T00:00:00Z'),
 ('perm_roster_changes_apply', 'roster.changes.apply', 'roster', 'changes_apply', 'Apply approved roster changes safely after final approval.', '2026-01-01T00:00:00Z');
+
+-- Roster weekly matrix view permissions.
+INSERT OR IGNORE INTO permissions (id, permission_key, module, action, description, created_at) VALUES
+('perm_rosters_weekly_matrix_view', 'rosters.weeklyMatrix.view', 'roster', 'weekly_matrix_view', 'View roster weekly matrix within assigned scope.', '2026-01-01T00:00:00Z'),
+('perm_rosters_weekly_matrix_view_team', 'rosters.weeklyMatrix.viewTeam', 'roster', 'weekly_matrix_view_team', 'View lower-level team employees in the roster weekly matrix.', '2026-01-01T00:00:00Z'),
+('perm_rosters_weekly_matrix_view_all', 'rosters.weeklyMatrix.viewAll', 'roster', 'weekly_matrix_view_all', 'View all employees in the roster weekly matrix within company/outlet scope.', '2026-01-01T00:00:00Z'),
+('perm_rosters_weekly_matrix_edit', 'rosters.weeklyMatrix.edit', 'roster', 'weekly_matrix_edit', 'Create draft roster changes from the weekly matrix.', '2026-01-01T00:00:00Z'),
+('perm_rosters_weekly_matrix_submit', 'rosters.weeklyMatrix.submit', 'roster', 'weekly_matrix_submit', 'Submit roster weekly matrix changes through roster change approval.', '2026-01-01T00:00:00Z'),
+('perm_rosters_weekly_matrix_apply', 'rosters.weeklyMatrix.apply', 'roster', 'weekly_matrix_apply', 'Apply approved roster weekly matrix changes through execution policy.', '2026-01-01T00:00:00Z'),
+('perm_rosters_weekly_matrix_override_conflicts', 'rosters.weeklyMatrix.overrideConflicts', 'roster', 'weekly_matrix_override_conflicts', 'Override soft roster weekly matrix conflicts with a reason.', '2026-01-01T00:00:00Z'),
+('perm_rosters_weekly_matrix_copy_week', 'rosters.weeklyMatrix.copyWeek', 'roster', 'weekly_matrix_copy_week', 'Copy previous week roster proposals within scope.', '2026-01-01T00:00:00Z'),
+('perm_rosters_weekly_matrix_bulk_assign', 'rosters.weeklyMatrix.bulkAssign', 'roster', 'weekly_matrix_bulk_assign', 'Validate bulk roster weekly matrix assignments.', '2026-01-01T00:00:00Z');
 
 -- Operation ownership / responsibility matrix foundation permissions.
 INSERT OR IGNORE INTO permissions (id, permission_key, module, action, description, created_at) VALUES

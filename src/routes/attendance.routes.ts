@@ -5,6 +5,7 @@ import { requireFeature } from "../middleware/feature.middleware";
 import { requireAnyPermission, requirePermission } from "../middleware/permission.middleware";
 import { requireReason } from "../middleware/reason-required.middleware";
 import * as controller from "../modules/attendance/attendance.controller";
+import * as calendarController from "../modules/attendance/attendance-calendar.controller";
 import * as reportController from "../modules/attendance/attendance-reports.controller";
 import type { AppContext } from "../types/api.types";
 
@@ -17,6 +18,8 @@ attendanceRoutes.get("/", requirePermission("attendance.view"), controller.listA
 attendanceRoutes.get("/today", requirePermission("attendance.view"), controller.today);
 attendanceRoutes.get("/monthly", requirePermission("attendance.view"), controller.monthly);
 attendanceRoutes.get("/summary", requirePermission("attendance.view"), controller.summary);
+attendanceRoutes.get("/calendar-employees", requireAnyPermission(["attendance.calendar.view", "attendance.calendar.viewTeam", "attendance.calendar.viewAll", "attendance.view", "attendance.reports.view", "payroll.attendanceReview.view", "payroll.view"]), calendarController.calendarEmployees);
+attendanceRoutes.get("/employee-calendar", requireAnyPermission(["attendance.calendar.view", "attendance.calendar.viewTeam", "attendance.calendar.viewAll", "attendance.view", "attendance.reports.view"]), calendarController.attendanceCalendar);
 attendanceRoutes.get("/reports/daily", requirePermission("attendance.reports.view"), reportController.daily);
 attendanceRoutes.get("/reports/monthly", requirePermission("attendance.reports.view"), reportController.monthly);
 attendanceRoutes.get("/reports/employee/:employeeId", requirePermission("attendance.reports.view"), reportController.employee);

@@ -23,8 +23,10 @@ export interface LookupFilters {
   position_id?: string;
   status?: string;
   is_enabled?: string;
+  mode?: string;
   page?: number;
   page_size?: number;
+  limit?: number;
 }
 
 const lookup = (path: string, filters: LookupFilters = {}) =>

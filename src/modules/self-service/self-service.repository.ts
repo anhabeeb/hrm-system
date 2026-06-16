@@ -88,6 +88,17 @@ export const getNextRosterShift = (env: Env, companyId: string, employeeId: stri
     [companyId, employeeId, date],
   );
 
+export const listUpcomingRosterShifts = (env: Env, companyId: string, employeeId: string, date: string, limit = 7) =>
+  many<any>(
+    env,
+    `SELECT shift_date, start_time, end_time, status
+       FROM roster_shifts
+      WHERE company_id = ? AND employee_id = ? AND shift_date >= ? AND status NOT IN ('cancelled', 'archived')
+      ORDER BY shift_date ASC, start_time ASC
+      LIMIT ?`,
+    [companyId, employeeId, date, limit],
+  );
+
 export const getLeaveBalanceSummary = (env: Env, companyId: string, employeeId: string) =>
   one<{ available_days: number | null; leave_types: number | null }>(
     env,
@@ -95,6 +106,32 @@ export const getLeaveBalanceSummary = (env: Env, companyId: string, employeeId: 
        FROM leave_balances
       WHERE company_id = ? AND employee_id = ?`,
     [companyId, employeeId],
+  );
+
+export const listLeaveBalanceRows = (env: Env, companyId: string, employeeId: string) =>
+  many<any>(
+    env,
+    `SELECT lb.leave_type_id, lt.name AS leave_type_name, lt.code AS leave_type_code,
+            COALESCE(lb.available_days, lb.remaining_days, 0) AS available_days,
+            COALESCE(lb.used_days, 0) AS used_days
+       FROM leave_balances lb
+       LEFT JOIN leave_types lt ON lt.company_id = lb.company_id AND lt.id = lb.leave_type_id
+      WHERE lb.company_id = ? AND lb.employee_id = ?
+      ORDER BY COALESCE(lt.display_order, 999), lt.name`,
+    [companyId, employeeId],
+  );
+
+export const getNextApprovedLeave = (env: Env, companyId: string, employeeId: string, today: string) =>
+  one<any>(
+    env,
+    `SELECT id, leave_type, start_date, end_date, status
+       FROM leave_requests
+      WHERE company_id = ? AND employee_id = ?
+        AND (status IN ('approved', 'APPROVED') OR approval_status = 'APPROVED')
+        AND end_date >= ?
+      ORDER BY start_date ASC
+      LIMIT 1`,
+    [companyId, employeeId, today],
   );
 
 export const getLeaveRequestCounts = (env: Env, companyId: string, employeeId: string) =>
@@ -180,6 +217,22 @@ export const getDocumentSummary = (env: Env, companyId: string, employeeId: stri
     [today, today, today, companyId, employeeId],
   );
 
+export const getKycRequestSummary = (env: Env, companyId: string, employeeId: string) =>
+  one<{ pending: number; latest_status: string | null; latest_updated_at: string | null }>(
+    env,
+    `SELECT
+      SUM(CASE WHEN status IN ('DRAFT', 'SUBMITTED', 'IN_REVIEW', 'PENDING_OWNER_REVIEW', 'PENDING_FINAL_APPROVAL', 'APPROVED_PENDING_APPLICATION', 'PENDING_MANUAL_REVIEW') THEN 1 ELSE 0 END) AS pending,
+      (SELECT status FROM employee_kyc_update_requests latest
+        WHERE latest.company_id = ? AND latest.employee_id = ?
+        ORDER BY COALESCE(latest.updated_at, latest.created_at) DESC LIMIT 1) AS latest_status,
+      (SELECT COALESCE(updated_at, created_at) FROM employee_kyc_update_requests latest
+        WHERE latest.company_id = ? AND latest.employee_id = ?
+        ORDER BY COALESCE(latest.updated_at, latest.created_at) DESC LIMIT 1) AS latest_updated_at
+       FROM employee_kyc_update_requests
+      WHERE company_id = ? AND employee_id = ?`,
+    [companyId, employeeId, companyId, employeeId, companyId, employeeId],
+  );
+
 export const getUnreadNotificationCount = (env: Env, companyId: string, userId: string) =>
   one<{ unread: number }>(
     env,
@@ -199,4 +252,83 @@ export const getLatestPayslip = (env: Env, companyId: string, employeeId: string
       ORDER BY COALESCE(r.payroll_month, p.created_at) DESC
       LIMIT 1`,
     [companyId, employeeId],
+  );
+
+export const getPayslipSummary = (env: Env, companyId: string, employeeId: string) =>
+  one<{ available_count: number; latest_period: string | null; latest_status: string | null; latest_pay_date: string | null }>(
+    env,
+    `SELECT
+      COUNT(*) AS available_count,
+      (SELECT r.payroll_month
+         FROM payslips latest
+         LEFT JOIN payroll_runs r ON r.company_id = latest.company_id AND r.id = latest.payroll_run_id
+        WHERE latest.company_id = ? AND latest.employee_id = ?
+        ORDER BY COALESCE(r.payroll_month, latest.created_at) DESC LIMIT 1) AS latest_period,
+      (SELECT latest.status
+         FROM payslips latest
+        WHERE latest.company_id = ? AND latest.employee_id = ?
+        ORDER BY latest.created_at DESC LIMIT 1) AS latest_status,
+      (SELECT r.pay_date
+         FROM payslips latest
+         LEFT JOIN payroll_runs r ON r.company_id = latest.company_id AND r.id = latest.payroll_run_id
+        WHERE latest.company_id = ? AND latest.employee_id = ?
+        ORDER BY COALESCE(r.payroll_month, latest.created_at) DESC LIMIT 1) AS latest_pay_date
+       FROM payslips
+      WHERE company_id = ? AND employee_id = ?`,
+    [companyId, employeeId, companyId, employeeId, companyId, employeeId, companyId, employeeId],
+  );
+
+export const getOwnOffboardingStatus = (env: Env, companyId: string, employeeId: string) =>
+  one<any>(
+    env,
+    `SELECT id, request_type, status, requested_last_working_date, approved_last_working_date,
+            notice_period_status, updated_at, created_at
+       FROM employee_exit_requests
+      WHERE company_id = ? AND employee_id = ?
+        AND status NOT IN ('CANCELLED', 'REJECTED', 'CLOSED')
+      ORDER BY COALESCE(updated_at, created_at) DESC
+      LIMIT 1`,
+    [companyId, employeeId],
+  );
+
+export const listOwnOffboardingTasks = (env: Env, companyId: string, employeeId: string, userId: string, limit = 5) =>
+  many<any>(
+    env,
+    `SELECT t.id, t.task_type, t.title, t.status, t.due_date, t.assigned_user_id, t.updated_at
+       FROM employee_offboarding_tasks t
+       JOIN employee_exit_requests r ON r.company_id = t.company_id AND r.id = t.exit_request_id
+      WHERE t.company_id = ? AND r.employee_id = ?
+        AND (t.assigned_user_id IS NULL OR t.assigned_user_id = ?)
+        AND t.status NOT IN ('COMPLETED', 'WAIVED', 'CANCELLED')
+      ORDER BY COALESCE(t.due_date, t.created_at) ASC
+      LIMIT ?`,
+    [companyId, employeeId, userId, limit],
+  );
+
+export const listOwnDisciplinaryAcknowledgements = (env: Env, companyId: string, employeeId: string, limit = 5) =>
+  many<any>(
+    env,
+    `SELECT r.id, r.action_type, r.outcome_type, r.status, r.acknowledgement_required,
+            r.acknowledged_at, r.updated_at, rec.id AS record_id
+       FROM employee_disciplinary_action_requests r
+       LEFT JOIN employee_disciplinary_records rec ON rec.company_id = r.company_id AND rec.request_id = r.id
+      WHERE r.company_id = ? AND r.employee_id = ?
+        AND r.acknowledgement_required = 1
+        AND r.acknowledged_at IS NULL
+        AND r.status IN ('PENDING_ACKNOWLEDGEMENT', 'APPLIED', 'PENDING_FOLLOW_UP')
+      ORDER BY COALESCE(r.updated_at, r.created_at) DESC
+      LIMIT ?`,
+    [companyId, employeeId, limit],
+  );
+
+export const listSelfRecentActivity = (env: Env, companyId: string, userId: string, employeeId: string, limit = 8) =>
+  many<any>(
+    env,
+    `SELECT id, operation_type, title, summary, status, COALESCE(submitted_at, updated_at, created_at) AS happened_at
+       FROM approval_requests
+      WHERE company_id = ?
+        AND (requester_user_id = ? OR requester_employee_id = ? OR subject_employee_id = ? OR employee_id = ?)
+      ORDER BY COALESCE(submitted_at, updated_at, created_at) DESC
+      LIMIT ?`,
+    [companyId, userId, employeeId, employeeId, employeeId, limit],
   );

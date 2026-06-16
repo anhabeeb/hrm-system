@@ -49,10 +49,57 @@ export interface SelfDashboardWidget {
   rows?: Array<{ label: string; value: string | number | null }>;
 }
 
+export interface SelfDashboardQuickAction {
+  key: string;
+  label: string;
+  href: string;
+  enabled: boolean;
+  module_code?: string;
+  permission?: string;
+}
+
+export interface SelfDashboardHeader {
+  today: string;
+  greeting_name: string | null;
+  current_shift: {
+    date: string | null;
+    start_time: string | null;
+    end_time: string | null;
+    status: string | null;
+  } | null;
+  today_status: string | null;
+  payroll_period: {
+    start_date: string;
+    end_date: string;
+    pay_date: string;
+    status?: string | null;
+    is_derived?: boolean;
+  } | null;
+}
+
+export interface SelfDashboardModernWidgets {
+  attendance_today: Record<string, unknown> & { visible: boolean };
+  attendance_calendar_preview: Record<string, unknown> & { visible: boolean };
+  leave_balance: Record<string, unknown> & { visible: boolean };
+  upcoming_roster: Record<string, unknown> & { visible: boolean };
+  pending_requests: Record<string, unknown> & { visible: boolean };
+  documents_kyc: Record<string, unknown> & { visible: boolean };
+  payslips: Record<string, unknown> & { visible: boolean };
+  my_approvals: Record<string, unknown> & { visible: boolean };
+  offboarding_status: Record<string, unknown> & { visible: boolean };
+  acknowledgements: Record<string, unknown> & { visible: boolean };
+  recent_activity: Record<string, unknown> & { visible: boolean };
+}
+
 export interface SelfDashboard {
   profile: SelfProfile;
   navigation: SelfNavigationItem[];
   widgets: SelfDashboardWidget[];
+  employee?: SelfProfile["employee"];
+  header?: SelfDashboardHeader;
+  modern_widgets?: SelfDashboardModernWidgets;
+  quick_actions?: SelfDashboardQuickAction[];
+  warnings?: string[];
   requests: unknown[];
   pending_approvals: unknown[];
 }

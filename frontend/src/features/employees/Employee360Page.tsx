@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { employeesApi } from "./employees.api";
 import { EmployeeStatusBadge } from "./EmployeeStatusBadge";
+import { EmployeeAttendanceCalendarWidget } from "@/features/attendance-calendar/EmployeeAttendanceCalendarWidget";
+import { useAuth } from "@/features/auth/auth.store";
 
 const cellValue = (value: unknown) => {
   if (value === null || value === undefined || value === "") return "Not recorded";
@@ -65,6 +67,7 @@ const SimpleTable = ({
 
 export const Employee360Page = () => {
   const { employeeId } = useParams();
+  const auth = useAuth();
   const profileQuery = useQuery({
     queryKey: ["employees", employeeId, "profile"],
     queryFn: () => employeesApi.profile(employeeId ?? "", { limit: 25 }),
@@ -73,6 +76,9 @@ export const Employee360Page = () => {
   const profile = profileQuery.data?.data;
   const employee = profile?.summary.employee;
   const warnings = profile?.summary.warnings ?? {};
+  const canViewAttendanceCalendar =
+    auth.hasFeature("attendance") &&
+    auth.hasAnyPermission(["attendance.calendar.view", "attendance.calendar.viewTeam", "attendance.calendar.viewAll", "attendance.view", "attendance.reports.view", "employees.view"]);
 
   return (
     <div>
@@ -114,6 +120,7 @@ export const Employee360Page = () => {
               <TabsList className="flex h-auto flex-wrap justify-start">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
                 <TabsTrigger value="attendance">Attendance</TabsTrigger>
+                {canViewAttendanceCalendar ? <TabsTrigger value="attendance-calendar">Attendance Calendar</TabsTrigger> : null}
                 <TabsTrigger value="leave">Leave</TabsTrigger>
                 <TabsTrigger value="long-leave">Long Leave</TabsTrigger>
                 <TabsTrigger value="documents">Documents</TabsTrigger>
@@ -163,6 +170,12 @@ export const Employee360Page = () => {
                   </>
                 ) : <InlineAlert title="Attendance section is hidden for your role." />}
               </TabsContent>
+
+              {canViewAttendanceCalendar ? (
+                <TabsContent value="attendance-calendar" className="space-y-3">
+                  <EmployeeAttendanceCalendarWidget source="employee" employeeId={employeeId ?? ""} />
+                </TabsContent>
+              ) : null}
 
               <TabsContent value="leave" className="space-y-3">
                 {profile.leave ? (
