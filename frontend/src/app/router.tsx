@@ -60,7 +60,6 @@ const ExpiryAlertsPage = lazyNamed(() => import("@/features/expiry-alerts/Expiry
 const HrReportsPage = lazyNamed(() => import("@/features/hr-reports/HrReportsPage"), "HrReportsPage");
 const PayrollReportsPage = lazyNamed(() => import("@/features/payroll-reports/PayrollReportsPage"), "PayrollReportsPage");
 const ExportHistoryPage = lazyNamed(() => import("@/features/report-exports/ExportHistoryPage"), "ExportHistoryPage");
-const ReportPrintPage = lazyNamed(() => import("@/features/report-exports/ReportPrintPage"), "ReportPrintPage");
 const ImportExportPage = lazyNamed(() => import("@/features/import-export/ImportExportPage"), "ImportExportPage");
 const ImportCenterPage = lazyNamed(() => import("@/features/imports/ImportCenterPage"), "ImportCenterPage");
 const BackupRecoveryPage = lazyNamed(() => import("@/features/backup-recovery/BackupRecoveryPage"), "BackupRecoveryPage");
@@ -124,8 +123,6 @@ export const AppRouter = () => (
     <Route path="/setup" element={<FirstTimeSetupPage />} />
     <Route path="/setup-placeholder" element={<FirstTimeSetupPlaceholder />} />
     <Route element={<ProtectedRoute />}>
-      <Route path="/reports/print/:reportKey" element={guarded(<ReportPrintPage />, { permission: "report_exports.print", feature: "reports" })} />
-      <Route path="/employees/:employeeId/print" element={guarded(<ReportPrintPage employeeProfile />, { permission: "report_exports.employee_profile.print", feature: "employee_management" })} />
       <Route element={<AppShell />}>
         <Route index element={<DefaultLandingRedirect />} />
         <Route path="/dashboard" element={guarded(<DashboardPage />, { permissionsAny: ["dashboard.view", "dashboard.view_company", "dashboard.view_outlet"] })} />

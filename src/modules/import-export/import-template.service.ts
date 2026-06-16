@@ -4,10 +4,19 @@ import { NotFoundError } from "../../utils/errors";
 const templates = IMPORT_TYPES.map((type) => ({
     import_type: type,
     template_key: type,
-    template_name: `${type} import template`,
-    format: "csv",
-    status: "placeholder",
-    columns: [],
+    template_name: "Employees Excel import template",
+    template_type: type,
+    format: "xlsx",
+    status: "available",
+    description: "Create employee records from an Excel workbook. Required columns: employee_no, full_name.",
+    columns: [
+      { key: "employee_no", label: "Employee No", required: true },
+      { key: "full_name", label: "Full Name", required: true },
+      { key: "employee_type", label: "Employee Type", required: false },
+      { key: "joined_at", label: "Joined Date", required: false },
+      { key: "phone", label: "Phone", required: false },
+      { key: "nationality", label: "Nationality", required: false },
+    ],
   }));
 
 export const listTemplates = () => ({ templates });

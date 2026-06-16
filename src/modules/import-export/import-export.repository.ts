@@ -67,3 +67,51 @@ export const findImportBatch = (env: Env, companyId: string, id: string) =>
 
 export const updateImportValidation = (env: Env, companyId: string, id: string, totals: { total_rows: number; valid_rows: number; invalid_rows: number }) =>
   run(env, "UPDATE import_batches SET status = ?, total_rows = ?, success_rows = ?, failed_rows = ?, completed_at = ? WHERE company_id = ? AND id = ?", [totals.invalid_rows > 0 ? "validation_failed" : "validated", totals.total_rows, totals.valid_rows, totals.invalid_rows, now(), companyId, id]);
+
+export const findEmployeeByCode = (env: Env, companyId: string, employeeCode: string) =>
+  one<{ id: string }>(env, "SELECT id FROM employees WHERE company_id = ? AND employee_code = ? AND deleted_at IS NULL LIMIT 1", [companyId, employeeCode]);
+
+export const insertImportedEmployees = async (
+  env: Env,
+  companyId: string,
+  actorUserId: string,
+  rows: Array<Record<string, string>>,
+) => {
+  const timestamp = now();
+  const statements = rows.map((row) =>
+    env.DB.prepare(
+      `INSERT INTO employees (
+        id, company_id, employee_code, full_name, employee_type, nationality, phone,
+        employment_status, joined_at, primary_outlet_id, department_id, position_id,
+        notes, created_by, updated_by, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(
+      crypto.randomUUID(),
+      companyId,
+      row.employee_no || row.employee_code,
+      row.full_name,
+      ["local", "foreign"].includes(String(row.employee_type ?? "").toLowerCase()) ? String(row.employee_type).toLowerCase() : "local",
+      row.nationality || null,
+      row.phone || null,
+      row.employment_status || "active",
+      row.joined_at || row.join_date || null,
+      row.primary_outlet_id || row.outlet_id || null,
+      row.department_id || null,
+      row.position_id || null,
+      row.notes || "Created from Excel import.",
+      actorUserId,
+      actorUserId,
+      timestamp,
+      timestamp,
+    ),
+  );
+  if (statements.length === 0) return [];
+  return env.DB.batch(statements);
+};
+
+export const markImportApplied = (env: Env, companyId: string, id: string, totals: { applied: number; failed: number; total: number }) =>
+  run(
+    env,
+    "UPDATE import_batches SET status = ?, total_rows = ?, success_rows = ?, failed_rows = ?, completed_at = ? WHERE company_id = ? AND id = ?",
+    [totals.failed > 0 ? "partially_applied" : "applied", totals.total, totals.applied, totals.failed, now(), companyId, id],
+  );

@@ -39,7 +39,6 @@ const heavyFeatureModules = [
   "hr-reports/HrReportsPage",
   "payroll-reports/PayrollReportsPage",
   "report-exports/ExportHistoryPage",
-  "report-exports/ReportPrintPage",
   "import-export/ImportExportPage",
   "imports/ImportCenterPage",
   "backup-recovery/BackupRecoveryPage",

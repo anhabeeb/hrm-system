@@ -1,7 +1,7 @@
 import type { AuthActor } from "../../types/api.types";
 import * as auditService from "../../services/audit.service";
 import { AppError, NotFoundError, ValidationError } from "../../utils/errors";
-import { validateImportContent } from "./import-validation.service";
+import { parseImportWorkbook, validateImportContent } from "./import-validation.service";
 import * as repository from "./import-export.repository";
 import type { ImportUploadInput, ListFilters } from "./import-export.types";
 
@@ -75,8 +75,43 @@ export const applyImport = async (env: Env, context: AuthActor, id: string, reas
   const job = await repository.findImportBatch(env, context.companyId, id);
   if (!job) throw new NotFoundError("Import job not found.");
   if (job.status !== "validated") throw new AppError("This import file has validation errors.", "IMPORT_VALIDATION_REQUIRED", 409);
-  await audit(env, context, "import_apply_blocked_not_configured", id, reason);
-  throw new AppError("Excel import apply is not configured for this template yet. Validation and preview are available, but applying changes is disabled.", "IMPORT_APPLY_NOT_CONFIGURED", 409);
+  if (job.import_type !== "employees") {
+    throw new AppError("This import template is not available for Excel apply yet.", "UNSUPPORTED_IMPORT_TEMPLATE", 400);
+  }
+  const object = job.file_key ? await env.BACKUP_BUCKET.get(job.file_key) : null;
+  if (!object) throw new AppError("Import file is not ready yet.", "IMPORT_FILE_NOT_READY", 409);
+  const parsed = await parseImportWorkbook(new Uint8Array(await object.arrayBuffer()), object.httpMetadata?.contentType ?? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", job.import_type);
+  if (parsed.invalid_rows > 0) {
+    await repository.updateImportValidation(env, context.companyId, id, { total_rows: parsed.total_rows, valid_rows: parsed.valid_rows, invalid_rows: parsed.invalid_rows });
+    throw new AppError("This import file has validation errors. Please fix the workbook and upload it again.", "IMPORT_VALIDATION_REQUIRED", 409);
+  }
+
+  const seenCodes = new Set<string>();
+  const rowsToInsert: Array<Record<string, string>> = [];
+  const errors: Array<{ row: number; message: string }> = [];
+  for (const [index, row] of parsed.rows.entries()) {
+    const employeeCode = (row.employee_no || row.employee_code || "").trim();
+    if (!employeeCode || !row.full_name?.trim()) {
+      errors.push({ row: index + 2, message: "Employee number and full name are required." });
+      continue;
+    }
+    if (seenCodes.has(employeeCode)) {
+      errors.push({ row: index + 2, message: `Duplicate employee number ${employeeCode} in workbook.` });
+      continue;
+    }
+    seenCodes.add(employeeCode);
+    const existing = await repository.findEmployeeByCode(env, context.companyId, employeeCode);
+    if (existing) {
+      errors.push({ row: index + 2, message: `Employee ${employeeCode} already exists.` });
+      continue;
+    }
+    rowsToInsert.push({ ...row, employee_no: employeeCode, full_name: row.full_name.trim() });
+  }
+
+  await repository.insertImportedEmployees(env, context.companyId, context.actorUserId, rowsToInsert);
+  await repository.markImportApplied(env, context.companyId, id, { total: parsed.total_rows, applied: rowsToInsert.length, failed: errors.length });
+  await audit(env, context, "import_applied", id, reason);
+  return { import_job_id: id, applied: true, applied_rows: rowsToInsert.length, failed_rows: errors.length, errors };
 };
 
 export const cancelImport = async (env: Env, context: AuthActor, id: string, reason: string) => {

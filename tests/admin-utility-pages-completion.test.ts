@@ -45,7 +45,11 @@ describe("admin utility pages completion", () => {
     expect(parser).toContain("readZipEntries");
     expect(parser).toContain("parseWorksheet");
     expect(parser).toContain("requiredHeaders");
-    expect(service).toContain("IMPORT_APPLY_NOT_CONFIGURED");
+    expect(service).toContain("parseImportWorkbook");
+    expect(service).toContain("insertImportedEmployees");
+    expect(service).toContain("markImportApplied");
+    expect(service).toContain("UNSUPPORTED_IMPORT_TEMPLATE");
+    expect(service).not.toContain("IMPORT_APPLY_NOT_CONFIGURED");
     expect(legacyImportCenter).toContain('to="/import-export"');
     expect(legacyImportCenter).not.toContain("Template CSV");
     expect(legacyImportCenter).not.toContain("csv_content");
@@ -114,6 +118,7 @@ describe("admin utility pages completion", () => {
     const avatar = read("frontend/src/components/employees/EmployeeAvatar.tsx");
     const employeeList = read("frontend/src/features/employees/EmployeeList.tsx");
     const employee360 = read("frontend/src/features/employees/Employee360Page.tsx");
+    const employeesPage = read("frontend/src/features/employees/EmployeesPage.tsx");
     const selfService = read("frontend/src/features/self-service/SelfServiceShared.tsx");
     const accountProfile = read("frontend/src/features/profile/ProfilePage.tsx");
     const validator = read("src/modules/employees/employees.validators.ts");
@@ -123,7 +128,12 @@ describe("admin utility pages completion", () => {
     expect(avatar).toContain("EmployeeAvatar");
     expect(avatar).toContain("initialsFor");
     expect(employeeList).toContain("EmployeeAvatar");
+    expect(employeeList).toContain("Missing photo");
+    expect(employeeList).toContain("profile_photo_url");
     expect(employee360).toContain("EmployeeProfilePhotoControls");
+    expect(employee360).toContain("Missing profile photo");
+    expect(employeesPage).toContain("Missing profile photos");
+    expect(employeesPage).toContain("Visible employees needing photo upload");
     expect(selfService).toContain("EmployeeAvatar");
     expect(accountProfile).toContain("Standalone account · no employee photo required");
     expect(validator).toContain("image/jpeg");

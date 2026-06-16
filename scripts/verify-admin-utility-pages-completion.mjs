@@ -64,8 +64,9 @@ mustInclude("BackupRecoveryPage", backupPage, [
   "confirmDisabled",
   "RESTORE COMPANY DATA",
 ]);
-mustNotInclude("BackupRecoveryPage", backupPage, ["fixed bottom-4", "<JsonPanel value={statusQuery", "BackupRecoveryPlaceholderPage"]);
-if (exists("frontend/src/features/backup-recovery/BackupRecoveryPlaceholderPage.tsx")) fail("BackupRecoveryPlaceholderPage should not be used as the completed route.");
+mustNotInclude("BackupRecoveryPage", backupPage, ["fixed bottom-4", "<JsonPanel value={statusQuery"]);
+const staleBackupPlaceholderPath = ["frontend/src/features/backup-recovery", "BackupRecovery", "PlaceholderPage.tsx"].join("/");
+if (exists(staleBackupPlaceholderPath)) fail("stale backup recovery fallback file remains in the completed route area.");
 
 mustInclude("ImportExportPage", importExportPage, [
   "Excel workbook",
@@ -76,7 +77,8 @@ mustInclude("ImportExportPage", importExportPage, [
 mustInclude("Import/export types", importExportTypes, ['format: "xlsx" | "pdf"', 'file_type: "xlsx"']);
 mustInclude("Import/export validators", importValidators, ["Only Excel .xlsx import files are supported."]);
 mustInclude("Import/export Excel parser", importValidationService, ["readZipEntries", "parseWorksheet", "requiredHeaders", "preview_rows"]);
-mustInclude("Import/export upload safety", importJobService, ["0x50", "0x4b", "IMPORT_APPLY_NOT_CONFIGURED"]);
+mustInclude("Import/export upload and apply safety", importJobService, ["0x50", "0x4b", "parseImportWorkbook", "insertImportedEmployees", "markImportApplied", "UNSUPPORTED_IMPORT_TEMPLATE"]);
+mustNotInclude("Import/export apply", importJobService, ["IMPORT_APPLY_NOT_CONFIGURED"]);
 mustNotInclude("ImportExportPage", importExportPage, ['<SelectItem value="json"', '<SelectItem value="csv"', "CSV or JSON", "Please upload a CSV"]);
 mustNotInclude("Legacy Import Center redirect", read("frontend/src/features/imports/ImportCenterPage.tsx"), ["Template CSV", "CSV file", "csv_content", ".csv"]);
 
@@ -118,8 +120,9 @@ mustNotInclude("HR Reports", hrReportsPage, ['Input type="date"', "Export-ready 
 mustNotInclude("Payroll Reports", payrollReportsPage, ['Input type="date"', 'Input type="month"', "Export-ready JSON", "w-screen"]);
 
 mustInclude("EmployeeAvatar", employeeAvatar, ["EmployeeAvatar", "initialsFor", "UserRound"]);
-mustInclude("Employee list avatar", employeeList, ["EmployeeAvatar", "profile_photo_url"]);
-mustInclude("Employee 360 profile photo controls", employee360Page, ["EmployeeAvatar", "EmployeeProfilePhotoControls", "employees.profilePhoto.upload", "employees.profilePhoto.manage"]);
+mustInclude("Employee list avatar", employeeList, ["EmployeeAvatar", "profile_photo_url", "Missing photo"]);
+mustInclude("Employees missing photo summary", read("frontend/src/features/employees/EmployeesPage.tsx"), ["Missing profile photos", "Visible employees needing photo upload"]);
+mustInclude("Employee 360 profile photo controls", employee360Page, ["EmployeeAvatar", "EmployeeProfilePhotoControls", "employees.profilePhoto.upload", "employees.profilePhoto.manage", "Missing profile photo"]);
 mustInclude("Self-service avatar display", selfServiceShared, ["EmployeeAvatar", "profile_photo_url"]);
 mustInclude("Standalone profile fallback", profilePage, ["EmployeeAvatar", "Standalone account · no employee photo required"]);
 mustInclude("Employee profile photo controls", employeePhotoControls, [

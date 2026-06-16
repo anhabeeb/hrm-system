@@ -1,6 +1,7 @@
 import { DataTable } from "@/components/data/DataTable";
 import { EmployeeAvatar } from "@/components/employees/EmployeeAvatar";
 import { RowActions } from "@/components/data/RowActions";
+import { Badge } from "@/components/ui/badge";
 import { EmployeeStatusBadge } from "./EmployeeStatusBadge";
 import { displayDate } from "./employee-format";
 import type { Employee } from "./employees.types";
@@ -51,7 +52,10 @@ export const EmployeeList = ({
         cell: (row) => (
           <div className="flex min-w-0 items-center gap-2">
             <EmployeeAvatar name={row.full_name} employeeCode={row.employee_code} photoUrl={row.profile_photo_url} size="sm" />
-            <span className="max-w-48 truncate font-medium">{row.full_name}</span>
+            <div className="min-w-0">
+              <span className="block max-w-48 truncate font-medium">{row.full_name}</span>
+              {!row.profile_photo_url ? <Badge variant="outline" className="mt-1 border-amber-200 bg-amber-50 text-[10px] text-amber-700">Missing photo</Badge> : null}
+            </div>
           </div>
         ),
       },

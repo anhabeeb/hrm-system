@@ -23,7 +23,6 @@ const router = read("frontend/src/app/router.tsx");
 const nav = read("frontend/src/lib/navigation.ts");
 const actions = read("frontend/src/features/report-exports/ReportExportActions.tsx");
 const historyPage = read("frontend/src/features/report-exports/ExportHistoryPage.tsx");
-const printPage = read("frontend/src/features/report-exports/ReportPrintPage.tsx");
 const hrPage = read("frontend/src/features/hr-reports/HrReportsPage.tsx");
 const payrollPage = read("frontend/src/features/payroll-reports/PayrollReportsPage.tsx");
 const attendancePage = read("frontend/src/features/attendance/AttendanceReportsPage.tsx");
@@ -45,9 +44,8 @@ mustInclude(routes, [
   '"/preview"',
   '"/jobs/:id/generate"',
   '"/jobs/:id/download"',
-  '"/print/:reportKey"',
-  '"/employee/:employeeId/print"',
 ], "report export routes");
+if (routes.includes('"/print/:reportKey"') || routes.includes('"/employee/:employeeId/print"')) fail("normal report export API routes must not expose legacy print output");
 
 mustInclude(migration, [
   "CREATE TABLE IF NOT EXISTS report_export_jobs",
@@ -114,17 +112,18 @@ mustInclude(repository, [
   "status IN ('pending', 'processing')",
 ], "report export repository");
 
-mustInclude(router, ["/reports/print/:reportKey", "/employees/:employeeId/print", "/report-exports"], "frontend export routes");
+mustInclude(router, ["/report-exports"], "frontend export routes");
+if (router.includes("/reports/print/:reportKey") || router.includes("/employees/:employeeId/print")) fail("normal frontend routes must not expose legacy print output");
 mustInclude(nav, ["Export History", "/report-exports"], "frontend navigation");
 mustInclude(historyPage, ["Export history page actions", "sensitive_export", "redaction_level"], "export history page");
-mustInclude(printPage, ["@media print", "no-print", "HRM System", "Filters:", "Generated at", "window.print"], "print page");
 mustInclude(actions, ["report_exports.create", "report_exports.download", "Download Excel", "Download PDF", "report_exports.sensitive"], "export actions");
+if (/CSV|Print|printData/.test(actions)) fail("normal report export actions must expose Excel/PDF only");
 mustInclude(hrPage, ["ReportExportActions", "hr:"], "HR report export integration");
 mustInclude(payrollPage, ["ReportExportActions", "payroll:"], "payroll report export integration");
 mustInclude(attendancePage, ["ReportExportActions", "attendance:"], "attendance report export integration");
-mustInclude(employeePage, ["Print Profile", "/print"], "Employee 360 print integration");
-if (/dark:/.test(`${historyPage}\n${printPage}\n${actions}`)) fail("export/print UI must not add dark mode");
-if (/metadata_json/.test(`${historyPage}\n${printPage}`)) fail("export/print UI must not expose raw metadata_json");
+if (employeePage.includes("Print Profile") || employeePage.includes("/print")) fail("Employee 360 must not expose normal print output");
+if (/dark:/.test(`${historyPage}\n${actions}`)) fail("export UI must not add dark mode");
+if (/metadata_json/.test(historyPage)) fail("export UI must not expose raw metadata_json");
 
 if (/it\.todo|describe\.todo/.test(tests)) fail("Phase 11D export/print tests contain TODO placeholders");
 mustInclude(tests, [
@@ -139,7 +138,7 @@ mustInclude(tests, [
   "user with create permission can generate own pending job without download permission",
   "Employee 360 print only shows allowed sections",
   "manager cannot export other outlet data",
-  "report print route page exists",
+  "normal frontend routes do not expose legacy print output",
 ], "export/print tests");
 
 if (!packageJson.includes("verify:export-print-schema")) fail("package.json is missing verify:export-print-schema");

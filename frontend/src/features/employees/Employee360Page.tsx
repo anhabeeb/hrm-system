@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Printer, ShieldAlert } from "lucide-react";
+import { ArrowLeft, ShieldAlert } from "lucide-react";
 
 import { DataTable } from "@/components/data/DataTable";
 import { EmptyState } from "@/components/data/EmptyState";
@@ -85,7 +85,7 @@ export const Employee360Page = () => {
 
   return (
     <div>
-      <PageActionBar label="Employee profile page actions"><div className="flex flex-wrap items-center justify-end gap-2"><Button asChild variant="outline"><Link to="/employees"><ArrowLeft className="h-4 w-4" /> Back to employees</Link></Button>{employeeId ? <Button asChild variant="outline"><Link to={`/employees/${employeeId}/print`}><Printer className="h-4 w-4" /> Print Profile</Link></Button> : null}</div></PageActionBar>
+      <PageActionBar label="Employee profile page actions"><div className="flex flex-wrap items-center justify-end gap-2"><Button asChild variant="outline"><Link to="/employees"><ArrowLeft className="h-4 w-4" /> Back to employees</Link></Button></div></PageActionBar>
       <div className="space-y-4 p-4 md:p-6">
         {profileQuery.isLoading ? <LoadingState rows={10} /> : null}
         {profileQuery.isError ? <InlineAlert title="Employee profile could not be loaded." variant="error">Please check your permission and outlet scope, then try again.</InlineAlert> : null}
@@ -121,6 +121,11 @@ export const Employee360Page = () => {
                 </div>
               </div>
             </div>
+            {!employee.profile_photo_url ? (
+              <InlineAlert title="Missing profile photo" variant="warning">
+                This employee needs a profile photo. Employee creation is not blocked, but HR should upload a photo to complete the profile.
+              </InlineAlert>
+            ) : null}
 
             <Tabs defaultValue="overview">
               <TabsList className="flex h-auto flex-wrap justify-start">

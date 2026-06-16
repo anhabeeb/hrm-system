@@ -18,7 +18,7 @@ describe("import/export foundation", () => {
   });
 
   it("validates import uploads", () => {
-    expect(IMPORT_TYPES).toContain("employees");
+    expect(IMPORT_TYPES).toEqual(["employees"]);
     expect(validateImportUpload({
       import_type: "employees",
       file_type: "xlsx",
@@ -36,31 +36,28 @@ describe("import/export foundation", () => {
     })).toThrow(ValidationError);
   });
 
-  it("normalizes supported Prompt 15 import aliases", () => {
-    expect(validateImportUpload({
+  it("rejects unsupported import templates instead of showing fake completed imports", () => {
+    expect(() => validateImportUpload({
       import_type: "attendance",
       file_type: "xlsx",
       file_name: "attendance.xlsx",
       mime_type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       content_base64: "YQ==",
       reason: "Manual attendance import",
-    }).import_type).toBe("attendance_manual");
+    })).toThrow("Please select a valid import type.");
   });
 
-  it("lists and loads Prompt 15 import templates", () => {
-    expect(listTemplates().templates.map((template) => template.import_type)).toEqual(expect.arrayContaining([
-      "employees",
-      "attendance_manual",
-      "leave_balances",
-      "assets",
-      "uniforms",
-      "documents_metadata",
-    ]));
-    expect(getTemplate("attendance_manual").template.import_type).toBe("attendance_manual");
+  it("lists only available Excel import templates", () => {
+    expect(listTemplates().templates.map((template) => template.import_type)).toEqual(["employees"]);
+    expect(getTemplate("employees").template).toMatchObject({
+      import_type: "employees",
+      format: "xlsx",
+      status: "available",
+    });
+    expect(() => getTemplate("attendance_manual")).toThrow(AppError);
   });
 
-  it("uses a truthful unavailable message for import apply when no safe writer exists", () => {
-    expect(IMPORT_EXPORT_MESSAGES.applyNotConfigured).toBe("Excel import apply is not configured for this template yet.");
+  it("keeps user-facing import apply messaging for the implemented Excel path", () => {
     expect(IMPORT_EXPORT_MESSAGES.applied).toBe("Import applied successfully.");
   });
 });

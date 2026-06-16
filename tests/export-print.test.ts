@@ -467,27 +467,11 @@ describe("Phase 11D Export / Print Reports", () => {
     expect(serviceSource).toContain('permissionService.hasPermission(actor, "report_exports.admin.manage")');
   });
 
-  it("report print route page exists", () => {
-    expect(source("frontend/src/app/router.tsx")).toContain("/reports/print/:reportKey");
-    expect(source("frontend/src/features/report-exports/ReportPrintPage.tsx")).toContain("window.print");
-  });
-
-  it("Employee 360 print route page exists", () => {
-    expect(source("frontend/src/app/router.tsx")).toContain("/employees/:employeeId/print");
-    expect(source("frontend/src/features/employees/Employee360Page.tsx")).toContain("Print Profile");
-  });
-
-  it("print layout hides sidebar actions", () => {
-    const page = source("frontend/src/features/report-exports/ReportPrintPage.tsx");
-    expect(page).toContain("no-print");
-    expect(page).toContain("@media print");
-  });
-
-  it("print layout includes company report filter generated metadata", () => {
-    const page = source("frontend/src/features/report-exports/ReportPrintPage.tsx");
-    expect(page).toContain("HRM System");
-    expect(page).toContain("Filters:");
-    expect(page).toContain("Generated at");
+  it("normal frontend routes do not expose legacy print output", () => {
+    const router = source("frontend/src/app/router.tsx");
+    expect(router).not.toContain("/reports/print/:reportKey");
+    expect(router).not.toContain("/employees/:employeeId/print");
+    expect(source("frontend/src/features/employees/Employee360Page.tsx")).not.toContain("Print Profile");
   });
 
   it("sensitive fields hidden in print without permission", async () => {
@@ -496,11 +480,14 @@ describe("Phase 11D Export / Print Reports", () => {
     expect(data.rows[0]).toMatchObject({ gross_salary: "REDACTED", net_payable_salary: "REDACTED" });
   });
 
-  it("export print buttons exist on report pages and are permission guarded", () => {
+  it("normal report actions expose Excel and PDF only", () => {
     expect(source("frontend/src/features/hr-reports/HrReportsPage.tsx")).toContain("ReportExportActions");
     expect(source("frontend/src/features/payroll-reports/PayrollReportsPage.tsx")).toContain("ReportExportActions");
     expect(source("frontend/src/features/report-exports/ReportExportActions.tsx")).toContain("report_exports.create");
     expect(source("frontend/src/features/report-exports/ReportExportActions.tsx")).toContain("Download Excel");
+    expect(source("frontend/src/features/report-exports/ReportExportActions.tsx")).toContain("Download PDF");
+    expect(source("frontend/src/features/report-exports/ReportExportActions.tsx")).not.toContain("CSV");
+    expect(source("frontend/src/features/report-exports/ReportExportActions.tsx")).not.toContain("Print");
   });
 
   it("unsupported export format message exists", () => {
@@ -511,10 +498,15 @@ describe("Phase 11D Export / Print Reports", () => {
     expect(source("frontend/src/features/report-exports/ExportHistoryPage.tsx")).not.toMatch(/import\s+batch|upload\s+import/i);
   });
 
-  it("no dark mode or unsafe metadata display", () => {
-    const page = source("frontend/src/features/report-exports/ReportPrintPage.tsx");
-    expect(page).not.toContain("dark:");
-    expect(page).not.toContain("metadata_json");
+  it("normal report export UI has no dark mode or unsafe metadata display", () => {
+    const ui = [
+      source("frontend/src/features/report-exports/ExportHistoryPage.tsx"),
+      source("frontend/src/features/report-exports/ReportExportActions.tsx"),
+      source("frontend/src/features/hr-reports/HrReportsPage.tsx"),
+      source("frontend/src/features/payroll-reports/PayrollReportsPage.tsx"),
+    ].join("\n");
+    expect(ui).not.toContain("dark:");
+    expect(ui).not.toContain("metadata_json");
   });
 
   it("sensitive export and download audit log paths are present", () => {

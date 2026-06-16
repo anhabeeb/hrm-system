@@ -1,7 +1,8 @@
 import { ValidationError } from "../../utils/errors";
 
 type ImportValidationError = { row: number; message: string };
-type ImportValidationResult = { total_rows: number; valid_rows: number; invalid_rows: number; errors: ImportValidationError[]; preview_rows: Record<string, string>[] };
+type ParsedImportWorkbook = { total_rows: number; valid_rows: number; invalid_rows: number; errors: ImportValidationError[]; preview_rows: Record<string, string>[]; rows: Record<string, string>[] };
+type ImportValidationResult = Omit<ParsedImportWorkbook, "rows">;
 
 const excelMime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const requiredHeaders: Record<string, string[]> = {
@@ -100,7 +101,7 @@ const parseWorksheet = (sheetXml: string, sharedStrings: string[]) => {
   return rows;
 };
 
-export const validateImportContent = async (content: Uint8Array, mimeType: string, importType: string): Promise<ImportValidationResult> => {
+export const parseImportWorkbook = async (content: Uint8Array, mimeType: string, importType: string): Promise<ParsedImportWorkbook> => {
   if (mimeType !== excelMime) {
     throw new ValidationError("Only Excel .xlsx import files are supported.");
   }
@@ -120,15 +121,16 @@ export const validateImportContent = async (content: Uint8Array, mimeType: strin
     errors.push({ row: 1, message: `Missing required column(s): ${missing.join(", ")}.` });
   }
 
-  const employeeNoIndex = headers.indexOf("employee_no");
+  const requiredIndexes = expected.map((header) => ({ header, index: headers.indexOf(header) }));
   const previewRows: Record<string, string>[] = [];
   let validRows = 0;
   dataRows.forEach((row, index) => {
     const rowNumber = index + 2;
     const mapped = Object.fromEntries(headers.map((header, cellIndex) => [header || `column_${cellIndex + 1}`, row[cellIndex] ?? ""]));
     if (previewRows.length < 10) previewRows.push(mapped);
-    if (employeeNoIndex >= 0 && !(row[employeeNoIndex] ?? "").trim()) {
-      errors.push({ row: rowNumber, message: "Employee number is required." });
+    const missingCell = requiredIndexes.find((item) => item.index >= 0 && !(row[item.index] ?? "").trim());
+    if (missingCell) {
+      errors.push({ row: rowNumber, message: `${missingCell.header.replace(/_/g, " ")} is required.` });
       return;
     }
     validRows += missing.length > 0 ? 0 : 1;
@@ -140,5 +142,11 @@ export const validateImportContent = async (content: Uint8Array, mimeType: strin
     invalid_rows: errors.length,
     errors,
     preview_rows: previewRows,
+    rows: missing.length > 0 ? [] : dataRows.map((row) => Object.fromEntries(headers.map((header, cellIndex) => [header || `column_${cellIndex + 1}`, row[cellIndex] ?? ""]))),
   };
+};
+
+export const validateImportContent = async (content: Uint8Array, mimeType: string, importType: string): Promise<ImportValidationResult> => {
+  const { rows: _rows, ...result } = await parseImportWorkbook(content, mimeType, importType);
+  return result;
 };

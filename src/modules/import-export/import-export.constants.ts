@@ -1,10 +1,7 @@
 export const EXPORT_FORMATS = ["xlsx", "pdf"] as const;
 export const EXPORT_TYPES = ["employees", "attendance", "leave", "payroll", "assets", "uniforms", "documents_metadata", "audit_activity", "approvals"] as const;
-export const IMPORT_TYPES = ["employees", "attendance_manual", "leave_balances", "assets", "uniforms", "documents_metadata"] as const;
+export const IMPORT_TYPES = ["employees"] as const;
 export const IMPORT_TYPE_ALIASES: Record<string, (typeof IMPORT_TYPES)[number]> = {
-  attendance: "attendance_manual",
-  leave: "leave_balances",
-  documents: "documents_metadata",
 };
 export const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
 
@@ -18,7 +15,6 @@ export const IMPORT_EXPORT_MESSAGES = {
   importsLoaded: "Import jobs loaded successfully.",
   validationOk: "Import validation completed successfully.",
   validationErrors: "This import file has validation errors.",
-  applyNotConfigured: "Excel import apply is not configured for this template yet.",
   applied: "Import applied successfully.",
   cancelled: "Import job cancelled successfully.",
   templatesLoaded: "Import templates loaded successfully.",

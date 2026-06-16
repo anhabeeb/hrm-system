@@ -275,6 +275,7 @@ export const EmployeesPage = () => {
   const missingLogin = employeeRows.filter((employee) => !employee.has_login && !employee.linked_user_id).length;
   const missingStructure = employeeRows.filter((employee) => !employee.department_id || !employee.position_id).length;
   const missingLevel = employeeRows.filter((employee) => !employee.level).length;
+  const missingProfilePhotos = employeeRows.filter((employee) => !employee.profile_photo_url).length;
   const lifecycleAttention = canViewLifecycleAttention ? employeeRows.filter((employee) => ["notice_period", "resigned", "terminated"].includes(String(employee.employment_status ?? "").toLowerCase())).length : null;
 
   return (
@@ -303,6 +304,7 @@ export const EmployeesPage = () => {
             <ModuleSummaryTile label="Active employees" value={activeEmployees} helperText="Active rows in current scoped result" status="info" />
             <ModuleSummaryTile label="Visible new hires" value={employeeRows.filter((employee) => employee.joined_at?.slice(0, 7) === new Date().toISOString().slice(0, 7)).length} helperText="This month in current view" />
             <ModuleSummaryTile label="Without login" value={missingLogin} status={missingLogin ? "warning" : "success"} />
+            <ModuleSummaryTile label="Missing profile photos" value={missingProfilePhotos} helperText="Visible employees needing photo upload" status={missingProfilePhotos ? "warning" : "success"} />
             <ModuleSummaryTile label="Missing structure" value={missingStructure} status={missingStructure ? "warning" : "success"} />
             <ModuleSummaryTile label="Missing level" value={missingLevel} status={missingLevel ? "warning" : "success"} />
             {canViewLifecycleAttention ? <ModuleSummaryTile label="Lifecycle attention" value={lifecycleAttention ?? 0} helperText="Visible lifecycle statuses only" status={lifecycleAttention ? "warning" : "neutral"} /> : null}
@@ -311,6 +313,7 @@ export const EmployeesPage = () => {
             description="Focused setup items from the currently loaded employee rows."
             items={[
               missingLogin ? `${missingLogin} visible employee(s) need login assignment.` : null,
+              missingProfilePhotos ? `${missingProfilePhotos} visible employee(s) need profile photos.` : null,
               missingStructure ? `${missingStructure} visible employee(s) need department or position setup.` : null,
               missingLevel ? `${missingLevel} visible employee(s) need level assignment.` : null,
               canViewDocumentKycAttention ? "Document/KYC attention is available from Documents & KYC." : null,

@@ -18,8 +18,6 @@ reportExportsRoutes.post("/jobs", requirePermission("report_exports.create"), co
 reportExportsRoutes.post("/jobs/:id/generate", requirePermission("report_exports.create"), controller.generate);
 reportExportsRoutes.get("/jobs/:id/download", requirePermission("report_exports.download"), controller.download);
 reportExportsRoutes.post("/jobs/:id/cancel", requireAnyPermission(["report_exports.cancel", "report_exports.admin.manage"]), controller.cancel);
-reportExportsRoutes.get("/print/:reportKey", requirePermission("report_exports.print"), controller.print);
-reportExportsRoutes.get("/employee/:employeeId/print", requirePermission("report_exports.employee_profile.print"), controller.printEmployee);
 
 export { reportExportsRoutes };
 

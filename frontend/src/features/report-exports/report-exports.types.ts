@@ -38,17 +38,3 @@ export interface ReportExportJob {
   redaction_level: string;
 }
 
-export interface ReportPrintData {
-  report_key: string;
-  report_name: string;
-  category: string;
-  filters: Record<string, unknown>;
-  columns: ReportExportColumn[];
-  rows: Array<Record<string, unknown>>;
-  generated_at: string;
-  sensitive: boolean;
-  redaction_level: string;
-  warnings: string[];
-  print: boolean;
-}
-

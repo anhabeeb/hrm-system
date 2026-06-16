@@ -270,8 +270,8 @@ export const OperationOwnershipPage = () => {
             <ModuleQuickActions>
               {canManage ? <Button variant="outline" disabled={!form.operation_code || resolveMutation.isPending} onClick={() => resolveMutation.mutate()}>Resolve Preview</Button> : null}
               {canManage ? <Button onClick={openCreate}><ShieldCheck className="h-4 w-4" />Configure Matrix</Button> : null}
-              {canManageFunctions ? <Button variant="outline" onClick={openCreateBusinessFunction}>Assign Business Function</Button> : null}
-              {canManageAssignments ? <Button variant="outline" onClick={openCreateAssignment}>Resolve Warnings</Button> : null}
+              {canManageFunctions ? <Button variant="outline" onClick={openCreateBusinessFunction}>Create Business Function</Button> : null}
+              {canManageAssignments ? <Button variant="outline" onClick={openCreateAssignment}>Assign Function</Button> : null}
             </ModuleQuickActions>
           )}
         />

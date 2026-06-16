@@ -30,7 +30,7 @@ import { importExportApi } from "./import-export.api";
 import type { ExportCreatePayload, ExportJob, ImportExportFilters, ImportJob, ImportTemplate, ImportUploadPayload } from "./import-export.types";
 
 const exportTypes = ["employees", "attendance", "leave", "payroll", "assets", "uniforms", "documents_metadata", "audit_activity", "approvals"];
-const importTypes = ["employees", "attendance_manual", "leave_balances", "assets", "uniforms", "documents_metadata"];
+const importTypes = ["employees"];
 const excelMime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const dangerousTypes = new Set(["text/html", "image/svg+xml", "application/x-msdownload", "application/x-msdos-program"]);
 const sensitiveExportTypes = new Set(["employees", "payroll", "documents_metadata", "audit_activity", "approvals"]);
