@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import app from "../src/app";
 import { classifyError } from "../src/utils/error-classifier";
-import { AuthError, PermissionError } from "../src/utils/errors";
+import { AuthError, AppError, PermissionError } from "../src/utils/errors";
+import { logAppError } from "../src/utils/error-logger";
 import { errorResponse } from "../src/utils/response";
 
 describe("application error classifier", () => {
@@ -160,5 +161,89 @@ describe("structured error responses", () => {
       error.mockRestore();
       warn.mockRestore();
     }
+  });
+
+  it("system_error_logs writer skips missing optional columns such as environment", async () => {
+    let insertSql = "";
+    let insertValues: unknown[] = [];
+    const db = {
+      prepare: (sql: string) => ({
+        first: async () => {
+          if (sql.includes("sqlite_master")) return { name: "system_error_logs" };
+          return null;
+        },
+        all: async () => {
+          if (sql.includes("PRAGMA table_info(system_error_logs)")) {
+            return {
+              results: [
+                { name: "id" },
+                { name: "company_id" },
+                { name: "module" },
+                { name: "error_code" },
+                { name: "error_message" },
+                { name: "stack_trace" },
+                { name: "request_id" },
+                { name: "user_id" },
+                { name: "device_id" },
+                { name: "created_at" },
+              ],
+            };
+          }
+          return { results: [] };
+        },
+        bind: (...values: unknown[]) => ({
+          first: async () => {
+            if (sql.includes("sqlite_master")) return { name: "system_error_logs" };
+            return null;
+          },
+          all: async () => {
+            if (sql.includes("PRAGMA table_info(system_error_logs)")) {
+              return {
+                results: [
+                  { name: "id" },
+                  { name: "company_id" },
+                  { name: "module" },
+                  { name: "error_code" },
+                  { name: "error_message" },
+                  { name: "stack_trace" },
+                  { name: "request_id" },
+                  { name: "user_id" },
+                  { name: "device_id" },
+                  { name: "created_at" },
+                ],
+              };
+            }
+            return { results: [] };
+          },
+          run: async () => {
+            insertSql = sql;
+            insertValues = values;
+            return { success: true };
+          },
+        }),
+      }),
+    };
+    const context = {
+      env: { ENVIRONMENT: "production", DB: db },
+      req: { path: "/api/v1/dashboard/command-center", method: "GET" },
+      get: (key: string) => {
+        if (key === "requestId") return "req_1";
+        if (key === "authUser") return { actorUserId: "user_1", companyId: "company_1", outletIds: [] };
+        return undefined;
+      },
+    };
+
+    await logAppError(
+      context as never,
+      new AppError({ code: "UNKNOWN_ERROR", message: "Dashboard failed", statusCode: 500 }),
+      new Error("D1_ERROR: too many SQL variables"),
+    );
+
+    expect(insertSql).toContain("INSERT INTO system_error_logs");
+    expect(insertSql).not.toContain("environment");
+    expect(insertSql).toContain("error_code");
+    expect(insertSql).toContain("error_message");
+    expect(insertValues).toContain("UNKNOWN_ERROR");
+    expect(insertValues).toContain("Dashboard failed");
   });
 });

@@ -1,4 +1,5 @@
 import type { AuthActor } from "../../types/api.types";
+import { chunkArray } from "../../utils/d1";
 
 const bind = (statement: D1PreparedStatement, values: readonly unknown[]) =>
   statement.bind(...(values as Parameters<D1PreparedStatement["bind"]>));
@@ -294,8 +295,7 @@ export const approvalInboxCount = async (env: Env, context: AuthActor) => {
 
 export const approvalQueueCounts = async (env: Env, context: AuthActor, operationTypes: string[]) => {
   if (operationTypes.length === 0) return [];
-  const operationPlaceholders = operationTypes.map(() => "?").join(", ");
-  const permissionPlaceholders = context.permissions.length ? context.permissions.map(() => "?").join(", ") : "NULL";
+  const permissionSet = new Set(context.permissions);
   const outlet =
     context.isSuperAdmin || context.isAdmin
       ? { sql: "", values: [] as string[] }
@@ -306,37 +306,64 @@ export const approvalQueueCounts = async (env: Env, context: AuthActor, operatio
           }
         : { sql: " AND r.subject_employee_id IS NULL", values: [] as string[] };
 
-  return many<Record<string, string | number | null>>(
-    env,
-    `SELECT
-      r.operation_type,
-      COUNT(DISTINCT r.id) AS total,
-      MIN(COALESCE(r.submitted_at, r.created_at)) AS oldest_submitted_at
-     FROM approval_requests r
-     LEFT JOIN approval_request_steps s ON s.company_id = r.company_id
-      AND s.approval_request_id = r.id
-      AND s.status IN ('PENDING', 'ESCALATED', 'WAITING_FOR_APPROVER', 'pending')
-     LEFT JOIN employees e ON e.company_id = r.company_id
-      AND e.id = COALESCE(r.subject_employee_id, r.employee_id)
-     WHERE r.company_id = ?
-       AND r.operation_type IN (${operationPlaceholders})
-       AND r.status IN ('PENDING', 'IN_PROGRESS', 'pending', 'in_progress', 'submitted')
-       AND (
-        ? = 1
-        OR s.assigned_approver_user_id = ?
-        OR s.required_permission IS NULL
-        OR s.required_permission IN (${permissionPlaceholders})
-       )${outlet.sql}
-     GROUP BY r.operation_type`,
-    [
-      context.companyId,
-      ...operationTypes,
-      context.isSuperAdmin || context.isAdmin ? 1 : 0,
-      context.actorUserId,
-      ...context.permissions,
-      ...outlet.values,
-    ],
-  );
+  const counts = new Map<string, { operation_type: string; total: number; oldest_submitted_at: string | null }>();
+  const seenRequestIds = new Set<string>();
+  const isPrivilegedActor = context.isSuperAdmin || context.isAdmin;
+
+  for (const operationChunk of chunkArray(operationTypes)) {
+    const operationPlaceholders = operationChunk.map(() => "?").join(", ");
+    const rows = await many<{
+      id: string;
+      operation_type: string;
+      oldest_submitted_at: string | null;
+      assigned_approver_user_id: string | null;
+      required_permission: string | null;
+    }>(
+      env,
+      `SELECT
+        r.id,
+        r.operation_type,
+        COALESCE(r.submitted_at, r.created_at) AS oldest_submitted_at,
+        s.assigned_approver_user_id,
+        s.required_permission
+       FROM approval_requests r
+       LEFT JOIN approval_request_steps s ON s.company_id = r.company_id
+        AND s.approval_request_id = r.id
+        AND s.status IN ('PENDING', 'ESCALATED', 'WAITING_FOR_APPROVER', 'pending')
+       LEFT JOIN employees e ON e.company_id = r.company_id
+        AND e.id = COALESCE(r.subject_employee_id, r.employee_id)
+       WHERE r.company_id = ?
+         AND r.operation_type IN (${operationPlaceholders})
+         AND r.status IN ('PENDING', 'IN_PROGRESS', 'pending', 'in_progress', 'submitted')${outlet.sql}`,
+      [context.companyId, ...operationChunk, ...outlet.values],
+    );
+
+    for (const row of rows) {
+      const canSeeRequest =
+        isPrivilegedActor ||
+        row.assigned_approver_user_id === context.actorUserId ||
+        row.required_permission === null ||
+        permissionSet.has(row.required_permission);
+      if (!canSeeRequest || seenRequestIds.has(row.id)) continue;
+
+      seenRequestIds.add(row.id);
+      const current = counts.get(row.operation_type) ?? {
+        operation_type: row.operation_type,
+        total: 0,
+        oldest_submitted_at: null,
+      };
+      current.total += 1;
+      if (
+        row.oldest_submitted_at &&
+        (!current.oldest_submitted_at || row.oldest_submitted_at < current.oldest_submitted_at)
+      ) {
+        current.oldest_submitted_at = row.oldest_submitted_at;
+      }
+      counts.set(row.operation_type, current);
+    }
+  }
+
+  return Array.from(counts.values());
 };
 
 export const leaveBalanceWarnings = async (env: Env, context: AuthActor) => {

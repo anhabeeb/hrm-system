@@ -39,6 +39,7 @@ mustInclude("backend dashboard service", "src/modules/dashboard/dashboard.servic
 mustInclude("backend dashboard service", "src/modules/dashboard/dashboard.service.ts", "moduleEnabled(features");
 mustInclude("backend dashboard service", "src/modules/dashboard/dashboard.service.ts", "visibleActions(actor, features");
 mustInclude("backend dashboard service", "src/modules/dashboard/dashboard.service.ts", "approvalQueueCounts");
+mustInclude("backend dashboard service", "src/modules/dashboard/dashboard.service.ts", "safeCommandCenterQuery");
 mustInclude("backend dashboard service", "src/modules/dashboard/dashboard.service.ts", "employeeSetupHealth");
 mustInclude("backend dashboard service", "src/modules/dashboard/dashboard.service.ts", "operationOwnershipHealth");
 mustInclude("backend dashboard service", "src/modules/dashboard/dashboard.service.ts", "recentAuditActivity");
@@ -46,7 +47,11 @@ mustInclude("backend dashboard service", "src/modules/dashboard/dashboard.servic
 mustInclude("backend dashboard service", "src/modules/dashboard/dashboard.service.ts", "resignation_offboarding");
 mustInclude("backend dashboard service", "src/modules/dashboard/dashboard.service.ts", "operation_ownership");
 mustInclude("backend dashboard repository", "src/modules/dashboard/dashboard.repository.ts", "FROM approval_requests r");
-mustInclude("backend dashboard repository", "src/modules/dashboard/dashboard.repository.ts", "GROUP BY r.operation_type");
+mustInclude("backend dashboard repository", "src/modules/dashboard/dashboard.repository.ts", "permissionSet.has");
+mustInclude("D1 binding helper", "src/utils/d1.ts", "MAX_D1_BINDINGS");
+mustInclude("D1 binding helper", "src/utils/d1.ts", "chunkArray");
+mustInclude("error logger", "src/utils/error-logger.ts", "PRAGMA table_info(system_error_logs)");
+mustInclude("error logger", "src/utils/error-logger.ts", "existingColumns.has(column)");
 mustInclude("backend dashboard repository", "src/modules/dashboard/dashboard.repository.ts", "FROM employee_kyc_update_requests r");
 mustInclude("backend dashboard repository", "src/modules/dashboard/dashboard.repository.ts", "FROM operation_responsibility_matrix");
 mustInclude("backend dashboard repository", "src/modules/dashboard/dashboard.repository.ts", "FROM audit_logs a");
@@ -86,6 +91,8 @@ for (const phrase of [
 }
 
 const service = read("src/modules/dashboard/dashboard.service.ts");
+const repository = read("src/modules/dashboard/dashboard.repository.ts");
+const errorLogger = read("src/utils/error-logger.ts");
 const forbiddenPlaceholders = [
   /employees_without_login:\s*0/,
   /employees_missing_level:\s*0/,
@@ -102,6 +109,21 @@ const forbiddenPlaceholders = [
 ];
 for (const pattern of forbiddenPlaceholders) {
   if (pattern.test(service)) failures.push(`backend dashboard service still contains placeholder/proxy metric pattern: ${pattern}`);
+}
+if (/permissions\.map\(\(\) => "\?"\)|s\.required_permission IN \(\$\{permissionPlaceholders\}\)/.test(repository)) {
+  failures.push("approval queue still uses an unbounded permission placeholder list.");
+}
+if (!repository.includes("chunkArray(operationTypes)") || !repository.includes("permissionSet.has(row.required_permission)")) {
+  failures.push("approval queue must chunk operation filters and evaluate permission eligibility in TypeScript.");
+}
+if (!service.includes("safeCommandCenterQuery") || !service.includes('"unavailable"')) {
+  failures.push("command center must isolate optional widget failures and return unavailable widget state.");
+}
+if (!errorLogger.includes("PRAGMA table_info(system_error_logs)") || /INSERT INTO system_error_logs \([\s\S]*environment[\s\S]*\) VALUES/.test(errorLogger)) {
+  failures.push("system error logging must be schema-resilient for optional environment column.");
+}
+if (!tests.includes("hundreds of permissions") || !tests.includes("one command-center widget failure does not crash")) {
+  failures.push("admin command center tests must cover permission overflow and widget failure isolation.");
 }
 
 if (failures.length > 0) {

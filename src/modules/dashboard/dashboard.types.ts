@@ -57,6 +57,7 @@ export interface CommandCenterWidgetState<T> {
   metrics?: T;
   rows?: unknown[];
   status?: "ready" | "needs_review" | "blocked" | "empty";
+  error?: "unavailable" | string;
   warnings?: string[];
   actions?: DashboardQuickAction[];
 }

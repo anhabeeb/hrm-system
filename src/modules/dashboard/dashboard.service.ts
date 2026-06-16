@@ -342,6 +342,24 @@ const widget = <T>(
   ...options,
 });
 
+const safeCommandCenterQuery = async <T>(
+  label: string,
+  fallback: T,
+  query: () => Promise<T>,
+  warnings: string[],
+): Promise<T> => {
+  try {
+    return await query();
+  } catch (error) {
+    warnings.push(`${label} is temporarily unavailable.`);
+    console.warn("Command center widget query failed", {
+      widget: label,
+      error_message: error instanceof Error ? error.message : String(error),
+    });
+    return fallback;
+  }
+};
+
 const moduleAction = (
   key: string,
   label: string,
@@ -377,10 +395,40 @@ const countApprovalRow = (
 
 export const getCommandCenter = async (env: Env, actor: AuthActor): Promise<{ data: CommandCenterResponse; meta: DashboardMeta }> => {
   const ctx = makeContext(actor);
+  const commandCenterWarnings: string[] = [];
   const features = new Set(await repository.listEnabledFeatureKeys(env, actor.companyId));
-  const summary = await getSummary(env, actor);
+  const summary = await safeCommandCenterQuery(
+    "dashboard summary",
+    {
+      data: {
+        employee_summary: null,
+        attendance_today: null,
+        leave_approvals: null,
+        long_leave: null,
+        expiry_alerts: null,
+        notifications_email_health: {
+          unread_in_app_notifications: 0,
+          urgent_notifications: 0,
+          pending_email_jobs: null,
+          failed_email_jobs: null,
+          href: "/notifications",
+        },
+        device_health: null,
+        holiday_roster_context: null,
+        payroll_readiness: null,
+      },
+      meta: meta(ctx),
+    },
+    () => getSummary(env, actor),
+    commandCenterWarnings,
+  );
   const data = summary.data;
-  const attention = await getAttention(env, actor);
+  const attention = await safeCommandCenterQuery(
+    "employee attention",
+    { data: [] as DashboardAttentionItem[], meta: meta(ctx) },
+    () => getAttention(env, actor),
+    commandCenterWarnings,
+  );
   const quickActions = visibleActions(actor, features, [
     { ...moduleAction("add-employee", "Add employee", "Create a new employee profile", "/employees", "employees.create", "Employees"), moduleCode: "employees" },
     { ...moduleAction("view-attendance", "View attendance", "Open today's attendance and exceptions", "/attendance", "attendance.view", "Attendance"), moduleCode: "attendance" },
@@ -438,17 +486,17 @@ export const getCommandCenter = async (env: Env, actor: AuthActor): Promise<{ da
     operationHealth,
     recentActivity,
   ] = await Promise.all([
-    employeesEnabled && canViewEmployees ? repository.employeeSetupHealth(env, actor, monthStart(new Date(`${ctx.today}T00:00:00Z`))) : Promise.resolve(null),
-    attendanceEnabled && leaveEnabled && canViewAttendance ? repository.leaveTodayCounts(env, actor, ctx.today) : Promise.resolve(null),
-    attendanceEnabled && canViewAttendance ? repository.pendingAttendanceCorrectionCount(env, actor) : Promise.resolve(null),
-    approvalsEnabled && canViewApprovals ? repository.approvalQueueCounts(env, actor, approvalOperationTypes) : Promise.resolve([]),
-    documentsEnabled && canViewDocuments ? repository.documentKycCounts(env, actor) : Promise.resolve(null),
-    documentsEnabled && canViewDocuments ? repository.expiryCountsWithinDays(env, actor, ctx.today, 60) : Promise.resolve(null),
-    rosterEnabled && canViewRoster ? repository.rosterCoverage(env, actor, ctx.today) : Promise.resolve(null),
-    lifecycleEnabled && canViewLifecycle ? repository.lifecycleCounts(env, actor, ctx.today) : Promise.resolve(null),
-    disciplineEnabled && canViewDiscipline ? repository.disciplinaryCounts(env, actor) : Promise.resolve(null),
-    operationOwnershipEnabled && canViewOperationOwnership ? repository.operationOwnershipHealth(env, actor) : Promise.resolve(null),
-    canViewAudit ? repository.recentAuditActivity(env, actor) : Promise.resolve([]),
+    employeesEnabled && canViewEmployees ? safeCommandCenterQuery("people snapshot", null, () => repository.employeeSetupHealth(env, actor, monthStart(new Date(`${ctx.today}T00:00:00Z`))), commandCenterWarnings) : Promise.resolve(null),
+    attendanceEnabled && leaveEnabled && canViewAttendance ? safeCommandCenterQuery("leave overlay", null, () => repository.leaveTodayCounts(env, actor, ctx.today), commandCenterWarnings) : Promise.resolve(null),
+    attendanceEnabled && canViewAttendance ? safeCommandCenterQuery("attendance corrections", null, () => repository.pendingAttendanceCorrectionCount(env, actor), commandCenterWarnings) : Promise.resolve(null),
+    approvalsEnabled && canViewApprovals ? safeCommandCenterQuery("approval queue", [] as Awaited<ReturnType<typeof repository.approvalQueueCounts>>, () => repository.approvalQueueCounts(env, actor, approvalOperationTypes), commandCenterWarnings) : Promise.resolve([]),
+    documentsEnabled && canViewDocuments ? safeCommandCenterQuery("document KYC", null, () => repository.documentKycCounts(env, actor), commandCenterWarnings) : Promise.resolve(null),
+    documentsEnabled && canViewDocuments ? safeCommandCenterQuery("document expiry 60 days", null, () => repository.expiryCountsWithinDays(env, actor, ctx.today, 60), commandCenterWarnings) : Promise.resolve(null),
+    rosterEnabled && canViewRoster ? safeCommandCenterQuery("roster coverage", null, () => repository.rosterCoverage(env, actor, ctx.today), commandCenterWarnings) : Promise.resolve(null),
+    lifecycleEnabled && canViewLifecycle ? safeCommandCenterQuery("lifecycle", null, () => repository.lifecycleCounts(env, actor, ctx.today), commandCenterWarnings) : Promise.resolve(null),
+    disciplineEnabled && canViewDiscipline ? safeCommandCenterQuery("disciplinary follow-up", null, () => repository.disciplinaryCounts(env, actor), commandCenterWarnings) : Promise.resolve(null),
+    operationOwnershipEnabled && canViewOperationOwnership ? safeCommandCenterQuery("operation ownership health", null, () => repository.operationOwnershipHealth(env, actor), commandCenterWarnings) : Promise.resolve(null),
+    canViewAudit ? safeCommandCenterQuery("recent activity", [] as Awaited<ReturnType<typeof repository.recentAuditActivity>>, () => repository.recentAuditActivity(env, actor), commandCenterWarnings) : Promise.resolve([]),
   ]);
 
   const approvalCountByOperation = new Map(approvalCounts.map((row) => [String(row.operation_type), n(row.total)]));
@@ -513,7 +561,8 @@ export const getCommandCenter = async (env: Env, actor: AuthActor): Promise<{ da
           { ...moduleAction("view-employees", "View employees", "Open employee directory", "/employees", "employees.view", "Employees"), moduleCode: "employees" },
           { ...moduleAction("assign-login", "Assign login", "Open login assignment tools", "/employees", "employees.login.view", "Employees"), moduleCode: "employees" },
         ]),
-        status: "ready",
+        status: employeeSetup ? "ready" : commandCenterWarnings.some((warning) => warning.includes("people snapshot")) ? "empty" : "ready",
+        error: commandCenterWarnings.some((warning) => warning.includes("people snapshot")) ? "unavailable" : undefined,
       }),
       attendance_pulse: widget("Attendance Pulse", attendanceEnabled, canViewAttendance, {
         description: "Today’s attendance status.",
@@ -530,7 +579,8 @@ export const getCommandCenter = async (env: Env, actor: AuthActor): Promise<{ da
           { ...moduleAction("open-attendance", "View attendance", "Open attendance module", "/attendance", "attendance.view", "Attendance"), moduleCode: "attendance" },
           { ...moduleAction("open-corrections", "View corrections", "Open correction queue", "/attendance/corrections", "attendance.view", "Attendance"), moduleCode: "attendance" },
         ]),
-        status: n(data.attendance_today?.attendance_exceptions_open) > 0 ? "needs_review" : "ready",
+        status: commandCenterWarnings.some((warning) => warning.includes("attendance")) ? "empty" : n(data.attendance_today?.attendance_exceptions_open) > 0 ? "needs_review" : "ready",
+        error: commandCenterWarnings.some((warning) => warning.includes("attendance")) ? "unavailable" : undefined,
       }),
       approval_queue: widget("Approval Command Queue", approvalsEnabled, canViewApprovals, {
         description: "Pending approval queues by module.",
@@ -538,7 +588,8 @@ export const getCommandCenter = async (env: Env, actor: AuthActor): Promise<{ da
         actions: visibleActions(actor, features, [
           { ...moduleAction("open-approvals", "Open approvals", "Open approval inbox", "/approvals", "approvals.view", "Approvals"), moduleCode: "approvals" },
         ]),
-        status: approvalRows.some((row) => row.count > 0) ? "needs_review" : "empty",
+        status: commandCenterWarnings.some((warning) => warning.includes("approval queue")) ? "empty" : approvalRows.some((row) => row.count > 0) ? "needs_review" : "empty",
+        error: commandCenterWarnings.some((warning) => warning.includes("approval queue")) ? "unavailable" : undefined,
       }),
       payroll_readiness: widget("Payroll Readiness", payrollEnabled, canViewPayroll, {
         description: "Pre-payroll blockers and setup checks.",
@@ -555,7 +606,8 @@ export const getCommandCenter = async (env: Env, actor: AuthActor): Promise<{ da
         actions: visibleActions(actor, features, [
           { ...moduleAction("open-payroll", "Open payroll", "Review payroll", "/payroll", "payroll.view", "Payroll"), moduleCode: "payroll" },
         ]),
-        status: payrollBlockers > 0 ? "needs_review" : "ready",
+        status: commandCenterWarnings.some((warning) => warning.includes("dashboard summary")) ? "empty" : payrollBlockers > 0 ? "needs_review" : "ready",
+        error: commandCenterWarnings.some((warning) => warning.includes("dashboard summary")) ? "unavailable" : undefined,
       }),
       document_expiry: widget("Document Expiry / KYC Attention", documentsEnabled, canViewDocuments, {
         description: "Document expiry and KYC attention counts.",
@@ -569,7 +621,8 @@ export const getCommandCenter = async (env: Env, actor: AuthActor): Promise<{ da
         actions: visibleActions(actor, features, [
           { ...moduleAction("open-documents", "Open documents", "Review documents", "/documents", "documents.view", "Documents"), moduleCode: "documents_kyc" },
         ]),
-        status: n(data.expiry_alerts?.critical_alerts) > 0 ? "needs_review" : "ready",
+        status: commandCenterWarnings.some((warning) => warning.includes("document")) ? "empty" : n(data.expiry_alerts?.critical_alerts) > 0 ? "needs_review" : "ready",
+        error: commandCenterWarnings.some((warning) => warning.includes("document")) ? "unavailable" : undefined,
       }),
       roster_coverage: widget("Roster Coverage", rosterEnabled, canViewRoster, {
         description: "Roster coverage and conflicts.",
@@ -584,7 +637,8 @@ export const getCommandCenter = async (env: Env, actor: AuthActor): Promise<{ da
         actions: visibleActions(actor, features, [
           { ...moduleAction("open-roster", "Open roster", "Review rosters", "/rosters", "rosters.view", "Roster"), moduleCode: "roster" },
         ]),
-        status: n(data.holiday_roster_context?.open_roster_conflicts) > 0 ? "needs_review" : "ready",
+        status: commandCenterWarnings.some((warning) => warning.includes("roster coverage")) ? "empty" : n(data.holiday_roster_context?.open_roster_conflicts) > 0 ? "needs_review" : "ready",
+        error: commandCenterWarnings.some((warning) => warning.includes("roster coverage")) ? "unavailable" : undefined,
       }),
       department_health: widget("Department Health", employeesEnabled, can(actor, ["department.dashboard.view", "employees.view", "dashboard.view_company"]), {
         description: "Department-level health overview.",
@@ -601,7 +655,8 @@ export const getCommandCenter = async (env: Env, actor: AuthActor): Promise<{ da
           priority: item.priority,
           href: item.href,
         })),
-        status: attention.data.length > 0 ? "needs_review" : "empty",
+        status: commandCenterWarnings.some((warning) => warning.includes("employee attention")) ? "empty" : attention.data.length > 0 ? "needs_review" : "empty",
+        error: commandCenterWarnings.some((warning) => warning.includes("employee attention")) ? "unavailable" : undefined,
       }),
       lifecycle: widget("Lifecycle / Offboarding", lifecycleEnabled, canViewLifecycle, {
         description: "Notice period and offboarding task health.",
@@ -615,7 +670,8 @@ export const getCommandCenter = async (env: Env, actor: AuthActor): Promise<{ da
         actions: visibleActions(actor, features, [
           { ...moduleAction("open-offboarding", "Open offboarding", "Review exit requests", "/offboarding", "employeeLifecycle.offboarding.view", "Lifecycle"), moduleCode: "resignation_offboarding" },
         ]),
-        status: Object.values(lifecycleCounts ?? {}).some((value) => n(value) > 0) ? "needs_review" : "empty",
+        status: commandCenterWarnings.some((warning) => warning.includes("lifecycle")) ? "empty" : Object.values(lifecycleCounts ?? {}).some((value) => n(value) > 0) ? "needs_review" : "empty",
+        error: commandCenterWarnings.some((warning) => warning.includes("lifecycle")) ? "unavailable" : undefined,
       }),
       disciplinary_follow_up: widget("Disciplinary Follow-up", disciplineEnabled, canViewDiscipline, {
         description: "Disciplinary reviews and follow-up tasks.",
@@ -628,7 +684,8 @@ export const getCommandCenter = async (env: Env, actor: AuthActor): Promise<{ da
         actions: visibleActions(actor, features, [
           { ...moduleAction("open-disciplinary", "Open disciplinary actions", "Review disciplinary actions", "/disciplinary-actions", "employeeDiscipline.actions.view", "Discipline"), moduleCode: "disciplinary_actions" },
         ]),
-        status: Object.values(disciplinaryCounts ?? {}).some((value) => n(value) > 0) ? "needs_review" : "empty",
+        status: commandCenterWarnings.some((warning) => warning.includes("disciplinary")) ? "empty" : Object.values(disciplinaryCounts ?? {}).some((value) => n(value) > 0) ? "needs_review" : "empty",
+        error: commandCenterWarnings.some((warning) => warning.includes("disciplinary")) ? "unavailable" : undefined,
       }),
       operation_ownership_health: widget("Operation Ownership Health", operationOwnershipEnabled, canViewOperationOwnership, {
         description: "Responsibility matrix setup health.",
@@ -644,7 +701,8 @@ export const getCommandCenter = async (env: Env, actor: AuthActor): Promise<{ da
         actions: visibleActions(actor, features, [
           { ...moduleAction("open-operation-ownership", "Open Operation Ownership", "Resolve setup warnings", "/organization/operation-ownership", "operationOwnership.view", "Operation Ownership"), moduleCode: "operation_ownership" },
         ]),
-        status: Object.values(operationHealth ?? {}).some((value) => n(value) > 0) ? "needs_review" : "ready",
+        status: commandCenterWarnings.some((warning) => warning.includes("operation ownership")) ? "empty" : Object.values(operationHealth ?? {}).some((value) => n(value) > 0) ? "needs_review" : "ready",
+        error: commandCenterWarnings.some((warning) => warning.includes("operation ownership")) ? "unavailable" : undefined,
       }),
       recent_activity: widget("Recent Activity", true, canViewAudit, {
         description: "Safe recent activity summaries.",
@@ -655,10 +713,12 @@ export const getCommandCenter = async (env: Env, actor: AuthActor): Promise<{ da
           timestamp: String(item.created_at ?? ctx.generatedAt),
           status: String(item.severity ?? "info"),
         })),
-        status: recentActivity.length > 0 ? "ready" : "empty",
+        status: commandCenterWarnings.some((warning) => warning.includes("recent activity")) ? "empty" : recentActivity.length > 0 ? "ready" : "empty",
+        error: commandCenterWarnings.some((warning) => warning.includes("recent activity")) ? "unavailable" : undefined,
       }),
     },
     warnings: [
+      ...commandCenterWarnings,
       ...(!quickActions.length ? ["No command-center quick actions are available for this role."] : []),
       ...operationWarnings,
     ],

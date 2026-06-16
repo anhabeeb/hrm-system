@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import app from "../src/app";
 import { getCommandCenter } from "../src/modules/dashboard/dashboard.service";
@@ -58,15 +58,15 @@ const commandCenterEnv = () => {
         { feature_key: "operation_ownership" },
       ];
     }
-    if (sql.includes("FROM approval_requests r") && sql.includes("GROUP BY r.operation_type")) {
+    if (sql.includes("FROM approval_requests r")) {
       return [
-        { operation_type: "LEAVE_REQUEST", total: 2, oldest_submitted_at: "2026-06-01" },
-        { operation_type: "ROSTER_CHANGE", total: 3, oldest_submitted_at: "2026-06-02" },
-        { operation_type: "DOCUMENT_KYC_UPDATE", total: 4, oldest_submitted_at: "2026-06-03" },
-        { operation_type: "ADVANCE_SALARY_REQUEST", total: 5, oldest_submitted_at: "2026-06-04" },
-        { operation_type: "EMPLOYEE_STRUCTURE_CHANGE", total: 6, oldest_submitted_at: "2026-06-05" },
-        { operation_type: "OFFBOARDING", total: 7, oldest_submitted_at: "2026-06-06" },
-        { operation_type: "DISCIPLINARY_ACTION", total: 8, oldest_submitted_at: "2026-06-07" },
+        ...Array.from({ length: 2 }, (_, index) => ({ id: `leave_${index}`, operation_type: "LEAVE_REQUEST", oldest_submitted_at: "2026-06-01", assigned_approver_user_id: null, required_permission: null })),
+        ...Array.from({ length: 3 }, (_, index) => ({ id: `roster_${index}`, operation_type: "ROSTER_CHANGE", oldest_submitted_at: "2026-06-02", assigned_approver_user_id: null, required_permission: null })),
+        ...Array.from({ length: 4 }, (_, index) => ({ id: `doc_${index}`, operation_type: "DOCUMENT_KYC_UPDATE", oldest_submitted_at: "2026-06-03", assigned_approver_user_id: null, required_permission: null })),
+        ...Array.from({ length: 5 }, (_, index) => ({ id: `advance_${index}`, operation_type: "ADVANCE_SALARY_REQUEST", oldest_submitted_at: "2026-06-04", assigned_approver_user_id: null, required_permission: null })),
+        ...Array.from({ length: 6 }, (_, index) => ({ id: `structure_${index}`, operation_type: "EMPLOYEE_STRUCTURE_CHANGE", oldest_submitted_at: "2026-06-05", assigned_approver_user_id: null, required_permission: null })),
+        ...Array.from({ length: 7 }, (_, index) => ({ id: `offboarding_${index}`, operation_type: "OFFBOARDING", oldest_submitted_at: "2026-06-06", assigned_approver_user_id: null, required_permission: null })),
+        ...Array.from({ length: 8 }, (_, index) => ({ id: `discipline_${index}`, operation_type: "DISCIPLINARY_ACTION", oldest_submitted_at: "2026-06-07", assigned_approver_user_id: null, required_permission: null })),
       ];
     }
     if (sql.includes("FROM audit_logs a")) return [{ id: "audit_1", module: "employees", action: "employee_created", severity: "info", entity_type: "employee", entity_id: "emp_1", created_at: "2026-06-16T00:00:00Z" }];
@@ -251,6 +251,52 @@ describe("Admin Command Center dashboard", () => {
     expect(byId.get("employee-structure")).toBe(6);
     expect(byId.get("discipline")).toBe(8);
     expect(calls.some((call) => call.sql.includes("FROM approval_requests r") && call.sql.includes("r.operation_type IN"))).toBe(true);
+    expect(calls.some((call) => call.sql.includes("s.required_permission IN"))).toBe(false);
+  });
+
+  it("command-center approval queue avoids huge permission bind lists for users with hundreds of permissions", async () => {
+    const { env, calls } = commandCenterEnv();
+    const manyPermissionActor = actor({
+      isAdmin: false,
+      roleKeys: ["custom_role"],
+      outletIds: ["outlet_1"],
+      permissions: ["approvals.view", ...Array.from({ length: 600 }, (_, index) => `permission.${index}`)],
+    });
+
+    await getCommandCenter(env, manyPermissionActor);
+    const approvalCalls = calls.filter((call) => call.sql.includes("FROM approval_requests r"));
+
+    expect(approvalCalls.length).toBeGreaterThan(0);
+    expect(approvalCalls.every((call) => call.values.length <= 50)).toBe(true);
+    expect(approvalCalls.some((call) => call.sql.includes("s.required_permission IN"))).toBe(false);
+  });
+
+  it("one command-center widget failure does not crash the whole dashboard", async () => {
+    const { env } = commandCenterEnv();
+    const originalPrepare = env.DB.prepare.bind(env.DB);
+    env.DB.prepare = ((sql: string) => {
+      if (sql.includes("FROM employee_kyc_update_requests r")) {
+        return {
+          bind: () => ({
+            first: async () => {
+              throw new Error("D1_ERROR: widget unavailable");
+            },
+            all: async () => ({ results: [] }),
+          }),
+        };
+      }
+      return originalPrepare(sql);
+    }) as Env["DB"]["prepare"];
+
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      const result = await getCommandCenter(env, actor());
+      expect(result.data.widgets.document_expiry.error).toBe("unavailable");
+      expect(result.data.warnings).toContain("document KYC is temporarily unavailable.");
+      expect(result.data.widgets.people_snapshot.visible).toBe(true);
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("document, roster, attendance, and recent activity widgets use their own data sources", async () => {
