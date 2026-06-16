@@ -26,16 +26,29 @@ requireContains("ToastProvider", "frontend/src/components/feedback/ToastProvider
   "setTimeout",
   "useLocation",
   "location.pathname",
+  "location.search",
   "toast.persistent && toast.type !== \"loading\"",
 ]);
 requireContains("ToastViewport", "frontend/src/components/feedback/ToastViewport.tsx", [
   "aria-live",
   "Dismiss notification",
+  "pointer-events-none fixed",
+  "z-40",
+  "pointer-events-auto",
   "role={toast.type === \"error\" || toast.type === \"warning\" ? \"alert\" : \"status\"}",
+]);
+requireContains("OverlayRouteCleanup", "frontend/src/components/feedback/OverlayRouteCleanup.tsx", [
+  "useLocation",
+  "location.pathname",
+  "location.search",
+  "document.body.style.pointerEvents = \"\"",
+  "document.body.style.overflow = \"\"",
+  "data-scroll-locked",
 ]);
 requireContains("AppProviders", "frontend/src/app/providers.tsx", [
   "ToastProvider",
-  "<ToastProvider>{children}</ToastProvider>",
+  "OverlayRouteCleanup",
+  "<OverlayRouteCleanup />",
 ]);
 requireContains("InlineAlert compatibility", "frontend/src/components/feedback/InlineAlert.tsx", [
   "variant === \"success\"",
@@ -76,15 +89,40 @@ if (!/if \(!persistent && \(variant === "success" \|\| variant === "error"\)\) r
   failures.push("InlineAlert must render normal success/error feedback as toast-only.");
 }
 
+const toastViewport = read("frontend/src/components/feedback/ToastViewport.tsx");
+if (/fixed\s+inset-0/.test(toastViewport) || /inset-0[\s\S]*pointer-events-auto/.test(toastViewport)) {
+  failures.push("ToastViewport must not use a fullscreen pointer-events blocking overlay.");
+}
+if (!/className="[^"]*pointer-events-none[^"]*fixed/.test(toastViewport)) {
+  failures.push("ToastViewport container must use pointer-events-none while fixed.");
+}
+if (/className=\{cn\("pointer-events-auto rounded-xl border/.test(toastViewport)) {
+  failures.push("Toast card body must not capture app clicks; keep only close/action controls pointer-events-auto.");
+}
+if (/z-\[999|z-\[100\]/.test(toastViewport)) {
+  failures.push("Toast viewport must not sit above modal/sheet overlays.");
+}
+
+const mobileSidebar = read("frontend/src/components/layout/MobileSidebar.tsx");
+if (!mobileSidebar.includes("useEffect") || !mobileSidebar.includes("setOpen(false)") || !mobileSidebar.includes("location.pathname")) {
+  failures.push("Mobile sidebar must close on route changes.");
+}
+
 const loginPage = read("frontend/src/features/auth/LoginPage.tsx");
 if (/FormError|InlineAlert|AppErrorAlert/.test(loginPage)) {
   failures.push("LoginPage must not render inline/page alerts for normal auth feedback.");
 }
 
-const tests = read("tests/frontend-ui-hardening.test.ts");
+const tests = `${read("tests/frontend-ui-hardening.test.ts")}\n${read("tests/popup-toast-navigation-regression.test.ts")}`;
 for (const phrase of [
   "ToastProvider",
   "ToastViewport",
+  "popup and toast navigation regression",
+  "toast viewport visible but non-blocking",
+  "cleans stale modal body locks",
+  "closes mobile sidebar on navigation",
+  "fixed inset-0",
+  "pointer-events-none fixed",
   "toastDurations",
   "hrm:session-expired",
   "window.alert",

@@ -1,5 +1,5 @@
 import { Menu } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 
 import { SidebarNavGroup } from "@/components/layout/SidebarNavGroup";
@@ -16,6 +16,10 @@ export const MobileSidebar = ({ groups, badges }: { groups: NavGroup[]; badges?:
   const location = useLocation();
   const filteredGroups = searchNavigation(groups, query);
   const activePath = getActiveNavigationItem(groups, location.pathname)?.path ?? null;
+
+  useEffect(() => {
+    setOpen(false);
+  }, [location.pathname, location.search]);
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>

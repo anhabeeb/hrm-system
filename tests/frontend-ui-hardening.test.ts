@@ -132,7 +132,9 @@ describe("frontend completed-phase hardening coverage", () => {
     const useToast = read("frontend/src/components/feedback/useToast.ts");
 
     expect(providers).toContain("ToastProvider");
-    expect(providers).toContain("<ToastProvider>{children}</ToastProvider>");
+    expect(providers).toContain("<ToastProvider>");
+    expect(providers).toContain("<OverlayRouteCleanup />");
+    expect(providers).toContain("{children}");
     expect(toastProvider).toContain("ToastContext.Provider");
     expect(toastProvider).toContain("showToast");
     expect(toastProvider).toContain("dismissToast");
