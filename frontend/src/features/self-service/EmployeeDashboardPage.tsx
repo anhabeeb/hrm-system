@@ -4,6 +4,9 @@ import { LinkedEmployeeOnlyGuard } from "@/components/access/LinkedEmployeeOnlyG
 import { LoadingState } from "@/components/data/LoadingState";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { DashboardGrid } from "@/components/widgets";
+import { selfServiceWidgetDefinitions } from "@/config/dashboardWidgets";
+import { DashboardCustomizeButton } from "@/features/dashboard-personalization/DashboardCustomizeButton";
+import { usePersonalizedWidgets } from "@/features/dashboard-personalization/dashboardPreferences.utils";
 import { friendlyOperationalError } from "@/lib/safe-display";
 import { SelfServiceCommandHeader } from "./dashboard/SelfServiceCommandHeader";
 import { MyAcknowledgementsWidget } from "./dashboard/MyAcknowledgementsWidget";
@@ -24,6 +27,22 @@ export const EmployeeDashboardPage = () => {
   const query = useQuery({ queryKey: ["self-service", "dashboard"], queryFn: selfServiceApi.dashboard });
   const dashboard = query.data?.data;
   const modern = dashboard?.modern_widgets;
+  const personalization = usePersonalizedWidgets("SELF_SERVICE_DASHBOARD", selfServiceWidgetDefinitions, {
+    enabled: Boolean(dashboard?.profile.linked_employee),
+  });
+  const modernRenderers = modern ? {
+    "my-attendance-today": <MyAttendanceTodayWidget widget={modern.attendance_today} />,
+    "my-attendance-calendar-preview": <MyAttendanceCalendarPreviewWidget widget={modern.attendance_calendar_preview} />,
+    "my-leave-balance": <MyLeaveBalanceWidget widget={modern.leave_balance} />,
+    "my-upcoming-roster": <MyUpcomingRosterWidget widget={modern.upcoming_roster} />,
+    "my-pending-requests": <MyPendingRequestsWidget widget={modern.pending_requests} />,
+    "my-documents-kyc": <MyDocumentsKycWidget widget={modern.documents_kyc} />,
+    "my-payslips": <MyPayslipsWidget widget={modern.payslips} />,
+    "my-approvals": <MyApprovalsWidget widget={modern.my_approvals} />,
+    "my-offboarding-status": <MyOffboardingStatusWidget widget={modern.offboarding_status} />,
+    "my-acknowledgements": <MyAcknowledgementsWidget widget={modern.acknowledgements} />,
+    "my-recent-activity": <MySelfServiceActivityWidget widget={modern.recent_activity} />,
+  } as const : null;
 
   return (
     <LinkedEmployeeOnlyGuard>
@@ -33,20 +52,24 @@ export const EmployeeDashboardPage = () => {
         {dashboard && !dashboard.profile.linked_employee ? <NotLinkedEmployeeState /> : null}
         {dashboard ? (
           <>
+            <div className="flex justify-end">
+              <DashboardCustomizeButton
+                dashboardType="SELF_SERVICE_DASHBOARD"
+                widgets={personalization.allWidgets}
+                isSaving={personalization.isSaving}
+                isResetting={personalization.isResetting}
+                onSaveLayout={personalization.saveLayout}
+                onResetLayout={() => personalization.resetLayout()}
+              />
+            </div>
             <SelfServiceCommandHeader dashboard={dashboard} />
             {modern ? (
               <DashboardGrid>
-                <MyAttendanceTodayWidget widget={modern.attendance_today} />
-                <MyAttendanceCalendarPreviewWidget widget={modern.attendance_calendar_preview} />
-                <MyLeaveBalanceWidget widget={modern.leave_balance} />
-                <MyUpcomingRosterWidget widget={modern.upcoming_roster} />
-                <MyPendingRequestsWidget widget={modern.pending_requests} />
-                <MyDocumentsKycWidget widget={modern.documents_kyc} />
-                <MyPayslipsWidget widget={modern.payslips} />
-                <MyApprovalsWidget widget={modern.my_approvals} />
-                <MyOffboardingStatusWidget widget={modern.offboarding_status} />
-                <MyAcknowledgementsWidget widget={modern.acknowledgements} />
-                <MySelfServiceActivityWidget widget={modern.recent_activity} />
+                {personalization.visibleWidgets.map((widget) => (
+                  <div key={widget.id} className={widget.size === "wide" ? "xl:col-span-2" : undefined}>
+                    {modernRenderers?.[widget.id as keyof typeof modernRenderers] ?? null}
+                  </div>
+                ))}
               </DashboardGrid>
             ) : (
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">

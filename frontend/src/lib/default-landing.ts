@@ -1,6 +1,6 @@
 import type { CurrentUser } from "@/types/auth";
 
-import { getVisibleNavigation } from "./navigation";
+import { getVisibleNavigation } from "@/config/navigation";
 import { hasAnyPermission, hasPermission } from "./permissions";
 
 export const adminDashboardPermissions = ["dashboard.view", "dashboard.view_company", "dashboard.view_outlet"];

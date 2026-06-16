@@ -1,16 +1,25 @@
-import { ChevronLeft, ChevronRight, Factory } from "lucide-react";
+import { Factory } from "lucide-react";
+import { useState } from "react";
+import { useLocation } from "react-router-dom";
 
-import { SidebarNavItem } from "@/components/layout/SidebarNavItem";
-import { Button } from "@/components/ui/button";
+import { SidebarCollapseButton } from "@/components/layout/SidebarCollapseButton";
+import { SidebarNavGroup } from "@/components/layout/SidebarNavGroup";
+import { SidebarSearch } from "@/components/layout/SidebarSearch";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { appConfig } from "@/app/config";
 import { useAuth } from "@/features/auth/auth.store";
-import { getVisibleNavigation } from "@/lib/navigation";
+import { getActiveNavigationItem, getVisibleNavigation, searchNavigation } from "@/config/navigation";
+import { useNavigationBadges } from "@/hooks/useNavigationBadges";
 import { cn } from "@/lib/utils";
 
 export const Sidebar = ({ collapsed, onCollapsedChange }: { collapsed: boolean; onCollapsedChange: (value: boolean) => void }) => {
   const { user, isLoading } = useAuth();
+  const location = useLocation();
+  const [query, setQuery] = useState("");
+  const badges = useNavigationBadges();
   const groups = getVisibleNavigation(user);
+  const filteredGroups = searchNavigation(groups, query);
+  const activePath = getActiveNavigationItem(groups, location.pathname)?.path ?? null;
 
   return (
     <aside className={cn("sticky top-0 hidden h-screen shrink-0 self-start border-r bg-card transition-[width] duration-200 lg:flex lg:flex-col", collapsed ? "w-16" : "w-64")}>
@@ -26,28 +35,20 @@ export const Sidebar = ({ collapsed, onCollapsedChange }: { collapsed: boolean; 
         ) : null}
       </div>
       <ScrollArea className="flex-1 px-2 py-3">
+        <SidebarSearch value={query} onChange={setQuery} collapsed={collapsed} />
         {isLoading ? (
           <div className="space-y-2 px-2 text-xs text-muted-foreground">Loading navigation...</div>
         ) : (
           <div className="space-y-5">
-            {groups.map((group) => (
-              <div key={group.label}>
-                {!collapsed ? <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</p> : null}
-                <div className="space-y-1">
-                  {group.items.map((item) => (
-                    <SidebarNavItem key={item.path} item={item} collapsed={collapsed} />
-                  ))}
-                </div>
-              </div>
+            {filteredGroups.map((group) => (
+              <SidebarNavGroup key={group.label} group={group} collapsed={collapsed} badges={badges} activePath={activePath} />
             ))}
+            {!collapsed && filteredGroups.length === 0 ? <p className="px-3 text-xs text-muted-foreground">No visible navigation matches your search.</p> : null}
           </div>
         )}
       </ScrollArea>
       <div className="border-t p-2">
-        <Button variant="ghost" size={collapsed ? "icon" : "sm"} className={cn(collapsed ? "mx-auto flex h-10 w-10 justify-center px-0" : "w-full justify-start")} onClick={() => onCollapsedChange(!collapsed)} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
-          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-          {!collapsed ? "Collapse" : null}
-        </Button>
+        <SidebarCollapseButton collapsed={collapsed} onToggle={() => onCollapsedChange(!collapsed)} />
       </div>
     </aside>
   );

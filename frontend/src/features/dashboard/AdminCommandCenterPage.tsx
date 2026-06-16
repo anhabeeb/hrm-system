@@ -5,6 +5,9 @@ import { EmptyState } from "@/components/data/EmptyState";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { Button } from "@/components/ui/button";
 import { DashboardGrid, WidgetCard } from "@/components/widgets";
+import { adminCommandCenterWidgetDefinitions } from "@/config/dashboardWidgets";
+import { DashboardCustomizeButton } from "@/features/dashboard-personalization/DashboardCustomizeButton";
+import { usePersonalizedWidgets } from "@/features/dashboard-personalization/dashboardPreferences.utils";
 import { ApiError } from "@/lib/api-errors";
 
 import { ApprovalCommandQueueWidget } from "./ApprovalCommandQueueWidget";
@@ -30,6 +33,7 @@ export const AdminCommandCenterPage = () => {
   const query = useQuery({ queryKey: ["dashboard-command-center"], queryFn: () => commandCenterApi.get() });
   const commandCenter = query.data?.data.data;
   const permissionDenied = isDashboardPermissionError(query.error);
+  const personalization = usePersonalizedWidgets("ADMIN_COMMAND_CENTER", adminCommandCenterWidgetDefinitions);
 
   if (query.isLoading) {
     return (
@@ -72,31 +76,42 @@ export const AdminCommandCenterPage = () => {
   }
 
   const widgets = commandCenter.widgets;
+  const renderers = {
+    "people-snapshot": <PeopleSnapshotWidget widget={widgets.people_snapshot} />,
+    "attendance-pulse": <AttendancePulseWidget widget={widgets.attendance_pulse} />,
+    "approval-queue": <ApprovalCommandQueueWidget widget={widgets.approval_queue} />,
+    "payroll-readiness": <PayrollReadinessWidget widget={widgets.payroll_readiness} />,
+    "department-health": <DepartmentHealthWidget widget={widgets.department_health} />,
+    "document-expiry": <DocumentExpiryWidget widget={widgets.document_expiry} />,
+    "roster-coverage": <RosterCoverageWidget widget={widgets.roster_coverage} />,
+    "employee-attention": <EmployeeAttentionWidget widget={widgets.employee_attention} />,
+    lifecycle: <LifecycleWidget widget={widgets.lifecycle} />,
+    "disciplinary-follow-up": <DisciplinaryFollowUpWidget widget={widgets.disciplinary_follow_up} />,
+    "operation-ownership-health": <OperationOwnershipHealthWidget widget={widgets.operation_ownership_health} />,
+    "recent-activity": <RecentActivityWidget widget={widgets.recent_activity} />,
+  } as const;
 
   return (
     <div className="min-h-full bg-slate-50/60">
       <div className="space-y-4 p-4 md:p-6">
+        <div className="flex justify-end">
+          <DashboardCustomizeButton
+            dashboardType="ADMIN_COMMAND_CENTER"
+            widgets={personalization.allWidgets}
+            isSaving={personalization.isSaving}
+            isResetting={personalization.isResetting}
+            onSaveLayout={personalization.saveLayout}
+            onResetLayout={() => personalization.resetLayout()}
+          />
+        </div>
         <CommandCenterHeader header={commandCenter.header} />
 
         <DashboardGrid>
-          <PeopleSnapshotWidget widget={widgets.people_snapshot} />
-          <AttendancePulseWidget widget={widgets.attendance_pulse} />
-          <PayrollReadinessWidget widget={widgets.payroll_readiness} />
-          <DocumentExpiryWidget widget={widgets.document_expiry} />
-          <RosterCoverageWidget widget={widgets.roster_coverage} />
-          <LifecycleWidget widget={widgets.lifecycle} />
-          <DisciplinaryFollowUpWidget widget={widgets.disciplinary_follow_up} />
-          <OperationOwnershipHealthWidget widget={widgets.operation_ownership_health} />
-        </DashboardGrid>
-
-        <DashboardGrid className="xl:grid-cols-2 2xl:grid-cols-2">
-          <ApprovalCommandQueueWidget widget={widgets.approval_queue} />
-          <EmployeeAttentionWidget widget={widgets.employee_attention} />
-        </DashboardGrid>
-
-        <DashboardGrid className="xl:grid-cols-2 2xl:grid-cols-2">
-          <DepartmentHealthWidget widget={widgets.department_health} />
-          <RecentActivityWidget widget={widgets.recent_activity} />
+          {personalization.visibleWidgets.map((widget) => (
+            <div key={widget.id} className={widget.size === "wide" ? "xl:col-span-2" : undefined}>
+              {renderers[widget.id as keyof typeof renderers] ?? null}
+            </div>
+          ))}
         </DashboardGrid>
       </div>
     </div>

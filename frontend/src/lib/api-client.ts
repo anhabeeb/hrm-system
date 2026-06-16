@@ -15,7 +15,7 @@ import {
   type ApiErrorDiagnostics,
 } from "./api-errors";
 
-type HttpMethod = "GET" | "POST" | "PATCH" | "DELETE";
+type HttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
 interface RequestOptions {
   headers?: Record<string, string>;
@@ -260,6 +260,7 @@ const request = async <T>(
 export const api = {
   get: <T>(path: string, options?: RequestOptions) => request<T>("GET", path, undefined, options),
   post: <T>(path: string, body?: unknown, options?: RequestOptions) => request<T>("POST", path, body, options),
+  put: <T>(path: string, body?: unknown, options?: RequestOptions) => request<T>("PUT", path, body, options),
   patch: <T>(path: string, body?: unknown, options?: RequestOptions) => request<T>("PATCH", path, body, options),
   delete: <T>(path: string, body?: unknown, options?: RequestOptions) => request<T>("DELETE", path, body, options),
   download: async (path: string) => {

@@ -4,6 +4,7 @@ import { authMiddleware } from "../middleware/auth.middleware";
 import { requireFeature } from "../middleware/feature.middleware";
 import { requireAnyPermission } from "../middleware/permission.middleware";
 import * as controller from "../modules/dashboard/dashboard.controller";
+import * as preferencesController from "../modules/dashboard-preferences/dashboard-preferences.controller";
 import type { AppContext } from "../types/api.types";
 
 const dashboardRoutes = new Hono<AppContext>();
@@ -13,6 +14,9 @@ dashboardRoutes.use("*", authMiddleware);
 dashboardRoutes.get("/", requireAnyPermission(["dashboard.view", "dashboard.view_company", "dashboard.view_outlet"]), controller.summary);
 dashboardRoutes.get("/summary", requireAnyPermission(["dashboard.view", "dashboard.view_company", "dashboard.view_outlet"]), controller.summary);
 dashboardRoutes.get("/command-center", requireAnyPermission(["dashboard.view", "dashboard.view_company", "dashboard.view_outlet"]), controller.commandCenter);
+dashboardRoutes.get("/preferences/:dashboardType", preferencesController.getPreference);
+dashboardRoutes.put("/preferences/:dashboardType", preferencesController.savePreference);
+dashboardRoutes.post("/preferences/:dashboardType/reset", preferencesController.resetPreference);
 dashboardRoutes.get("/attention", requireAnyPermission(["dashboard.view", "dashboard.view_company", "dashboard.view_outlet"]), controller.attention);
 dashboardRoutes.get("/attendance-today", requireFeature("attendance"), requireAnyPermission(["dashboard.attendance.view", "attendance.view", "attendance.reports.view"]), controller.attendanceToday);
 dashboardRoutes.get("/approvals", requireFeature("leave"), requireAnyPermission(["dashboard.leave.view", "leave.view", "leave.approvals.view"]), controller.approvals);

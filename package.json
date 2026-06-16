@@ -50,6 +50,8 @@
     "verify:department-weekly-team-view": "node scripts/verify-department-weekly-team-view.mjs",
     "verify:roster-weekly-matrix-view": "node scripts/verify-roster-weekly-matrix-view.mjs",
     "verify:module-landing-page-modernization": "node scripts/verify-module-landing-page-modernization.mjs",
+    "verify:sidebar-navigation-modernization": "node scripts/verify-sidebar-navigation-modernization.mjs",
+    "verify:dashboard-personalization": "node scripts/verify-dashboard-personalization.mjs",
     "verify:employee-login-assignment": "node scripts/verify-employee-login-assignment.mjs",
     "verify:employee-structure": "node scripts/verify-employee-structure.mjs",
     "verify:approval-workflow-engine": "node scripts/verify-approval-workflow-engine.mjs",
