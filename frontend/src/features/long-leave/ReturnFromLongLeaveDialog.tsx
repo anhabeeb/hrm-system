@@ -1,10 +1,10 @@
 import { useState } from "react";
 
 import { FormError } from "@/components/feedback/FormError";
+import { AppDatePicker } from "@/components/forms/AppDatePicker";
 import { LoadingButton } from "@/components/forms/LoadingButton";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -31,7 +31,7 @@ export const ReturnFromLongLeaveDialog = ({
           <DialogDescription>Confirming return may affect payroll-impact records for the return month.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
-          <Label className="space-y-1 text-sm">Actual return date<Input type="date" value={actualReturnDate} onChange={(event) => setActualReturnDate(event.target.value)} /></Label>
+          <AppDatePicker label="Actual return date" value={actualReturnDate} onChange={(value) => setActualReturnDate(value ?? "")} />
           <Label className="space-y-1 text-sm">Reason<Textarea value={reason} onChange={(event) => setReason(event.target.value)} /></Label>
           <FormError message={error ?? undefined} />
         </div>

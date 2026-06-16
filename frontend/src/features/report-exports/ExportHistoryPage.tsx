@@ -46,7 +46,7 @@ export const ExportHistoryPage = () => {
             ) },
           ]}
           emptyTitle="No export jobs found"
-          emptyDescription="CSV exports and print previews you create will appear here."
+          emptyDescription="Excel and PDF report exports you create will appear here."
         />
       </div>
     </div>

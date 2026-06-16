@@ -12,6 +12,7 @@ export interface SelfProfile {
     id: string;
     employee_code: string | null;
     full_name: string | null;
+    profile_photo_url?: string | null;
     department_id: string | null;
     department_name: string | null;
     position_id: string | null;

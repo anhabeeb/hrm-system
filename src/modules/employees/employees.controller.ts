@@ -11,6 +11,7 @@ import {
   validateEmployeeLoginUpdateInput,
   validateEmployeeListFilters,
   validateEmployeeNoteInput,
+  validateEmployeeProfilePhotoInput,
   validateEmployeeStatusInput,
   validateEmployeeUpdateInput,
   validateJobChangeInput,
@@ -132,6 +133,39 @@ export const getEmployee = async (c: Context<AppContext>) =>
   ok(
     { employee: await employeesService.getEmployee(c.env, actor(c), requiredId(c)) },
     "Employee loaded successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const getEmployeeProfilePhoto = async (c: Context<AppContext>) => {
+  const object = await employeesService.getEmployeeProfilePhoto(c.env, actor(c), requiredId(c));
+  const headers = new Headers();
+  object.writeHttpMetadata(headers);
+  headers.set("etag", object.httpEtag);
+  headers.set("cache-control", "private, max-age=300");
+  return new Response(object.body, { headers });
+};
+
+export const updateEmployeeProfilePhoto = async (c: Context<AppContext>) =>
+  ok(
+    await employeesService.updateEmployeeProfilePhoto(
+      c.env,
+      actor(c),
+      requiredId(c),
+      validateEmployeeProfilePhotoInput(await readJson(c)),
+    ),
+    "Employee profile picture updated successfully.",
+    { requestId: c.get("requestId") },
+  );
+
+export const removeEmployeeProfilePhoto = async (c: Context<AppContext>) =>
+  ok(
+    await employeesService.removeEmployeeProfilePhoto(
+      c.env,
+      actor(c),
+      requiredId(c),
+      await reasonFromBody(c),
+    ),
+    "Employee profile picture removed successfully.",
     { requestId: c.get("requestId") },
   );
 

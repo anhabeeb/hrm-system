@@ -28,7 +28,9 @@ describe("reports foundation", () => {
   });
 
   it("validates report generation input", () => {
-    expect(validateGenerateReport({ report_key: "employee_summary", format: "json" }).report_key).toBe("employee_summary");
+    expect(validateGenerateReport({ report_key: "employee_summary", format: "xlsx" }).report_key).toBe("employee_summary");
+    expect(validateGenerateReport({ report_key: "employee_summary", format: "pdf" }).format).toBe("pdf");
+    expect(() => validateGenerateReport({ report_key: "employee_summary", format: "json" })).toThrow(ValidationError);
     expect(() => validateGenerateReport({ report_key: "", format: "pdf" })).toThrow(ValidationError);
   });
 

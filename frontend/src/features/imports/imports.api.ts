@@ -5,8 +5,6 @@ import type { ImportFilters, ImportJob, ImportListResponse, ImportPreviewPayload
 export const importsApi = {
   templates: () => api.get<{ data: ImportTemplate[]; generated_at: string }>("/imports/templates"),
   template: (importType: string) => api.get<{ data: ImportTemplate; generated_at: string }>(`/imports/templates/${encodeURIComponent(importType)}`),
-  templateCsvUrl: (importType: string) => `/imports/templates/${encodeURIComponent(importType)}/csv`,
-  downloadTemplateCsv: (importType: string) => api.download(`/imports/templates/${encodeURIComponent(importType)}/csv`),
   jobs: (filters: ImportFilters = {}) => api.get<ImportListResponse<ImportJob>>(`/imports/jobs${buildQueryString(filters)}`),
   job: (id: string) => api.get<{ job: ImportJob }>(`/imports/jobs/${id}`),
   rows: (id: string, filters: ImportFilters = {}) => api.get<ImportListResponse<ImportRow>>(`/imports/jobs/${id}/rows${buildQueryString(filters)}`),

@@ -66,6 +66,7 @@ export interface RosterMatrixEmployee {
   id: string;
   employee_no: string | null;
   name: string;
+  profile_photo_url?: string | null;
   department_name: string | null;
   position_name: string | null;
   level: number | null;

@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { FormError } from "@/components/feedback/FormError";
+import { AppMonthPicker } from "@/components/forms/AppMonthPicker";
 import { LoadingButton } from "@/components/forms/LoadingButton";
 import { EmployeeCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
@@ -37,7 +38,7 @@ export const SalaryLoanForm = ({
             <Label className="space-y-1 text-sm">Loan amount<Input type="number" min="1" step="1" value={payload.loan_amount} onChange={(event) => setPayload((current) => ({ ...current, loan_amount: event.target.value }))} /></Label>
             <Label className="space-y-1 text-sm">Installment amount<Input type="number" min="1" step="1" value={payload.installment_amount} onChange={(event) => setPayload((current) => ({ ...current, installment_amount: event.target.value }))} /></Label>
           </div>
-          <Label className="space-y-1 text-sm">Start month<Input type="month" value={payload.start_month} onChange={(event) => setPayload((current) => ({ ...current, start_month: event.target.value }))} /></Label>
+          <AppMonthPicker label="Start month" value={payload.start_month} onChange={(value) => setPayload((current) => ({ ...current, start_month: value ?? "" }))} />
           <Label className="space-y-1 text-sm">Reason<Textarea value={payload.reason} onChange={(event) => setPayload((current) => ({ ...current, reason: event.target.value }))} /></Label>
           <FormError message={error ?? undefined} />
         </div>

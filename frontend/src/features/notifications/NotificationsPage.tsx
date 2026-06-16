@@ -7,6 +7,7 @@ import { DataTable } from "@/components/data/DataTable";
 import { RowActions } from "@/components/data/RowActions";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { AppDateRangePicker } from "@/components/forms/AppDateRangePicker";
 import { PageActionBar } from "@/components/layout/PageActionBar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -167,8 +168,13 @@ export const NotificationsPage = () => {
           <Label className="space-y-1 text-xs font-medium text-muted-foreground">Status<Select value={filters.status ?? "active"} onValueChange={(value) => updateFilters({ status: value === "active" ? undefined : value, include_archived: value === "archived" || value === "dismissed" ? true : filters.include_archived })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Active</SelectItem>{statuses.map((status) => <SelectItem key={status} value={status}>{label(status)}</SelectItem>)}</SelectContent></Select></Label>
           <Label className="space-y-1 text-xs font-medium text-muted-foreground">Category<Select value={filters.category ?? "all"} onValueChange={(value) => updateFilters({ category: value === "all" ? undefined : value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All categories</SelectItem>{categories.map((category) => <SelectItem key={category} value={category}>{label(category)}</SelectItem>)}</SelectContent></Select></Label>
           <Label className="space-y-1 text-xs font-medium text-muted-foreground">Priority<Select value={filters.priority ?? "all"} onValueChange={(value) => updateFilters({ priority: value === "all" ? undefined : value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All priorities</SelectItem>{priorities.map((priority) => <SelectItem key={priority} value={priority}>{label(priority)}</SelectItem>)}</SelectContent></Select></Label>
-          <Label className="space-y-1 text-xs font-medium text-muted-foreground">From<Input type="date" value={filters.from_date ?? ""} onChange={(event) => updateFilters({ from_date: event.target.value })} /></Label>
-          <Label className="space-y-1 text-xs font-medium text-muted-foreground">To<Input type="date" value={filters.to_date ?? ""} onChange={(event) => updateFilters({ to_date: event.target.value })} /></Label>
+          <div className="md:col-span-2">
+            <AppDateRangePicker
+              dateFrom={filters.from_date}
+              dateTo={filters.to_date}
+              onChange={({ dateFrom, dateTo }) => updateFilters({ from_date: dateFrom, to_date: dateTo })}
+            />
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-card p-3 text-sm">
           <Badge>Unread: {countQuery.data?.data.unread_count ?? 0}</Badge>

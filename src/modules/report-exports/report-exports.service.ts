@@ -13,6 +13,7 @@ import { createAuditLog } from "../../services/audit.service";
 import * as permissionService from "../../services/permission.service";
 import type { AuthActor, PaginationMeta } from "../../types/api.types";
 import { AppError, NotFoundError, PermissionError } from "../../utils/errors";
+import { excelContentType, generateExcelWorkbook, generatePdfReport, pdfContentType } from "../../utils/export-file-format";
 import { createPrefixedId } from "../../utils/ids";
 import * as repository from "./report-exports.repository";
 import type {
@@ -28,8 +29,8 @@ import type {
 
 const MAX_EXPORT_ROWS = 5000;
 const MAX_PRINT_ROWS = 500;
-const supportedDownloadFormats = new Set<ReportExportFormat>(["csv"]);
-const dangerousFormula = /^[=+\-@]/;
+const supportedDownloadFormats = new Set<ReportExportFormat>(["xlsx", "pdf"]);
+type InternalReportFormat = ReportExportFormat | "print_html";
 const unsafeKeys = new Set([
   "metadata_json",
   "raw_metadata",
@@ -56,7 +57,7 @@ const attendanceCatalog: ReportExportCatalogItem[] = [
   category: "attendance" as const,
   required_permission: key === "exceptions" ? "attendance.exceptions.view" : key === "device_punches" ? "attendance.device_punches.view" : "attendance.reports.view",
   route: `/api/v1/attendance/reports/${key === "employee_detail" ? "employee/:employeeId" : key.replace("_", "-")}`,
-  formats: ["csv", "print_html"],
+  formats: ["xlsx", "pdf"],
   export_ready: true as const,
   sensitive: false,
   columns: [
@@ -81,7 +82,7 @@ const expiryCatalog: ReportExportCatalogItem[] = [
     category: "expiry",
     required_permission: "expiry_alerts.view",
     route: "/api/v1/expiry-alerts",
-    formats: ["csv", "print_html"],
+    formats: ["xlsx", "pdf"],
     export_ready: true,
     sensitive: true,
     columns: [
@@ -106,7 +107,7 @@ const employeeProfileCatalog: ReportExportCatalogItem[] = [
     category: "employee_profile",
     required_permission: "report_exports.employee_profile.print",
     route: "/api/v1/report-exports/employee/:employeeId/print",
-    formats: ["print_html", "csv"],
+    formats: ["xlsx", "pdf"],
     export_ready: true,
     sensitive: true,
     columns: [
@@ -128,7 +129,7 @@ const hrCatalog = (): ReportExportCatalogItem[] => HR_REPORT_DEFINITIONS.map((de
   category: "hr",
   required_permission: definition.required_permission,
   route: definition.route,
-  formats: ["csv", "print_html"],
+  formats: ["xlsx", "pdf"],
   export_ready: true,
   sensitive: definition.columns.some((column) => ["passport", "work_permit", "national_id", "phone", "email"].some((key) => column.key.includes(key))),
   columns: definition.columns.map((column) => ({
@@ -146,7 +147,7 @@ const payrollCatalog = (): ReportExportCatalogItem[] => PAYROLL_REPORT_DEFINITIO
   category: "payroll",
   required_permission: definition.required_permission,
   route: definition.route,
-  formats: ["csv", "print_html"],
+  formats: ["xlsx", "pdf"],
   export_ready: true,
   sensitive: definition.sensitive,
   columns: definition.columns.map((column) => ({
@@ -221,7 +222,7 @@ const requireCatalogItem = (reportKey: string) => {
   return item;
 };
 
-const requireBoundedExport = (reportKey: string, filters: Record<string, unknown>, format: ReportExportFormat): Record<string, unknown> => {
+const requireBoundedExport = (reportKey: string, filters: Record<string, unknown>, format: InternalReportFormat): Record<string, unknown> => {
   const hasDate = Boolean(filters.from_date || filters.to_date || filters.date || filters.month || filters.payroll_month || filters.as_of_date || filters.employee_id);
   const historyHeavy = /audit|lifecycle|history|device_punches|exceptions|employee_detail/.test(reportKey);
   if (historyHeavy && !hasDate) {
@@ -256,25 +257,25 @@ const normalizeDataResult = (
   };
 };
 
-export const escapeCsvValue = (value: unknown) => {
-  if (value === null || value === undefined) return "";
-  const stringValue = typeof value === "object" ? JSON.stringify(value) : String(value);
-  const safeValue = dangerousFormula.test(stringValue) ? `'${stringValue}` : stringValue;
-  return /[",\n\r]/.test(safeValue) ? `"${safeValue.replace(/"/g, '""')}"` : safeValue;
+const buildDownloadFile = (data: ResolvedReportData, format: ReportExportFormat) => {
+  const columns = data.columns.map((column) => ({ key: column.key, label: column.label }));
+  const safeName = data.report_key.replace(/[:/]/g, "-");
+  if (format === "pdf") {
+    const body = generatePdfReport(data.report_name, columns, data.rows);
+    return { body, contentType: pdfContentType, fileName: `${safeName}-${data.generated_at.slice(0, 10)}.pdf` };
+  }
+  const body = generateExcelWorkbook(data.report_name, columns, data.rows);
+  return { body, contentType: excelContentType, fileName: `${safeName}-${data.generated_at.slice(0, 10)}.xlsx` };
 };
 
-export const generateCsv = (columns: ReportExportColumn[], rows: Array<Record<string, unknown>>) => {
-  const header = columns.map((column) => escapeCsvValue(column.label)).join(",");
-  const body = rows.map((row) => columns.map((column) => escapeCsvValue(row[column.key])).join(",")).join("\n");
-  return `\uFEFF${header}${body ? `\n${body}` : ""}\n`;
-};
+const exportBodySize = (body: string | Uint8Array) => typeof body === "string" ? new TextEncoder().encode(body).length : body.byteLength;
 
 const runReport = async (
   env: Env,
   actor: AuthActor,
   item: ReportExportCatalogItem,
   filtersInput: Record<string, unknown>,
-  format: ReportExportFormat,
+  format: InternalReportFormat,
 ): Promise<ResolvedReportData> => {
   const filters = requireBoundedExport(item.report_key, filtersInput, format);
   const [namespace, key] = item.report_key.split(":");
@@ -338,15 +339,15 @@ export const getExportCatalog = (actor: AuthActor) => ({
 
 export const previewExport = async (env: Env, actor: AuthActor, input: ReportExportPreviewInput) => {
   const item = requireCatalogItem(input.report_key);
-  requireExportPermission(actor, item, input.format === "print_html" ? "print" : "preview");
+  requireExportPermission(actor, item, "preview");
   if (input.format && !item.formats.includes(input.format)) {
     throw new AppError("This export format is not supported for the selected report.", "REPORT_EXPORT_FORMAT_UNSUPPORTED", 400);
   }
-  if (input.format && !supportedDownloadFormats.has(input.format) && input.format !== "print_html") {
-    throw new AppError("XLSX and PDF server generation are not enabled in this Worker. Use CSV or the browser print view.", "REPORT_EXPORT_FORMAT_UNSUPPORTED", 400);
+  if (input.format && !supportedDownloadFormats.has(input.format)) {
+    throw new AppError("Only Excel and PDF report exports are supported.", "REPORT_EXPORT_FORMAT_UNSUPPORTED", 400);
   }
-  const data = await runReport(env, actor, item, input.filters ?? {}, input.format ?? "csv");
-  const maxRows = input.format === "print_html" ? MAX_PRINT_ROWS : MAX_EXPORT_ROWS;
+  const data = await runReport(env, actor, item, input.filters ?? {}, input.format ?? "xlsx");
+  const maxRows = MAX_EXPORT_ROWS;
   if (data.rows.length > maxRows) throw new AppError("This export is too large. Please narrow your filters.", "REPORT_EXPORT_TOO_LARGE", 400);
   const sensitiveColumns = data.columns.filter((column) => column.sensitive || column.redacted);
   if (sensitiveColumns.length > 0) {
@@ -354,7 +355,7 @@ export const previewExport = async (env: Env, actor: AuthActor, input: ReportExp
   }
   return {
     report_key: data.report_key,
-    format: input.format ?? "csv",
+    format: input.format ?? "xlsx",
     row_count: data.rows.length,
     columns: data.columns,
     redaction: { level: data.redaction_level, redacted_columns: data.columns.filter((column) => column.redacted).map((column) => column.key) },
@@ -366,9 +367,9 @@ export const previewExport = async (env: Env, actor: AuthActor, input: ReportExp
 
 export const createExportJob = async (env: Env, actor: AuthActor, input: ReportExportCreateInput) => {
   const item = requireCatalogItem(input.report_key);
-  requireExportPermission(actor, item, input.format === "print_html" ? "print" : "create");
-  if (!supportedDownloadFormats.has(input.format) && input.format !== "print_html") {
-    throw new AppError("XLSX and PDF server generation are not enabled in this Worker. Use CSV or the browser print view.", "REPORT_EXPORT_FORMAT_UNSUPPORTED", 400);
+  requireExportPermission(actor, item, "create");
+  if (!supportedDownloadFormats.has(input.format)) {
+    throw new AppError("Only Excel and PDF report exports are supported.", "REPORT_EXPORT_FORMAT_UNSUPPORTED", 400);
   }
   const filters = requireBoundedExport(item.report_key, input.filters ?? {}, input.format);
   const idempotencyKey = input.idempotency_key ?? `${actor.actorUserId}:${item.report_key}:${input.format}:${stringifyFilters(filters)}`;
@@ -400,7 +401,7 @@ export const createExportJob = async (env: Env, actor: AuthActor, input: ReportE
     sensitive_export: item.sensitive ? 1 : 0,
     redaction_level: "pending",
     idempotency_key: idempotencyKey,
-    metadata_json: JSON.stringify({ storage_mode: "streamed_csv", worker_safe: true }),
+    metadata_json: JSON.stringify({ storage_mode: "generated_file", worker_safe: true }),
     created_at: now,
     updated_at: now,
   };
@@ -423,12 +424,11 @@ export const generateExport = async (env: Env, actor: AuthActor, jobId: string) 
   try {
     const item = requireCatalogItem(job.report_key);
     const data = await runReport(env, actor, item, parseJobFilters(job), job.format as ReportExportFormat);
-    const csv = generateCsv(data.columns, data.rows);
-    const fileName = `${job.report_key.replace(/[:/]/g, "-")}-${now.slice(0, 10)}.csv`;
+    const file = buildDownloadFile(data, job.format as ReportExportFormat);
     const completed = await repository.markCompleted(env, actor.companyId, job.id, {
       rowCount: data.rows.length,
-      fileName,
-      fileSize: new TextEncoder().encode(csv).length,
+      fileName: file.fileName,
+      fileSize: exportBodySize(file.body),
       columnsJson: JSON.stringify(data.columns),
       completedAt: now,
     });
@@ -436,7 +436,7 @@ export const generateExport = async (env: Env, actor: AuthActor, jobId: string) 
       throw new AppError("This export job could not be completed because its status changed.", "REPORT_EXPORT_INVALID_STATUS", 409);
     }
     await auditExport(env, actor, "report_export_generated", item, { export_job_id: job.id, row_count: data.rows.length, sensitive_export: data.sensitive });
-    return { export_job: safeJob(await repository.getJob(env, actor.companyId, job.id) ?? job), csv, data };
+    return { export_job: safeJob(await repository.getJob(env, actor.companyId, job.id) ?? job), file, data };
   } catch (error) {
     await repository.markFailed(env, actor.companyId, job.id, { code: "REPORT_EXPORT_GENERATION_FAILED", message: safeFailure(error), failedAt: now });
     await auditExport(env, actor, "report_export_failed", requireCatalogItem(job.report_key), { export_job_id: job.id, failure: safeFailure(error) });
@@ -451,9 +451,9 @@ export const downloadExport = async (env: Env, actor: AuthActor, jobId: string) 
   }
   const item = requireCatalogItem(job.report_key);
   const data = await runReport(env, actor, item, parseJobFilters(job), job.format as ReportExportFormat);
-  const csv = generateCsv(data.columns, data.rows);
+  const file = buildDownloadFile(data, job.format as ReportExportFormat);
   await auditExport(env, actor, "report_export_downloaded", item, { export_job_id: jobId, row_count: data.rows.length });
-  return { export_job: safeJob(job), csv, data, regenerated: true };
+  return { export_job: safeJob(job), file, data, regenerated: true };
 };
 
 export const printReport = async (env: Env, actor: AuthActor, reportKey: string, filters: Record<string, unknown>) => {

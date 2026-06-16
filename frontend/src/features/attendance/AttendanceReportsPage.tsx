@@ -7,10 +7,11 @@ import { DataTable } from "@/components/data/DataTable";
 import { RowActions } from "@/components/data/RowActions";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { AppDateRangePicker } from "@/components/forms/AppDateRangePicker";
+import { AppMonthPicker } from "@/components/forms/AppMonthPicker";
 import { LookupCombobox } from "@/components/selectors/LookupCombobox";
 import { lookupApi } from "@/components/selectors/lookup-api";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/features/auth/auth.store";
@@ -175,18 +176,14 @@ export const AttendanceReportsPage = () => {
         </div>
         <div className="rounded-lg border bg-card p-4 shadow-sm">
           <div className="grid gap-3 md:grid-cols-4">
-            <div className="space-y-1">
-              <Label>From</Label>
-              <Input type="date" value={filters.from_date ?? ""} onChange={(event) => updateFilters({ from_date: event.target.value })} />
+            <div className="md:col-span-2">
+              <AppDateRangePicker
+                dateFrom={filters.from_date}
+                dateTo={filters.to_date}
+                onChange={({ dateFrom, dateTo }) => updateFilters({ from_date: dateFrom, to_date: dateTo })}
+              />
             </div>
-            <div className="space-y-1">
-              <Label>To</Label>
-              <Input type="date" value={filters.to_date ?? ""} onChange={(event) => updateFilters({ to_date: event.target.value })} />
-            </div>
-            <div className="space-y-1">
-              <Label>Month</Label>
-              <Input type="month" value={filters.month ?? ""} onChange={(event) => updateFilters({ month: event.target.value })} />
-            </div>
+            <AppMonthPicker label="Month" value={filters.month} onChange={(value) => updateFilters({ month: value })} />
             <div className="space-y-1">
               <Label>Employee</Label>
               <LookupCombobox value={filters.employee_id} onChange={(employee_id) => updateFilters({ employee_id })} queryKey={["lookups", "employees"]} queryFn={lookupApi.employees} placeholder="All employees" />
@@ -266,7 +263,7 @@ export const AttendanceReportsPage = () => {
             ) : <InlineAlert title="Device punch reports are not available for your role." />}
           </TabsContent>
         </Tabs>
-        {activeQuery.data?.generated_at ? <p className="text-xs text-muted-foreground">Generated at {formatDateTime(activeQuery.data.generated_at)}. Report data is export-ready JSON; final export files come later.</p> : null}
+        {activeQuery.data?.generated_at ? <p className="text-xs text-muted-foreground">Generated at {formatDateTime(activeQuery.data.generated_at)}. Use Download Excel or Download PDF for production report files.</p> : null}
       </div>
     </div>
   );

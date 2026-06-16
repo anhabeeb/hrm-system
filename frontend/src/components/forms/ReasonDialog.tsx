@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 
 import { FormError } from "@/components/feedback/FormError";
@@ -11,6 +12,8 @@ export const ReasonDialog = ({
   title,
   description,
   confirmLabel = "Submit",
+  confirmDisabled,
+  children,
   loading,
   error,
   onOpenChange,
@@ -20,6 +23,8 @@ export const ReasonDialog = ({
   title: string;
   description: string;
   confirmLabel?: string;
+  confirmDisabled?: boolean;
+  children?: ReactNode;
   loading?: boolean;
   error?: string | null;
   onOpenChange: (open: boolean) => void;
@@ -51,6 +56,7 @@ export const ReasonDialog = ({
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
+        {children}
         <Textarea value={reason} placeholder="Reason" onChange={(event) => setReason(event.target.value)} />
         {localError ? <FormError message={localError} /> : null}
         {error ? <FormError message={error} /> : null}
@@ -58,7 +64,7 @@ export const ReasonDialog = ({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <LoadingButton loading={loading} onClick={submit}>
+          <LoadingButton loading={loading} disabled={confirmDisabled} onClick={submit}>
             {confirmLabel}
           </LoadingButton>
         </DialogFooter>

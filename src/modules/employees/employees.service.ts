@@ -11,6 +11,7 @@ import type {
   EmployeeListRow,
   EmployeePersistInput,
   EmployeeNoteInput,
+  EmployeeProfilePhotoInput,
   EmployeeRecord,
   EmployeeStatusInput,
   PayrollEligibilityResult,
@@ -350,19 +351,39 @@ const maskValue = (value: string | null): string | null => {
   return `${"*".repeat(Math.max(value.length - 4, 4))}${value.slice(-4)}`;
 };
 
+const profilePhotoUrlFor = (
+  employee: Pick<EmployeeRecord, "id"> & {
+    profile_photo_key?: string | null;
+    profile_photo_updated_at?: string | null;
+  },
+) =>
+  employee.profile_photo_key
+    ? `/api/v1/employees/${employee.id}/profile-photo${
+        employee.profile_photo_updated_at ? `?v=${encodeURIComponent(employee.profile_photo_updated_at)}` : ""
+      }`
+    : null;
+
 const maskEmployee = <T extends EmployeeListRow | EmployeeRecord>(
   employee: T,
   includeSensitive: boolean,
-): T =>
-  includeSensitive
-    ? employee
+): T => {
+  const { profile_photo_key: _profilePhotoKey, ...withoutPrivatePhotoKey } =
+    employee as T & { profile_photo_key?: string | null };
+  const safeEmployee = {
+    ...withoutPrivatePhotoKey,
+    profile_photo_url: profilePhotoUrlFor(employee),
+  } as T;
+
+  return includeSensitive
+    ? safeEmployee
     : {
-        ...employee,
+        ...safeEmployee,
         id_card_number: maskValue(employee.id_card_number),
         passport_number: maskValue(employee.passport_number),
         work_permit_number: maskValue(employee.work_permit_number),
         bank_name: null,
       };
+};
 
 const normalizeOptionalText = (
   value: string | null | undefined,
@@ -816,6 +837,127 @@ export const getEmployee = async (
   context: AuthActor,
   employeeId: string,
 ) => maskEmployee(await ensureEmployeeAccess(env, context, employeeId), hasSensitivePermission(context));
+
+const profilePhotoPermissions = [
+  "employees.profilePhoto.upload",
+  "employees.profilePhoto.manage",
+  "employees.edit",
+  "employees.manage",
+];
+
+const viewProfilePhotoPermissions = [
+  "employees.profilePhoto.view",
+  "employees.view",
+  "employees.profile.view",
+];
+
+const decodeProfilePhotoBase64 = (value: string): Uint8Array => {
+  let binary = "";
+  try {
+    binary = atob(value);
+  } catch {
+    throw new AppError("The profile picture content is invalid.", "PROFILE_PHOTO_CONTENT_INVALID", 400);
+  }
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  if (bytes.byteLength === 0) throw new AppError("The profile picture is empty.", "PROFILE_PHOTO_EMPTY", 400);
+  return bytes;
+};
+
+const buildProfilePhotoKey = (companyId: string, employeeId: string, fileName: string) =>
+  `${companyId}/employees/${employeeId}/profile-photos/${createPrefixedId("profile_photo")}-${fileName.replace(/[^A-Za-z0-9._-]/g, "_")}`;
+
+export const updateEmployeeProfilePhoto = async (
+  env: Env,
+  context: AuthActor,
+  employeeId: string,
+  input: EmployeeProfilePhotoInput,
+) => {
+  if (!permissionService.hasAnyPermission(context, profilePhotoPermissions)) {
+    throw new PermissionError("You do not have permission to update employee profile pictures.");
+  }
+  const employee = await ensureEmployeeAccess(env, context, employeeId);
+  const bytes = decodeProfilePhotoBase64(input.content_base64);
+  const timestamp = new Date().toISOString();
+  const fileKey = buildProfilePhotoKey(context.companyId, employeeId, input.file_name);
+
+  await env.DOCUMENTS_BUCKET.put(fileKey, bytes, {
+    httpMetadata: { contentType: input.mime_type },
+    customMetadata: { employee_id: employeeId, purpose: "employee_profile_photo", uploaded_by: context.actorUserId },
+  });
+  await employeesRepository.updateEmployeeProfilePhoto(env, context.companyId, employeeId, {
+    profilePhotoKey: fileKey,
+    actorUserId: context.actorUserId,
+    timestamp,
+  });
+  if (employee.profile_photo_key) {
+    await env.DOCUMENTS_BUCKET.delete(employee.profile_photo_key).catch(() => undefined);
+  }
+  await ensureAudit(env, context, {
+    action: "employee_profile_photo_updated",
+    entityType: "employee",
+    entityId: employeeId,
+    employeeId,
+    outletId: employee.primary_outlet_id,
+    oldValue: { had_profile_photo: Boolean(employee.profile_photo_key) },
+    newValue: { mime_type: input.mime_type, file_name: input.file_name },
+    reason: input.reason,
+  });
+
+  const updated = await employeesRepository.findEmployeeById(env, context.companyId, employeeId);
+  return { employee: updated ? maskEmployee(updated, hasSensitivePermission(context)) : null };
+};
+
+export const removeEmployeeProfilePhoto = async (
+  env: Env,
+  context: AuthActor,
+  employeeId: string,
+  reason: string,
+) => {
+  if (!permissionService.hasAnyPermission(context, ["employees.profilePhoto.manage", "employees.edit", "employees.manage"])) {
+    throw new PermissionError("You do not have permission to remove employee profile pictures.");
+  }
+  const employee = await ensureEmployeeAccess(env, context, employeeId);
+  await employeesRepository.updateEmployeeProfilePhoto(env, context.companyId, employeeId, {
+    profilePhotoKey: null,
+    actorUserId: context.actorUserId,
+    timestamp: new Date().toISOString(),
+  });
+  if (employee.profile_photo_key) {
+    await env.DOCUMENTS_BUCKET.delete(employee.profile_photo_key).catch(() => undefined);
+  }
+  await ensureAudit(env, context, {
+    action: "employee_profile_photo_removed",
+    entityType: "employee",
+    entityId: employeeId,
+    employeeId,
+    outletId: employee.primary_outlet_id,
+    oldValue: { had_profile_photo: Boolean(employee.profile_photo_key) },
+    newValue: { had_profile_photo: false },
+    reason,
+  });
+  const updated = await employeesRepository.findEmployeeById(env, context.companyId, employeeId);
+  return { employee: updated ? maskEmployee(updated, hasSensitivePermission(context)) : null };
+};
+
+export const getEmployeeProfilePhoto = async (
+  env: Env,
+  context: AuthActor,
+  employeeId: string,
+) => {
+  if (!permissionService.hasAnyPermission(context, viewProfilePhotoPermissions)) {
+    throw new PermissionError("You do not have permission to view employee profile pictures.");
+  }
+  const employee = await ensureEmployeeAccess(env, context, employeeId);
+  if (!employee.profile_photo_key) {
+    throw new NotFoundError("This employee does not have a profile picture.");
+  }
+  const object = await env.DOCUMENTS_BUCKET.get(employee.profile_photo_key);
+  if (!object) {
+    throw new NotFoundError("The employee profile picture could not be found.");
+  }
+  return object;
+};
 
 export const listEmployeeLoginLinkCandidates = async (
   env: Env,

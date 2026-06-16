@@ -36,9 +36,10 @@ export const DataTable = <T,>({
   onPageChange,
   onPageSizeChange,
 }: DataTableProps<T>) => (
-  <div className="space-y-3">
-    <div className="table-surface overflow-x-auto">
-      <Table>
+  <div className="w-full min-w-0 space-y-3 overflow-hidden">
+    <div className="table-surface w-full min-w-0 overflow-hidden">
+      <div className="w-full overflow-x-auto">
+        <Table className="min-w-max w-full">
         <TableHeader className="bg-muted/60">
           <TableRow>
             {columns.map((column) => (
@@ -90,7 +91,8 @@ export const DataTable = <T,>({
             ))
           )}
         </TableBody>
-      </Table>
+        </Table>
+      </div>
     </div>
     {pagination ? (
       <PaginationBar

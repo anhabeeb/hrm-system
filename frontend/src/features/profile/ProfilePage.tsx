@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 
 import { DetailSection } from "@/components/data/DetailSection";
+import { EmployeeAvatar } from "@/components/employees/EmployeeAvatar";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { PageActionBar } from "@/components/layout/PageActionBar";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,15 @@ export const ProfilePage = () => {
         <Button asChild><Link to="/profile/kyc-update">Request profile update</Link></Button>
       </PageActionBar>
       <div className="space-y-4 p-4 md:p-6">
+        <div className="flex min-w-0 items-center gap-3 rounded-lg border bg-card p-4">
+          <EmployeeAvatar name={user?.full_name ?? user?.email} employeeCode={user?.employee_id ?? undefined} size="lg" />
+          <div className="min-w-0">
+            <p className="truncate text-base font-semibold">{user?.full_name ?? user?.email ?? "Account profile"}</p>
+            <p className="truncate text-sm text-muted-foreground">
+              {user?.employee_id ? `Linked employee: ${user.employee_id}` : "Standalone account · no employee photo required"}
+            </p>
+          </div>
+        </div>
         <DetailSection
           title="Account details"
           rows={[

@@ -1,4 +1,5 @@
 import { DataTable } from "@/components/data/DataTable";
+import { EmployeeAvatar } from "@/components/employees/EmployeeAvatar";
 import { RowActions } from "@/components/data/RowActions";
 import { EmployeeStatusBadge } from "./EmployeeStatusBadge";
 import { displayDate } from "./employee-format";
@@ -44,7 +45,16 @@ export const EmployeeList = ({
     emptyDescription="Try adjusting filters or add the first employee if you have permission."
     columns={[
       { key: "employee_code", header: "Employee ID" },
-      { key: "full_name", header: "Full Name" },
+      {
+        key: "full_name",
+        header: "Full Name",
+        cell: (row) => (
+          <div className="flex min-w-0 items-center gap-2">
+            <EmployeeAvatar name={row.full_name} employeeCode={row.employee_code} photoUrl={row.profile_photo_url} size="sm" />
+            <span className="max-w-48 truncate font-medium">{row.full_name}</span>
+          </div>
+        ),
+      },
       { key: "employee_type", header: "Employee Type" },
       { key: "id_card_number", header: "National ID / Passport", cell: identityValue },
       { key: "primary_outlet_name", header: "Outlet", cell: (row) => row.primary_outlet_name ?? "Not assigned" },

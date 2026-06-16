@@ -5,13 +5,14 @@ import { useMemo } from "react";
 
 import { DataTable } from "@/components/data/DataTable";
 import { EmptyState } from "@/components/data/EmptyState";
+import { EmployeeAvatar } from "@/components/employees/EmployeeAvatar";
 import { RowActions } from "@/components/data/RowActions";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { AppDateRangePicker } from "@/components/forms/AppDateRangePicker";
 import { EmployeeCombobox, OutletCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { friendlyHrmError } from "@/lib/hrm-errors";
@@ -81,8 +82,19 @@ export const HrReportsPage = () => {
   const columns = (result?.meta.columns ?? selectedReport?.columns ?? []).slice(0, 12).map((column) => ({
     key: column.key,
     header: column.label,
-    cell: (row: Record<string, unknown>) =>
-      column.data_type === "status" ? <StatusBadge status={String(row[column.key] ?? "neutral")} /> : <span className="max-w-xs truncate">{formatReportValue(row[column.key])}</span>,
+    cell: (row: Record<string, unknown>) => {
+      if (column.data_type === "status") return <StatusBadge status={String(row[column.key] ?? "neutral")} />;
+      if (["employee_name", "full_name"].includes(column.key)) {
+        const name = String(row[column.key] ?? "");
+        return (
+          <div className="flex min-w-0 items-center gap-2">
+            <EmployeeAvatar name={name} employeeCode={String(row.employee_code ?? row.employee_no ?? "")} photoUrl={typeof row.profile_photo_url === "string" ? row.profile_photo_url : null} size="sm" />
+            <span className="max-w-48 truncate">{formatReportValue(row[column.key])}</span>
+          </div>
+        );
+      }
+      return <span className="block max-w-xs truncate">{formatReportValue(row[column.key])}</span>;
+    },
   }));
 
   const error = catalogQuery.error ?? reportQuery.error;
@@ -92,11 +104,18 @@ export const HrReportsPage = () => {
       <div className="space-y-4 p-4 md:p-6">
         {error ? <InlineAlert title={friendlyHrmError(error, "HR reports could not be loaded.")} variant="error" /> : null}
 
-        <div className="grid gap-3 rounded-lg border bg-card p-4 md:grid-cols-7">
+        <div className="grid min-w-0 gap-3 rounded-lg border bg-card p-4 md:grid-cols-7">
           <OutletCombobox value={filters.outlet_id} onChange={(value) => updateParams({ outlet_id: value, employee_id: undefined })} placeholder="All accessible outlets" />
           <EmployeeCombobox value={filters.employee_id} outletId={filters.outlet_id} onChange={(value) => updateParams({ employee_id: value })} placeholder="All employees" />
-          <Input type="date" value={filters.from_date ?? ""} onChange={(event) => updateParams({ from_date: event.target.value })} aria-label="From date" />
-          <Input type="date" value={filters.to_date ?? ""} onChange={(event) => updateParams({ to_date: event.target.value })} aria-label="To date" />
+          <div className="min-w-0 md:col-span-2">
+            <AppDateRangePicker
+              dateFrom={filters.from_date}
+              dateTo={filters.to_date}
+              fromLabel="From date"
+              toLabel="To date"
+              onChange={({ dateFrom, dateTo }) => updateParams({ from_date: dateFrom, to_date: dateTo })}
+            />
+          </div>
           <Select value={filters.employee_type ?? "all"} onValueChange={(value) => updateParams({ employee_type: value as HrReportFilters["employee_type"] })}>
             <SelectTrigger><SelectValue placeholder="Employee type" /></SelectTrigger>
             <SelectContent>
@@ -120,8 +139,8 @@ export const HrReportsPage = () => {
           </TabsList>
         </Tabs>
 
-        <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
-          <div className="rounded-lg border bg-card">
+        <div className="grid min-w-0 gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
+          <div className="min-w-0 rounded-lg border bg-card">
             <div className="border-b px-4 py-3">
               <h2 className="text-sm font-semibold">Report catalog</h2>
               <p className="text-xs text-muted-foreground">Only reports available to your role are shown.</p>
@@ -132,7 +151,7 @@ export const HrReportsPage = () => {
               loading={catalogQuery.isLoading}
               columns={[
                 { key: "name", header: "Report", cell: (row) => <button className="text-left text-sm font-medium hover:underline" onClick={() => updateParams({ report: row.report_key })}>{row.name}</button> },
-                { key: "export_ready", header: "JSON", cell: () => <StatusBadge status="active" /> },
+                { key: "export_ready", header: "Output", cell: () => <StatusBadge status="xlsx/pdf" /> },
               ]}
               getRowId={(row) => row.report_key}
               emptyTitle="No HR reports available"
@@ -140,7 +159,7 @@ export const HrReportsPage = () => {
             />
           </div>
 
-          <div className="space-y-3">
+          <div className="min-w-0 space-y-3">
             <div className="flex flex-wrap items-start justify-between gap-3 rounded-lg border bg-card px-4 py-3">
               <div>
                 <div className="flex items-center gap-2">
@@ -167,12 +186,12 @@ export const HrReportsPage = () => {
                 emptyDescription="Try adjusting filters or choosing another report."
               />
             ) : (
-              <EmptyState title="No report selected" description="Pick a report from the catalog to load export-ready JSON rows." />
+              <EmptyState title="No report selected" description="Pick a report from the catalog to preview scoped report rows and export Excel or PDF files." />
             )}
 
             <div className="rounded-lg border bg-card p-3 text-xs text-muted-foreground">
-              <Label className="font-medium">Export-ready JSON</Label>
-              <p className="mt-1">CSV export and print views use the same scoped backend report data. XLSX/PDF are intentionally unavailable unless Worker-safe generation is added later.</p>
+              <p className="font-medium text-foreground">Excel/PDF output</p>
+              <p className="mt-1">Report previews use scoped backend data. Download actions generate Excel workbooks or PDF reports for normal users.</p>
               <p className="mt-1">Generated at: {result?.generated_at ? formatReportValue(result.generated_at) : "Not generated yet"}</p>
             </div>
           </div>

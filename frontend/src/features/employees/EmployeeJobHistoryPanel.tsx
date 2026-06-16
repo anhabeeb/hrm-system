@@ -3,8 +3,10 @@ import { useMemo, useState } from "react";
 
 import { DataTable } from "@/components/data/DataTable";
 import { FormError } from "@/components/feedback/FormError";
+import { AppDatePicker } from "@/components/forms/AppDatePicker";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { LoadingButton } from "@/components/forms/LoadingButton";
+import { ReasonDialog } from "@/components/forms/ReasonDialog";
 import { DepartmentCombobox, OutletCombobox, PositionCombobox } from "@/components/selectors";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -71,6 +73,7 @@ export const EmployeeJobHistoryPanel = ({
   const auth = useAuth();
   const queryClient = useQueryClient();
   const [formOpen, setFormOpen] = useState(false);
+  const [cancelApprovalTarget, setCancelApprovalTarget] = useState<ApprovalRequest | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [localFieldErrors, setLocalFieldErrors] = useState<Record<string, string>>({});
   const [form, setForm] = useState({
@@ -134,11 +137,7 @@ export const EmployeeJobHistoryPanel = ({
       await queryClient.invalidateQueries({ queryKey: ["employee-job-salary-approvals", employee.id] });
     },
   });
-  const cancelApproval = (approval: ApprovalRequest) => {
-    const reason = window.prompt("Enter a reason for cancelling this promotion approval request.");
-    if (!reason?.trim()) return;
-    cancelApprovalMutation.mutate({ id: approval.id, reason: reason.trim() });
-  };
+  const cancelApproval = (approval: ApprovalRequest) => setCancelApprovalTarget(approval);
   const apiError = mutation.error instanceof ApiError ? mutation.error : null;
   const fieldError = (field: string) => localFieldErrors[field] ?? apiError?.fieldErrors?.[field];
 
@@ -340,11 +339,10 @@ export const EmployeeJobHistoryPanel = ({
                 </select>
                 {fieldError("change_type") ? <span className="block text-xs text-red-600">{fieldError("change_type")}</span> : null}
               </Label>
-              <Label className="space-y-1">
-                <span>Effective from</span>
-                <Input type="date" value={form.effective_from} onChange={(event) => setForm((current) => ({ ...current, effective_from: event.target.value }))} />
+              <div className="space-y-1">
+                <AppDatePicker label="Effective from" value={form.effective_from} onChange={(value) => setForm((current) => ({ ...current, effective_from: value ?? "" }))} />
                 {fieldError("effective_from") ? <span className="block text-xs text-red-600">{fieldError("effective_from")}</span> : null}
-              </Label>
+              </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
               <Label className="space-y-1">
@@ -412,6 +410,19 @@ export const EmployeeJobHistoryPanel = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ReasonDialog
+        open={Boolean(cancelApprovalTarget)}
+        title="Cancel promotion approval request"
+        description="A reason is required before cancelling this promotion approval request."
+        confirmLabel="Cancel approval request"
+        loading={cancelApprovalMutation.isPending}
+        onOpenChange={(open) => { if (!open) setCancelApprovalTarget(null); }}
+        onSubmit={(reason) => {
+          if (!cancelApprovalTarget) return;
+          cancelApprovalMutation.mutate({ id: cancelApprovalTarget.id, reason });
+          setCancelApprovalTarget(null);
+        }}
+      />
     </div>
   );
 };

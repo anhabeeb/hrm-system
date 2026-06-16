@@ -2,7 +2,7 @@ import { z } from "zod";
 import { ValidationError } from "../../utils/errors";
 import type { ReportExportCreateInput, ReportExportListFilters, ReportExportPreviewInput } from "./report-exports.types";
 
-const format = z.enum(["csv", "xlsx", "print_html", "pdf"]);
+const format = z.enum(["xlsx", "pdf"]);
 const reportKey = z.string().trim().min(3).max(160);
 const filters = z.record(z.union([z.string(), z.number(), z.boolean(), z.null(), z.undefined()])).default({});
 
@@ -15,7 +15,7 @@ const parse = <T extends z.ZodTypeAny>(schema: T, input: unknown): z.infer<T> =>
 export const validateExportPreview = (input: unknown): ReportExportPreviewInput =>
   parse(z.object({
     report_key: reportKey,
-    format: format.optional().default("csv"),
+    format: format.optional().default("xlsx"),
     filters,
   }), input);
 

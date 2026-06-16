@@ -1,4 +1,4 @@
-export type ReportExportFormat = "csv" | "xlsx" | "print_html" | "pdf";
+export type ReportExportFormat = "xlsx" | "pdf";
 export type ReportExportStatus = "pending" | "processing" | "completed" | "failed" | "expired" | "cancelled";
 export type ReportExportCategory = "attendance" | "hr" | "payroll" | "expiry" | "employee_profile";
 

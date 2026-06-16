@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { DataTable } from "@/components/data/DataTable";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { AppDateRangePicker } from "@/components/forms/AppDateRangePicker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,8 +23,13 @@ export const AuditLogsPage = () => {
       <div className="space-y-4 p-4 md:p-6">
         {query.isError ? <InlineAlert title="Audit logs could not be loaded." variant="error" /> : null}
         <div className="grid gap-3 rounded-lg border bg-card p-4 md:grid-cols-4">
-          <div><Label>Date from</Label><Input className="mt-1" type="date" value={filters.date_from} onChange={(event) => setFilters((current) => ({ ...current, date_from: event.target.value, page: 1 }))} /></div>
-          <div><Label>Date to</Label><Input className="mt-1" type="date" value={filters.date_to} onChange={(event) => setFilters((current) => ({ ...current, date_to: event.target.value, page: 1 }))} /></div>
+          <div className="md:col-span-2">
+            <AppDateRangePicker
+              dateFrom={filters.date_from || undefined}
+              dateTo={filters.date_to || undefined}
+              onChange={({ dateFrom, dateTo }) => setFilters((current) => ({ ...current, date_from: dateFrom ?? "", date_to: dateTo ?? "", page: 1 }))}
+            />
+          </div>
           <div><Label>Actor user</Label><Input className="mt-1" value={filters.actor_user_id} onChange={(event) => setFilters((current) => ({ ...current, actor_user_id: event.target.value, page: 1 }))} /></div>
           <div><Label>Module</Label><Input className="mt-1" value={filters.module} onChange={(event) => setFilters((current) => ({ ...current, module: event.target.value, page: 1 }))} /></div>
           <div><Label>Action</Label><Input className="mt-1" value={filters.action} onChange={(event) => setFilters((current) => ({ ...current, action: event.target.value, page: 1 }))} /></div>

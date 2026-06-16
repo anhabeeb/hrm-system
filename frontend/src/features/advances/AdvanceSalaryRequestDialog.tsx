@@ -2,6 +2,8 @@ import { useMutation } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import { useToast } from "@/components/feedback/useToast";
+import { AppDatePicker } from "@/components/forms/AppDatePicker";
+import { AppMonthPicker } from "@/components/forms/AppMonthPicker";
 import { EmployeeCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -115,8 +117,8 @@ export const AdvanceSalaryRequestDialog = ({ open, onOpenChange, currentEmployee
           </Label>
           <Label className="grid gap-1 text-sm">Requested amount<Input type="number" min="0" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} /></Label>
           <Label className="grid gap-1 text-sm">Currency<Input value={currency} onChange={(event) => setCurrency(event.target.value.toUpperCase())} /></Label>
-          <Label className="grid gap-1 text-sm">Requested payment date<Input type="date" value={requestedPaymentDate} onChange={(event) => setRequestedPaymentDate(event.target.value)} /></Label>
-          <Label className="grid gap-1 text-sm">Repayment start month<Input type="month" value={repaymentStartMonth} onChange={(event) => setRepaymentStartMonth(event.target.value)} /></Label>
+          <AppDatePicker label="Requested payment date" value={requestedPaymentDate} onChange={(value) => setRequestedPaymentDate(value ?? "")} />
+          <AppMonthPicker label="Repayment start month" value={repaymentStartMonth} onChange={(value) => setRepaymentStartMonth(value ?? "")} />
           <Label className="grid gap-1 text-sm">Repayment months<Input type="number" min="1" max="60" value={repaymentMonths} onChange={(event) => setRepaymentMonths(event.target.value)} /></Label>
           <Label className="grid gap-1 text-sm md:col-span-2">Reason<Textarea value={reason} onChange={(event) => setReason(event.target.value)} /></Label>
           <Label className="grid gap-1 text-sm md:col-span-2">Employee note, optional<Textarea value={employeeNote} onChange={(event) => setEmployeeNote(event.target.value)} /></Label>

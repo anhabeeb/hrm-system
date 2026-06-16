@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { FormError } from "@/components/feedback/FormError";
+import { AppDatePicker } from "@/components/forms/AppDatePicker";
 import { LoadingButton } from "@/components/forms/LoadingButton";
 import { EmployeeCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
@@ -133,9 +134,9 @@ export const DocumentUploadDialog = ({ open, loading, error, employeeId, mode = 
             </Select>
           </Label>
           <Label className="space-y-1 text-sm">Document number/reference<Input value={payload.document_number} onChange={(e) => setPayload((p) => ({ ...p, document_number: e.target.value }))} /></Label>
-          <Label className="space-y-1 text-sm">Issue date<Input type="date" value={payload.issue_date} onChange={(e) => setPayload((p) => ({ ...p, issue_date: e.target.value }))} /></Label>
-          <Label className="space-y-1 text-sm">Start date<Input type="date" value={payload.start_date} onChange={(e) => setPayload((p) => ({ ...p, start_date: e.target.value }))} /></Label>
-          <Label className="space-y-1 text-sm">Expiry date<Input type="date" value={payload.expiry_date} onChange={(e) => setPayload((p) => ({ ...p, expiry_date: e.target.value }))} /></Label>
+          <AppDatePicker label="Issue date" value={payload.issue_date} onChange={(value) => setPayload((p) => ({ ...p, issue_date: value ?? "" }))} />
+          <AppDatePicker label="Start date" value={payload.start_date} onChange={(value) => setPayload((p) => ({ ...p, start_date: value ?? "" }))} />
+          <AppDatePicker label="Expiry date" value={payload.expiry_date} onChange={(value) => setPayload((p) => ({ ...p, expiry_date: value ?? "" }))} />
           {isDrivingLicense ? (
             <Label className="space-y-1 text-sm">
               Driving license category

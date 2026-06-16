@@ -703,17 +703,17 @@ describe("Phase 12A import workflow behavior", () => {
 describe("Phase 12A frontend/static coverage", () => {
   it("Import Center page exists", () => {
     const page = readFileSync("frontend/src/features/imports/ImportCenterPage.tsx", "utf8");
-    expect(page).toContain("Import Center");
-    expect(page).toContain("Import History");
-    expect(page).toContain("Apply is disabled until blocking row errors are fixed");
+    expect(page).toContain("Navigate");
+    expect(page).toContain('to="/import-export"');
     expect(page).not.toContain("dark:");
     expect(page).not.toContain("metadata_json");
   });
 
-  it("template download UI exists", () => {
+  it("legacy import route no longer exposes CSV template UI", () => {
     const page = readFileSync("frontend/src/features/imports/ImportCenterPage.tsx", "utf8");
-    expect(page).toContain("Template CSV");
-    expect(page).toContain("downloadTemplate");
+    expect(page).not.toContain("Template CSV");
+    expect(page).not.toContain("downloadTemplate");
+    expect(page).not.toContain("csv_content");
   });
 
   it("import history UI is permission-aware", () => {

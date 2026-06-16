@@ -3,11 +3,11 @@ import { AlertTriangle, Check } from "lucide-react";
 
 import { DataTable } from "@/components/data/DataTable";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { AppDatePicker } from "@/components/forms/AppDatePicker";
 import { ReasonDialog } from "@/components/forms/ReasonDialog";
 import { LookupCombobox } from "@/components/selectors/LookupCombobox";
 import { lookupApi } from "@/components/selectors/lookup-api";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { TableColumn } from "@/types/common";
 import type { LeaveAccrualPayload, LeaveAccrualRow } from "./leave.types";
@@ -53,10 +53,7 @@ export const LeaveAccrualPanel = ({
       {success ? <InlineAlert title={success} variant="success" /> : null}
       <div className="rounded-lg border bg-card p-4 shadow-sm">
         <div className="grid gap-3 md:grid-cols-4">
-          <div className="space-y-1">
-            <Label>As-of date</Label>
-            <Input type="date" value={payload.as_of_date} onChange={(event) => setPayload((current) => ({ ...current, as_of_date: event.target.value }))} />
-          </div>
+          <AppDatePicker label="As-of date" value={payload.as_of_date} onChange={(value) => setPayload((current) => ({ ...current, as_of_date: value ?? "" }))} />
           <div className="space-y-1">
             <Label>Employee</Label>
             <LookupCombobox value={payload.employee_id} onChange={(employee_id) => setPayload((current) => ({ ...current, employee_id }))} queryKey={["lookups", "employees"]} queryFn={lookupApi.employees} placeholder="All employees" />

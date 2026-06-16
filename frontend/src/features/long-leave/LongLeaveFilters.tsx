@@ -1,5 +1,5 @@
 import { FilterBar } from "@/components/data/FilterBar";
-import { Input } from "@/components/ui/input";
+import { AppDateRangePicker } from "@/components/forms/AppDateRangePicker";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { LongLeaveFilters as LongLeaveFilterValues } from "./long-leave.types";
@@ -32,13 +32,10 @@ export const LongLeaveFilters = ({
         </SelectContent>
       </Select>
     </Label>
-    <Label className="space-y-1 text-xs font-medium text-muted-foreground">
-      From
-      <Input type="date" value={filters.date_from ?? ""} onChange={(event) => onChange({ date_from: event.target.value })} />
-    </Label>
-    <Label className="space-y-1 text-xs font-medium text-muted-foreground">
-      To
-      <Input type="date" value={filters.date_to ?? ""} onChange={(event) => onChange({ date_to: event.target.value })} />
-    </Label>
+    <AppDateRangePicker
+      dateFrom={filters.date_from}
+      dateTo={filters.date_to}
+      onChange={({ dateFrom, dateTo }) => onChange({ date_from: dateFrom, date_to: dateTo })}
+    />
   </FilterBar>
 );

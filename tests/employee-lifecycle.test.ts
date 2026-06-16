@@ -199,7 +199,7 @@ describe("employee lifecycle backend wiring", () => {
 
   it("frontend prevents unsupported future scheduling and explains immediate access actions", () => {
     const panel = read("frontend/src/features/employees/EmployeeLifecyclePanel.tsx");
-    expect(panel).toContain("max={today()}");
+    expect(panel).toContain("maxDate={today()}");
     expect(panel).toContain("Future-dated employee status changes require scheduled activation and are not available yet.");
     expect(panel).toContain("Status changes are applied immediately. Future scheduling will be added later.");
     expect(panel).toContain("Disable linked user access when this status is applied");

@@ -3,8 +3,10 @@ import { useMemo, useState } from "react";
 
 import { DataTable } from "@/components/data/DataTable";
 import { FormError } from "@/components/feedback/FormError";
+import { AppDatePicker } from "@/components/forms/AppDatePicker";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { LoadingButton } from "@/components/forms/LoadingButton";
+import { ReasonDialog } from "@/components/forms/ReasonDialog";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -125,6 +127,7 @@ export const EmployeeSalaryHistoryPanel = ({ employeeId, canViewSalary, canEditS
   const auth = useAuth();
   const queryClient = useQueryClient();
   const [formOpen, setFormOpen] = useState(false);
+  const [cancelApprovalTarget, setCancelApprovalTarget] = useState<ApprovalRequest | null>(null);
   const [form, setForm] = useState({
     monthly_salary_major: "",
     currency: "MVR",
@@ -255,11 +258,7 @@ export const EmployeeSalaryHistoryPanel = ({ employeeId, canViewSalary, canEditS
       await queryClient.invalidateQueries({ queryKey: ["employee-salary-approvals", employeeId] });
     },
   });
-  const cancelApproval = (approval: ApprovalRequest) => {
-    const reason = window.prompt("Enter a reason for cancelling this salary approval request.");
-    if (!reason?.trim()) return;
-    cancelApprovalMutation.mutate({ id: approval.id, reason: reason.trim() });
-  };
+  const cancelApproval = (approval: ApprovalRequest) => setCancelApprovalTarget(approval);
   const apiError = addSalaryMutation.error instanceof ApiError ? addSalaryMutation.error : null;
   const componentApiError =
     addComponentMutation.error instanceof ApiError
@@ -745,11 +744,10 @@ export const EmployeeSalaryHistoryPanel = ({ employeeId, canViewSalary, canEditS
                 <Input value={form.currency} maxLength={3} onChange={(event) => setForm((current) => ({ ...current, currency: event.target.value.toUpperCase() }))} />
                 {fieldError("currency") ? <span className="block text-xs text-red-600">{fieldError("currency")}</span> : null}
               </Label>
-              <Label className="space-y-1">
-                <span>Effective from</span>
-                <Input type="date" value={form.effective_from} onChange={(event) => setForm((current) => ({ ...current, effective_from: event.target.value }))} />
+              <div className="space-y-1">
+                <AppDatePicker label="Effective from" value={form.effective_from} onChange={(value) => setForm((current) => ({ ...current, effective_from: value ?? "" }))} />
                 {fieldError("effective_from") ? <span className="block text-xs text-red-600">{fieldError("effective_from")}</span> : null}
-              </Label>
+              </div>
             </div>
             <Label className="space-y-1">
               <span>Change type</span>
@@ -888,11 +886,10 @@ export const EmployeeSalaryHistoryPanel = ({ employeeId, canViewSalary, canEditS
                 <Input value={componentForm.currency} maxLength={3} onChange={(event) => setComponentForm((current) => ({ ...current, currency: event.target.value.toUpperCase() }))} />
                 {fieldError("currency") ? <span className="block text-xs text-red-600">{fieldError("currency")}</span> : null}
               </Label>
-              <Label className="space-y-1">
-                <span>Effective from</span>
-                <Input type="date" value={componentForm.effective_from} onChange={(event) => setComponentForm((current) => ({ ...current, effective_from: event.target.value }))} />
+              <div className="space-y-1">
+                <AppDatePicker label="Effective from" value={componentForm.effective_from} onChange={(value) => setComponentForm((current) => ({ ...current, effective_from: value ?? "" }))} />
                 {fieldError("effective_from") ? <span className="block text-xs text-red-600">{fieldError("effective_from")}</span> : null}
-              </Label>
+              </div>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <Label className="flex items-center gap-2 rounded-md border p-3 text-sm">
@@ -954,11 +951,10 @@ export const EmployeeSalaryHistoryPanel = ({ employeeId, canViewSalary, canEditS
             <InlineAlert title="History will be preserved." variant="info">
               Future-dated endings keep the component active until the effective end date.
             </InlineAlert>
-            <Label className="space-y-1">
-              <span>Effective end date</span>
-              <Input type="date" value={endForm.effective_to} onChange={(event) => setEndForm((current) => ({ ...current, effective_to: event.target.value }))} />
+            <div className="space-y-1">
+              <AppDatePicker label="Effective end date" value={endForm.effective_to} onChange={(value) => setEndForm((current) => ({ ...current, effective_to: value ?? "" }))} />
               {fieldError("effective_to") ? <span className="block text-xs text-red-600">{fieldError("effective_to")}</span> : null}
-            </Label>
+            </div>
             <Label className="space-y-1">
               <span>Reason</span>
               <Textarea value={endForm.reason} onChange={(event) => setEndForm((current) => ({ ...current, reason: event.target.value }))} />
@@ -972,6 +968,19 @@ export const EmployeeSalaryHistoryPanel = ({ employeeId, canViewSalary, canEditS
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ReasonDialog
+        open={Boolean(cancelApprovalTarget)}
+        title="Cancel salary approval request"
+        description="A reason is required before cancelling this salary or compensation approval request."
+        confirmLabel="Cancel approval request"
+        loading={cancelApprovalMutation.isPending}
+        onOpenChange={(open) => { if (!open) setCancelApprovalTarget(null); }}
+        onSubmit={(reason) => {
+          if (!cancelApprovalTarget) return;
+          cancelApprovalMutation.mutate({ id: cancelApprovalTarget.id, reason });
+          setCancelApprovalTarget(null);
+        }}
+      />
     </div>
   );
 };

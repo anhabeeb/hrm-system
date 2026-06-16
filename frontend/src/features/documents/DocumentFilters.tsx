@@ -1,6 +1,6 @@
 import { FilterBar } from "@/components/data/FilterBar";
+import { AppDateRangePicker } from "@/components/forms/AppDateRangePicker";
 import { EmployeeCombobox, OutletCombobox } from "@/components/selectors";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { documentStatusOptions, documentTypeOptions } from "./document-format";
@@ -74,10 +74,11 @@ export const DocumentFilters = ({ filters, onChange, onClear }: { filters: Docum
         </Select>
       </Label>
       {expiryPreset === "custom" ? (
-        <>
-          <Label className="space-y-1 text-xs font-medium text-muted-foreground">Expiry from<Input type="date" value={filters.expiry_from ?? ""} onChange={(event) => onChange({ expiry_from: event.target.value || undefined })} /></Label>
-          <Label className="space-y-1 text-xs font-medium text-muted-foreground">Expiry to<Input type="date" value={filters.expiry_to ?? ""} onChange={(event) => onChange({ expiry_to: event.target.value || undefined })} /></Label>
-        </>
+        <AppDateRangePicker
+          dateFrom={filters.expiry_from}
+          dateTo={filters.expiry_to}
+          onChange={({ dateFrom, dateTo }) => onChange({ expiry_from: dateFrom, expiry_to: dateTo })}
+        />
       ) : null}
       <Label className="space-y-1 text-xs font-medium text-muted-foreground">Employee<EmployeeCombobox value={filters.employee_id} outletId={filters.outlet_id} onChange={(value) => onChange({ employee_id: value })} placeholder="All employees" /></Label>
       <Label className="space-y-1 text-xs font-medium text-muted-foreground">Outlet<OutletCombobox value={filters.outlet_id} onChange={(value) => onChange({ outlet_id: value, employee_id: undefined })} placeholder="All accessible outlets" /></Label>

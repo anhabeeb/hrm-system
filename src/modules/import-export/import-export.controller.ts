@@ -25,7 +25,7 @@ export const validateImport = async (c: Context<AppContext>) => {
 };
 export const applyImport = async (c: Context<AppContext>) => {
   const result = await importJobs.applyImport(c.env, auth(c), c.req.param("id") ?? "", validateReason(await json(c)).reason);
-  return ok(result, result.applied ? IMPORT_EXPORT_MESSAGES.applied : IMPORT_EXPORT_MESSAGES.applyPlaceholder, requestId(c));
+  return ok(result, IMPORT_EXPORT_MESSAGES.applied, requestId(c));
 };
 export const cancelImport = async (c: Context<AppContext>) => ok(await importJobs.cancelImport(c.env, auth(c), c.req.param("id") ?? "", validateReason(await json(c)).reason), IMPORT_EXPORT_MESSAGES.cancelled, requestId(c));
 export const templates = (c: Context<AppContext>) => ok(listTemplates(), IMPORT_EXPORT_MESSAGES.templatesLoaded, requestId(c));

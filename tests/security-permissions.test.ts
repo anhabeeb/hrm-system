@@ -107,7 +107,7 @@ describe("Phase 13A permission audit", () => {
     const router = read("frontend/src/app/router.tsx");
     const nav = read("frontend/src/lib/navigation.ts");
     const exportsPage = read("frontend/src/features/report-exports/ReportExportActions.tsx");
-    const importsPage = read("frontend/src/features/imports/ImportCenterPage.tsx");
+    const importsPage = read("frontend/src/features/import-export/ImportExportPage.tsx");
     const backupPage = read("frontend/src/features/backup-recovery/BackupRecoveryPage.tsx");
     const retentionPage = read("frontend/src/features/data-retention/DataRetentionPage.tsx");
 
@@ -115,7 +115,8 @@ describe("Phase 13A permission audit", () => {
     expect(`${router}\n${nav}`).toContain("imports.upload");
     expect(`${router}\n${nav}`).toContain("data_retention.preview");
     expect(exportsPage).toContain("report_exports.create");
-    expect(importsPage).toContain("imports.apply");
+    expect(importsPage).toContain("import.create");
+    expect(importsPage).toContain("import.rollback");
     expect(backupPage).toContain("backup_recovery.restore.apply");
     expect(retentionPage).toContain("data_retention.archive");
   });

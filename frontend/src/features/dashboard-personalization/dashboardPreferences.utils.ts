@@ -1,3 +1,5 @@
+import { useMemo } from "react";
+
 import type { DashboardWidgetDefinition } from "@/config/dashboardWidgets";
 import { useAuth } from "@/features/auth/auth.store";
 import { canShowModuleItem } from "@/lib/moduleAccess";
@@ -90,11 +92,17 @@ export const usePersonalizedWidgets = (
   options: { enabled?: boolean } = {},
 ) => {
   const { user } = useAuth();
-  const allowedDefinitions = getAllowedDashboardWidgets(user, dashboardType, definitions);
+  const allowedDefinitions = useMemo(
+    () => getAllowedDashboardWidgets(user, dashboardType, definitions),
+    [dashboardType, definitions, user],
+  );
   const preferences = useDashboardPreferences(dashboardType, options.enabled ?? true);
   const save = useSaveDashboardPreferences(dashboardType);
   const reset = useResetDashboardPreferences(dashboardType);
-  const merged = mergeDashboardPreferences(allowedDefinitions, preferences.data?.data.layout ?? null);
+  const merged = useMemo(
+    () => mergeDashboardPreferences(allowedDefinitions, preferences.data?.data.layout ?? null),
+    [allowedDefinitions, preferences.data?.data.layout],
+  );
 
   return {
     allWidgets: merged,

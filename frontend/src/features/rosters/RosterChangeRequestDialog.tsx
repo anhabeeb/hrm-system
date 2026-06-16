@@ -2,6 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
 import { useToast } from "@/components/feedback/useToast";
+import { AppDatePicker } from "@/components/forms/AppDatePicker";
 import { EmployeeCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -163,7 +164,7 @@ export const RosterChangeRequestDialog = ({
               Current shift: {selectedShift.roster_date} - {formatTimeRange(selectedShift.start_time, selectedShift.end_time)} - {label(selectedShift.status)}
             </div>
           ) : null}
-          <Label className="grid gap-1 text-sm">Requested date<Input type="date" value={requestedDate} onChange={(event) => setRequestedDate(event.target.value)} /></Label>
+          <AppDatePicker label="Requested date" value={requestedDate} onChange={(value) => setRequestedDate(value ?? "")} />
           {timeChange ? (
             <>
               <Label className="grid gap-1 text-sm">Requested start<Input type="time" value={requestedStart} onChange={(event) => setRequestedStart(event.target.value)} /></Label>

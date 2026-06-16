@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { FormError } from "@/components/feedback/FormError";
+import { AppDatePicker } from "@/components/forms/AppDatePicker";
 import { LoadingButton } from "@/components/forms/LoadingButton";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -108,22 +109,10 @@ export const ContractFormDialog = ({
               </Select>
             </Label>
           )}
-          <Label className="grid gap-1 text-sm">
-            Start date
-            <Input type="date" value={payload.start_date} onChange={(event) => setPayload((current) => ({ ...current, start_date: event.target.value }))} />
-          </Label>
-          <Label className="grid gap-1 text-sm">
-            End date
-            <Input type="date" value={payload.end_date ?? ""} onChange={(event) => setPayload((current) => ({ ...current, end_date: event.target.value }))} />
-          </Label>
-          <Label className="grid gap-1 text-sm">
-            Signed date
-            <Input type="date" value={payload.signed_date ?? ""} onChange={(event) => setPayload((current) => ({ ...current, signed_date: event.target.value }))} />
-          </Label>
-          <Label className="grid gap-1 text-sm">
-            Probation end date
-            <Input type="date" value={payload.probation_end_date ?? ""} onChange={(event) => setPayload((current) => ({ ...current, probation_end_date: event.target.value }))} />
-          </Label>
+          <AppDatePicker label="Start date" value={payload.start_date} onChange={(value) => setPayload((current) => ({ ...current, start_date: value ?? "" }))} />
+          <AppDatePicker label="End date" value={payload.end_date ?? ""} onChange={(value) => setPayload((current) => ({ ...current, end_date: value ?? "" }))} />
+          <AppDatePicker label="Signed date" value={payload.signed_date ?? ""} onChange={(value) => setPayload((current) => ({ ...current, signed_date: value ?? "" }))} />
+          <AppDatePicker label="Probation end date" value={payload.probation_end_date ?? ""} onChange={(value) => setPayload((current) => ({ ...current, probation_end_date: value ?? "" }))} />
           <Label className="grid gap-1 text-sm md:col-span-2">
             Contract document
             <EmployeeDocumentCombobox

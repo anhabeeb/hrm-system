@@ -77,6 +77,7 @@ const employeeColumns = `
   e.id AS employee_id,
   e.employee_code,
   e.full_name AS employee_name,
+  CASE WHEN e.profile_photo_key IS NULL THEN NULL ELSE '/api/v1/employees/' || e.id || '/profile-photo' END AS profile_photo_url,
   e.primary_outlet_id AS outlet_id,
   COALESCE(o.name, 'Unassigned') AS outlet_name,
   e.department_id,

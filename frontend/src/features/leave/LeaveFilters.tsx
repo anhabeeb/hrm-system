@@ -1,4 +1,5 @@
 import { FilterBar } from "@/components/data/FilterBar";
+import { AppDateRangePicker } from "@/components/forms/AppDateRangePicker";
 import { EmployeeCombobox, LeaveTypeCombobox, OutletCombobox } from "@/components/selectors";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,7 +11,12 @@ export const LeaveFilters = ({ filters, onChange, onClear }: { filters: LeaveFil
     <div className="space-y-1.5"><Label>Employee</Label><EmployeeCombobox value={filters.employee_id} outletId={filters.outlet_id} onChange={(value) => onChange({ employee_id: value })} placeholder="All employees" /></div>
     <div className="space-y-1.5"><Label>Leave type</Label><LeaveTypeCombobox value={filters.leave_type_id} onChange={(value) => onChange({ leave_type_id: value })} placeholder="All leave types" /></div>
     <div className="space-y-1.5"><Label>Status</Label><Input value={filters.status ?? ""} onChange={(event) => onChange({ status: event.target.value })} /></div>
-    <div className="space-y-1.5"><Label>Date From</Label><Input type="date" value={filters.date_from ?? ""} onChange={(event) => onChange({ date_from: event.target.value })} /></div>
-    <div className="space-y-1.5"><Label>Date To</Label><Input type="date" value={filters.date_to ?? ""} onChange={(event) => onChange({ date_to: event.target.value })} /></div>
+    <AppDateRangePicker
+      dateFrom={filters.date_from}
+      dateTo={filters.date_to}
+      fromLabel="Date From"
+      toLabel="Date To"
+      onChange={({ dateFrom, dateTo }) => onChange({ date_from: dateFrom, date_to: dateTo })}
+    />
   </FilterBar>
 );

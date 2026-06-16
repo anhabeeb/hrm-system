@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Printer, ShieldAlert, UserRound } from "lucide-react";
+import { ArrowLeft, Printer, ShieldAlert } from "lucide-react";
 
 import { DataTable } from "@/components/data/DataTable";
 import { EmptyState } from "@/components/data/EmptyState";
+import { EmployeeAvatar } from "@/components/employees/EmployeeAvatar";
 import { LoadingState } from "@/components/data/LoadingState";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
@@ -12,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { employeesApi } from "./employees.api";
 import { EmployeeStatusBadge } from "./EmployeeStatusBadge";
+import { EmployeeProfilePhotoControls } from "./EmployeeProfilePhotoControls";
 import { EmployeeAttendanceCalendarWidget } from "@/features/attendance-calendar/EmployeeAttendanceCalendarWidget";
 import { useAuth } from "@/features/auth/auth.store";
 
@@ -79,6 +81,7 @@ export const Employee360Page = () => {
   const canViewAttendanceCalendar =
     auth.hasFeature("attendance") &&
     auth.hasAnyPermission(["attendance.calendar.view", "attendance.calendar.viewTeam", "attendance.calendar.viewAll", "attendance.view", "attendance.reports.view", "employees.view"]);
+  const canManageProfilePhoto = auth.hasAnyPermission(["employees.profilePhoto.upload", "employees.profilePhoto.manage", "employees.edit", "employees.manage"]);
 
   return (
     <div>
@@ -94,9 +97,7 @@ export const Employee360Page = () => {
             <div className="rounded-lg border bg-card p-4">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="flex gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-md border bg-muted text-muted-foreground">
-                    <UserRound className="h-6 w-6" />
-                  </div>
+                  <EmployeeAvatar name={employee.full_name} employeeCode={employee.employee_code} photoUrl={employee.profile_photo_url} size="lg" />
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="text-xl font-semibold">{employee.full_name}</h2>
@@ -112,6 +113,11 @@ export const Employee360Page = () => {
                   <div className="rounded-md border p-2 text-sm"><span className="text-muted-foreground">Missing punches</span><p className="font-semibold">{cellValue(warnings.missing_punches)}</p></div>
                   <div className="rounded-md border p-2 text-sm"><span className="text-muted-foreground">Pending approvals</span><p className="font-semibold">{cellValue(warnings.pending_approvals)}</p></div>
                   <div className="rounded-md border p-2 text-sm"><span className="text-muted-foreground">Payroll warnings</span><p className="font-semibold">{cellValue(warnings.payroll_warnings)}</p></div>
+                  {canManageProfilePhoto ? (
+                    <div className="sm:col-span-2">
+                      <EmployeeProfilePhotoControls employeeId={employee.id} hasPhoto={Boolean(employee.profile_photo_url)} />
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </div>

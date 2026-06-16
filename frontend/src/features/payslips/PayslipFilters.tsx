@@ -1,6 +1,6 @@
 import { FilterBar } from "@/components/data/FilterBar";
+import { AppMonthPicker } from "@/components/forms/AppMonthPicker";
 import { EmployeeCombobox, OutletCombobox } from "@/components/selectors";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { PayslipFilters as PayslipFilterValues } from "./payslips.types";
@@ -15,10 +15,7 @@ export const PayslipFilters = ({
   onClear: () => void;
 }) => (
   <FilterBar onClear={onClear}>
-    <Label className="space-y-1 text-xs font-medium text-muted-foreground">
-      Payroll month
-      <Input type="month" value={filters.payroll_month ?? ""} onChange={(event) => onChange({ payroll_month: event.target.value })} />
-    </Label>
+    <AppMonthPicker label="Payroll month" value={filters.payroll_month} onChange={(value) => onChange({ payroll_month: value })} />
     <Label className="space-y-1 text-xs font-medium text-muted-foreground">
       Status
       <Select value={filters.status ?? "all"} onValueChange={(value) => onChange({ status: value === "all" ? undefined : value })}>

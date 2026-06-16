@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
 import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { AppDatePicker } from "@/components/forms/AppDatePicker";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -140,14 +141,8 @@ export const EmployeeExitRequestDialog = ({
               <SelectContent>{requestTypes.map((type) => <SelectItem key={type} value={type}>{label(type)}</SelectItem>)}</SelectContent>
             </Select>
           </label>
-          <label className="space-y-1 text-sm">
-            <span className="font-medium">Resignation date</span>
-            <Input type="date" value={form.resignation_date ?? ""} onChange={(event) => update("resignation_date", event.target.value)} />
-          </label>
-          <label className="space-y-1 text-sm">
-            <span className="font-medium">Requested last working date</span>
-            <Input type="date" value={form.requested_last_working_date ?? ""} onChange={(event) => update("requested_last_working_date", event.target.value)} />
-          </label>
+          <AppDatePicker label="Resignation date" value={form.resignation_date ?? ""} onChange={(value) => update("resignation_date", value ?? "")} />
+          <AppDatePicker label="Requested last working date" value={form.requested_last_working_date ?? ""} onChange={(value) => update("requested_last_working_date", value ?? "")} />
           <label className="space-y-1 text-sm">
             <span className="font-medium">Notice period days</span>
             <Input type="number" min={0} value={form.notice_period_days ?? ""} onChange={(event) => update("notice_period_days", event.target.value ? Number(event.target.value) : null)} />

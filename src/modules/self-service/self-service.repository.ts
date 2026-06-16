@@ -22,6 +22,8 @@ export const findSelfProfile = (env: Env, companyId: string, userId: string) =>
       e.id AS employee_id,
       e.employee_code,
       e.full_name AS employee_name,
+      e.profile_photo_key,
+      e.profile_photo_updated_at,
       e.department_id,
       d.name AS department_name,
       e.position_id,

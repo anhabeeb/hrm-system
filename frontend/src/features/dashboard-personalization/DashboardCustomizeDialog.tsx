@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { useToast } from "@/components/feedback/useToast";
 import { Button } from "@/components/ui/button";
@@ -42,10 +42,15 @@ export const DashboardCustomizeDialog = ({
 }: DashboardCustomizeDialogProps) => {
   const toast = useToast();
   const [draftWidgets, setDraftWidgets] = useState(widgets);
+  const widgetSignature = useMemo(
+    () => widgets.map((widget) => `${widget.id}:${widget.visible}:${widget.order}:${widget.size ?? ""}`).join("|"),
+    [widgets],
+  );
+  const stableWidgets = useMemo(() => widgets, [widgetSignature]);
 
   useEffect(() => {
-    if (open) setDraftWidgets(widgets);
-  }, [open, widgets]);
+    if (open) setDraftWidgets(stableWidgets);
+  }, [open, stableWidgets]);
 
   const saving = Boolean(isSaving || isResetting);
 

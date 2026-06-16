@@ -40,6 +40,10 @@ export interface EmployeeRecord {
   company_id: string;
   employee_code: string;
   full_name: string;
+  profile_photo_key?: string | null;
+  profile_photo_updated_at?: string | null;
+  profile_photo_uploaded_by?: string | null;
+  profile_photo_url?: string | null;
   employee_type: EmployeeType;
   nationality: string | null;
   id_card_number: string | null;
@@ -435,4 +439,11 @@ export interface EmployeeNoteInput {
   note_type?: string;
   note: string;
   is_sensitive?: boolean;
+}
+
+export interface EmployeeProfilePhotoInput {
+  file_name: string;
+  mime_type: "image/jpeg" | "image/png" | "image/webp";
+  content_base64: string;
+  reason: string;
 }

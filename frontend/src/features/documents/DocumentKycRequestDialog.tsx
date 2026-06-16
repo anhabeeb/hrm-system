@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { FormError } from "@/components/feedback/FormError";
+import { AppDatePicker } from "@/components/forms/AppDatePicker";
 import { LoadingButton } from "@/components/forms/LoadingButton";
 import { EmployeeCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
@@ -254,14 +255,8 @@ export const DocumentKycRequestDialog = ({ open, loading, error, currentEmployee
           ) : null}
           {showDates ? (
             <>
-              <Label className="space-y-1 text-sm">
-                Issue date
-                <Input type="date" value={payload.issue_date} onChange={(event) => setPayload((current) => ({ ...current, issue_date: event.target.value }))} />
-              </Label>
-              <Label className="space-y-1 text-sm">
-                Expiry date
-                <Input type="date" value={payload.expiry_date} onChange={(event) => setPayload((current) => ({ ...current, expiry_date: event.target.value }))} />
-              </Label>
+              <AppDatePicker label="Issue date" value={payload.issue_date} onChange={(value) => setPayload((current) => ({ ...current, issue_date: value ?? "" }))} />
+              <AppDatePicker label="Expiry date" value={payload.expiry_date} onChange={(value) => setPayload((current) => ({ ...current, expiry_date: value ?? "" }))} />
             </>
           ) : null}
           {showCountry ? (

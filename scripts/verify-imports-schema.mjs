@@ -246,17 +246,14 @@ mustInclude(permissions, [
 if (!roles.includes("rp_imports_admin_") || !roles.includes("rp_imports_hr_")) fail("import permissions are not assigned to default roles");
 
 mustInclude(router, ["ImportCenterPage", '"/imports"'], "frontend import route");
-mustInclude(nav, ["Import Center", '"/imports"', "imports.templates.view"], "frontend import navigation");
+mustInclude(nav, ["Import / Export", '"/import-export"', "import_export"], "frontend import navigation");
+if (nav.includes("Import Center")) fail("normal navigation must not expose the legacy CSV Import Center");
 mustInclude(page, [
-  "Import Center",
-  "Import History",
-  "Template CSV",
-  "Preview only",
-  "Errors",
-  "Apply is disabled until blocking row errors are fixed",
-  "imports.apply",
-  "imports.sensitive.manage",
+  "Navigate",
+  'to="/import-export"',
+  "replace",
 ], "Import Center page");
+if (/Template CSV|CSV file|csv_content|\.csv/.test(page)) fail("legacy Import Center route must not expose CSV import UI");
 if (/dark:/.test(page)) fail("Import Center UI must not add dark mode");
 if (/metadata_json/.test(page)) fail("Import Center UI must not expose raw metadata_json");
 

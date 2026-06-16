@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 
 import { DetailDrawer } from "@/components/data/DetailDrawer";
 import { DetailSection } from "@/components/data/DetailSection";
+import { ReasonDialog } from "@/components/forms/ReasonDialog";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/auth.store";
@@ -16,6 +18,7 @@ export const UserDetailDrawer = ({ user, open, onOpenChange }: { user: AdminUser
   const canViewSessions = auth.hasPermission("users.sessions.view") || auth.hasPermission("users.revoke_sessions");
   const canRevokeSessions = auth.hasPermission("users.sessions.revoke") || auth.hasPermission("users.revoke_sessions");
   const canRevokeAllSessions = auth.hasPermission("users.sessions.revoke_all") || auth.hasPermission("users.revoke_sessions");
+  const [revokeTarget, setRevokeTarget] = useState<{ kind: "one"; sessionId: string } | { kind: "all" } | null>(null);
   const sessionsQuery = useQuery({
     queryKey: ["users", user?.id, "sessions"],
     queryFn: () => usersApi.sessions(user?.id ?? ""),
@@ -33,7 +36,6 @@ export const UserDetailDrawer = ({ user, open, onOpenChange }: { user: AdminUser
       await queryClient.invalidateQueries({ queryKey: ["users", user?.id, "sessions"] });
     },
   });
-  const askReason = (fallback: string) => window.prompt("Reason for revoking session access", fallback)?.trim() ?? "";
 
   if (!user) return null;
   return (
@@ -63,10 +65,7 @@ export const UserDetailDrawer = ({ user, open, onOpenChange }: { user: AdminUser
                 size="sm"
                 variant="outline"
                 disabled={revokeAllSessions.isPending || (sessionsQuery.data?.data.sessions ?? []).length === 0}
-                onClick={() => {
-                  const reason = askReason("Admin revoked all active sessions.");
-                  if (reason.length >= 3) revokeAllSessions.mutate(reason);
-                }}
+                onClick={() => setRevokeTarget({ kind: "all" })}
               >
                 Revoke all
               </Button>
@@ -99,10 +98,7 @@ export const UserDetailDrawer = ({ user, open, onOpenChange }: { user: AdminUser
                             size="sm"
                             variant="outline"
                             disabled={revokeSession.isPending}
-                            onClick={() => {
-                              const reason = askReason("Admin revoked an active session.");
-                              if (reason.length >= 3) revokeSession.mutate({ sessionId: session.id, reason });
-                            }}
+                            onClick={() => setRevokeTarget({ kind: "one", sessionId: session.id })}
                           >
                             Revoke
                           </Button>
@@ -121,6 +117,20 @@ export const UserDetailDrawer = ({ user, open, onOpenChange }: { user: AdminUser
           ) : null}
         </section>
       ) : null}
+      <ReasonDialog
+        open={Boolean(revokeTarget)}
+        title={revokeTarget?.kind === "all" ? "Revoke all sessions" : "Revoke session"}
+        description="A reason is required before revoking account session access."
+        confirmLabel={revokeTarget?.kind === "all" ? "Revoke all sessions" : "Revoke session"}
+        loading={revokeSession.isPending || revokeAllSessions.isPending}
+        onOpenChange={(openDialog) => { if (!openDialog) setRevokeTarget(null); }}
+        onSubmit={(reason) => {
+          if (!revokeTarget) return;
+          if (revokeTarget.kind === "all") revokeAllSessions.mutate(reason);
+          else revokeSession.mutate({ sessionId: revokeTarget.sessionId, reason });
+          setRevokeTarget(null);
+        }}
+      />
     </DetailDrawer>
   );
 };

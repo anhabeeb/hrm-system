@@ -155,7 +155,7 @@ describe("Phase 13B security hardening", () => {
     expect(read("src/modules/documents/documents.controller.ts")).toContain("safeAttachmentHeader");
     expect(read("src/modules/report-exports/report-exports.controller.ts")).toContain("safeAttachmentHeader");
     expect(read("src/modules/backup-recovery/backup-recovery.service.ts")).toContain("safeAttachmentHeader");
-    expect(read("src/modules/report-exports/report-exports.service.ts")).toMatch(/formula|spreadsheet|dangerous/i);
+    expect(`${read("src/modules/report-exports/report-exports.service.ts")}\n${read("src/utils/export-file-format.ts")}`).toMatch(/formula|spreadsheet|dangerous/i);
     expect(read("src/routes/report-exports.routes.ts")).toContain("report_exports.download");
     expect(read("src/routes/backup-recovery.routes.ts")).toContain("backup_recovery.restore.apply");
     expect(read("src/routes/data-retention.routes.ts")).toMatch(/data_retention\.archive[\s\S]*requireReason/);

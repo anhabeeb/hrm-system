@@ -75,9 +75,10 @@ mustInclude(permissions, [
 if (!roles.includes("rp_report_exports_admin_") || !roles.includes("rp_report_exports_hr_")) fail("report export permissions are not assigned to default roles");
 
 mustInclude(service, [
-  "generateCsv",
-  "escapeCsvValue",
-  "dangerousFormula",
+  "generateExcelWorkbook",
+  "generatePdfReport",
+  "excelContentType",
+  "pdfContentType",
   "REDACTED",
   "hrReports.runReport(env, actor",
   "payrollReports.runReport(env, actor",
@@ -100,7 +101,7 @@ const downloadExportBody = between(service, "export const downloadExport", "expo
 if (/requireJob\(env,\s*actor,\s*id,\s*"download"\)/.test(getExportJobBody)) fail("getExportJob must not require download permission");
 if (/requireJob\(env,\s*actor,\s*jobId,\s*"download"\)/.test(generateExportBody)) fail("generateExport must not require download permission");
 if (generateExportBody.includes('if (job.status === "completed") return { export_job: safeJob(job), already_completed: true };') && !/runReport\(env,\s*actor,\s*item,\s*parseJobFilters\(job\)/.test(downloadExportBody)) {
-  fail("completed streamed downloads must regenerate CSV from saved filters");
+  fail("completed streamed downloads must regenerate Excel/PDF from saved filters");
 }
 if (/from\s+["'](?:pdfkit|jspdf|puppeteer|playwright|xlsx|exceljs)["']|require\(["'](?:pdfkit|jspdf|puppeteer|playwright|xlsx|exceljs)["']\)/i.test(service)) fail("server export code must not use Node-only PDF/XLSX libraries in Phase 11D");
 if (service.includes("import-export") || service.includes("backup")) fail("Phase 11D export service appears to start import/backup work");
@@ -117,7 +118,7 @@ mustInclude(router, ["/reports/print/:reportKey", "/employees/:employeeId/print"
 mustInclude(nav, ["Export History", "/report-exports"], "frontend navigation");
 mustInclude(historyPage, ["Export history page actions", "sensitive_export", "redaction_level"], "export history page");
 mustInclude(printPage, ["@media print", "no-print", "HRM System", "Filters:", "Generated at", "window.print"], "print page");
-mustInclude(actions, ["report_exports.create", "report_exports.download", "report_exports.print", "report_exports.sensitive"], "export actions");
+mustInclude(actions, ["report_exports.create", "report_exports.download", "Download Excel", "Download PDF", "report_exports.sensitive"], "export actions");
 mustInclude(hrPage, ["ReportExportActions", "hr:"], "HR report export integration");
 mustInclude(payrollPage, ["ReportExportActions", "payroll:"], "payroll report export integration");
 mustInclude(attendancePage, ["ReportExportActions", "attendance:"], "attendance report export integration");
@@ -128,11 +129,11 @@ if (/metadata_json/.test(`${historyPage}\n${printPage}`)) fail("export/print UI 
 if (/it\.todo|describe\.todo/.test(tests)) fail("Phase 11D export/print tests contain TODO placeholders");
 mustInclude(tests, [
   "catalog lists exportable reports by permission",
-  "CSV protects against spreadsheet formula injection",
+  "XLSX generation returns a real ZIP/OpenXML workbook",
   "sensitive columns are omitted or masked without permission",
-  "unsupported XLSX/PDF format returns safe error",
+  "CSV format is rejected for normal report exports",
   "idempotency prevents duplicate jobs",
-  "completed job download returns regenerated CSV content from saved filters",
+  "completed job download returns regenerated Excel content from saved filters",
   "cancelled job cannot be generated",
   "user with history.view can view own job detail without download permission",
   "user with create permission can generate own pending job without download permission",

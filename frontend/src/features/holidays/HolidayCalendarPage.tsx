@@ -7,6 +7,7 @@ import { DataTable } from "@/components/data/DataTable";
 import { RowActions } from "@/components/data/RowActions";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { AppDatePicker } from "@/components/forms/AppDatePicker";
 import { PageActionBar } from "@/components/layout/PageActionBar";
 import { OutletCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
@@ -241,8 +242,8 @@ const HolidayFormDialog = ({ open, payload, editing, loading, error, onOpenChang
         <Label className="grid gap-1 text-sm">Code<Input value={payload.code ?? ""} onChange={(event) => onChange({ ...payload, code: event.target.value })} /></Label>
         <Label className="grid gap-1 text-sm">Type<Select value={payload.holiday_type} onValueChange={(value) => onChange({ ...payload, holiday_type: value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{["public_holiday", "company_holiday", "outlet_holiday", "optional_holiday", "religious_holiday", "national_holiday", "replacement_holiday", "other"].map((type) => <SelectItem key={type} value={type}>{label(type)}</SelectItem>)}</SelectContent></Select></Label>
         <Label className="grid gap-1 text-sm">Outlet<OutletCombobox value={payload.outlet_id} onChange={(value) => onChange({ ...payload, outlet_id: value ?? "", applies_to_all_outlets: !value })} placeholder="All outlets" /></Label>
-        <Label className="grid gap-1 text-sm">Date<Input type="date" value={payload.date} onChange={(event) => onChange({ ...payload, date: event.target.value })} /></Label>
-        <Label className="grid gap-1 text-sm">End date<Input type="date" value={payload.end_date ?? ""} onChange={(event) => onChange({ ...payload, end_date: event.target.value })} /></Label>
+        <AppDatePicker label="Date" value={payload.date} onChange={(value) => onChange({ ...payload, date: value ?? "" })} />
+        <AppDatePicker label="End date" value={payload.end_date ?? ""} onChange={(value) => onChange({ ...payload, end_date: value ?? "" })} />
         <div className="grid gap-2 md:col-span-2 md:grid-cols-2">
           <Toggle label="Recurring yearly" checked={payload.is_recurring} onChange={(value) => onChange({ ...payload, is_recurring: value })} />
           <Toggle label="Paid holiday" checked={payload.paid_holiday} onChange={(value) => onChange({ ...payload, paid_holiday: value })} />

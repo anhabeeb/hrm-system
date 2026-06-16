@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { EmployeeAvatar } from "@/components/employees/EmployeeAvatar";
 import type { DepartmentWeeklyCell, DepartmentWeeklyEmployee, DepartmentWeeklyTeamResponse } from "./departmentWeeklyTeam.types";
 import { DepartmentWeeklyDayCell } from "./DepartmentWeeklyDayCell";
 
@@ -28,8 +29,13 @@ export const DepartmentWeeklyMatrix = ({
         ) : data.employees.map((employee) => (
           <tr key={employee.id} className="border-t align-top">
             <td className="sticky left-0 z-10 border-r bg-white px-3 py-2">
-              <div className="font-medium">{employee.name}</div>
-              <div className="text-xs text-muted-foreground">{employee.employee_no ?? employee.id}</div>
+              <div className="flex min-w-0 items-start gap-2">
+                <EmployeeAvatar name={employee.name} employeeCode={employee.employee_no} photoUrl={employee.profile_photo_url} size="sm" />
+                <div className="min-w-0">
+                  <div className="truncate font-medium">{employee.name}</div>
+                  <div className="text-xs text-muted-foreground">{employee.employee_no ?? employee.id}</div>
+                </div>
+              </div>
               <div className="mt-1 flex flex-wrap gap-1">
                 {employee.position_name ? <Badge variant="outline">{employee.position_name}</Badge> : null}
                 {employee.level ? <Badge variant="outline">Level {employee.level}</Badge> : null}

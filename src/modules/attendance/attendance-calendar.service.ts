@@ -28,6 +28,10 @@ const monthEnd = (month: string) => {
   const monthNumber = Number(month.slice(5, 7));
   return `${month}-${new Date(year, monthNumber, 0).getDate().toString().padStart(2, "0")}`;
 };
+const employeeProfilePhotoUrl = (employee: AttendanceCalendarEmployeeRecord) =>
+  employee.profile_photo_key
+    ? `/api/v1/employees/${employee.id}/profile-photo${employee.profile_photo_updated_at ? `?v=${encodeURIComponent(employee.profile_photo_updated_at)}` : ""}`
+    : null;
 
 const normalizeDate = (value: string | null | undefined) => value ? String(value).slice(0, 10) : null;
 const normalizedStatus = (value: unknown) => String(value ?? "").toLowerCase();
@@ -414,6 +418,7 @@ export const getEmployeeAttendanceCalendar = async (
       id: employee.id,
       name: employee.full_name,
       employee_no: employee.employee_code,
+      profile_photo_url: employeeProfilePhotoUrl(employee),
       department_id: employee.department_id,
       department_name: employee.department_name,
       position_id: employee.position_id,

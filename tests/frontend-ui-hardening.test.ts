@@ -70,7 +70,7 @@ describe("frontend completed-phase hardening coverage", () => {
       ['path="/approvals"', 'permission: "approvals.view"'],
       ['path="/payroll-reports"', 'payroll_reports.view'],
       ['path="/report-exports"', 'report_exports.history.view'],
-      ['path="/imports"', 'imports.view'],
+      ['path="/import-export"', 'import.view'],
       ['path="/backup-recovery"', 'backup.view'],
       ['path="/data-retention"', 'data_retention.view'],
     ];
@@ -253,19 +253,17 @@ describe("frontend completed-phase hardening coverage", () => {
     const criticalActions = [
       ["frontend/src/features/employees/EmployeesPage.tsx", "Add Employee"],
       ["frontend/src/features/documents/DocumentsPage.tsx", "Upload document"],
-      ["frontend/src/features/imports/ImportCenterPage.tsx", "Template CSV"],
+      ["frontend/src/features/imports/ImportCenterPage.tsx", 'to="/import-export"'],
       ["frontend/src/features/backup-recovery/BackupRecoveryPage.tsx", "Create backup"],
       ["frontend/src/features/backup-recovery/BackupRecoveryPage.tsx", "Create restore job"],
       ["frontend/src/features/advances/AdvancesPage.tsx", "New advance"],
       ["frontend/src/features/salary-loans/SalaryLoansPage.tsx", "New loan"],
       ["frontend/src/features/assets/AssetsPage.tsx", "Create asset"],
       ["frontend/src/features/leave/LeavePage.tsx", "New request"],
-      ["frontend/src/features/imports/ImportCenterPage.tsx", "Create job"],
-      ["frontend/src/features/imports/ImportCenterPage.tsx", "Apply valid rows"],
       ["frontend/src/features/import-export/ImportExportPage.tsx", "Create export"],
       ["frontend/src/features/import-export/ImportExportPage.tsx", "Upload import"],
-      ["frontend/src/features/report-exports/ReportExportActions.tsx", "CSV"],
-      ["frontend/src/features/report-exports/ReportExportActions.tsx", "Print"],
+      ["frontend/src/features/report-exports/ReportExportActions.tsx", "Download Excel"],
+      ["frontend/src/features/report-exports/ReportExportActions.tsx", "Download PDF"],
     ];
 
     for (const [file, actionText] of criticalActions) {
@@ -282,7 +280,6 @@ describe("frontend completed-phase hardening coverage", () => {
       "frontend/src/features/holidays/HolidayCalendarPage.tsx",
       "frontend/src/features/rosters/RostersPage.tsx",
       "frontend/src/features/notifications/NotificationsPage.tsx",
-      "frontend/src/features/imports/ImportCenterPage.tsx",
       "frontend/src/features/employees/Employee360Page.tsx",
       "frontend/src/features/attendance/AttendanceCorrectionsPage.tsx",
       "frontend/src/features/long-leave/LongLeavePage.tsx",

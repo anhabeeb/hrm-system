@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
 import { FormError } from "@/components/feedback/FormError";
+import { AppDatePicker } from "@/components/forms/AppDatePicker";
 import { LoadingButton } from "@/components/forms/LoadingButton";
 import { OutletCombobox } from "@/components/selectors";
 import { lookupApi, type LookupOption } from "@/components/selectors/lookup-api";
@@ -129,7 +130,7 @@ export const ManualAttendanceBatchDialog = ({
         </DialogHeader>
         <div className="grid gap-3 md:grid-cols-[1.2fr_1fr_1.4fr]">
           <Label className="space-y-1.5 text-sm">Outlet<OutletCombobox value={outletId} onChange={(value) => { setOutletId(value ?? ""); setRows([]); }} placeholder="Select outlet first" /></Label>
-          <Label className="space-y-1.5 text-sm">Attendance date<Input type="date" value={attendanceDate} onChange={(event) => setAttendanceDate(event.target.value)} /></Label>
+          <AppDatePicker label="Attendance date" value={attendanceDate} onChange={(value) => setAttendanceDate(value ?? "")} />
           <Label className="space-y-1.5 text-sm">Search employees<Input disabled={!outletId} value={search} placeholder="Search employee code or name" onChange={(event) => setSearch(event.target.value)} /></Label>
         </div>
         <Label className="space-y-1.5 text-sm">Reason<Textarea value={reason} onChange={(event) => setReason(event.target.value)} /></Label>

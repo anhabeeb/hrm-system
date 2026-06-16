@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { FormError } from "@/components/feedback/FormError";
+import { AppDateRangePicker } from "@/components/forms/AppDateRangePicker";
 import { LoadingButton } from "@/components/forms/LoadingButton";
 import { EmployeeCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
@@ -37,10 +38,13 @@ export const LongLeaveForm = ({
           <Label className="space-y-1 text-sm">Employee<EmployeeCombobox value={payload.employee_id} onChange={(value) => update("employee_id", value ?? "")} /></Label>
           <p className="rounded-md border bg-muted/30 p-2 text-xs text-muted-foreground">Foreign employees are eligible by default. Local employee override requires backend permission and policy approval.</p>
           <Label className="space-y-1 text-sm">Linked leave request, optional<Input value={payload.leave_request_id ?? ""} onChange={(event) => update("leave_request_id", event.target.value)} placeholder="Optional leave request ID" /></Label>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Label className="space-y-1 text-sm">Start date<Input type="date" value={payload.start_date} onChange={(event) => update("start_date", event.target.value)} /></Label>
-            <Label className="space-y-1 text-sm">Expected return<Input type="date" value={payload.expected_return_date} onChange={(event) => update("expected_return_date", event.target.value)} /></Label>
-          </div>
+          <AppDateRangePicker
+            fromLabel="Start date"
+            toLabel="Expected return"
+            dateFrom={payload.start_date}
+            dateTo={payload.expected_return_date}
+            onChange={({ dateFrom, dateTo }) => setPayload((current) => ({ ...current, start_date: dateFrom ?? "", expected_return_date: dateTo ?? "" }))}
+          />
           <div className="grid gap-3 sm:grid-cols-2">
             <Label className="space-y-1 text-sm">Salary treatment<Select value={payload.salary_treatment ?? "unpaid"} onValueChange={(value) => update("salary_treatment", value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="unpaid">Unpaid</SelectItem><SelectItem value="partially_paid">Partially paid</SelectItem><SelectItem value="paid">Paid</SelectItem></SelectContent></Select></Label>
             <Label className="space-y-1 text-sm">Deduction method<Select value={payload.deduction_method ?? "calendar_days"} onValueChange={(value) => update("deduction_method", value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="calendar_days">Calendar days</SelectItem><SelectItem value="working_days">Working days</SelectItem><SelectItem value="scheduled_roster_days">Scheduled roster days</SelectItem><SelectItem value="attendance_days">Attendance days</SelectItem></SelectContent></Select></Label>

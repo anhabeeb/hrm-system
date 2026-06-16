@@ -2,6 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { useToast } from "@/components/feedback/useToast";
+import { AppMonthPicker } from "@/components/forms/AppMonthPicker";
 import { EmployeeCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -138,7 +139,7 @@ export const PayrollAdjustmentDialog = ({ open, onOpenChange, currentEmployeeId,
           </Label>
           <Label className="grid gap-1 text-sm">Amount<Input type="number" step="0.01" value={amount} disabled={direction === "NEUTRAL"} onChange={(event) => setAmount(event.target.value)} /></Label>
           <Label className="grid gap-1 text-sm">Currency<Input value={currency} onChange={(event) => setCurrency(event.target.value.toUpperCase())} /></Label>
-          <Label className="grid gap-1 text-sm">Payroll month<Input type="month" value={payrollMonth} onChange={(event) => setPayrollMonth(event.target.value)} /></Label>
+          <AppMonthPicker label="Payroll month" value={payrollMonth} onChange={(value) => setPayrollMonth(value ?? "")} />
           {canSelectEmployee ? (
             <div className="space-y-3 rounded-md border bg-muted/20 p-3 md:col-span-2">
               <div className="flex flex-wrap items-center justify-between gap-2">

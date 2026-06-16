@@ -1,6 +1,8 @@
 import { useState } from "react";
 
 import { FormError } from "@/components/feedback/FormError";
+import { AppDatePicker } from "@/components/forms/AppDatePicker";
+import { AppMonthPicker } from "@/components/forms/AppMonthPicker";
 import { LoadingButton } from "@/components/forms/LoadingButton";
 import { EmployeeCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
@@ -35,8 +37,8 @@ export const AdvanceForm = ({
           <Label className="space-y-1 text-sm">Employee<EmployeeCombobox value={payload.employee_id} onChange={(value) => setPayload((current) => ({ ...current, employee_id: value ?? "" }))} /></Label>
           <Label className="space-y-1 text-sm">Amount minor units<Input type="number" min="1" step="1" value={payload.amount} onChange={(event) => setPayload((current) => ({ ...current, amount: event.target.value }))} /></Label>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Label className="space-y-1 text-sm">Paid date<Input type="date" value={payload.paid_date} onChange={(event) => setPayload((current) => ({ ...current, paid_date: event.target.value }))} /></Label>
-            <Label className="space-y-1 text-sm">Deduction month<Input type="month" value={payload.deduction_month} onChange={(event) => setPayload((current) => ({ ...current, deduction_month: event.target.value }))} /></Label>
+            <AppDatePicker label="Paid date" value={payload.paid_date} onChange={(value) => setPayload((current) => ({ ...current, paid_date: value ?? "" }))} />
+            <AppMonthPicker label="Deduction month" value={payload.deduction_month} onChange={(value) => setPayload((current) => ({ ...current, deduction_month: value ?? "" }))} />
           </div>
           <Label className="space-y-1 text-sm">Reason<Textarea value={payload.reason} onChange={(event) => setPayload((current) => ({ ...current, reason: event.target.value }))} /></Label>
           <FormError message={error ?? undefined} />

@@ -1,6 +1,6 @@
 export interface ExportCreateInput {
   export_type: string;
-  format: "json" | "csv";
+  format: "xlsx" | "pdf";
   report_key?: string;
   filters: Record<string, unknown>;
   reason?: string;
@@ -8,6 +8,7 @@ export interface ExportCreateInput {
 
 export interface ImportUploadInput {
   import_type: string;
+  file_type: "xlsx";
   file_name: string;
   mime_type: string;
   content_base64: string;

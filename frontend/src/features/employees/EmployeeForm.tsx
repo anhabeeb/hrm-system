@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 
 import { FormError } from "@/components/feedback/FormError";
+import { AppDatePicker } from "@/components/forms/AppDatePicker";
 import { LoadingButton } from "@/components/forms/LoadingButton";
 import { RequiredLabel } from "@/components/forms/RequiredLabel";
 import { Button } from "@/components/ui/button";
@@ -183,7 +184,7 @@ export const EmployeeForm = ({
                 </FormItem>
               )} />
               <FormField control={form.control} name="joined_at" render={({ field }) => (
-                <FormItem><FormLabel>Joined date</FormLabel><FormControl><Input type="date" value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value || null)} /></FormControl><FormMessage /></FormItem>
+                <FormItem><FormLabel>Joined date</FormLabel><AppDatePicker value={field.value ?? ""} onChange={(value) => field.onChange(value ?? null)} /><FormMessage /></FormItem>
               )} />
               {employeeType === "local" ? (
                 <FormField control={form.control} name="id_card_number" render={({ field }) => (
@@ -198,13 +199,13 @@ export const EmployeeForm = ({
                     <FormItem><FormLabel><RequiredLabel>Passport number</RequiredLabel></FormLabel><FormControl><Input value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value || null)} /></FormControl><FormMessage /></FormItem>
                   )} />
                   <FormField control={form.control} name="passport_expiry_date" render={({ field }) => (
-                    <FormItem><FormLabel><RequiredLabel>Passport expiry date</RequiredLabel></FormLabel><FormControl><Input type="date" value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value || null)} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel><RequiredLabel>Passport expiry date</RequiredLabel></FormLabel><AppDatePicker value={field.value ?? ""} onChange={(value) => field.onChange(value ?? null)} /><FormMessage /></FormItem>
                   )} />
                   <FormField control={form.control} name="work_permit_number" render={({ field }) => (
                     <FormItem><FormLabel><RequiredLabel>Work permit number</RequiredLabel></FormLabel><FormControl><Input value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value || null)} /></FormControl><FormMessage /></FormItem>
                   )} />
                   <FormField control={form.control} name="work_permit_expiry_date" render={({ field }) => (
-                    <FormItem><FormLabel><RequiredLabel>Work permit expiry date</RequiredLabel></FormLabel><FormControl><Input type="date" value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value || null)} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel><RequiredLabel>Work permit expiry date</RequiredLabel></FormLabel><AppDatePicker value={field.value ?? ""} onChange={(value) => field.onChange(value ?? null)} /><FormMessage /></FormItem>
                   )} />
                 </>
               )}
@@ -281,7 +282,7 @@ export const EmployeeForm = ({
                     <FormItem><FormLabel><RequiredLabel>Currency</RequiredLabel></FormLabel><FormControl><Input value={field.value ?? "MVR"} onChange={(event) => field.onChange(event.target.value || "MVR")} /></FormControl><FormMessage /></FormItem>
                   )} />
                   <FormField control={form.control} name="starting_salary.effective_from" render={({ field }) => (
-                    <FormItem><FormLabel><RequiredLabel>Effective from</RequiredLabel></FormLabel><FormControl><Input type="date" value={field.value ?? ""} onChange={(event) => field.onChange(event.target.value)} /></FormControl><FormMessage /></FormItem>
+                    <FormItem><FormLabel><RequiredLabel>Effective from</RequiredLabel></FormLabel><AppDatePicker value={field.value ?? ""} onChange={(value) => field.onChange(value ?? "")} /><FormMessage /></FormItem>
                   )} />
                 </div>
                 <FormField control={form.control} name="starting_salary.reason" render={({ field }) => (

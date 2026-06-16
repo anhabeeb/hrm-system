@@ -33,10 +33,16 @@ const activeEmployee = (row: any) =>
     !["inactive", "archived", "deleted", "terminated", "resigned"].includes(String(row.employment_status ?? "").toLowerCase()),
   );
 
+const employeeProfilePhotoUrl = (row: any) =>
+  row?.profile_photo_key
+    ? `/api/v1/employees/${row.employee_id}/profile-photo${row.profile_photo_updated_at ? `?v=${encodeURIComponent(row.profile_photo_updated_at)}` : ""}`
+    : null;
+
 const employeeFromRow = (row: any): SelfProfile["employee"] => row?.employee_id ? ({
   id: row.employee_id,
   employee_code: row.employee_code ?? null,
   full_name: row.employee_name ?? null,
+  profile_photo_url: employeeProfilePhotoUrl(row),
   department_id: row.department_id ?? null,
   department_name: row.department_name ?? null,
   position_id: row.position_id ?? null,

@@ -20,7 +20,10 @@ const decodeBase64 = (value: string) => {
   if (binary.length === 0) throw new ValidationError("The uploaded import file is empty.");
   const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
   if (bytes.byteLength === 0) throw new ValidationError("The uploaded import file is empty.");
-  return new TextDecoder().decode(bytes);
+  if (bytes[0] !== 0x50 || bytes[1] !== 0x4b) {
+    throw new ValidationError("The uploaded file is not a valid Excel .xlsx workbook.");
+  }
+  return bytes;
 };
 
 const audit = async (env: Env, context: AuthActor, action: string, entityId: string, reason?: string) => {
@@ -61,8 +64,8 @@ export const validateImport = async (env: Env, context: AuthActor, id: string) =
   if (!job) throw new NotFoundError("Import job not found.");
   const object = job.file_key ? await env.BACKUP_BUCKET.get(job.file_key) : null;
   if (!object) throw new AppError("Import file is not ready yet.", "IMPORT_FILE_NOT_READY", 409);
-  const content = await object.text();
-  const result = validateImportContent(content, object.httpMetadata?.contentType ?? "text/csv");
+  const content = new Uint8Array(await object.arrayBuffer());
+  const result = await validateImportContent(content, object.httpMetadata?.contentType ?? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", job.import_type);
   await repository.updateImportValidation(env, context.companyId, id, { total_rows: result.total_rows, valid_rows: result.valid_rows, invalid_rows: result.invalid_rows });
   await audit(env, context, "import_validated", id);
   return result;
@@ -72,8 +75,8 @@ export const applyImport = async (env: Env, context: AuthActor, id: string, reas
   const job = await repository.findImportBatch(env, context.companyId, id);
   if (!job) throw new NotFoundError("Import job not found.");
   if (job.status !== "validated") throw new AppError("This import file has validation errors.", "IMPORT_VALIDATION_REQUIRED", 409);
-  await audit(env, context, "import_applied", id, reason);
-  return { import_job_id: id, applied: false, note: "Import apply is a safe placeholder and does not modify business data yet." };
+  await audit(env, context, "import_apply_blocked_not_configured", id, reason);
+  throw new AppError("Excel import apply is not configured for this template yet. Validation and preview are available, but applying changes is disabled.", "IMPORT_APPLY_NOT_CONFIGURED", 409);
 };
 
 export const cancelImport = async (env: Env, context: AuthActor, id: string, reason: string) => {

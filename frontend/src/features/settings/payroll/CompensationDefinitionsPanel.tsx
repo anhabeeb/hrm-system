@@ -4,6 +4,7 @@ import { useState } from "react";
 import { DataTable } from "@/components/data/DataTable";
 import { FormError } from "@/components/feedback/FormError";
 import { LoadingButton } from "@/components/forms/LoadingButton";
+import { ReasonDialog } from "@/components/forms/ReasonDialog";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -53,6 +54,7 @@ export const CompensationDefinitionsPanel = () => {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<CompensationComponentDefinition | null>(null);
+  const [statusTarget, setStatusTarget] = useState<CompensationComponentDefinition | null>(null);
   const [form, setForm] = useState(defaultForm);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -130,11 +132,7 @@ export const CompensationDefinitionsPanel = () => {
     });
   };
 
-  const toggleStatus = (definition: CompensationComponentDefinition) => {
-    const reason = window.prompt(`Enter a reason to ${definition.status === "active" ? "disable" : "enable"} this component definition.`);
-    if (!reason?.trim()) return;
-    statusMutation.mutate({ id: definition.id, status: definition.status, reason: reason.trim() });
-  };
+  const toggleStatus = (definition: CompensationComponentDefinition) => setStatusTarget(definition);
 
   const rows = query.data?.data ?? [];
 
@@ -214,6 +212,19 @@ export const CompensationDefinitionsPanel = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ReasonDialog
+        open={Boolean(statusTarget)}
+        title={`${statusTarget?.status === "active" ? "Disable" : "Enable"} compensation component`}
+        description="A reason is required before changing this compensation component definition status."
+        confirmLabel={statusTarget?.status === "active" ? "Disable component" : "Enable component"}
+        loading={statusMutation.isPending}
+        onOpenChange={(nextOpen) => { if (!nextOpen) setStatusTarget(null); }}
+        onSubmit={(reason) => {
+          if (!statusTarget) return;
+          statusMutation.mutate({ id: statusTarget.id, status: statusTarget.status, reason });
+          setStatusTarget(null);
+        }}
+      />
     </section>
   );
 };

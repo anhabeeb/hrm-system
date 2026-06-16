@@ -1,4 +1,5 @@
 import { FilterBar } from "@/components/data/FilterBar";
+import { AppDateRangePicker } from "@/components/forms/AppDateRangePicker";
 import { EmployeeCombobox, OutletCombobox } from "@/components/selectors";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,7 +18,10 @@ export const UniformFilters = ({ filters, onChange, onClear }: { filters: Unifor
         <SelectContent><SelectItem value="all">All statuses</SelectItem><SelectItem value="issued">Issued</SelectItem><SelectItem value="returned">Returned</SelectItem><SelectItem value="pending_return">Pending return</SelectItem></SelectContent>
       </Select>
     </Label>
-    <Label className="space-y-1 text-xs font-medium text-muted-foreground">From<Input type="date" value={filters.date_from ?? ""} onChange={(event) => onChange({ date_from: event.target.value })} /></Label>
-    <Label className="space-y-1 text-xs font-medium text-muted-foreground">To<Input type="date" value={filters.date_to ?? ""} onChange={(event) => onChange({ date_to: event.target.value })} /></Label>
+    <AppDateRangePicker
+      dateFrom={filters.date_from}
+      dateTo={filters.date_to}
+      onChange={({ dateFrom, dateTo }) => onChange({ date_from: dateFrom, date_to: dateTo })}
+    />
   </FilterBar>
 );

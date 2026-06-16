@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { FormError } from "@/components/feedback/FormError";
+import { AppDatePicker } from "@/components/forms/AppDatePicker";
 import { LoadingButton } from "@/components/forms/LoadingButton";
 import { EmployeeCombobox, OutletCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
@@ -74,10 +75,7 @@ export const ManualAttendanceDialog = ({
               <Label>Employee</Label>
               <EmployeeCombobox value={values.employee_id} outletId={values.outlet_id} onChange={(value) => update("employee_id", value ?? "")} />
             </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="manual-date">Attendance date</Label>
-              <Input id="manual-date" type="date" value={values.attendance_date} onChange={(event) => update("attendance_date", event.target.value)} />
-            </div>
+            <AppDatePicker label="Attendance date" value={values.attendance_date} onChange={(value) => update("attendance_date", value ?? "")} />
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="grid gap-1.5">
                 <Label htmlFor="manual-in">Clock in</Label>

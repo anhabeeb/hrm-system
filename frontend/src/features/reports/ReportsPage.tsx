@@ -12,6 +12,8 @@ import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { toastError, toastSuccess } from "@/components/feedback/toast-helpers";
 import { useToast } from "@/components/feedback/useToast";
+import { AppDateRangePicker } from "@/components/forms/AppDateRangePicker";
+import { AppMonthPicker } from "@/components/forms/AppMonthPicker";
 import { EmployeeCombobox, OutletCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +26,7 @@ import { friendlyHrmError } from "@/lib/hrm-errors";
 import { searchParamNumber } from "@/lib/query-string";
 import { sanitizeForDisplay } from "@/lib/safe-display";
 import type { TableColumn } from "@/types/common";
+import { ReportExportActions } from "@/features/report-exports/ReportExportActions";
 import { formatReportValue, reportColumnLabel } from "./report-format";
 import { reportsApi } from "./reports.api";
 import type { ReportDefinition, ReportFilters, ReportResult } from "./reports.types";
@@ -50,16 +53,27 @@ const dynamicColumns = (rows: Record<string, unknown>[]): TableColumn<Record<str
     cell: (row) => <span className="max-w-xs truncate">{formatReportValue(row[key])}</span>,
   }));
 
-const JsonPanel = ({ value }: { value: unknown }) => (
-  <pre className="max-h-72 overflow-auto rounded-lg border bg-muted p-3 text-xs">{JSON.stringify(sanitizeForDisplay(value ?? {}), null, 2)}</pre>
-);
+const SummaryPanel = ({ value }: { value?: Record<string, unknown> }) => {
+  const entries = Object.entries(sanitizeForDisplay(value ?? {}) as Record<string, unknown>).slice(0, 12);
+  if (entries.length === 0) return null;
+  return (
+    <div className="grid gap-2 rounded-lg border bg-card p-3 sm:grid-cols-2 lg:grid-cols-4">
+      {entries.map(([key, item]) => (
+        <div key={key} className="rounded-md border bg-muted/30 p-2">
+          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{reportColumnLabel(key)}</div>
+          <div className="mt-1 truncate text-sm font-semibold">{formatReportValue(item)}</div>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 const ReportResultPanel = ({ result, loading }: { result?: ReportResult; loading?: boolean }) => {
   const rows = resultRows(result);
   const columns = dynamicColumns(rows);
   return (
     <div className="space-y-3">
-      {result?.summary ? <JsonPanel value={result.summary} /> : null}
+      {result?.summary ? <SummaryPanel value={result.summary} /> : null}
       <DataTable
         rows={rows}
         columns={columns.length ? columns : [{ key: "message", header: "Result", cell: () => "No row data returned" }]}
@@ -83,6 +97,7 @@ export const ReportsPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = useState(searchParams.get("tab") ?? "catalog");
   const [selectedReport, setSelectedReport] = useState<ReportDefinition | null>(null);
+  const [generateFormat, setGenerateFormat] = useState<"xlsx" | "pdf">("xlsx");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [generated, setGenerated] = useState<ReportResult | null>(null);
   const toast = useToast();
@@ -153,12 +168,11 @@ export const ReportsPage = () => {
     <div>
       <div className="space-y-4 p-4 md:p-6">
         {activeError ? <InlineAlert title={friendlyHrmError(activeError, "Report data could not be loaded.")} variant="error" /> : null}
-        <div className="grid gap-3 rounded-lg border bg-card p-4 md:grid-cols-6">
+        <div className="grid gap-3 rounded-lg border bg-card p-4 md:grid-cols-[1fr_1fr_2fr_1fr_1fr]">
           <OutletCombobox value={filters.outlet_id} onChange={(value) => updateFilters({ outlet_id: value, employee_id: undefined })} placeholder="All accessible outlets" />
           <EmployeeCombobox value={filters.employee_id} outletId={filters.outlet_id} onChange={(value) => updateFilters({ employee_id: value })} placeholder="All employees" />
-          <Input type="date" value={filters.date_from ?? ""} onChange={(event) => updateFilters({ date_from: event.target.value })} />
-          <Input type="date" value={filters.date_to ?? ""} onChange={(event) => updateFilters({ date_to: event.target.value })} />
-          <Input placeholder="Payroll month" value={filters.payroll_month ?? ""} onChange={(event) => updateFilters({ payroll_month: event.target.value })} />
+          <AppDateRangePicker dateFrom={filters.date_from} dateTo={filters.date_to} fromLabel="Date from" toLabel="Date to" onChange={({ dateFrom, dateTo }) => updateFilters({ date_from: dateFrom, date_to: dateTo })} />
+          <AppMonthPicker label="Payroll month" value={filters.payroll_month} onChange={(value) => updateFilters({ payroll_month: value })} />
           <Input placeholder="Status" value={filters.status ?? ""} onChange={(event) => updateFilters({ status: event.target.value })} />
         </div>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -194,10 +208,16 @@ export const ReportsPage = () => {
             <div className="grid gap-4 rounded-lg border bg-card p-4 lg:grid-cols-[320px_1fr]">
               <div className="space-y-3">
                 <Label className="space-y-1 text-sm">Report<Select value={selectedReport?.report_key ?? ""} onValueChange={(value) => setSelectedReport((catalogQuery.data?.data.reports ?? []).find((report) => report.report_key === value) ?? null)}><SelectTrigger><SelectValue placeholder="Select report" /></SelectTrigger><SelectContent>{(catalogQuery.data?.data.reports ?? []).map((report) => <SelectItem key={report.report_key} value={report.report_key}>{report.report_name}</SelectItem>)}</SelectContent></Select></Label>
-                <Button disabled={!selectedReport || generateMutation.isPending} onClick={() => selectedReport && generateMutation.mutate({ report_key: selectedReport.report_key, filters, format: "json" })}><Play className="h-4 w-4" />Generate JSON report</Button>
-                <p className="text-sm text-muted-foreground">CSV/PDF/XLSX export formatting is handled by export jobs or future template work.</p>
+                <Label className="space-y-1 text-sm">Output format<Select value={generateFormat} onValueChange={(value: "xlsx" | "pdf") => setGenerateFormat(value)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="xlsx">Excel workbook</SelectItem><SelectItem value="pdf">PDF report</SelectItem></SelectContent></Select></Label>
+                <Button disabled={!selectedReport || generateMutation.isPending} onClick={() => selectedReport && generateMutation.mutate({ report_key: selectedReport.report_key, filters, format: generateFormat })}><Play className="h-4 w-4" />Generate {generateFormat === "xlsx" ? "Excel" : "PDF"} report</Button>
+                <p className="text-xs font-medium text-muted-foreground">Generate Excel or Generate PDF from the selected report.</p>
+                <p className="text-sm text-muted-foreground">Report outputs are generated as Excel or PDF files. The preview below uses safe table rows only.</p>
+                {selectedReport ? <ReportExportActions reportKey={selectedReport.report_key} filters={filters as Record<string, unknown>} sensitive={selectedReport.sensitive} /> : null}
               </div>
-              <ReportResultPanel result={generated ?? undefined} loading={generateMutation.isPending} />
+              <div className="space-y-3">
+                {generated ? <InlineAlert title={`${generateFormat === "xlsx" ? "Excel" : "PDF"} report generated.`}>Use the download actions for file output, or review the scoped preview below.</InlineAlert> : null}
+                <ReportResultPanel result={generated ?? undefined} loading={generateMutation.isPending} />
+              </div>
             </div>
           </TabsContent>
           <TabsContent value="hr">{canViewEmployeeReport ? <ReportResultPanel result={employeeReportQuery.data?.data} loading={employeeReportQuery.isLoading} /> : <PermissionPlaceholder title="This report is not available for your role." />}{canViewAssetReport ? <ReportResultPanel result={assetReportQuery.data?.data} loading={assetReportQuery.isLoading} /> : <PermissionPlaceholder title="This report is not available for your role." />}</TabsContent>
@@ -208,7 +228,7 @@ export const ReportsPage = () => {
           {(canDevices || canSync) ? <TabsContent value="devices">{canDevices ? <ReportResultPanel result={devicesQuery.data?.[0]?.data} loading={devicesQuery.isLoading} /> : <PermissionPlaceholder title="Device health report is not available for your role." />}{canSync ? <ReportResultPanel result={devicesQuery.data?.[1]?.data} loading={devicesQuery.isLoading} /> : <PermissionPlaceholder title="Sync status report is not available for your role." />}</TabsContent> : null}
           <TabsContent value="templates">
             <div className="space-y-4">
-              <InlineAlert title="Template editing will be connected in a future prompt." variant="warning">Real PDF rendering, export formatting, notification provider integration, and send actions are not implemented here.</InlineAlert>
+              <InlineAlert title="Report templates use safe export outputs." variant="info">Report outputs are generated as Excel or PDF files. Notification provider integration and send actions remain separate from report generation.</InlineAlert>
               <DataTable rows={templatePlaceholders} columns={[{ key: "template_name", header: "Template Name" }, { key: "category", header: "Category" }, { key: "format", header: "Format" }, { key: "status", header: "Status", cell: (row) => <StatusBadge status={row.status} /> }, { key: "description", header: "Description" }]} getRowId={(row) => row.id} compact />
               <DataTable rows={notificationTemplatePlaceholders} columns={[{ key: "template_name", header: "Notification Template" }, { key: "category", header: "Trigger" }, { key: "format", header: "Channel" }, { key: "status", header: "Status", cell: (row) => <StatusBadge status={row.status} /> }, { key: "description", header: "Description" }]} getRowId={(row) => row.id} compact />
             </div>

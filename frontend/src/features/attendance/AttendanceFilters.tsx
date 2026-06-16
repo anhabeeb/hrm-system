@@ -1,4 +1,5 @@
 import { FilterBar } from "@/components/data/FilterBar";
+import { AppDateRangePicker } from "@/components/forms/AppDateRangePicker";
 import { EmployeeCombobox, OutletCombobox } from "@/components/selectors";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,14 +18,11 @@ export const AttendanceFilters = ({
   onClear: () => void;
 }) => (
   <FilterBar onClear={onClear} onApply={() => onChange({})}>
-    <div className="space-y-1.5">
-      <Label htmlFor="date-from">From</Label>
-      <Input id="date-from" type="date" value={filters.date_from ?? ""} onChange={(event) => onChange({ date_from: event.target.value })} />
-    </div>
-    <div className="space-y-1.5">
-      <Label htmlFor="date-to">To</Label>
-      <Input id="date-to" type="date" value={filters.date_to ?? ""} onChange={(event) => onChange({ date_to: event.target.value })} />
-    </div>
+    <AppDateRangePicker
+      dateFrom={filters.date_from}
+      dateTo={filters.date_to}
+      onChange={({ dateFrom, dateTo }) => onChange({ date_from: dateFrom, date_to: dateTo })}
+    />
     <div className="space-y-1.5">
       <Label>Outlet</Label>
       <OutletCombobox value={filters.outlet_id} onChange={(value) => onChange({ outlet_id: value, employee_id: undefined })} placeholder="All outlets" />

@@ -1,4 +1,4 @@
-export type ReportExportFormat = "csv" | "xlsx" | "print_html" | "pdf";
+export type ReportExportFormat = "xlsx" | "pdf";
 
 export interface ReportExportColumn {
   key: string;

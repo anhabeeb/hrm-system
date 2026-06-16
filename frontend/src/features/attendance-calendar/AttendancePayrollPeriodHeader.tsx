@@ -1,5 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EmployeeAvatar } from "@/components/employees/EmployeeAvatar";
+import { AppMonthPicker } from "@/components/forms/AppMonthPicker";
 import { cn } from "@/lib/utils";
 
 import type { AttendanceCalendarResponse } from "./attendanceCalendar.types";
@@ -18,28 +20,25 @@ export const AttendancePayrollPeriodHeader = ({
 }) => (
   <div className="rounded-lg border bg-white p-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-      <div>
-        <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-base font-semibold">{calendar?.employee.name ?? "Employee Attendance Calendar"}</h2>
-          {modeLabel ? <Badge variant="outline">{modeLabel}</Badge> : null}
-          {calendar?.payroll_period.is_derived ? <Badge variant="secondary">Default monthly period</Badge> : null}
-          {calendar?.payroll_period.attendance_locked ? <Badge className="bg-amber-100 text-amber-800">Locked / finalized</Badge> : null}
+      <div className="flex min-w-0 gap-3">
+        {calendar?.employee ? <EmployeeAvatar name={calendar.employee.name} employeeCode={calendar.employee.employee_no} photoUrl={calendar.employee.profile_photo_url} size="md" /> : null}
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-base font-semibold">{calendar?.employee.name ?? "Employee Attendance Calendar"}</h2>
+            {modeLabel ? <Badge variant="outline">{modeLabel}</Badge> : null}
+            {calendar?.payroll_period.is_derived ? <Badge variant="secondary">Default monthly period</Badge> : null}
+            {calendar?.payroll_period.attendance_locked ? <Badge className="bg-amber-100 text-amber-800">Locked / finalized</Badge> : null}
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {calendar
+              ? `${calendar.employee.employee_no ?? "No employee code"} / ${calendar.employee.department_name ?? "No department"} / ${calendar.employee.position_name ?? "No position"} / Level ${calendar.employee.level ?? "not set"}`
+              : "Select an employee and month to review attendance payroll status."}
+          </p>
         </div>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {calendar
-            ? `${calendar.employee.employee_no ?? "No employee code"} / ${calendar.employee.department_name ?? "No department"} / ${calendar.employee.position_name ?? "No position"} / Level ${calendar.employee.level ?? "not set"}`
-            : "Select an employee and month to review attendance payroll status."}
-        </p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="outline" size="sm" onClick={() => onMonthChange(addMonths(month, -1))}>Previous</Button>
-        <input
-          aria-label="Attendance calendar month"
-          type="month"
-          value={month}
-          onChange={(event) => onMonthChange(event.target.value)}
-          className="h-9 rounded-md border bg-background px-2 text-sm"
-        />
+        <AppMonthPicker value={month} onChange={(value) => value && onMonthChange(value)} clearable={false} />
         <Button variant="outline" size="sm" onClick={() => onMonthChange(addMonths(month, 1))}>Next</Button>
       </div>
     </div>

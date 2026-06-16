@@ -38,18 +38,18 @@ export const createJob = async (c: Context<AppContext>) =>
 
 export const generate = async (c: Context<AppContext>) => {
   const result = await service.generateExport(c.env, actor(c), requiredParam(c.req.param("id"), "export job"));
-  const { csv: _csv, data: _data, ...payload } = result;
+  const { file: _file, data: _data, ...payload } = result;
   return ok(payload, "Export job generated successfully.", request(c));
 };
 
 export const download = async (c: Context<AppContext>) => {
   const result = await service.downloadExport(c.env, actor(c), requiredParam(c.req.param("id"), "export job"));
-  const fileName = result.export_job.file_name ?? "report-export.csv";
-  return new Response(result.csv ?? "", {
+  const fileName = result.export_job.file_name ?? result.file.fileName;
+  return new Response(result.file.body, {
     status: 200,
     headers: {
-      "content-type": "text/csv; charset=utf-8",
-      "content-disposition": safeAttachmentHeader(fileName, "report-export.csv"),
+      "content-type": result.file.contentType,
+      "content-disposition": safeAttachmentHeader(fileName, result.file.fileName),
       "cache-control": "no-store",
       "x-request-id": c.get("requestId"),
     },

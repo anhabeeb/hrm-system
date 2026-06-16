@@ -27,9 +27,6 @@ export const getCatalog = listReports;
 
 export const generateReport = async (env: Env, context: AuthActor, input: ReportGenerateInput) => {
   const definition = assertReportAccess(context, input.report_key);
-  if (input.format !== "json") {
-    throw new AppError("This export format is not supported yet.", "UNSUPPORTED_EXPORT_FORMAT", 400);
-  }
   const report = await buildReport(env, context, input.report_key, input.filters);
   if (definition.sensitive) {
     const audit = await auditService.createAuditLog(env, {
@@ -49,6 +46,6 @@ export const generateReport = async (env: Env, context: AuthActor, input: Report
 };
 
 export const generateByKey = (env: Env, context: AuthActor, reportKey: string, filters: ReportFilters) =>
-  generateReport(env, context, { report_key: reportKey, filters, format: "json" });
+  buildReport(env, context, assertReportAccess(context, reportKey).report_key, filters);
 
 export { getDashboardSummary };

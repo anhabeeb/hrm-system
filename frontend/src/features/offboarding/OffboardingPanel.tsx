@@ -4,6 +4,7 @@ import { CheckCircle2, FileCheck2, Play, RotateCcw, ShieldOff } from "lucide-rea
 
 import { DataTable } from "@/components/data/DataTable";
 import { FormError } from "@/components/feedback/FormError";
+import { AppDatePicker } from "@/components/forms/AppDatePicker";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { LoadingButton } from "@/components/forms/LoadingButton";
 import { Button } from "@/components/ui/button";
@@ -221,10 +222,7 @@ export const OffboardingPanel = ({
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid gap-2">
-              <Label>Effective exit date</Label>
-              <Input type="date" value={startForm.effective_exit_date} onChange={(event) => setStartForm((current) => ({ ...current, effective_exit_date: event.target.value }))} />
-            </div>
+            <AppDatePicker label="Effective exit date" value={startForm.effective_exit_date} onChange={(value) => setStartForm((current) => ({ ...current, effective_exit_date: value ?? "" }))} />
             <div className="grid gap-2">
               <Label>Reason</Label>
               <Textarea value={startForm.reason} onChange={(event) => setStartForm((current) => ({ ...current, reason: event.target.value }))} />

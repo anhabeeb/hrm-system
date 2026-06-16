@@ -22,6 +22,7 @@ import type {
   EmployeeLoginUpdateInput,
   EmployeeListFilters,
   EmployeeNoteInput,
+  EmployeeProfilePhotoInput,
   EmployeeStatusInput,
   EmployeeUpdateInput,
   EmployeeWriteInput,
@@ -54,6 +55,8 @@ const optionalTrimmedMax = (max: number, message: string) =>
   z.string().trim().max(max, message).nullable().optional();
 
 const reason = z.string().trim().min(3, "A reason is required for this action.");
+const profilePhotoMimeTypes = ["image/jpeg", "image/png", "image/webp"] as const;
+const maxProfilePhotoBytes = 2 * 1024 * 1024;
 
 const employeeBase = z.object({
   employee_code: z.string().trim().nullable().optional(),
@@ -974,3 +977,32 @@ export const validateEmployeeNoteInput = (payload: unknown): EmployeeNoteInput =
     }),
     payload,
   );
+
+export const validateEmployeeProfilePhotoInput = (payload: unknown): EmployeeProfilePhotoInput => {
+  const parsed = parse(
+    z.object({
+      file_name: z.string().trim().min(1, "File name is required.").max(160, "File name is too long."),
+      mime_type: z.enum(profilePhotoMimeTypes),
+      content_base64: z.string().trim().min(1, "Please attach a profile picture."),
+      reason,
+    }),
+    payload,
+  );
+
+  if (/[\\/:*?"<>|]/.test(parsed.file_name)) {
+    throw new ValidationError("Please use a safe file name.");
+  }
+  if (!/\.(jpe?g|png|webp)$/i.test(parsed.file_name)) {
+    throw new ValidationError("Profile picture must be a JPG, PNG, or WebP image.");
+  }
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(parsed.content_base64) || parsed.content_base64.length % 4 !== 0) {
+    throw new AppError("The profile picture content is invalid.", "PROFILE_PHOTO_CONTENT_INVALID", 400);
+  }
+
+  const padding = parsed.content_base64.endsWith("==") ? 2 : parsed.content_base64.endsWith("=") ? 1 : 0;
+  const estimatedBytes = Math.floor((parsed.content_base64.length * 3) / 4) - padding;
+  if (estimatedBytes <= 0) throw new AppError("The profile picture is empty.", "PROFILE_PHOTO_EMPTY", 400);
+  if (estimatedBytes > maxProfilePhotoBytes) throw new ValidationError("Profile picture must be 2 MB or smaller.");
+
+  return parsed;
+};

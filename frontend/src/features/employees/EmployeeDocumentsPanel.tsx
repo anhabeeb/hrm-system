@@ -7,6 +7,7 @@ import { DetailDrawer } from "@/components/data/DetailDrawer";
 import { RowActions } from "@/components/data/RowActions";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { ReasonDialog } from "@/components/forms/ReasonDialog";
 import { Button } from "@/components/ui/button";
 import { DocumentUploadDialog } from "@/features/documents/DocumentUploadDialog";
 import { documentTypeOptions, drivingLicenseCategoryOptions } from "@/features/documents/document-format";
@@ -63,6 +64,7 @@ export const EmployeeDocumentsPanel = ({
   const [replaceOpen, setReplaceOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [selected, setSelected] = useState<EmployeeDocumentRow | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<EmployeeDocumentRow | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const query = useQuery({
     queryKey: ["employee-documents", employeeId],
@@ -140,10 +142,7 @@ export const EmployeeDocumentsPanel = ({
             actions={[
               { key: "view", label: "View history", onSelect: () => { setSelected(row); setHistoryOpen(true); } },
               ...(canUploadDocuments ? [{ key: "edit" as const, label: "Replace document", onSelect: () => { setSelected(row); setReplaceOpen(true); } }] : []),
-              ...(canEditDocuments ? [{ key: "archive" as const, label: "Archive document", onSelect: () => {
-                const reason = window.prompt("Reason for archiving this document");
-                if (reason && reason.trim().length >= 3) archiveMutation.mutate({ id: row.id, reason });
-              } }] : []),
+              ...(canEditDocuments ? [{ key: "archive" as const, label: "Archive document", onSelect: () => setArchiveTarget(row) }] : []),
             ]}
           />
         )}
@@ -183,6 +182,20 @@ export const EmployeeDocumentsPanel = ({
           emptyTitle="No document history found."
         />
       </DetailDrawer>
+      <ReasonDialog
+        open={Boolean(archiveTarget)}
+        title="Archive document"
+        description="A reason is required before this employee document is archived."
+        confirmLabel="Archive document"
+        loading={archiveMutation.isPending}
+        error={archiveMutation.error ? friendlyHrmError(archiveMutation.error, "Document could not be archived.") : null}
+        onOpenChange={(open) => { if (!open) setArchiveTarget(null); }}
+        onSubmit={(reason) => {
+          if (!archiveTarget) return;
+          archiveMutation.mutate({ id: archiveTarget.id, reason });
+          setArchiveTarget(null);
+        }}
+      />
     </div>
   );
 };

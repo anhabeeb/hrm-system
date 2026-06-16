@@ -1,5 +1,6 @@
 import { CalendarDays } from "lucide-react";
 
+import { AppDatePicker } from "@/components/forms/AppDatePicker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { RosterWeeklyMatrixFilters } from "./rosterWeeklyMatrix.types";
@@ -30,10 +31,7 @@ export const RosterWeeklyMatrixHeader = ({
         </div>
       </div>
       <div className="mt-4 grid gap-3 md:grid-cols-4">
-        <label className="grid gap-1 text-xs font-medium text-muted-foreground">
-          Week start
-          <Input type="date" value={weekStart} onChange={(event) => onChange({ ...filters, week_start: event.target.value })} />
-        </label>
+        <AppDatePicker label="Week start" value={weekStart} onChange={(value) => onChange({ ...filters, week_start: value ?? weekStart })} />
         <label className="grid gap-1 text-xs font-medium text-muted-foreground">
           Search employee
           <Input value={filters.search ?? ""} onChange={(event) => onChange({ ...filters, search: event.target.value || undefined })} placeholder="Name, code, department, position" />

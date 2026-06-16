@@ -24,6 +24,7 @@ export interface AttendanceCalendarResponse {
     id: string;
     name: string;
     employee_no: string | null;
+    profile_photo_url?: string | null;
     department_id: string | null;
     department_name: string | null;
     position_id: string | null;

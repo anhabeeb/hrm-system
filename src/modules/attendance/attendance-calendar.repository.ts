@@ -27,7 +27,7 @@ export const findEmployeeForCalendar = (
   const outlet = employeeOutletClause(context, "e");
   return one<AttendanceCalendarEmployeeRecord>(
     env,
-    `SELECT e.id, e.employee_code, e.full_name, e.department_id, d.name AS department_name,
+    `SELECT e.id, e.employee_code, e.full_name, e.profile_photo_key, e.profile_photo_updated_at, e.department_id, d.name AS department_name,
       e.position_id, p.title AS position_name, e.level, e.primary_outlet_id, NULL AS store_id,
       e.joined_at, e.resigned_at, e.terminated_at, e.employment_status, e.deleted_at, e.archived_at
      FROM employees e
@@ -42,7 +42,7 @@ export const findEmployeeForCalendar = (
 export const findActorLinkedEmployee = (env: Env, context: AuthActor) =>
   one<AttendanceCalendarEmployeeRecord>(
     env,
-    `SELECT e.id, e.employee_code, e.full_name, e.department_id, d.name AS department_name,
+    `SELECT e.id, e.employee_code, e.full_name, e.profile_photo_key, e.profile_photo_updated_at, e.department_id, d.name AS department_name,
       e.position_id, p.title AS position_name, e.level, e.primary_outlet_id, NULL AS store_id,
       e.joined_at, e.resigned_at, e.terminated_at, e.employment_status, e.deleted_at, e.archived_at
      FROM users u

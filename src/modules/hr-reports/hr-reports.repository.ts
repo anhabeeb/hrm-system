@@ -105,6 +105,7 @@ const employeeColumns = `
   e.id AS employee_id,
   e.employee_code,
   e.full_name AS employee_name,
+  CASE WHEN e.profile_photo_key IS NULL THEN NULL ELSE '/api/v1/employees/' || e.id || '/profile-photo' END AS profile_photo_url,
   e.employee_type,
   e.nationality,
   e.primary_outlet_id AS outlet_id,

@@ -111,7 +111,7 @@ const exportJob = (overrides: Record<string, unknown> = {}) => ({
   company_id: "company_1",
   report_key: "hr:employee-master",
   report_category: "hr",
-  format: "csv",
+  format: "xlsx",
   status: "pending",
   requested_by: "user_1",
   requested_at: "2026-06-08T00:00:00.000Z",
@@ -131,7 +131,7 @@ const exportJob = (overrides: Record<string, unknown> = {}) => ({
   sensitive_export: 1,
   redaction_level: "pending",
   idempotency_key: null,
-  metadata_json: JSON.stringify({ storage_mode: "streamed_csv" }),
+  metadata_json: JSON.stringify({ storage_mode: "generated_file" }),
   created_at: "2026-06-08T00:00:00.000Z",
   updated_at: "2026-06-08T00:00:00.000Z",
   ...overrides,
@@ -155,7 +155,7 @@ const fakeEnv = (options: { existingJob?: Record<string, unknown> | null } = {})
         job.status = "completed";
         job.completed_at = "2026-06-08T00:00:00.000Z";
         job.row_count = 1;
-        job.file_name = "employee-master.csv";
+        job.file_name = "employee-master.xlsx";
         return 1;
       }
       return 0;
@@ -204,6 +204,7 @@ const fakeEnv = (options: { existingJob?: Record<string, unknown> | null } = {})
 };
 
 const source = (path: string) => readFileSync(path, "utf8");
+const bytesText = (body: string | Uint8Array) => typeof body === "string" ? body : new TextDecoder().decode(body);
 
 describe("Phase 11D Export / Print Reports", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -222,7 +223,7 @@ describe("Phase 11D Export / Print Reports", () => {
     const { env } = fakeEnv();
     const preview = await service.previewExport(env, actor(), {
       report_key: "hr:employee-master",
-      format: "csv",
+      format: "xlsx",
       filters: { as_of_date: "2026-06-08" },
     });
     expect(preview.row_count).toBe(1);
@@ -231,24 +232,22 @@ describe("Phase 11D Export / Print Reports", () => {
     expect(preview.sample_rows[0]).not.toHaveProperty("metadata_json");
   });
 
-  it("CSV escapes commas quotes and newlines", () => {
-    const csv = service.generateCsv([{ key: "name", label: "Name", data_type: "text" }], [
-      { name: "Aisha, \"HR\"\nManager" },
-    ]);
-    expect(csv).toContain('"Aisha, ""HR""\nManager"');
-  });
-
-  it("CSV protects against spreadsheet formula injection", () => {
-    expect(service.escapeCsvValue("=IMPORTXML(\"http://evil\")")).toContain("'=IMPORTXML");
-    const csv = service.generateCsv([{ key: "value", label: "Value", data_type: "text" }], [{ value: "+SUM(1,2)" }]);
-    expect(csv).toContain("'+SUM(1,2)");
+  it("XLSX generation returns a real ZIP/OpenXML workbook", async () => {
+    const { env } = fakeEnv({ existingJob: exportJob({ status: "pending" }) });
+    const result = await service.generateExport(env, actor(), "report_export_1");
+    const body = result.file?.body;
+    expect(body).toBeInstanceOf(Uint8Array);
+    expect(Array.from((body as Uint8Array).slice(0, 4))).toEqual([0x50, 0x4b, 0x03, 0x04]);
+    expect(result.file?.contentType).toBe("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    expect(result.file?.fileName).toMatch(/\.xlsx$/);
+    expect(bytesText(body as Uint8Array)).toContain("xl/worksheets/sheet1.xml");
   });
 
   it("sensitive columns are omitted or masked without permission", async () => {
     const { env } = fakeEnv();
     const preview = await service.previewExport(env, actor(), {
       report_key: "payroll:employee-detail",
-      format: "csv",
+      format: "xlsx",
       filters: { payroll_month: "2026-06" },
     });
     expect(preview.sample_rows[0]).toMatchObject({ gross_salary: "REDACTED", net_payable_salary: "REDACTED" });
@@ -260,17 +259,17 @@ describe("Phase 11D Export / Print Reports", () => {
       permissions: [...permissions, "report_exports.sensitive", "payroll_reports.sensitive_amounts.view"],
     }), {
       report_key: "payroll:employee-detail",
-      format: "csv",
+      format: "xlsx",
       filters: { payroll_month: "2026-06" },
     });
     expect(preview.sample_rows[0]).toMatchObject({ gross_salary: 60000, net_payable_salary: 50000 });
   });
 
-  it("unsupported XLSX/PDF format returns safe error if not implemented", async () => {
+  it("CSV format is rejected for normal report exports", async () => {
     const { env } = fakeEnv();
     await expect(service.previewExport(env, actor(), {
       report_key: "hr:employee-master",
-      format: "xlsx",
+      format: "csv" as any,
       filters: { as_of_date: "2026-06-08" },
     })).rejects.toMatchObject({ code: "REPORT_EXPORT_FORMAT_UNSUPPORTED" });
   });
@@ -279,7 +278,7 @@ describe("Phase 11D Export / Print Reports", () => {
     const { env } = fakeEnv();
     await expect(service.previewExport(env, actor(), {
       report_key: "hr:lifecycle",
-      format: "csv",
+      format: "xlsx",
       filters: {},
     })).rejects.toMatchObject({ code: "REPORT_EXPORT_FILTER_REQUIRED" });
   });
@@ -288,17 +287,17 @@ describe("Phase 11D Export / Print Reports", () => {
     const { env } = fakeEnv();
     await expect(service.previewExport(env, actor(), {
       report_key: "payroll:audit",
-      format: "csv",
+      format: "xlsx",
       filters: {},
     })).rejects.toMatchObject({ code: "REPORT_EXPORT_FILTER_REQUIRED" });
   });
 
   it("idempotency prevents duplicate jobs", async () => {
-    const existingJob = exportJob({ status: "completed", filters_json: "{}", row_count: 1, file_name: "employee-master.csv", file_size: 100, sensitive_export: 0, redaction_level: "full", idempotency_key: "same" });
+    const existingJob = exportJob({ status: "completed", filters_json: "{}", row_count: 1, file_name: "employee-master.xlsx", file_size: 100, sensitive_export: 0, redaction_level: "full", idempotency_key: "same" });
     const { env, calls } = fakeEnv({ existingJob });
     const result = await service.createExportJob(env, actor(), {
       report_key: "hr:employee-master",
-      format: "csv",
+      format: "xlsx",
       filters: { as_of_date: "2026-06-08" },
       idempotency_key: "same",
     });
@@ -306,13 +305,15 @@ describe("Phase 11D Export / Print Reports", () => {
     expect(calls.some((call) => call.method === "run" && call.sql.includes("INSERT INTO report_export_jobs"))).toBe(false);
   });
 
-  it("completed job download returns regenerated CSV content from saved filters", async () => {
-    const existingJob = exportJob({ status: "completed", file_name: "employee-master.csv", row_count: 1, redaction_level: "redacted" });
+  it("completed job download returns regenerated Excel content from saved filters", async () => {
+    const existingJob = exportJob({ status: "completed", file_name: "employee-master.xlsx", row_count: 1, redaction_level: "redacted" });
     const { env } = fakeEnv({ existingJob });
     const downloaded = await service.downloadExport(env, actor(), "report_export_1");
-    expect(downloaded.csv).toContain("Full Name");
-    expect(downloaded.csv).toContain("Aisha");
-    expect(downloaded.csv).toContain("REDACTED");
+    expect(downloaded.file.fileName).toContain(".xlsx");
+    const workbookText = bytesText(downloaded.file.body);
+    expect(workbookText).toContain("Full Name");
+    expect(workbookText).toContain("Aisha");
+    expect(workbookText).toContain("REDACTED");
     expect(downloaded.regenerated).toBe(true);
     expect(vi.mocked(hrReportService.runReport).mock.calls.at(-1)?.[3]).toMatchObject({ as_of_date: "2026-06-08" });
   });
@@ -326,8 +327,9 @@ describe("Phase 11D Export / Print Reports", () => {
   it("completed job download redacts sensitive fields when actor lacks permission", async () => {
     const { env } = fakeEnv({ existingJob: exportJob({ status: "completed" }) });
     const result = await service.downloadExport(env, actor(), "report_export_1");
-    expect(result.csv).toContain("REDACTED");
-    expect(result.csv).not.toContain("A1234567");
+    const workbookText = bytesText(result.file.body);
+    expect(workbookText).toContain("REDACTED");
+    expect(workbookText).not.toContain("A1234567");
   });
 
   it("user with history.view can view own job detail without download permission", async () => {
@@ -345,7 +347,7 @@ describe("Phase 11D Export / Print Reports", () => {
   it("user with create permission can generate own pending job without download permission", async () => {
     const { env, job } = fakeEnv({ existingJob: exportJob({ status: "pending" }) });
     const result = await service.generateExport(env, actor({ permissions: permissions.filter((permission) => permission !== "report_exports.download") }), "report_export_1");
-    expect(result.csv).toContain("Aisha");
+    expect(bytesText(result.file?.body as Uint8Array)).toContain("Aisha");
     expect(job?.status).toBe("completed");
   });
 
@@ -412,7 +414,7 @@ describe("Phase 11D Export / Print Reports", () => {
     const { env } = fakeEnv();
     const preview = await service.previewExport(env, actor(), {
       report_key: "attendance:daily",
-      format: "csv",
+      format: "xlsx",
       filters: { from_date: "2026-06-08", to_date: "2026-06-08" },
     });
     expect(preview.sample_rows[0]).toMatchObject({ employee_name: "Aisha", attendance_status: "present" });
@@ -432,11 +434,11 @@ describe("Phase 11D Export / Print Reports", () => {
     expect(serviceSource).toContain("await attendanceReports.dailyReport(env, actor");
   });
 
-  it("generated CSV download requires permission", async () => {
+  it("generated Excel download requires permission", async () => {
     const { env } = fakeEnv();
     await expect(service.createExportJob(env, actor({ permissions: permissions.filter((permission) => permission !== "report_exports.create") }), {
       report_key: "hr:employee-master",
-      format: "csv",
+      format: "xlsx",
       filters: { as_of_date: "2026-06-08" },
     })).rejects.toThrow(/permission/i);
   });
@@ -498,11 +500,11 @@ describe("Phase 11D Export / Print Reports", () => {
     expect(source("frontend/src/features/hr-reports/HrReportsPage.tsx")).toContain("ReportExportActions");
     expect(source("frontend/src/features/payroll-reports/PayrollReportsPage.tsx")).toContain("ReportExportActions");
     expect(source("frontend/src/features/report-exports/ReportExportActions.tsx")).toContain("report_exports.create");
-    expect(source("frontend/src/features/report-exports/ReportExportActions.tsx")).toContain("report_exports.print");
+    expect(source("frontend/src/features/report-exports/ReportExportActions.tsx")).toContain("Download Excel");
   });
 
   it("unsupported export format message exists", () => {
-    expect(source("src/modules/report-exports/report-exports.service.ts")).toContain("XLSX and PDF server generation are not enabled");
+    expect(source("src/modules/report-exports/report-exports.service.ts")).toContain("Only Excel and PDF report exports are supported");
   });
 
   it("Phase 11D does not add import UI", () => {

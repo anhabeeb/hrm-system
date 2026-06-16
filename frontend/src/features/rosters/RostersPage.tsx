@@ -6,6 +6,8 @@ import { Plus } from "lucide-react";
 import { DataTable } from "@/components/data/DataTable";
 import { RowActions } from "@/components/data/RowActions";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { AppDatePicker } from "@/components/forms/AppDatePicker";
+import { AppDateRangePicker } from "@/components/forms/AppDateRangePicker";
 import { useToast } from "@/components/feedback/useToast";
 import { PageActionBar } from "@/components/layout/PageActionBar";
 import { ModuleAttentionPanel, ModuleLandingHeader, ModuleLandingShell, ModuleQuickActions, ModuleSummaryGrid, ModuleSummaryTile } from "@/components/module-landing";
@@ -366,8 +368,11 @@ export const RostersPage = () => {
           <Label className="space-y-1 text-xs font-medium text-muted-foreground">Department<DepartmentCombobox value={filters.department_id} onChange={(value) => updateFilters({ department_id: value, employee_id: undefined, position_id: undefined })} placeholder="All departments" /></Label>
           <Label className="space-y-1 text-xs font-medium text-muted-foreground">Position<PositionCombobox value={filters.position_id} departmentId={filters.department_id} onChange={(value) => updateFilters({ position_id: value, employee_id: undefined })} placeholder="All positions" /></Label>
           <Label className="space-y-1 text-xs font-medium text-muted-foreground">Employee<EmployeeCombobox value={filters.employee_id} outletId={filters.outlet_id} departmentId={filters.department_id} positionId={filters.position_id} onChange={(value) => updateFilters({ employee_id: value })} placeholder="All employees" /></Label>
-          <Label className="space-y-1 text-xs font-medium text-muted-foreground">From<Input type="date" value={filters.date_from ?? ""} onChange={(event) => updateFilters({ date_from: event.target.value })} /></Label>
-          <Label className="space-y-1 text-xs font-medium text-muted-foreground">To<Input type="date" value={filters.date_to ?? ""} onChange={(event) => updateFilters({ date_to: event.target.value })} /></Label>
+          <AppDateRangePicker
+            dateFrom={filters.date_from}
+            dateTo={filters.date_to}
+            onChange={({ dateFrom, dateTo }) => updateFilters({ date_from: dateFrom, date_to: dateTo })}
+          />
           <Label className="space-y-1 text-xs font-medium text-muted-foreground">Status<Select value={filters.status ?? "all"} onValueChange={(value) => updateFilters({ status: value === "all" ? undefined : value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{["all", "draft", "published", "cancelled", "completed"].map((status) => <SelectItem key={status} value={status}>{status === "all" ? "All statuses" : label(status)}</SelectItem>)}</SelectContent></Select></Label>
           <div className="flex items-end gap-2"><Button variant="outline" onClick={() => setSearchParams(new URLSearchParams({ tab, page: "1", page_size: String(filters.page_size ?? 25) }))}>Clear</Button></div>
         </div>
@@ -617,7 +622,7 @@ const RosterDialog = ({ open, payload, templates, loading, error, warningReview,
         <Label className="grid gap-1 text-sm">Department<DepartmentCombobox value={payload.department_id ?? ""} onChange={(value) => onPayloadChange({ ...payload, department_id: value, position_id: "", employee_id: "" })} placeholder="Optional department" /></Label>
         <Label className="grid gap-1 text-sm">Position<PositionCombobox value={payload.position_id ?? ""} departmentId={payload.department_id} onChange={(value) => onPayloadChange({ ...payload, position_id: value, employee_id: "" })} placeholder="Optional position" /></Label>
         <Label className="grid gap-1 text-sm">Employee<EmployeeCombobox value={payload.employee_id} outletId={payload.outlet_id} departmentId={payload.department_id ?? undefined} positionId={payload.position_id ?? undefined} onChange={(value) => onPayloadChange({ ...payload, employee_id: value ?? "" })} /></Label>
-        <Label className="grid gap-1 text-sm">Date<Input type="date" value={payload.roster_date} onChange={(event) => onPayloadChange({ ...payload, roster_date: event.target.value })} /></Label>
+        <AppDatePicker label="Date" value={payload.roster_date} onChange={(value) => onPayloadChange({ ...payload, roster_date: value ?? "" })} />
         <Label className="grid gap-1 text-sm">Shift template<TemplateSelect templates={templates} value={payload.shift_template_id} onChange={(value) => onPayloadChange({ ...payload, shift_template_id: value })} /></Label>
         <Label className="grid gap-1 text-sm md:col-span-2">Notes<Textarea value={payload.notes ?? ""} onChange={(event) => onPayloadChange({ ...payload, notes: event.target.value })} /></Label>
         <Label className="grid gap-1 text-sm md:col-span-2">Reason<Textarea value={payload.reason ?? ""} onChange={(event) => onPayloadChange({ ...payload, reason: event.target.value })} /></Label>
@@ -654,8 +659,11 @@ const BulkRosterDialog = ({ open, payload, templates, loading, error, warningRev
           <Label className="grid gap-1 text-sm">Department<DepartmentCombobox value={payload.department_id ?? ""} onChange={(value) => onPayloadChange({ ...payload, department_id: value, position_id: "", employee_ids: [] })} placeholder="Optional department" /></Label>
           <Label className="grid gap-1 text-sm">Position<PositionCombobox value={payload.position_id ?? ""} departmentId={payload.department_id} onChange={(value) => onPayloadChange({ ...payload, position_id: value, employee_ids: [] })} placeholder="Optional position" /></Label>
           <Label className="grid gap-1 text-sm">Shift template<TemplateSelect templates={templates} value={payload.shift_template_id} onChange={(value) => onPayloadChange({ ...payload, shift_template_id: value })} /></Label>
-          <Label className="grid gap-1 text-sm">From<Input type="date" value={payload.date_from} onChange={(event) => onPayloadChange({ ...payload, date_from: event.target.value })} /></Label>
-          <Label className="grid gap-1 text-sm">To<Input type="date" value={payload.date_to} onChange={(event) => onPayloadChange({ ...payload, date_to: event.target.value })} /></Label>
+          <AppDateRangePicker
+            dateFrom={payload.date_from}
+            dateTo={payload.date_to}
+            onChange={({ dateFrom, dateTo }) => onPayloadChange({ ...payload, date_from: dateFrom ?? "", date_to: dateTo ?? "" })}
+          />
           <div className="space-y-2 md:col-span-2">
             <Label className="text-sm">Employees</Label>
             <div className="flex gap-2">

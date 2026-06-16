@@ -1,7 +1,7 @@
 import { api } from "@/lib/api-client";
 import { buildQueryString } from "@/lib/query-string";
 import type { DocumentUpdatePayload, DocumentUploadPayload } from "@/features/documents/documents.types";
-import type { ApplyLevelRoleTemplateResult, CompensationComponentDefinition, CompensationComponentDefinitionPayload, Employee, Employee360Profile, EmployeeCompensationComponent, EmployeeCompensationComponentEndPayload, EmployeeCompensationComponentMutationResponse, EmployeeCompensationComponentPayload, EmployeeCompensationSummary, EmployeeDetailResponse, EmployeeDocumentCompliance, EmployeeDocumentRow, EmployeeFilters, EmployeeJobChangePayload, EmployeeJobChangeResponse, EmployeeJobHistoryRow, EmployeeLoginCreatePayload, EmployeeLoginCreateResponse, EmployeeLoginDetails, EmployeeLoginLinkCandidate, EmployeeLoginLinkExistingPayload, EmployeeLoginResetPasswordPayload, EmployeeLoginUpdatePayload, EmployeeNoteRow, EmployeePayload, EmployeeSalaryChangePayload, EmployeeSalaryChangeResponse, EmployeeSalaryRow, EmployeeStatusChangePayload, EmployeeStatusHistoryRow, EmployeeStructure, EmployeeStructureHistoryRow, EmployeeStructurePayload, EmployeeUpdatePayload } from "./employees.types";
+import type { ApplyLevelRoleTemplateResult, CompensationComponentDefinition, CompensationComponentDefinitionPayload, Employee, Employee360Profile, EmployeeCompensationComponent, EmployeeCompensationComponentEndPayload, EmployeeCompensationComponentMutationResponse, EmployeeCompensationComponentPayload, EmployeeCompensationSummary, EmployeeDetailResponse, EmployeeDocumentCompliance, EmployeeDocumentRow, EmployeeFilters, EmployeeJobChangePayload, EmployeeJobChangeResponse, EmployeeJobHistoryRow, EmployeeLoginCreatePayload, EmployeeLoginCreateResponse, EmployeeLoginDetails, EmployeeLoginLinkCandidate, EmployeeLoginLinkExistingPayload, EmployeeLoginResetPasswordPayload, EmployeeLoginUpdatePayload, EmployeeNoteRow, EmployeePayload, EmployeeProfilePhotoPayload, EmployeeSalaryChangePayload, EmployeeSalaryChangeResponse, EmployeeSalaryRow, EmployeeStatusChangePayload, EmployeeStatusHistoryRow, EmployeeStructure, EmployeeStructureHistoryRow, EmployeeStructurePayload, EmployeeUpdatePayload } from "./employees.types";
 
 export const employeesApi = {
   list: (filters: EmployeeFilters) => api.get<Employee[]>(`/employees${buildQueryString(filters)}`),
@@ -19,6 +19,10 @@ export const employeesApi = {
   profileTimeline: (id: string, filters: { limit?: number } = {}) => api.get<{ data: Employee360Profile["timeline"] }>(`/employees/${id}/profile/timeline${buildQueryString(filters)}`),
   create: (payload: EmployeePayload) => api.post<{ employee: Employee } | { id: string }>("/employees", payload),
   update: (id: string, payload: EmployeeUpdatePayload) => api.patch<{ employee: Employee } | { updated: boolean }>(`/employees/${id}`, payload),
+  updateProfilePhoto: (id: string, payload: EmployeeProfilePhotoPayload) =>
+    api.post<{ employee: Employee | null }>(`/employees/${id}/profile-photo`, payload),
+  removeProfilePhoto: (id: string, reason: string) =>
+    api.delete<{ employee: Employee | null }>(`/employees/${id}/profile-photo`, { reason }),
   login: (id: string) =>
     api.get<{ login: EmployeeLoginDetails | null }>(`/employees/${id}/login`),
   loginLinkCandidates: (filters: { search?: string; employee_id?: string; page?: number; page_size?: number }) =>

@@ -19,6 +19,8 @@ export interface Employee {
   id: string;
   employee_code: string;
   full_name: string;
+  profile_photo_url?: string | null;
+  profile_photo_updated_at?: string | null;
   employee_type: EmployeeType;
   nationality?: string | null;
   id_card_number?: string | null;
@@ -101,6 +103,13 @@ export interface EmployeePayload {
 }
 
 export type EmployeeUpdatePayload = Partial<Omit<EmployeePayload, "primary_outlet_id" | "employment_status" | "starting_salary">>;
+
+export interface EmployeeProfilePhotoPayload {
+  file_name: string;
+  mime_type: "image/jpeg" | "image/png" | "image/webp";
+  content_base64: string;
+  reason: string;
+}
 
 export interface EmployeeLoginCreatePayload {
   username: string;

@@ -134,7 +134,6 @@ export const navigationGroups: NavGroup[] = [
       { label: "HR Reports", path: "/hr-reports", icon: BarChart3, requiredFeature: "reports", requiredPermissionsAny: ["hr_reports.view", "hr_reports.catalog.view"] },
       { label: "Payroll / Finance Reports", path: "/payroll-reports", icon: Landmark, requiredFeature: "reports", requiredPermissionsAny: ["payroll_reports.view", "payroll_reports.catalog.view"] },
       { label: "Export History", path: "/report-exports", icon: Download, requiredFeature: "reports", requiredPermissionsAny: ["report_exports.history.view", "report_exports.admin.manage"] },
-      { label: "Import Center", path: "/imports", icon: Upload, requiredFeature: "import_export", requiredPermissionsAny: ["imports.view", "imports.upload", "imports.templates.view"] },
       { label: "Reports", path: "/reports", icon: BarChart3, requiredFeature: "reports", requiredPermission: "reports.view" },
       { label: "Import / Export", path: "/import-export", icon: Archive, requiredFeature: "import_export", requiredPermissionsAny: ["export.view", "import.view"] },
       { label: "Backup & Recovery", path: "/backup-recovery", icon: DatabaseBackup, requiredFeature: "backup_recovery", requiredPermissionsAny: ["backup.view", "backup.view_history", "backup.restore_request"] },

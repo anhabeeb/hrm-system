@@ -24,7 +24,7 @@ export const validateListFilters = (query: Record<string, unknown>): ListFilters
 export const validateExportCreate = (payload: unknown): ExportCreateInput => {
   if (!isObject(payload)) throw new ValidationError();
   const exportType = asString(payload.export_type) ?? "report";
-  const format = asString(payload.format) ?? "json";
+  const format = asString(payload.format) ?? "xlsx";
   if (!(EXPORT_TYPES as readonly string[]).includes(exportType)) throw new AppError("This export type is not supported yet.", "UNSUPPORTED_EXPORT_TYPE", 400);
   if (!(EXPORT_FORMATS as readonly string[]).includes(format)) throw new AppError("This export format is not supported yet.", "UNSUPPORTED_EXPORT_FORMAT", 400);
   return {
@@ -44,14 +44,19 @@ export const validateImportUpload = (payload: unknown): ImportUploadInput => {
   const parsedReason = asString(payload.reason);
   if (!parsedReason || parsedReason.length < 3) throw new ReasonRequiredError();
   const mime = asString(payload.mime_type) ?? "";
-  if (!["text/csv", "application/json"].includes(mime)) throw new ValidationError("This import file type is not supported.");
+  const fileName = asString(payload.file_name) ?? "import-file.xlsx";
+  const fileType = asString(payload.file_type) ?? "";
+  if (fileType !== "xlsx" || !fileName.toLowerCase().endsWith(".xlsx") || mime !== "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") {
+    throw new ValidationError("Only Excel .xlsx import files are supported.");
+  }
   const content = asString(payload.content_base64);
   if (!content) throw new ValidationError("Please attach an import file before uploading.");
   const approxBytes = Math.floor((content.length * 3) / 4);
   if (approxBytes > MAX_IMPORT_BYTES) throw new ValidationError("This import file is too large.");
   return {
     import_type: importType,
-    file_name: asString(payload.file_name) ?? "import-file",
+    file_type: "xlsx",
+    file_name: fileName,
     mime_type: mime,
     content_base64: content,
     reason: parsedReason,

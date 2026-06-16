@@ -422,6 +422,31 @@ employeesRoutes.get(
   attendanceCalendarController.employeeAttendanceCalendar,
 );
 employeesRoutes.get(
+  "/:id/profile-photo",
+  requireAnyPermissionOrError(["employees.profilePhoto.view", "employees.view", "employees.profile.view"], {
+    code: "EMPLOYEE_PROFILE_PHOTO_PERMISSION_DENIED",
+    message: "You do not have permission to view employee profile pictures.",
+  }),
+  employeesController.getEmployeeProfilePhoto,
+);
+employeesRoutes.post(
+  "/:id/profile-photo",
+  requireAnyPermissionOrError(["employees.profilePhoto.upload", "employees.profilePhoto.manage", "employees.edit", "employees.manage"], {
+    code: "EMPLOYEE_PROFILE_PHOTO_PERMISSION_DENIED",
+    message: "You do not have permission to update employee profile pictures.",
+  }),
+  employeesController.updateEmployeeProfilePhoto,
+);
+employeesRoutes.delete(
+  "/:id/profile-photo",
+  requireAnyPermissionOrError(["employees.profilePhoto.manage", "employees.edit", "employees.manage"], {
+    code: "EMPLOYEE_PROFILE_PHOTO_PERMISSION_DENIED",
+    message: "You do not have permission to remove employee profile pictures.",
+  }),
+  requireReason(),
+  employeesController.removeEmployeeProfilePhoto,
+);
+employeesRoutes.get(
   "/:id/payslips",
   requireFeature("payslips"),
   requirePermission("payslips.view"),

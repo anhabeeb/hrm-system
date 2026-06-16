@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 import { DataTable } from "@/components/data/DataTable";
 import { FormError } from "@/components/feedback/FormError";
+import { AppDatePicker } from "@/components/forms/AppDatePicker";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { LoadingButton } from "@/components/forms/LoadingButton";
 import { Button } from "@/components/ui/button";
@@ -195,8 +196,7 @@ export const EmployeeLifecyclePanel = ({
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label>Effective from</Label>
-              <Input type="date" max={today()} value={form.effective_from} onChange={(event) => setForm((current) => ({ ...current, effective_from: event.target.value }))} />
+              <AppDatePicker label="Effective from" maxDate={today()} value={form.effective_from} onChange={(value) => setForm((current) => ({ ...current, effective_from: value ?? "" }))} />
               <p className="text-xs text-muted-foreground">Status changes are applied immediately. Future scheduling will be added later.</p>
             </div>
             <div className="grid gap-2">

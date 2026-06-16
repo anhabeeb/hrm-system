@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { FormError } from "@/components/feedback/FormError";
+import { AppDateRangePicker } from "@/components/forms/AppDateRangePicker";
 import { LoadingButton } from "@/components/forms/LoadingButton";
 import { EmployeeCombobox, LeaveTypeCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
@@ -60,10 +61,13 @@ export const LeaveRequestForm = ({
             <Label>Employee<Input value={currentEmployeeName ?? currentEmployeeId ?? "Employee profile not linked"} disabled /></Label>
           )}
           <Label className="space-y-1.5">Leave type<LeaveTypeCombobox value={values.leave_type_id} onChange={(value) => setValues((current) => ({ ...current, leave_type_id: value ?? "" }))} /></Label>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Label>Start Date<Input type="date" value={values.start_date} onChange={(event) => setValues((current) => ({ ...current, start_date: event.target.value }))} /></Label>
-            <Label>End Date<Input type="date" value={values.end_date} onChange={(event) => setValues((current) => ({ ...current, end_date: event.target.value }))} /></Label>
-          </div>
+          <AppDateRangePicker
+            fromLabel="Start date"
+            toLabel="End date"
+            dateFrom={values.start_date}
+            dateTo={values.end_date}
+            onChange={({ dateFrom, dateTo }) => setValues((current) => ({ ...current, start_date: dateFrom ?? "", end_date: dateTo ?? "" }))}
+          />
           <Label>Reason<Textarea value={values.reason ?? ""} onChange={(event) => setValues((current) => ({ ...current, reason: event.target.value }))} /></Label>
         </div>
         {localError ? <FormError message={localError} /> : null}{error ? <FormError message={error} /> : null}

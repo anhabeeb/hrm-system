@@ -27,7 +27,7 @@ export interface ReportFilters {
 export interface ReportGenerateInput {
   report_key: string;
   filters: ReportFilters;
-  format: "json" | "csv" | "xlsx" | "pdf";
+  format: "xlsx" | "pdf";
 }
 
 export interface OutletScope {

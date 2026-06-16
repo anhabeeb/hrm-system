@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { FormError } from "@/components/feedback/FormError";
+import { AppDatePicker } from "@/components/forms/AppDatePicker";
 import { LoadingButton } from "@/components/forms/LoadingButton";
 import { EmployeeCombobox, OutletCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
@@ -105,10 +106,7 @@ export const CorrectionRequestDialog = ({
                   {currentEmployeeId ? "This correction will be submitted for your linked employee profile." : "Your employee profile is not linked to this login. Please contact HR."}
                 </div>
               )}
-              <div className="grid gap-1.5">
-                <Label htmlFor="correction-date">Attendance date</Label>
-                <Input id="correction-date" type="date" value={values.attendance_date} onChange={(event) => setValues((current) => ({ ...current, attendance_date: event.target.value }))} />
-              </div>
+              <AppDatePicker label="Attendance date" value={values.attendance_date} onChange={(value) => setValues((current) => ({ ...current, attendance_date: value ?? "" }))} />
               <div className="grid gap-1.5">
                 <Label>Correction type</Label>
                 <Select value={values.correction_type} onValueChange={(value) => setValues((current) => ({ ...current, correction_type: value }))}>

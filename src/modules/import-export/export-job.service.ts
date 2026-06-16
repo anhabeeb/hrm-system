@@ -4,8 +4,7 @@ import * as permissionService from "../../services/permission.service";
 import { AppError, NotFoundError, OutletAccessError, PermissionError, ReasonRequiredError } from "../../utils/errors";
 import { generateByKey } from "../reports/reports.service";
 import type { ReportFilters } from "../reports/reports.types";
-import { toCsv } from "./csv.service";
-import { toSafeJson } from "./json-export.service";
+import { columnsFromRows, excelContentType, generateExcelWorkbook, generatePdfReport, pdfContentType } from "../../utils/export-file-format";
 import * as repository from "./import-export.repository";
 import type { ExportCreateInput, ListFilters } from "./import-export.types";
 
@@ -122,11 +121,15 @@ export const createExportJob = async (env: Env, context: AuthActor, input: Expor
     ? await generateByKey(env, context, reportKey, filters as ReportFilters)
     : { export_type: input.export_type, rows: [], summary: { note: "This export type is a safe metadata placeholder." } };
   const rows = Array.isArray(report.rows) ? report.rows as Record<string, unknown>[] : [];
-  const body = input.format === "csv" ? toCsv(rows.length > 0 ? rows : [report.summary ?? {}]) : toSafeJson(report);
+  const exportRows = rows.length > 0 ? rows : [report.summary ?? {}];
+  const columns = columnsFromRows(exportRows, report.summary ?? {});
+  const body = input.format === "pdf"
+    ? generatePdfReport(reportKey ?? input.export_type, columns, exportRows)
+    : generateExcelWorkbook(reportKey ?? input.export_type, columns, exportRows);
   const jobId = crypto.randomUUID();
   const fileKey = `exports/${context.companyId}/${jobId}.${input.format}`;
   await env.BACKUP_BUCKET.put(fileKey, body, {
-    httpMetadata: { contentType: input.format === "csv" ? "text/csv" : "application/json" },
+    httpMetadata: { contentType: input.format === "pdf" ? pdfContentType : excelContentType },
   });
   await repository.createExportJob(env, jobId, context.companyId, context.actorUserId, { ...input, filters }, fileKey, rows.length);
   const job = await repository.findExportJob(env, context.companyId, jobId);

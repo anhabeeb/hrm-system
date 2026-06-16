@@ -50,9 +50,9 @@ export const validateGenerateReport = (payload: unknown): ReportGenerateInput =>
   if (!reportKey || !REPORT_DEFINITIONS.some((report) => report.report_key === reportKey)) {
     throw new ValidationError("Please select a valid report.");
   }
-  const format = asString(payload.format) ?? "json";
-  if (!["json", "csv", "xlsx", "pdf"].includes(format)) {
-    throw new ValidationError("Please select a valid export format.");
+  const format = asString(payload.format) ?? "xlsx";
+  if (!["xlsx", "pdf"].includes(format)) {
+    throw new ValidationError("Only Excel and PDF report exports are supported.");
   }
   return {
     report_key: reportKey,

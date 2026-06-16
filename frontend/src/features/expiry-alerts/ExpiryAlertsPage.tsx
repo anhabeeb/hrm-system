@@ -7,6 +7,9 @@ import { DataTable } from "@/components/data/DataTable";
 import { RowActions } from "@/components/data/RowActions";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { AppDatePicker } from "@/components/forms/AppDatePicker";
+import { AppDateRangePicker } from "@/components/forms/AppDateRangePicker";
+import { ReasonDialog } from "@/components/forms/ReasonDialog";
 import { PageActionBar } from "@/components/layout/PageActionBar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,8 +32,6 @@ const defaultScanDate = () => new Date().toISOString().slice(0, 10);
 const label = (value?: string | null) => String(value ?? "-").replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 const dateLabel = (value?: string | null) => value ? value.slice(0, 10) : "-";
 
-const reasonPrompt = (message: string) => window.prompt(message)?.trim() ?? "";
-
 export const ExpiryAlertsPage = () => {
   const auth = useAuth();
   const queryClient = useQueryClient();
@@ -38,6 +39,8 @@ export const ExpiryAlertsPage = () => {
   const [tab, setTab] = useState(searchParams.get("tab") ?? "alerts");
   const [success, setSuccess] = useState<string | null>(null);
   const [scan, setScan] = useState<ExpiryScanInput>({ as_of_date: defaultScanDate(), warning_days: [90, 60, 30, 14, 7, 1] });
+  const [pendingAction, setPendingAction] = useState<{ id: string; action: "resolve" | "dismiss" | "snooze" } | null>(null);
+  const [snoozedUntil, setSnoozedUntil] = useState(() => new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10));
 
   const filters = useMemo<ExpiryAlertFilters>(() => ({
     status: searchParams.get("status") || undefined,
@@ -138,8 +141,13 @@ export const ExpiryAlertsPage = () => {
           <Label className="space-y-1 text-xs font-medium text-muted-foreground">Status<Select value={filters.status ?? "active"} onValueChange={(value) => updateFilters({ status: value === "active" ? undefined : value, include_closed: value === "resolved" || value === "dismissed" ? true : filters.include_closed })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Active</SelectItem>{statuses.map((status) => <SelectItem key={status} value={status}>{label(status)}</SelectItem>)}</SelectContent></Select></Label>
           <Label className="space-y-1 text-xs font-medium text-muted-foreground">Severity<Select value={filters.severity ?? "all"} onValueChange={(value) => updateFilters({ severity: value === "all" ? undefined : value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All</SelectItem>{severities.map((severity) => <SelectItem key={severity} value={severity}>{label(severity)}</SelectItem>)}</SelectContent></Select></Label>
           <Label className="space-y-1 text-xs font-medium text-muted-foreground">Source<Select value={filters.source_type ?? "all"} onValueChange={(value) => updateFilters({ source_type: value === "all" ? undefined : value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All sources</SelectItem>{sourceTypes.map((source) => <SelectItem key={source} value={source}>{label(source)}</SelectItem>)}</SelectContent></Select></Label>
-          <Label className="space-y-1 text-xs font-medium text-muted-foreground">From<Input type="date" value={filters.from_date ?? ""} onChange={(event) => updateFilters({ from_date: event.target.value })} /></Label>
-          <Label className="space-y-1 text-xs font-medium text-muted-foreground">To<Input type="date" value={filters.to_date ?? ""} onChange={(event) => updateFilters({ to_date: event.target.value })} /></Label>
+          <div className="md:col-span-2">
+            <AppDateRangePicker
+              dateFrom={filters.from_date}
+              dateTo={filters.to_date}
+              onChange={({ dateFrom, dateTo }) => updateFilters({ from_date: dateFrom, to_date: dateTo })}
+            />
+          </div>
           <Label className="flex items-end gap-2 text-xs text-muted-foreground">Include closed<Switch checked={Boolean(filters.include_closed)} onCheckedChange={(include_closed) => updateFilters({ include_closed })} /></Label>
         </div>
         <Tabs value={tab} onValueChange={setActiveTab}>
@@ -159,18 +167,14 @@ export const ExpiryAlertsPage = () => {
               rowActions={(row) => <RowActions actions={[
                 { key: "approve", label: "Acknowledge", disabled: !canManage || row.status === "acknowledged", onSelect: () => actionMutation.mutate({ id: row.id, action: "acknowledge" }) },
                 { key: "rebuild", label: "Snooze", disabled: !canManage, onSelect: () => {
-                  const reason = reasonPrompt("Reason for snoozing this alert");
-                  if (!reason) return;
-                  const snoozed_until = window.prompt("Snooze until (YYYY-MM-DD)", new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10))?.trim();
-                  if (snoozed_until) actionMutation.mutate({ id: row.id, action: "snooze", reason, snoozed_until });
+                  setSnoozedUntil(new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10));
+                  setPendingAction({ id: row.id, action: "snooze" });
                 } },
                 { key: "enable", label: "Resolve", disabled: !canManage, onSelect: () => {
-                  const reason = reasonPrompt("Reason for resolving this alert");
-                  if (reason) actionMutation.mutate({ id: row.id, action: "resolve", reason });
+                  setPendingAction({ id: row.id, action: "resolve" });
                 } },
                 { key: "archive", label: "Dismiss", disabled: !canManage, onSelect: () => {
-                  const reason = reasonPrompt("Reason for dismissing this alert");
-                  if (reason) actionMutation.mutate({ id: row.id, action: "dismiss", reason });
+                  setPendingAction({ id: row.id, action: "dismiss" });
                 } },
               ]} />}
               onPageChange={(page) => updateFilters({ page })}
@@ -187,6 +191,29 @@ export const ExpiryAlertsPage = () => {
           </TabsContent>
         </Tabs>
       </div>
+      <ReasonDialog
+        open={Boolean(pendingAction)}
+        title={pendingAction?.action === "snooze" ? "Snooze expiry alert" : pendingAction?.action === "dismiss" ? "Dismiss expiry alert" : "Resolve expiry alert"}
+        description="A reason is required for this expiry alert action."
+        confirmLabel={pendingAction?.action === "snooze" ? "Snooze alert" : pendingAction?.action === "dismiss" ? "Dismiss alert" : "Resolve alert"}
+        loading={actionMutation.isPending}
+        error={actionMutation.error ? friendlyHrmError(actionMutation.error, "Expiry alert action could not be completed.") : null}
+        onOpenChange={(open) => { if (!open) setPendingAction(null); }}
+        onSubmit={(reason) => {
+          if (!pendingAction) return;
+          actionMutation.mutate({
+            id: pendingAction.id,
+            action: pendingAction.action,
+            reason,
+            snoozed_until: pendingAction.action === "snooze" ? snoozedUntil : undefined,
+          });
+          setPendingAction(null);
+        }}
+      >
+        {pendingAction?.action === "snooze" ? (
+          <AppDatePicker label="Snooze until" value={snoozedUntil} minDate={defaultScanDate()} onChange={(value) => setSnoozedUntil(value ?? "")} />
+        ) : null}
+      </ReasonDialog>
     </div>
   );
 };
@@ -209,8 +236,8 @@ const ScanPanel = ({
     <div className="space-y-4 rounded-lg border bg-card p-4">
       <InlineAlert title="Preview does not write alert records or send notifications. Run scan applies idempotently and uses the in-app/email notification bridge." />
       <div className="grid gap-3 md:grid-cols-5">
-        <Label className="space-y-1 text-xs font-medium text-muted-foreground">As-of date<Input type="date" value={scan.as_of_date} onChange={(event) => setScan({ ...scan, as_of_date: event.target.value })} /></Label>
-        <Label className="space-y-1 text-xs font-medium text-muted-foreground">Through date<Input type="date" value={scan.through_date ?? ""} onChange={(event) => setScan({ ...scan, through_date: event.target.value || undefined })} /></Label>
+        <AppDatePicker label="As-of date" value={scan.as_of_date} onChange={(value) => setScan({ ...scan, as_of_date: value ?? "" })} />
+        <AppDatePicker label="Through date" value={scan.through_date ?? ""} onChange={(value) => setScan({ ...scan, through_date: value })} />
         <Label className="space-y-1 text-xs font-medium text-muted-foreground">Warning days<Input value={(scan.warning_days ?? []).join(",")} onChange={(event) => setScan({ ...scan, warning_days: event.target.value.split(",").map((value) => Number(value.trim())).filter(Number.isFinite) })} /></Label>
         <Label className="space-y-1 text-xs font-medium text-muted-foreground">Source<Select value={scan.source_type ?? "all"} onValueChange={(value) => setScan({ ...scan, source_type: value === "all" ? undefined : value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All sources</SelectItem>{sourceTypes.map((source) => <SelectItem key={source} value={source}>{label(source)}</SelectItem>)}</SelectContent></Select></Label>
         <div className="flex items-end gap-2">

@@ -1,6 +1,7 @@
 import { FilterBar } from "@/components/data/FilterBar";
+import { AppDateRangePicker } from "@/components/forms/AppDateRangePicker";
+import { AppMonthPicker } from "@/components/forms/AppMonthPicker";
 import { OutletCombobox } from "@/components/selectors";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { AdvanceFilters as AdvanceFilterValues } from "./advances.types";
@@ -15,10 +16,7 @@ export const AdvanceFilters = ({
   onClear: () => void;
 }) => (
   <FilterBar onClear={onClear}>
-    <Label className="space-y-1 text-xs font-medium text-muted-foreground">
-      Deduction month
-      <Input type="month" value={filters.deduction_month ?? ""} onChange={(event) => onChange({ deduction_month: event.target.value })} />
-    </Label>
+    <AppMonthPicker label="Deduction month" value={filters.deduction_month} onChange={(value) => onChange({ deduction_month: value })} />
     <Label className="space-y-1 text-xs font-medium text-muted-foreground">
       Status
       <Select value={filters.status ?? "all"} onValueChange={(value) => onChange({ status: value === "all" ? undefined : value })}>
@@ -31,14 +29,11 @@ export const AdvanceFilters = ({
         </SelectContent>
       </Select>
     </Label>
-    <Label className="space-y-1 text-xs font-medium text-muted-foreground">
-      From
-      <Input type="date" value={filters.date_from ?? ""} onChange={(event) => onChange({ date_from: event.target.value })} />
-    </Label>
-    <Label className="space-y-1 text-xs font-medium text-muted-foreground">
-      To
-      <Input type="date" value={filters.date_to ?? ""} onChange={(event) => onChange({ date_to: event.target.value })} />
-    </Label>
+    <AppDateRangePicker
+      dateFrom={filters.date_from}
+      dateTo={filters.date_to}
+      onChange={({ dateFrom, dateTo }) => onChange({ date_from: dateFrom, date_to: dateTo })}
+    />
     <Label className="space-y-1 text-xs font-medium text-muted-foreground">
       Outlet
       <OutletCombobox value={filters.outlet_id} onChange={(value) => onChange({ outlet_id: value })} placeholder="All accessible outlets" />

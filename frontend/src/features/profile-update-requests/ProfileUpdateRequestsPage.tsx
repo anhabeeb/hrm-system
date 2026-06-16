@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 
 import { DataTable } from "@/components/data/DataTable";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { AppDateRangePicker } from "@/components/forms/AppDateRangePicker";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -90,8 +91,13 @@ export const ProfileUpdateRequestsPage = () => {
             </Select>
           </div>
           <div><Label>Requested by</Label><Input className="mt-1" value={filters.user_id} onChange={(event) => setFilters((current) => ({ ...current, user_id: event.target.value, page: 1 }))} placeholder="User ID" /></div>
-          <div><Label>Date from</Label><Input className="mt-1" type="date" value={filters.date_from} onChange={(event) => setFilters((current) => ({ ...current, date_from: event.target.value, page: 1 }))} /></div>
-          <div><Label>Date to</Label><Input className="mt-1" type="date" value={filters.date_to} onChange={(event) => setFilters((current) => ({ ...current, date_to: event.target.value, page: 1 }))} /></div>
+          <div className="md:col-span-2">
+            <AppDateRangePicker
+              dateFrom={filters.date_from || undefined}
+              dateTo={filters.date_to || undefined}
+              onChange={({ dateFrom, dateTo }) => setFilters((current) => ({ ...current, date_from: dateFrom ?? "", date_to: dateTo ?? "", page: 1 }))}
+            />
+          </div>
         </div>
         <DataTable
           compact

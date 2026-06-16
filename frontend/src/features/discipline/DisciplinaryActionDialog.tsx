@@ -2,6 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { useToast } from "@/components/feedback/useToast";
+import { AppDatePicker } from "@/components/forms/AppDatePicker";
 import { EmployeeCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -126,7 +127,7 @@ export const DisciplinaryActionDialog = ({ open, onOpenChange, currentEmployeeId
               <SelectContent>{severities.map((value) => <SelectItem key={value} value={value}>{humanize(value)}</SelectItem>)}</SelectContent>
             </Select>
           </Label>
-          <Label className="grid gap-1 text-sm">Incident date<Input type="date" value={incidentDate} onChange={(event) => setIncidentDate(event.target.value)} /></Label>
+          <AppDatePicker label="Incident date" value={incidentDate} onChange={(value) => setIncidentDate(value ?? "")} />
           <Label className="grid gap-1 text-sm md:col-span-2">Title<Input value={title} onChange={(event) => setTitle(event.target.value)} /></Label>
           <Label className="grid gap-1 text-sm md:col-span-2">Description<Textarea value={description} onChange={(event) => setDescription(event.target.value)} /></Label>
           <Label className="grid gap-1 text-sm">Policy reference<Input value={policyReference} onChange={(event) => setPolicyReference(event.target.value)} /></Label>

@@ -9,10 +9,10 @@ import { DetailSection } from "@/components/data/DetailSection";
 import { RowActions } from "@/components/data/RowActions";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { useToast } from "@/components/feedback/useToast";
+import { AppDateRangePicker } from "@/components/forms/AppDateRangePicker";
 import { PageActionBar } from "@/components/layout/PageActionBar";
 import { EmployeeCombobox, OutletCombobox } from "@/components/selectors";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/features/auth/auth.store";
@@ -132,8 +132,13 @@ export const AttendanceCorrectionsPage = () => {
           <Label className="space-y-1.5 text-sm">Outlet<OutletCombobox value={filters.outlet_id} onChange={(value) => updateFilters({ outlet_id: value, employee_id: undefined })} placeholder="All accessible outlets" /></Label>
           <Label className="space-y-1.5 text-sm">Employee<EmployeeCombobox value={filters.employee_id} outletId={filters.outlet_id} onChange={(value) => updateFilters({ employee_id: value })} placeholder="All employees" /></Label>
           <Label className="space-y-1.5 text-sm">Status<Select value={filters.status ?? "all"} onValueChange={(value) => updateFilters({ status: value === "all" ? undefined : value })}><SelectTrigger><SelectValue placeholder="All statuses" /></SelectTrigger><SelectContent><SelectItem value="all">All statuses</SelectItem><SelectItem value="pending">Pending</SelectItem><SelectItem value="approved">Approved</SelectItem><SelectItem value="rejected">Rejected</SelectItem></SelectContent></Select></Label>
-          <Label className="space-y-1.5 text-sm">From<Input type="date" value={filters.date_from ?? ""} onChange={(event) => updateFilters({ date_from: event.target.value })} /></Label>
-          <Label className="space-y-1.5 text-sm">To<Input type="date" value={filters.date_to ?? ""} onChange={(event) => updateFilters({ date_to: event.target.value })} /></Label>
+          <div className="md:col-span-2">
+            <AppDateRangePicker
+              dateFrom={filters.date_from}
+              dateTo={filters.date_to}
+              onChange={({ dateFrom, dateTo }) => updateFilters({ date_from: dateFrom, date_to: dateTo })}
+            />
+          </div>
         </div>
         <DataTable
           columns={columns}

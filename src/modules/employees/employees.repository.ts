@@ -2403,6 +2403,32 @@ export const updateLinkedUserIdentity = (
     [input.username, input.email, input.status, new Date().toISOString(), companyId, userId],
   );
 
+export const updateEmployeeProfilePhoto = (
+  env: Env,
+  companyId: string,
+  employeeId: string,
+  input: { profilePhotoKey: string | null; actorUserId: string; timestamp: string },
+) =>
+  execute(
+    env,
+    `UPDATE employees
+       SET profile_photo_key = ?,
+           profile_photo_updated_at = ?,
+           profile_photo_uploaded_by = ?,
+           updated_by = ?,
+           updated_at = ?
+     WHERE company_id = ? AND id = ? AND deleted_at IS NULL`,
+    [
+      input.profilePhotoKey,
+      input.profilePhotoKey ? input.timestamp : null,
+      input.profilePhotoKey ? input.actorUserId : null,
+      input.actorUserId,
+      input.timestamp,
+      companyId,
+      employeeId,
+    ],
+  );
+
 export const updateLinkedUserPassword = (
   env: Env,
   companyId: string,

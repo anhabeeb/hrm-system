@@ -56,6 +56,7 @@ export interface AttendanceCalendarEmployee {
   id: string;
   name: string;
   employee_no: string | null;
+  profile_photo_url?: string | null;
   department_id: string | null;
   department_name: string | null;
   position_id: string | null;
@@ -148,6 +149,8 @@ export interface AttendanceCalendarEmployeeRecord {
   id: string;
   employee_code: string | null;
   full_name: string;
+  profile_photo_key?: string | null;
+  profile_photo_updated_at?: string | null;
   department_id: string | null;
   department_name: string | null;
   position_id: string | null;

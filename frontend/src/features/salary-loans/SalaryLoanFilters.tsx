@@ -1,6 +1,6 @@
 import { FilterBar } from "@/components/data/FilterBar";
+import { AppMonthPicker } from "@/components/forms/AppMonthPicker";
 import { OutletCombobox } from "@/components/selectors";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { SalaryLoanFilters as SalaryLoanFilterValues } from "./salary-loans.types";
@@ -15,10 +15,7 @@ export const SalaryLoanFilters = ({
   onClear: () => void;
 }) => (
   <FilterBar onClear={onClear}>
-    <Label className="space-y-1 text-xs font-medium text-muted-foreground">
-      Start month
-      <Input type="month" value={filters.start_month ?? ""} onChange={(event) => onChange({ start_month: event.target.value })} />
-    </Label>
+    <AppMonthPicker label="Start month" value={filters.start_month} onChange={(value) => onChange({ start_month: value })} />
     <Label className="space-y-1 text-xs font-medium text-muted-foreground">
       Status
       <Select value={filters.status ?? "all"} onValueChange={(value) => onChange({ status: value === "all" ? undefined : value })}>

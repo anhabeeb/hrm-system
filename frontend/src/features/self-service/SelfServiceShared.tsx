@@ -3,6 +3,7 @@ import { ArrowRight, ShieldAlert } from "lucide-react";
 
 import { DataTable } from "@/components/data/DataTable";
 import { EmptyState } from "@/components/data/EmptyState";
+import { EmployeeAvatar } from "@/components/employees/EmployeeAvatar";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -49,27 +50,43 @@ export const WidgetCard = ({ widget }: { widget: SelfDashboardWidget }) => (
 );
 
 export const ProfileSummaryTable = ({ profile }: { profile: SelfProfile }) => (
-  <DataTable
-    compact
-    columns={[
-      { key: "label", header: "Profile field" },
-      { key: "value", header: "Value" },
-    ]}
-    rows={[
-      { id: "name", label: "Name", value: profile.employee?.full_name ?? profile.user.full_name ?? "-" },
-      { id: "code", label: "Employee code", value: profile.employee?.employee_code ?? "-" },
-      { id: "department", label: "Department", value: profile.employee?.department_name ?? "Unassigned" },
-      { id: "position", label: "Position / title", value: profile.employee?.position_title ?? "Unassigned" },
-      { id: "level", label: "Level", value: profile.employee?.level ? `Level ${profile.employee.level}` : "Unassigned" },
-      { id: "outlet", label: "Outlet / store", value: profile.employee?.outlet_name ?? "Unassigned" },
-      { id: "employment", label: "Employment status", value: profile.employee?.employment_status ?? "-" },
-      { id: "nationality", label: "Nationality", value: profile.employee?.nationality ?? "-" },
-      { id: "username", label: "Login username", value: profile.user.username ?? "-" },
-      { id: "email", label: "Login email", value: profile.user.email ?? "-" },
-      { id: "roles", label: "Roles", value: profile.roles.join(", ") || "-" },
-    ]}
-    getRowId={(row) => row.id}
-  />
+  <div className="space-y-3">
+    <div className="flex min-w-0 items-center gap-3 rounded-lg border bg-muted/20 p-3">
+      <EmployeeAvatar
+        name={profile.employee?.full_name ?? profile.user.full_name}
+        employeeCode={profile.employee?.employee_code}
+        photoUrl={profile.employee?.profile_photo_url}
+        size="lg"
+      />
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold">{profile.employee?.full_name ?? profile.user.full_name ?? "Employee"}</p>
+        <p className="truncate text-xs text-muted-foreground">
+          {profile.employee?.employee_code ?? "No employee code"} · {profile.employee?.department_name ?? "Unassigned department"}
+        </p>
+      </div>
+    </div>
+    <DataTable
+      compact
+      columns={[
+        { key: "label", header: "Profile field" },
+        { key: "value", header: "Value" },
+      ]}
+      rows={[
+        { id: "name", label: "Name", value: profile.employee?.full_name ?? profile.user.full_name ?? "-" },
+        { id: "code", label: "Employee code", value: profile.employee?.employee_code ?? "-" },
+        { id: "department", label: "Department", value: profile.employee?.department_name ?? "Unassigned" },
+        { id: "position", label: "Position / title", value: profile.employee?.position_title ?? "Unassigned" },
+        { id: "level", label: "Level", value: profile.employee?.level ? `Level ${profile.employee.level}` : "Unassigned" },
+        { id: "outlet", label: "Outlet / store", value: profile.employee?.outlet_name ?? "Unassigned" },
+        { id: "employment", label: "Employment status", value: profile.employee?.employment_status ?? "-" },
+        { id: "nationality", label: "Nationality", value: profile.employee?.nationality ?? "-" },
+        { id: "username", label: "Login username", value: profile.user.username ?? "-" },
+        { id: "email", label: "Login email", value: profile.user.email ?? "-" },
+        { id: "roles", label: "Roles", value: profile.roles.join(", ") || "-" },
+      ]}
+      getRowId={(row) => row.id}
+    />
+  </div>
 );
 
 export const RequestsTable = ({ rows, loading, emptyTitle = "No requests found." }: { rows: SelfRequest[]; loading?: boolean; emptyTitle?: string }) => (

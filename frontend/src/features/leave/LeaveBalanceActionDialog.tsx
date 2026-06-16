@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { FormError } from "@/components/feedback/FormError";
+import { AppDatePicker } from "@/components/forms/AppDatePicker";
 import { LoadingButton } from "@/components/forms/LoadingButton";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -105,7 +106,7 @@ export const LeaveBalanceActionDialog = ({
             <Label>Destination year<Input value={destinationYear} onChange={(event) => setDestinationYear(event.target.value)} /></Label>
           ) : null}
           {action === "expiry" ? (
-            <Label>Effective date<Input type="date" value={effectiveDate} onChange={(event) => setEffectiveDate(event.target.value)} /></Label>
+            <AppDatePicker label="Effective date" value={effectiveDate} onChange={(value) => setEffectiveDate(value ?? "")} />
           ) : null}
           <Label>Reason<Textarea value={reason} onChange={(event) => setReason(event.target.value)} /></Label>
           {localError ? <FormError message={localError} /> : null}

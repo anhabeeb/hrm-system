@@ -38,5 +38,5 @@ export interface ReportResult {
 export interface ReportGeneratePayload {
   report_key: string;
   filters: ReportFilters;
-  format: "json" | "csv" | "xlsx" | "pdf";
+  format: "xlsx" | "pdf";
 }
