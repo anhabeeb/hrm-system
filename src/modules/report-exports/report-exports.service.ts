@@ -11,6 +11,7 @@ import * as payrollReports from "../payroll-reports/payroll-reports.service";
 import { validatePayrollReportFilters } from "../payroll-reports/payroll-reports.validators";
 import { createAuditLog } from "../../services/audit.service";
 import * as permissionService from "../../services/permission.service";
+import * as settingsService from "../../services/settings.service";
 import type { AuthActor, PaginationMeta } from "../../types/api.types";
 import { AppError, NotFoundError, PermissionError } from "../../utils/errors";
 import { excelContentType, generateExcelWorkbook, generatePdfReport, pdfContentType } from "../../utils/export-file-format";
@@ -275,6 +276,15 @@ const runReport = async (
   const filters = requireBoundedExport(item.report_key, filtersInput, format);
   const [namespace, key] = item.report_key.split(":");
   if (namespace === "hr") {
+    if (key === "assets-uniforms") {
+      const [assetsEnabled, uniformsEnabled] = await Promise.all([
+        settingsService.isFeatureEnabled(env, actor.companyId, "asset_tracking", actor),
+        settingsService.isFeatureEnabled(env, actor.companyId, "uniform_tracking", actor),
+      ]);
+      if (!assetsEnabled || !uniformsEnabled) {
+        throw new AppError("Asset Tracking and Uniform Tracking must both be enabled before exporting this report.", "ASSETS_UNIFORMS_REPORT_DISABLED", 403);
+      }
+    }
     const validated = validateHrReportFilters(filters, { historyRequired: /leave-requests|long-leave|lifecycle/.test(key) });
     return normalizeDataResult(item, actor, await hrReports.runReport(env, actor, key, validated), { ...validated });
   }

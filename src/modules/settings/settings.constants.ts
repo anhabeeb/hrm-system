@@ -78,6 +78,8 @@ export const FEATURE_DEPENDENCIES: Record<string, string[]> = {
   roster: ["employee_management"],
   documents: ["employee_management"],
   assets_uniforms: ["employee_management"],
+  asset_tracking: ["employee_management"],
+  uniform_tracking: ["employee_management"],
 };
 
 export const FEATURE_DEPENDENCY_LABELS: Record<string, string> = {
@@ -96,6 +98,8 @@ export const REPORTABLE_FEATURES = [
   "payroll",
   "roster",
   "assets_uniforms",
+  "asset_tracking",
+  "uniform_tracking",
   "documents",
 ] as const;
 

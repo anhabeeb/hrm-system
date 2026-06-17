@@ -119,8 +119,8 @@ export const navigationGroups: NavGroup[] = [
   {
     label: "Assets & Documents",
     items: [
-      { label: "Assets", path: "/assets", icon: PackageCheck, requiredFeature: "assets_uniforms", requiredPermission: "assets.view" },
-      { label: "Uniforms", path: "/uniforms", icon: Shirt, requiredFeature: "assets_uniforms", requiredPermission: "uniforms.view" },
+      { label: "Assets", path: "/assets", icon: PackageCheck, moduleCode: "asset_tracking", requiredFeature: "asset_tracking", requiredPermission: "assets.view" },
+      { label: "Uniforms", path: "/uniforms", icon: Shirt, moduleCode: "uniform_tracking", requiredFeature: "uniform_tracking", requiredPermission: "uniforms.view" },
       { label: "Documents", path: "/documents", icon: FileText, moduleCode: "documents_kyc", requiredFeature: "documents", requiredPermission: "documents.view" },
     ],
   },

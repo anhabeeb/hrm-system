@@ -18,7 +18,7 @@ reportsRoutes.get("/employees/summary", requirePermission("reports.view"), requi
 reportsRoutes.get("/attendance/summary", requirePermission("reports.view"), requirePermission("attendance.view"), controller.attendanceSummary);
 reportsRoutes.get("/leave/summary", requirePermission("reports.view"), requirePermission("leave.view"), controller.leaveSummary);
 reportsRoutes.get("/payroll/summary", requirePermission("reports.view"), requirePermission("payroll.view"), controller.payrollSummary);
-reportsRoutes.get("/assets/summary", requirePermission("reports.view"), requirePermission("assets.view"), controller.assetSummary);
+reportsRoutes.get("/assets/summary", requireFeature("asset_tracking"), requirePermission("reports.view"), requirePermission("assets.view"), controller.assetSummary);
 reportsRoutes.get("/documents/summary", requirePermission("reports.view"), requirePermission("documents.view"), controller.documentSummary);
 reportsRoutes.get("/compliance/expiring-documents", requirePermission("reports.view"), requirePermission("documents.view"), controller.expiringDocuments);
 reportsRoutes.get("/compliance/missing-documents", requirePermission("reports.view"), requirePermission("documents.view"), controller.missingDocuments);

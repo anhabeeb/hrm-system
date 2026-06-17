@@ -1,5 +1,6 @@
 import { createAuditLog } from "../../services/audit.service";
 import * as permissionService from "../../services/permission.service";
+import * as settingsService from "../../services/settings.service";
 import type { AuthActor, PaginationMeta } from "../../types/api.types";
 import { AppError, NotFoundError, PermissionError } from "../../utils/errors";
 import { createPrefixedId } from "../../utils/ids";
@@ -55,6 +56,20 @@ const requireImportAccess = (actor: AuthActor, template: ImportTemplate, action:
   requirePermission(actor, template.required_permission);
   if (template.sensitive && !permissionService.hasPermission(actor, "imports.sensitive.manage")) {
     throw new PermissionError("This import contains sensitive fields and requires sensitive import permission.", "IMPORT_SENSITIVE_PERMISSION_REQUIRED");
+  }
+};
+
+const assertAssetsUniformsImportEnabled = async (env: Env, actor: AuthActor) => {
+  const [assetsEnabled, uniformsEnabled] = await Promise.all([
+    settingsService.isFeatureEnabled(env, actor.companyId, "asset_tracking", actor),
+    settingsService.isFeatureEnabled(env, actor.companyId, "uniform_tracking", actor),
+  ]);
+  if (!assetsEnabled || !uniformsEnabled) {
+    throw new AppError(
+      "Asset Tracking and Uniform Tracking must both be enabled before importing asset/uniform assignments.",
+      "ASSETS_UNIFORMS_IMPORT_DISABLED",
+      403,
+    );
   }
 };
 
@@ -288,6 +303,7 @@ const safeRow = (row: ImportJobRow, template: ImportTemplate | null | undefined,
 export const previewImport = async (env: Env, actor: AuthActor, input: ImportPreviewInput): Promise<ImportValidationResult> => {
   const template = getTemplate(input.import_type);
   if (!template) throw new AppError("This import type is not supported.", "IMPORT_TYPE_UNSUPPORTED", 404);
+  if (template.import_type === "assets_uniforms") await assertAssetsUniformsImportEnabled(env, actor);
   requireImportAccess(actor, template, "preview");
   const rows = await buildRows(env, actor, template, input.mode, input.csv_content, "preview_only");
   const now = nowIso();
@@ -333,6 +349,7 @@ export const previewImport = async (env: Env, actor: AuthActor, input: ImportPre
 export const createImportJob = async (env: Env, actor: AuthActor, input: ImportJobCreateInput) => {
   const template = getTemplate(input.import_type);
   if (!template) throw new AppError("This import type is not supported.", "IMPORT_TYPE_UNSUPPORTED", 404);
+  if (template.import_type === "assets_uniforms") await assertAssetsUniformsImportEnabled(env, actor);
   requireImportAccess(actor, template, "upload");
   if (!template.supported_modes.includes(input.mode)) throw new AppError("This import mode is not supported for the selected template.", "IMPORT_JOB_INVALID_STATUS", 400);
   const idempotencyKey = input.idempotency_key ?? `${actor.actorUserId}:${input.import_type}:${input.mode}:${input.file_name ?? "csv"}:${input.csv_content.length}`;
@@ -387,6 +404,7 @@ export const validateImportJob = async (env: Env, actor: AuthActor, id: string) 
   const rows = await repository.listRows(env, actor.companyId, id, { page: 1, page_size: 5000 });
   const template = getTemplate(job.import_type);
   if (!template) throw new AppError("This import type is not supported.", "IMPORT_TYPE_UNSUPPORTED", 404);
+  if (template.import_type === "assets_uniforms") await assertAssetsUniformsImportEnabled(env, actor);
   const summary = summaryFromRows(rows, template);
   await repository.updateJobValidation(env, actor.companyId, id, {
     status: summary.invalid_rows > 0 || summary.duplicate_rows > 0 ? "validation_failed" : "preview_ready",
@@ -511,6 +529,7 @@ const applyRow = async (env: Env, actor: AuthActor, job: ImportJob, row: ImportJ
 
 export const applyImportJob = async (env: Env, actor: AuthActor, id: string) => {
   const job = await requireJob(env, actor, id, "apply");
+  if (job.import_type === "assets_uniforms") await assertAssetsUniformsImportEnabled(env, actor);
   if (job.status === "completed") return { job: safeJob(job), summary: { created_rows: job.created_rows, updated_rows: job.updated_rows, skipped_rows: job.skipped_rows, failed_rows: job.failed_rows }, already_applied: true };
   if (!["preview_ready", "partially_completed"].includes(job.status)) throw new AppError("Only preview-ready imports can be applied.", "IMPORT_APPLY_BLOCKED", 409);
   const rows = await repository.listValidRowsForApply(env, actor.companyId, id);

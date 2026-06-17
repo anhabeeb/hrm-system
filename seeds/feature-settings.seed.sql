@@ -32,6 +32,8 @@ INSERT OR IGNORE INTO feature_settings (
 ('feature_holidays', 'company_seed_default', 'holidays', 'Holidays', 1, 'enabled', 1, NULL, NULL, 1, 1, 1, 1, 0, 1, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
 ('feature_roster', 'company_seed_default', 'roster', 'Roster', 1, 'enabled', 1, NULL, NULL, 0, 0, 0, 1, 0, 1, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
 ('feature_assets_uniforms', 'company_seed_default', 'assets_uniforms', 'Assets and Uniforms', 1, 'enabled', 1, NULL, NULL, 0, 0, 0, 0, 0, 1, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+('feature_asset_tracking', 'company_seed_default', 'asset_tracking', 'Asset Tracking', 1, 'enabled', 1, NULL, NULL, 0, 0, 0, 0, 0, 1, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+('feature_uniform_tracking', 'company_seed_default', 'uniform_tracking', 'Uniform Tracking', 1, 'enabled', 1, NULL, NULL, 0, 0, 0, 0, 0, 1, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
 ('feature_documents', 'company_seed_default', 'documents', 'Documents', 1, 'enabled', 1, NULL, NULL, 0, 0, 0, 0, 0, 1, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
 ('feature_approvals', 'company_seed_default', 'approvals', 'Approvals', 1, 'enabled', 1, NULL, NULL, 0, 0, 0, 0, 0, 1, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
 ('feature_approval_workflows', 'company_seed_default', 'approval_workflows', 'Approval Workflows', 1, 'enabled', 1, NULL, NULL, 0, 0, 0, 0, 0, 1, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),

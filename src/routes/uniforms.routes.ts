@@ -10,7 +10,7 @@ import type { AppContext } from "../types/api.types";
 const uniformsRoutes = new Hono<AppContext>();
 
 uniformsRoutes.use("*", authMiddleware);
-uniformsRoutes.use("*", requireFeature("assets_uniforms"));
+uniformsRoutes.use("*", requireFeature("uniform_tracking"));
 
 uniformsRoutes.get("/", requirePermission("uniforms.view"), controller.listUniforms);
 uniformsRoutes.post("/", requirePermission("uniforms.issue"), controller.issueUniform);

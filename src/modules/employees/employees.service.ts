@@ -1546,11 +1546,18 @@ export const getEmployeeProfileAssets = async (
   requireProfilePermission(context, ["assets.view", "uniforms.view"], "You do not have permission to view employee assets or uniforms.");
   await ensureEmployeeAccess(env, context, employeeId);
   const safeLimit = profileLimit(limit);
+  const [assetsEnabled, uniformsEnabled] = await Promise.all([
+    settingsService.isFeatureEnabled(env, context.companyId, "asset_tracking", context),
+    settingsService.isFeatureEnabled(env, context.companyId, "uniform_tracking", context),
+  ]);
+  if (!assetsEnabled && !uniformsEnabled) {
+    throw new AppError("Asset Tracking and Uniform Tracking are disabled. Enable them in Settings to use this section.", "ASSETS_UNIFORMS_DISABLED", 403);
+  }
   const [assets, uniforms] = await Promise.all([
-    permissionService.hasPermission(context, "assets.view")
+    assetsEnabled && permissionService.hasPermission(context, "assets.view")
       ? employeesRepository.profileAssets(env, context.companyId, employeeId, safeLimit)
       : Promise.resolve([]),
-    permissionService.hasPermission(context, "uniforms.view")
+    uniformsEnabled && permissionService.hasPermission(context, "uniforms.view")
       ? employeesRepository.profileUniforms(env, context.companyId, employeeId, safeLimit)
       : Promise.resolve([]),
   ]);

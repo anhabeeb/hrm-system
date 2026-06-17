@@ -38,7 +38,7 @@ const formatJobFileType = (fileType?: string) => fileType === "json" || fileType
 
 const JsonPanel = ({ value }: { value: unknown }) => <pre className="max-h-72 overflow-auto rounded border bg-muted p-3 text-xs">{JSON.stringify(sanitizeForDisplay(value ?? {}), null, 2)}</pre>;
 
-const ExportCreateDialog = ({ open, loading, error, onOpenChange, onSubmit }: { open: boolean; loading?: boolean; error?: string | null; onOpenChange: (open: boolean) => void; onSubmit: (payload: ExportCreatePayload) => void }) => {
+const ExportCreateDialog = ({ open, loading, error, visibleExportTypes, onOpenChange, onSubmit }: { open: boolean; loading?: boolean; error?: string | null; visibleExportTypes: string[]; onOpenChange: (open: boolean) => void; onSubmit: (payload: ExportCreatePayload) => void }) => {
   const [payload, setPayload] = useState<ExportCreatePayload>({ export_type: "employees", format: "xlsx", filters: {} });
   const [localError, setLocalError] = useState<string | null>(null);
   useEffect(() => {
@@ -47,6 +47,11 @@ const ExportCreateDialog = ({ open, loading, error, onOpenChange, onSubmit }: { 
       setLocalError(null);
     }
   }, [open]);
+  useEffect(() => {
+    if (!visibleExportTypes.includes(payload.export_type)) {
+      setPayload((current) => ({ ...current, export_type: visibleExportTypes[0] ?? "employees" }));
+    }
+  }, [payload.export_type, visibleExportTypes]);
   const submit = () => {
     if (sensitiveExportTypes.has(payload.export_type) && !payload.reason?.trim()) {
       setLocalError("A reason is required for this action.");
@@ -55,7 +60,7 @@ const ExportCreateDialog = ({ open, loading, error, onOpenChange, onSubmit }: { 
     setLocalError(null);
     onSubmit({ ...payload, reason: payload.reason?.trim() || undefined });
   };
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent><DialogHeader><DialogTitle>Create export job</DialogTitle><DialogDescription>Create an Excel workbook or PDF report. Sensitive exports require a reason.</DialogDescription></DialogHeader><div className="grid gap-3 sm:grid-cols-2"><Label className="space-y-1 text-sm">Export type<Select value={payload.export_type} onValueChange={(value) => setPayload((p) => ({ ...p, export_type: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{exportTypes.map((type) => <SelectItem key={type} value={type}>{formatJobType(type)}</SelectItem>)}</SelectContent></Select></Label><Label className="space-y-1 text-sm">Format<Select value={payload.format} onValueChange={(value: "xlsx" | "pdf") => setPayload((p) => ({ ...p, format: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="xlsx">Excel workbook</SelectItem><SelectItem value="pdf">PDF report</SelectItem></SelectContent></Select></Label><Label className="space-y-1 text-sm">Outlet<OutletCombobox value={typeof payload.filters?.outlet_id === "string" ? payload.filters.outlet_id : undefined} onChange={(value) => setPayload((p) => ({ ...p, filters: { ...p.filters, outlet_id: value } }))} placeholder="All accessible outlets" /></Label><AppMonthPicker label="Payroll month" value={typeof payload.filters?.payroll_month === "string" ? payload.filters.payroll_month : undefined} onChange={(value) => setPayload((p) => ({ ...p, filters: { ...p.filters, payroll_month: value } }))} /></div><Textarea placeholder={sensitiveExportTypes.has(payload.export_type) ? "Reason required for this sensitive export" : "Reason (optional)"} value={payload.reason ?? ""} onChange={(event) => setPayload((p) => ({ ...p, reason: event.target.value }))} />{localError || error ? <InlineAlert title={localError ?? error ?? ""} variant="error" /> : null}<DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button><LoadingButton loading={loading} onClick={submit}>Create export</LoadingButton></DialogFooter></DialogContent></Dialog>;
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent><DialogHeader><DialogTitle>Create export job</DialogTitle><DialogDescription>Create an Excel workbook or PDF report. Sensitive exports require a reason.</DialogDescription></DialogHeader><div className="grid gap-3 sm:grid-cols-2"><Label className="space-y-1 text-sm">Export type<Select value={payload.export_type} onValueChange={(value) => setPayload((p) => ({ ...p, export_type: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{visibleExportTypes.map((type) => <SelectItem key={type} value={type}>{formatJobType(type)}</SelectItem>)}</SelectContent></Select></Label><Label className="space-y-1 text-sm">Format<Select value={payload.format} onValueChange={(value: "xlsx" | "pdf") => setPayload((p) => ({ ...p, format: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="xlsx">Excel workbook</SelectItem><SelectItem value="pdf">PDF report</SelectItem></SelectContent></Select></Label><Label className="space-y-1 text-sm">Outlet<OutletCombobox value={typeof payload.filters?.outlet_id === "string" ? payload.filters.outlet_id : undefined} onChange={(value) => setPayload((p) => ({ ...p, filters: { ...p.filters, outlet_id: value } }))} placeholder="All accessible outlets" /></Label><AppMonthPicker label="Payroll month" value={typeof payload.filters?.payroll_month === "string" ? payload.filters.payroll_month : undefined} onChange={(value) => setPayload((p) => ({ ...p, filters: { ...p.filters, payroll_month: value } }))} /></div><Textarea placeholder={sensitiveExportTypes.has(payload.export_type) ? "Reason required for this sensitive export" : "Reason (optional)"} value={payload.reason ?? ""} onChange={(event) => setPayload((p) => ({ ...p, reason: event.target.value }))} />{localError || error ? <InlineAlert title={localError ?? error ?? ""} variant="error" /> : null}<DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button><LoadingButton loading={loading} onClick={submit}>Create export</LoadingButton></DialogFooter></DialogContent></Dialog>;
 };
 
 const ImportUploadDialog = ({ open, loading, error, onOpenChange, onSubmit }: { open: boolean; loading?: boolean; error?: string | null; onOpenChange: (open: boolean) => void; onSubmit: (payload: ImportUploadPayload) => void }) => {
@@ -106,6 +111,10 @@ export const ImportExportPage = () => {
   const canViewExports = has("export.view");
   const canViewImports = has("import.view");
   const canViewTemplates = has("import.download_template");
+  const visibleExportTypes = useMemo(
+    () => exportTypes.filter((type) => (type !== "assets" || auth.hasFeature("asset_tracking")) && (type !== "uniforms" || auth.hasFeature("uniform_tracking"))),
+    [auth],
+  );
   const activeTab = tab === "imports" && canViewImports ? "imports" : tab === "templates" && canViewTemplates ? "templates" : canViewExports ? "exports" : canViewImports ? "imports" : "templates";
   const filters = useMemo<ImportExportFilters>(() => ({ status: searchParams.get("status") || undefined, type: searchParams.get("type") || undefined, page: searchParamNumber(searchParams, "page", 1), page_size: searchParamNumber(searchParams, "page_size", 25) }), [searchParams]);
   const updateFilters = (next: Partial<ImportExportFilters>) => { const params = new URLSearchParams(searchParams); Object.entries(next).forEach(([key, value]) => value === undefined || value === "" ? params.delete(key) : params.set(key, String(value))); if (!("page" in next)) params.set("page", "1"); params.set("tab", activeTab); setSearchParams(params); };
@@ -155,7 +164,7 @@ export const ImportExportPage = () => {
         </Tabs>
       </div>
       <DetailDrawer title={String(selected?.id ?? selected?.template_name ?? "Detail")} subtitle="Sensitive keys are sanitized before display." open={drawerOpen} onOpenChange={setDrawerOpen}><DetailSection title="Metadata" rows={[{ label: "Detail", value: <JsonPanel value={selected} /> }]} /></DetailDrawer>
-      <ExportCreateDialog open={exportOpen} loading={createExportMutation.isPending} error={createExportMutation.error ? friendlyHrmError(createExportMutation.error, "Export job could not be created.") : null} onOpenChange={setExportOpen} onSubmit={(payload) => createExportMutation.mutate(payload)} />
+      <ExportCreateDialog open={exportOpen} visibleExportTypes={visibleExportTypes} loading={createExportMutation.isPending} error={createExportMutation.error ? friendlyHrmError(createExportMutation.error, "Export job could not be created.") : null} onOpenChange={setExportOpen} onSubmit={(payload) => createExportMutation.mutate(payload)} />
       <ImportUploadDialog open={importOpen} loading={uploadMutation.isPending} error={uploadMutation.error ? friendlyHrmError(uploadMutation.error, "Import file could not be uploaded.") : null} onOpenChange={setImportOpen} onSubmit={(payload) => uploadMutation.mutate(payload)} />
       <ReasonDialog open={Boolean(reasonAction)} title="Confirm import/export action" description="A reason is required for this action where backend policy requires it." loading={reasonMutation.isPending} error={reasonMutation.error ? friendlyHrmError(reasonMutation.error, "Import/export action could not be completed.") : null} onOpenChange={(open) => !open && setReasonAction(null)} onSubmit={(reason) => reasonMutation.mutate(reason)} />
     </div>

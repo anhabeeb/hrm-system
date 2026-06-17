@@ -58,16 +58,18 @@ const fakeEnv = (rows: Record<string, unknown>[] = [{ employee_id: "emp_1", empl
 const source = (path: string) => readFileSync(path, "utf8");
 
 describe("Phase 11B HR Reports", () => {
-  it("catalog returns HR reports", () => {
-    const result = service.catalog(actor());
+  it("catalog returns HR reports", async () => {
+    const { env } = fakeEnv();
+    const result = await service.catalog(env, actor());
     expect(result.data.map((report) => report.report_key)).toContain("employee-master");
     expect(result.data.map((report) => report.report_key)).toContain("document-compliance");
     expect(result.data.map((report) => report.report_key)).toContain("employee-360-summary");
     expect(result.meta.export_ready).toBe(true);
   });
 
-  it("unavailable reports hidden by permission", () => {
-    const result = service.catalog(actor({ permissions: ["hr_reports.view", "hr_reports.catalog.view", "hr_reports.employee.view"] }));
+  it("unavailable reports hidden by permission", async () => {
+    const { env } = fakeEnv();
+    const result = await service.catalog(env, actor({ permissions: ["hr_reports.view", "hr_reports.catalog.view", "hr_reports.employee.view"] }));
     expect(result.data.every((report) => report.required_permission === "hr_reports.employee.view")).toBe(true);
   });
 
@@ -199,14 +201,14 @@ describe("Phase 11B HR Reports", () => {
   });
 
   it("catalog-only permission can view catalog but cannot run report data", async () => {
+    const { env } = fakeEnv();
     const catalogActor = actor({
       permissions: ["hr_reports.catalog.view"],
       roleKeys: ["auditor"],
       roles: ["Auditor"],
     });
-    const catalog = service.catalog(catalogActor);
+    const catalog = await service.catalog(env, catalogActor);
     expect(catalog.meta.report_key).toBe("catalog");
-    const { env } = fakeEnv();
     await expect(service.runReport(env, catalogActor, "employee-master", validateHrReportFilters({}))).rejects.toThrow(/permission/i);
   });
 

@@ -10,7 +10,7 @@ import type { AppContext } from "../types/api.types";
 const assetsRoutes = new Hono<AppContext>();
 
 assetsRoutes.use("*", authMiddleware);
-assetsRoutes.use("*", requireFeature("assets_uniforms"));
+assetsRoutes.use("*", requireFeature("asset_tracking"));
 
 assetsRoutes.get("/", requirePermission("assets.view"), controller.listAssets);
 assetsRoutes.post("/", requirePermission("assets.create"), controller.createAsset);

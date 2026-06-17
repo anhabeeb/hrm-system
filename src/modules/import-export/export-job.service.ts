@@ -1,6 +1,7 @@
 import type { AuthActor } from "../../types/api.types";
 import * as auditService from "../../services/audit.service";
 import * as permissionService from "../../services/permission.service";
+import * as settingsService from "../../services/settings.service";
 import { AppError, NotFoundError, OutletAccessError, PermissionError, ReasonRequiredError } from "../../utils/errors";
 import { generateByKey } from "../reports/reports.service";
 import type { ReportFilters } from "../reports/reports.types";
@@ -37,6 +38,26 @@ const assertModulePermission = (context: AuthActor, exportType: string) => {
   };
   const required = permissions[exportType];
   if (!required || !hasAny(context, required)) throw new PermissionError();
+};
+
+const moduleForExportType: Record<string, string | undefined> = {
+  assets: "asset_tracking",
+  uniforms: "uniform_tracking",
+};
+
+const assertExportModuleEnabled = async (env: Env, context: AuthActor, exportType: string) => {
+  const featureKey = moduleForExportType[exportType];
+  if (!featureKey) return;
+  const enabled = await settingsService.isFeatureEnabled(env, context.companyId, featureKey, context);
+  if (!enabled) {
+    throw new AppError(
+      exportType === "assets"
+        ? "Asset Tracking is disabled. Enable it in Settings to use this module."
+        : "Uniform Tracking is disabled. Enable it in Settings to use this module.",
+      exportType === "assets" ? "ASSET_TRACKING_DISABLED" : "UNIFORM_TRACKING_DISABLED",
+      403,
+    );
+  }
 };
 
 const scopedFilters = (context: AuthActor, input: ExportCreateInput) => {
@@ -113,6 +134,7 @@ const loadMutableExportJob = async (env: Env, context: AuthActor, id: string) =>
 };
 
 export const createExportJob = async (env: Env, context: AuthActor, input: ExportCreateInput) => {
+  await assertExportModuleEnabled(env, context, input.export_type);
   assertModulePermission(context, input.export_type);
   assertSensitiveExportAllowed(context, input);
   const filters = scopedFilters(context, input);

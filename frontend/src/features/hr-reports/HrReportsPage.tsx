@@ -19,6 +19,7 @@ import { friendlyHrmError } from "@/lib/hrm-errors";
 import { searchParamNumber } from "@/lib/query-string";
 import { formatReportValue } from "@/features/reports/report-format";
 import { ReportExportActions } from "@/features/report-exports/ReportExportActions";
+import { useAuth } from "@/features/auth/auth.store";
 import { hrReportsApi } from "./hr-reports.api";
 import type { HrReportDefinition, HrReportFilters } from "./hr-reports.types";
 
@@ -53,9 +54,15 @@ const defaultReportFor = (reports: HrReportDefinition[], selected?: string | nul
   reports.find((report) => report.report_key === selected) ?? reports[0] ?? null;
 
 export const HrReportsPage = () => {
+  const auth = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const filters = useMemo(() => filtersFromParams(searchParams), [searchParams]);
-  const selectedCategory = searchParams.get("category") ?? "employee";
+  const visibleCategories = useMemo(
+    () => categories.filter((category) => category.key !== "assets" || (auth.hasFeature("asset_tracking") && auth.hasFeature("uniform_tracking"))),
+    [auth],
+  );
+  const requestedCategory = searchParams.get("category") ?? "employee";
+  const selectedCategory = visibleCategories.some((category) => category.key === requestedCategory) ? requestedCategory : "employee";
   const selectedReportKey = searchParams.get("report") ?? undefined;
 
   const catalogQuery = useQuery({ queryKey: ["hr-reports", "catalog"], queryFn: () => hrReportsApi.catalog() });
@@ -133,7 +140,7 @@ export const HrReportsPage = () => {
 
         <Tabs value={selectedCategory} onValueChange={(category) => updateParams({ category })}>
           <TabsList className="flex flex-wrap">
-            {categories.map((category) => (
+            {visibleCategories.map((category) => (
               <TabsTrigger key={category.key} value={category.key}>{category.label}</TabsTrigger>
             ))}
           </TabsList>

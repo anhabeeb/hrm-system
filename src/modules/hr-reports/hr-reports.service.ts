@@ -1,4 +1,5 @@
 import * as permissionService from "../../services/permission.service";
+import * as settingsService from "../../services/settings.service";
 import type { AuthActor } from "../../types/api.types";
 import { AppError, PermissionError } from "../../utils/errors";
 import { HR_REPORT_BY_KEY, HR_REPORT_DEFINITIONS } from "./hr-reports.definitions";
@@ -62,26 +63,41 @@ const result = (
   };
 };
 
-export const catalog = (actor: AuthActor) => ({
-  data: HR_REPORT_DEFINITIONS.filter((definition) => canViewReport(actor, definition.required_permission)),
-  meta: {
-    report_key: "catalog",
-    report_name: "HR Report Catalog",
-    description: "Available HR reports for the current user.",
-    categories: ["employee", "compliance", "documents", "leave", "long_leave", "lifecycle", "assets", "summary"],
-    export_ready: true,
-  },
-  generated_at: new Date().toISOString(),
-});
+const enabledCategories = async (env: Env, actor: AuthActor) => {
+  const [assetsEnabled, uniformsEnabled] = await Promise.all([
+    settingsService.isFeatureEnabled(env, actor.companyId, "asset_tracking", actor),
+    settingsService.isFeatureEnabled(env, actor.companyId, "uniform_tracking", actor),
+  ]);
+  return {
+    assets: assetsEnabled && uniformsEnabled,
+  };
+};
+
+export const catalog = async (env: Env, actor: AuthActor) => {
+  const categories = await enabledCategories(env, actor);
+  return {
+    data: HR_REPORT_DEFINITIONS.filter((definition) => canViewReport(actor, definition.required_permission))
+      .filter((definition) => definition.category !== "assets" || categories.assets),
+    meta: {
+      report_key: "catalog",
+      report_name: "HR Report Catalog",
+      description: "Available HR reports for the current user.",
+      categories: ["employee", "compliance", "documents", "leave", "long_leave", "lifecycle", ...(categories.assets ? ["assets"] : []), "summary"],
+      export_ready: true,
+    },
+    generated_at: new Date().toISOString(),
+  };
+};
 
 export const summary = async (env: Env, actor: AuthActor, filters: HrReportFilters) => {
   if (!permissionService.hasPermission(actor, "hr_reports.view")) {
     throw new PermissionError(reportPermissionMessage, "HR_REPORT_PERMISSION_DENIED");
   }
+  const reportCatalog = await catalog(env, actor);
   const counts = await repository.summary(env, actor, filters);
   return {
     data: {
-      available_reports: catalog(actor).data.length,
+      available_reports: reportCatalog.data.length,
       ...counts,
     },
     meta: {
@@ -143,6 +159,9 @@ export const runReport = async (
       reportRows = await repository.longLeave(env, actor, filters);
       break;
     case "assets-uniforms":
+      if (!(await enabledCategories(env, actor)).assets) {
+        throw new AppError("Asset Tracking and Uniform Tracking must both be enabled before viewing this report.", "ASSETS_UNIFORMS_REPORT_DISABLED", 403);
+      }
       reportRows = await repository.assetsUniforms(env, actor, filters);
       break;
     case "compliance-summary":

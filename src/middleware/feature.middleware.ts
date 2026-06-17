@@ -5,6 +5,11 @@ import * as settingsService from "../services/settings.service";
 import type { AppContext } from "../types/api.types";
 import { AuthError, DeviceAuthError, FeatureDisabledError } from "../utils/errors";
 
+const disabledFeatureMessages: Record<string, string> = {
+  asset_tracking: "Asset Tracking is disabled. Enable it in Settings to use this module.",
+  uniform_tracking: "Uniform Tracking is disabled. Enable it in Settings to use this module.",
+};
+
 export const requireFeature = (featureKey: string) =>
   createMiddleware<AppContext>(async (c, next) => {
     const authUser = c.get("authUser");
@@ -31,7 +36,7 @@ export const requireFeature = (featureKey: string) =>
     }
 
     if (!enabled) {
-      throw new FeatureDisabledError("This module is currently disabled.");
+      throw new FeatureDisabledError(disabledFeatureMessages[featureKey] ?? "This module is currently disabled.");
     }
 
     await next();

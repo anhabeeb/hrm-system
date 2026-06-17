@@ -57,6 +57,7 @@ export const ModuleRoute = ({
   requiredFeaturesAll,
   moduleCode,
   moduleCodesAll,
+  moduleName,
   requiresLinkedEmployee,
   children,
 }: {
@@ -66,6 +67,7 @@ export const ModuleRoute = ({
   requiredFeaturesAll?: string[];
   moduleCode?: string;
   moduleCodesAll?: string[];
+  moduleName?: string;
   requiresLinkedEmployee?: boolean;
   children: ReactNode;
 }) => {
@@ -74,8 +76,8 @@ export const ModuleRoute = ({
   if (requiresLinkedEmployee && !user?.employee_id) {
     return <LinkedEmployeeOnlyGuard>{children}</LinkedEmployeeOnlyGuard>;
   }
-  if (!isModuleEnabled(user, moduleCode ?? requiredFeature)) return <ModuleDisabledPage />;
-  if (!areModulesEnabled(user, moduleCodesAll ?? requiredFeaturesAll)) return <ModuleDisabledPage />;
+  if (!isModuleEnabled(user, moduleCode ?? requiredFeature)) return <ModuleDisabledPage moduleName={moduleName} />;
+  if (!areModulesEnabled(user, moduleCodesAll ?? requiredFeaturesAll)) return <ModuleDisabledPage moduleName={moduleName} />;
   if (!hasPermission(user, requiredPermission)) return <FullPagePermissionDenied />;
   if (!hasAnyPermission(user, requiredPermissionsAny)) return <FullPagePermissionDenied />;
 

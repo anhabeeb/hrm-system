@@ -91,7 +91,7 @@ const routeFallback = (
 
 const guarded = (
   element: ReactNode,
-  options: { permission?: string; permissionsAny?: string[]; feature?: string; featuresAll?: string[]; moduleCode?: string; moduleCodesAll?: string[]; requiresLinkedEmployee?: boolean } = {},
+  options: { permission?: string; permissionsAny?: string[]; feature?: string; featuresAll?: string[]; moduleCode?: string; moduleCodesAll?: string[]; moduleName?: string; requiresLinkedEmployee?: boolean } = {},
 ) => (
   <ModuleRoute
     requiredPermission={options.permission}
@@ -100,6 +100,7 @@ const guarded = (
     requiredFeaturesAll={options.featuresAll}
     moduleCode={options.moduleCode}
     moduleCodesAll={options.moduleCodesAll}
+    moduleName={options.moduleName}
     requiresLinkedEmployee={options.requiresLinkedEmployee}
   >
     {element}
@@ -171,8 +172,8 @@ export const AppRouter = () => (
         <Route path="/payslips" element={guarded(<PayslipsPage />, { permission: "payslips.view", feature: "payslips" })} />
         <Route path="/advances" element={guarded(<AdvancesPage />, { permission: "advances.view", feature: "advance_salary", moduleCode: "advance_salary" })} />
         <Route path="/salary-loans" element={guarded(<SalaryLoansPage />, { permission: "salary_loans.view", feature: "payroll" })} />
-        <Route path="/assets" element={guarded(<AssetsPage />, { permission: "assets.view", feature: "assets_uniforms" })} />
-        <Route path="/uniforms" element={guarded(<UniformsPage />, { permission: "uniforms.view", feature: "assets_uniforms" })} />
+        <Route path="/assets" element={guarded(<AssetsPage />, { permission: "assets.view", feature: "asset_tracking", moduleCode: "asset_tracking", moduleName: "Asset Tracking" })} />
+        <Route path="/uniforms" element={guarded(<UniformsPage />, { permission: "uniforms.view", feature: "uniform_tracking", moduleCode: "uniform_tracking", moduleName: "Uniform Tracking" })} />
         <Route path="/documents" element={guarded(<DocumentsPage />, { permission: "documents.view", feature: "documents", moduleCode: "documents_kyc" })} />
         <Route path="/approvals" element={guarded(<ApprovalsPage />, { permission: "approvals.view", feature: "approvals", moduleCode: "approvals" })} />
         <Route path="/reports" element={guarded(<ReportsPage />, { permission: "reports.view", feature: "reports" })} />

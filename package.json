@@ -43,6 +43,7 @@
     "verify:security-hardening": "node scripts/verify-security-hardening.mjs && npm run verify:dependency-security",
     "verify:toast-alerts": "node scripts/verify-toast-alerts.mjs",
     "verify:settings": "node scripts/verify-settings.mjs",
+    "verify:module-toggles": "node scripts/verify-module-toggles.mjs",
     "verify:ui-foundation-modernization": "node scripts/verify-ui-foundation-modernization.mjs",
     "verify:admin-command-center-dashboard": "node scripts/verify-admin-command-center-dashboard.mjs",
     "verify:attendance-calendar": "node scripts/verify-attendance-calendar.mjs",

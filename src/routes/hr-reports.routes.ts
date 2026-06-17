@@ -26,7 +26,7 @@ hrReportsRoutes.get("/foreign-compliance", requirePermission("hr_reports.complia
 hrReportsRoutes.get("/leave-balances", requirePermission("hr_reports.leave.view"), controller.leaveBalances);
 hrReportsRoutes.get("/leave-requests", requirePermission("hr_reports.leave.view"), controller.leaveRequests);
 hrReportsRoutes.get("/long-leave", requirePermission("hr_reports.long_leave.view"), controller.longLeave);
-hrReportsRoutes.get("/assets-uniforms", requirePermission("hr_reports.assets.view"), controller.assetsUniforms);
+hrReportsRoutes.get("/assets-uniforms", requireFeature("asset_tracking"), requireFeature("uniform_tracking"), requirePermission("hr_reports.assets.view"), controller.assetsUniforms);
 hrReportsRoutes.get("/compliance-summary", requirePermission("hr_reports.compliance.view"), controller.complianceSummary);
 hrReportsRoutes.get("/lifecycle", requirePermission("hr_reports.lifecycle.view"), controller.lifecycle);
 hrReportsRoutes.get("/employee-360-summary", requirePermission("hr_reports.employee_360.view"), controller.employee360Summary);
@@ -61,6 +61,10 @@ hrReportsRoutes.get("/:reportKey", requireAnyPermission([
   };
   const handler = map[key];
   if (!handler) return controller.catalog(c);
+  if (key === "assets-uniforms") {
+    await requireFeature("asset_tracking")(c, async () => undefined);
+    await requireFeature("uniform_tracking")(c, async () => undefined);
+  }
   return handler(c);
 });
 

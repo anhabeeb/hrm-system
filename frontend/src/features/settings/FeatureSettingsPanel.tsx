@@ -13,6 +13,21 @@ import { FeatureReasonDialog } from "./FeatureReasonDialog";
 import { settingsApi } from "./settings.api";
 import type { FeatureSetting } from "./settings.types";
 
+const featureDisplay: Record<string, { name: string; description: string }> = {
+  documents: {
+    name: "Document Tracking",
+    description: "Track employee documents, KYC records, expiries, and verification status.",
+  },
+  asset_tracking: {
+    name: "Asset Tracking",
+    description: "Track company assets assigned to employees, including issue, return, and history.",
+  },
+  uniform_tracking: {
+    name: "Uniform Tracking",
+    description: "Track uniforms issued to employees, including sizes, quantities, issue dates, and return status.",
+  },
+};
+
 export const FeatureSettingsPanel = () => {
   const auth = useAuth();
   const queryClient = useQueryClient();
@@ -46,13 +61,25 @@ export const FeatureSettingsPanel = () => {
         getRowId={(row) => row.feature_key}
         emptyTitle="No feature settings found."
         columns={[
-          { key: "feature_name", header: "Feature" },
+          {
+            key: "feature_name",
+            header: "Feature",
+            cell: (row) => (
+              <div className="max-w-md">
+                <p className="font-medium">{featureDisplay[row.feature_key]?.name ?? row.feature_name}</p>
+                {featureDisplay[row.feature_key]?.description ? (
+                  <p className="text-xs text-muted-foreground">{featureDisplay[row.feature_key].description}</p>
+                ) : null}
+              </div>
+            ),
+          },
           { key: "feature_key", header: "Key" },
           { key: "status", header: "Status", cell: (row) => <StatusBadge status={row.is_enabled === 1 ? "active" : "disabled"} /> },
           { key: "affects", header: "Impact", cell: (row) => [row.affects_payroll ? "Payroll" : null, row.affects_attendance ? "Attendance" : null, row.affects_leave ? "Leave" : null].filter(Boolean).join(", ") || "Operational" },
           { key: "enabled", header: "Enabled", cell: (row) => <Switch checked={row.is_enabled === 1} disabled={!canManage || mutation.isPending} onCheckedChange={(value) => toggleFeature(row, Boolean(value))} aria-label={`Toggle ${row.feature_name}`} /> },
         ]}
       />
+      <p className="text-xs text-muted-foreground">Disabling this module hides it from normal use but does not delete existing records.</p>
       {!canManage ? <p className="text-xs text-muted-foreground">Feature switches are disabled because you do not have settings management permission.</p> : null}
       <FeatureReasonDialog
         open={Boolean(pendingChange)}

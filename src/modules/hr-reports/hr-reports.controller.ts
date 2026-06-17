@@ -9,8 +9,8 @@ const request = (c: Context<AppContext>) => ({ requestId: c.get("requestId") });
 const query = (c: Context<AppContext>, historyRequired = false) =>
   validateHrReportFilters(c.req.query(), { historyRequired });
 
-export const catalog = (c: Context<AppContext>) =>
-  ok(service.catalog(actor(c)), "HR report catalog loaded successfully.", request(c));
+export const catalog = async (c: Context<AppContext>) =>
+  ok(await service.catalog(c.env, actor(c)), "HR report catalog loaded successfully.", request(c));
 
 export const summary = async (c: Context<AppContext>) =>
   ok(await service.summary(c.env, actor(c), query(c)), "HR report summary loaded successfully.", request(c));

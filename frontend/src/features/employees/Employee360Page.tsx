@@ -81,6 +81,9 @@ export const Employee360Page = () => {
   const canViewAttendanceCalendar =
     auth.hasFeature("attendance") &&
     auth.hasAnyPermission(["attendance.calendar.view", "attendance.calendar.viewTeam", "attendance.calendar.viewAll", "attendance.view", "attendance.reports.view", "employees.view"]);
+  const canViewAssets = auth.hasFeature("asset_tracking") && auth.hasPermission("assets.view");
+  const canViewUniforms = auth.hasFeature("uniform_tracking") && auth.hasPermission("uniforms.view");
+  const canViewAssetsUniforms = canViewAssets || canViewUniforms;
   const canManageProfilePhoto = auth.hasAnyPermission(["employees.profilePhoto.upload", "employees.profilePhoto.manage", "employees.edit", "employees.manage"]);
 
   return (
@@ -136,7 +139,7 @@ export const Employee360Page = () => {
                 <TabsTrigger value="long-leave">Long Leave</TabsTrigger>
                 <TabsTrigger value="documents">Documents</TabsTrigger>
                 <TabsTrigger value="contracts">Contracts</TabsTrigger>
-                <TabsTrigger value="assets">Assets/Uniforms</TabsTrigger>
+                {canViewAssetsUniforms ? <TabsTrigger value="assets">Assets/Uniforms</TabsTrigger> : null}
                 <TabsTrigger value="payroll">Payroll Readiness</TabsTrigger>
                 <TabsTrigger value="alerts">Alerts</TabsTrigger>
                 <TabsTrigger value="history">History</TabsTrigger>
@@ -216,14 +219,16 @@ export const Employee360Page = () => {
                 {profile.contracts ? <SimpleTable title="Contracts" rows={recordRows(profile.contracts.contracts)} columns={["contract_number", "contract_type", "contract_status", "start_date", "end_date", "probation_end_date", "salary_snapshot_amount"]} /> : <InlineAlert title="Contracts section is hidden for your role." />}
               </TabsContent>
 
+              {canViewAssetsUniforms ? (
               <TabsContent value="assets" className="space-y-3">
                 {profile.assets ? (
                   <>
-                    <SimpleTable title="Assigned Assets" rows={recordRows(profile.assets.assets)} columns={["asset_code", "asset_name", "asset_type", "issued_date", "returned_date", "status", "issue_condition", "return_condition"]} />
-                    <SimpleTable title="Assigned Uniforms" rows={recordRows(profile.assets.uniforms)} columns={["uniform_type", "quantity", "issued_date", "returned_date", "status"]} />
+                    {canViewAssets ? <SimpleTable title="Assigned Assets" rows={recordRows(profile.assets.assets)} columns={["asset_code", "asset_name", "asset_type", "issued_date", "returned_date", "status", "issue_condition", "return_condition"]} /> : null}
+                    {canViewUniforms ? <SimpleTable title="Assigned Uniforms" rows={recordRows(profile.assets.uniforms)} columns={["uniform_type", "quantity", "issued_date", "returned_date", "status"]} /> : null}
                   </>
                 ) : <InlineAlert title="Assets and uniforms are hidden for your role." />}
               </TabsContent>
+              ) : null}
 
               <TabsContent value="payroll" className="space-y-3">
                 {profile.payroll_readiness ? (
