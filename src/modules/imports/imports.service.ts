@@ -84,6 +84,17 @@ const assertLeaveImportEnabled = async (env: Env, actor: AuthActor) => {
   }
 };
 
+const assertAttendanceImportEnabled = async (env: Env, actor: AuthActor) => {
+  const enabled = await settingsService.isFeatureEnabled(env, actor.companyId, "attendance", actor);
+  if (!enabled) {
+    throw new AppError(
+      "Attendance Management is disabled. Enable it in Settings to use this module.",
+      "ATTENDANCE_MANAGEMENT_DISABLED",
+      403,
+    );
+  }
+};
+
 const ensureOutletScope = (actor: AuthActor, outletId?: string | null) => {
   if (!outletId || actor.isAdmin || actor.isSuperAdmin || actor.outletIds.length === 0) return;
   if (!actor.outletIds.includes(outletId)) throw new PermissionError("You cannot import rows for an outlet outside your scope.", "IMPORT_PERMISSION_DENIED");
@@ -104,6 +115,9 @@ const audit = (env: Env, actor: AuthActor, action: string, details: Record<strin
   });
 
 const templateFeatureEnabled = async (env: Env, actor: AuthActor, template: ImportTemplate) => {
+  if (template.import_type === "attendance") {
+    return settingsService.isFeatureEnabled(env, actor.companyId, "attendance", actor);
+  }
   if (template.import_type === "leave_balances") {
     return settingsService.isFeatureEnabled(env, actor.companyId, "leave_management", actor);
   }
@@ -339,6 +353,7 @@ const safeRow = (row: ImportJobRow, template: ImportTemplate | null | undefined,
 export const previewImport = async (env: Env, actor: AuthActor, input: ImportPreviewInput): Promise<ImportValidationResult> => {
   const template = getTemplate(input.import_type);
   if (!template) throw new AppError("This import type is not supported.", "IMPORT_TYPE_UNSUPPORTED", 404);
+  if (template.import_type === "attendance") await assertAttendanceImportEnabled(env, actor);
   if (template.import_type === "leave_balances") await assertLeaveImportEnabled(env, actor);
   if (template.import_type === "assets_uniforms") await assertAssetsUniformsImportEnabled(env, actor);
   requireImportAccess(actor, template, "preview");
@@ -386,6 +401,7 @@ export const previewImport = async (env: Env, actor: AuthActor, input: ImportPre
 export const createImportJob = async (env: Env, actor: AuthActor, input: ImportJobCreateInput) => {
   const template = getTemplate(input.import_type);
   if (!template) throw new AppError("This import type is not supported.", "IMPORT_TYPE_UNSUPPORTED", 404);
+  if (template.import_type === "attendance") await assertAttendanceImportEnabled(env, actor);
   if (template.import_type === "leave_balances") await assertLeaveImportEnabled(env, actor);
   if (template.import_type === "assets_uniforms") await assertAssetsUniformsImportEnabled(env, actor);
   requireImportAccess(actor, template, "upload");
@@ -442,6 +458,7 @@ export const validateImportJob = async (env: Env, actor: AuthActor, id: string) 
   const rows = await repository.listRows(env, actor.companyId, id, { page: 1, page_size: 5000 });
   const template = getTemplate(job.import_type);
   if (!template) throw new AppError("This import type is not supported.", "IMPORT_TYPE_UNSUPPORTED", 404);
+  if (template.import_type === "attendance") await assertAttendanceImportEnabled(env, actor);
   if (template.import_type === "leave_balances") await assertLeaveImportEnabled(env, actor);
   if (template.import_type === "assets_uniforms") await assertAssetsUniformsImportEnabled(env, actor);
   const summary = summaryFromRows(rows, template);
@@ -568,6 +585,7 @@ const applyRow = async (env: Env, actor: AuthActor, job: ImportJob, row: ImportJ
 
 export const applyImportJob = async (env: Env, actor: AuthActor, id: string) => {
   const job = await requireJob(env, actor, id, "apply");
+  if (job.import_type === "attendance") await assertAttendanceImportEnabled(env, actor);
   if (job.import_type === "leave_balances") await assertLeaveImportEnabled(env, actor);
   if (job.import_type === "assets_uniforms") await assertAssetsUniformsImportEnabled(env, actor);
   if (job.status === "completed") return { job: safeJob(job), summary: { created_rows: job.created_rows, updated_rows: job.updated_rows, skipped_rows: job.skipped_rows, failed_rows: job.failed_rows }, already_applied: true };

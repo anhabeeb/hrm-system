@@ -9,6 +9,7 @@ import type {
   AttendanceReportResponse,
   AttendanceReportRow,
   AttendanceSummary,
+  AttendanceSubFeatureVisibility,
   CorrectionRequestPayload,
   ManualAttendanceBatchPayload,
   ManualAttendanceBatchResult,
@@ -17,6 +18,7 @@ import type {
 } from "./attendance.types";
 
 export const attendanceApi = {
+  subFeatures: () => api.get<{ subfeatures: AttendanceSubFeatureVisibility }>("/attendance/subfeatures"),
   listSummary: (filters: AttendanceFilters = {}) => api.get<AttendanceSummary[]>(`/attendance/summary${buildQueryString(filters)}`),
   listEvents: (filters: AttendanceFilters = {}) => api.get<AttendanceEvent[]>(`/attendance/events${buildQueryString(filters)}`),
   getEvent: (id: string) => api.get<{ event: AttendanceEvent } | AttendanceEvent>(`/attendance/events/${id}`),

@@ -10,6 +10,7 @@ const contractsRoutes = new Hono<AppContext>();
 
 contractsRoutes.use("*", authMiddleware);
 contractsRoutes.use("*", requireFeature("employee_management"));
+contractsRoutes.use("*", requireFeature("contract_tracking"));
 
 contractsRoutes.get(
   "/",

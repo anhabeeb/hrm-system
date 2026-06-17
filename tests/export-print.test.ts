@@ -208,8 +208,9 @@ const bytesText = (body: string | Uint8Array) => typeof body === "string" ? body
 describe("Phase 11D Excel/PDF report exports", () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it("catalog lists exportable reports by permission", () => {
-    const result = service.getExportCatalog(actor());
+  it("catalog lists exportable reports by permission", async () => {
+    const { env } = fakeEnv();
+    const result = await service.getExportCatalog(env, actor());
     const keys = result.data.map((report) => report.report_key);
     expect(keys).toContain("attendance:daily");
     expect(keys).toContain("hr:employee-master");

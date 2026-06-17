@@ -41,6 +41,7 @@ const assertModulePermission = (context: AuthActor, exportType: string) => {
 };
 
 const moduleForExportType: Record<string, string | undefined> = {
+  attendance: "attendance",
   leave: "leave_management",
   assets: "asset_tracking",
   uniforms: "uniform_tracking",
@@ -51,6 +52,13 @@ const assertExportModuleEnabled = async (env: Env, context: AuthActor, exportTyp
   if (!featureKey) return;
   const enabled = await settingsService.isFeatureEnabled(env, context.companyId, featureKey, context);
   if (!enabled) {
+    if (exportType === "attendance") {
+      throw new AppError(
+        "Attendance Management is disabled. Enable it in Settings to use this module.",
+        "ATTENDANCE_MANAGEMENT_DISABLED",
+        403,
+      );
+    }
     if (exportType === "leave") {
       throw new AppError(
         "Leave Management is disabled. Enable it in Settings to use this module.",

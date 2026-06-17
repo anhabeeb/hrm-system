@@ -3,10 +3,13 @@ import { readFileSync } from "node:fs";
 
 const read = (file: string) => readFileSync(file, "utf8");
 
-describe("asset and uniform module toggles", () => {
-  it("seeds independent Asset Tracking and Uniform Tracking feature settings", () => {
+describe("operational module toggles", () => {
+  it("seeds independent optional module feature settings", () => {
     const migration = read("migrations/0080_asset_uniform_tracking_feature_settings.sql");
     const leaveMigration = read("migrations/0081_leave_long_leave_management_feature_settings.sql");
+    const rosterMigration = read("migrations/0082_duty_roster_feature_metadata.sql");
+    const contractMigration = read("migrations/0083_contract_tracking_feature_setting.sql");
+    const attendanceMigration = read("migrations/0084_attendance_management_feature_settings.sql");
     const seeds = read("seeds/feature-settings.seed.sql");
     const bootstrap = read("src/modules/bootstrap/bootstrap.repository.ts");
     const settingsConstants = read("src/modules/settings/settings.constants.ts");
@@ -18,20 +21,45 @@ describe("asset and uniform module toggles", () => {
     expect(leaveMigration).toContain("leave_management");
     expect(leaveMigration).toContain("long_leave_management");
     expect(leaveMigration).not.toMatch(/DROP\s+|DELETE\s+FROM/i);
+    expect(rosterMigration).toContain("INSERT OR IGNORE INTO feature_settings");
+    expect(rosterMigration).toContain("feature_key = 'roster'");
+    expect(rosterMigration).toContain("Duty Roster");
+    expect(rosterMigration).not.toMatch(/DROP\s+|DELETE\s+FROM/i);
+    expect(contractMigration).toContain("INSERT OR IGNORE INTO feature_settings");
+    expect(contractMigration).toContain("contract_tracking");
+    expect(contractMigration).toContain("Contract Tracking");
+    expect(contractMigration).toContain("WHERE c.deleted_at IS NULL");
+    expect(contractMigration).not.toMatch(/DROP\s+|DELETE\s+FROM|UPDATE\s+feature_settings/i);
+    expect(attendanceMigration).toContain("INSERT OR IGNORE INTO feature_settings");
+    expect(attendanceMigration).toContain("Attendance Management");
+    expect(attendanceMigration).toContain("attendance.manual_entry_enabled");
+    expect(attendanceMigration).toContain("attendance.payroll_deductions_enabled");
+    expect(attendanceMigration).toContain("WHERE c.deleted_at IS NULL");
+    expect(attendanceMigration).not.toMatch(/DROP\s+|DELETE\s+FROM|UPDATE\s+feature_settings/i);
     expect(seeds).toContain("Leave Management");
     expect(seeds).toContain("Long Leave Management");
     expect(seeds).toContain("Asset Tracking");
     expect(seeds).toContain("Uniform Tracking");
+    expect(seeds).toContain("Duty Roster");
+    expect(seeds).toContain("Contract Tracking");
+    expect(seeds).toContain("Attendance Management");
     expect(bootstrap).toContain("leave_management");
     expect(bootstrap).toContain("long_leave_management");
     expect(bootstrap).toContain("asset_tracking");
     expect(bootstrap).toContain("uniform_tracking");
+    expect(bootstrap).toContain("Duty Roster");
+    expect(bootstrap).toContain("Attendance Management");
+    expect(bootstrap).toContain("contract_tracking");
+    expect(bootstrap).toContain("Contract Tracking");
     expect(settingsConstants).toContain('long_leave_management: ["leave_management", "payroll"]');
     expect(settingsConstants).toContain('asset_tracking: ["employee_management"]');
     expect(settingsConstants).toContain('uniform_tracking: ["employee_management"]');
+    expect(settingsConstants).toContain('roster: ["employee_management"]');
+    expect(settingsConstants).toContain('contract_tracking: ["employee_management"]');
+    expect(settingsConstants).toContain('attendance: ["employee_management"]');
   });
 
-  it("uses separate backend guards for asset and uniform routes", () => {
+  it("uses separate backend guards and disabled messages", () => {
     expect(read("src/routes/leave.routes.ts")).toContain('requireFeature("leave_management")');
     expect(read("src/routes/long-leave.routes.ts")).toContain('requireFeature("long_leave_management")');
     expect(read("src/routes/assets.routes.ts")).toContain('requireFeature("asset_tracking")');
@@ -42,6 +70,20 @@ describe("asset and uniform module toggles", () => {
     expect(read("src/middleware/feature.middleware.ts")).toContain("Uniform Tracking is disabled. Enable it in Settings to use this module.");
     expect(read("src/middleware/feature.middleware.ts")).toContain("Leave Management is disabled. Enable it in Settings to use this module.");
     expect(read("src/middleware/feature.middleware.ts")).toContain("Long Leave Management is disabled. Enable it in Settings to use this module.");
+    expect(read("src/routes/rosters.routes.ts")).toContain('requireFeature("roster")');
+    expect(read("src/middleware/feature.middleware.ts")).toContain("Duty Roster is disabled. Enable it in Settings to use this module.");
+    expect(read("src/routes/contracts.routes.ts")).toContain('requireFeature("contract_tracking")');
+    expect(read("src/routes/employees.routes.ts")).toContain('requireFeature("contract_tracking")');
+    expect(read("src/middleware/feature.middleware.ts")).toContain("Contract Tracking is disabled. Enable it in Settings to use this module.");
+    expect(read("src/routes/attendance.routes.ts")).toContain('requireFeature("attendance")');
+    expect(read("src/routes/attendance.routes.ts")).toContain('requireAttendanceSubFeature("attendance.manual_entry_enabled")');
+    expect(read("src/routes/attendance.routes.ts")).toContain('requireAttendanceSubFeature("attendance.corrections_enabled")');
+    expect(read("src/routes/kiosk.routes.ts")).toContain('requireAttendanceSubFeature("attendance.kiosk_enabled")');
+    expect(read("src/routes/biometric.routes.ts")).toContain('requireAttendanceSubFeature("attendance.biometric_enabled")');
+    expect(read("src/routes/payroll-reports.routes.ts")).toContain('requireAttendanceSubFeature("attendance.payroll_deductions_enabled")');
+    expect(read("src/routes/attendance.routes.ts")).toContain('"/subfeatures"');
+    expect(read("src/modules/attendance/attendance.service.ts")).toContain("getAttendanceSubFeatures");
+    expect(read("src/middleware/feature.middleware.ts")).toContain("Attendance Management is disabled. Enable it in Settings to use this module.");
   });
 
   it("hides and guards secondary UI/report/import surfaces", () => {
@@ -49,19 +91,59 @@ describe("asset and uniform module toggles", () => {
     expect(read("frontend/src/lib/navigation.ts")).toContain('moduleCode: "long_leave_management"');
     expect(read("frontend/src/lib/navigation.ts")).toContain('moduleCode: "asset_tracking"');
     expect(read("frontend/src/lib/navigation.ts")).toContain('moduleCode: "uniform_tracking"');
+    expect(read("frontend/src/lib/navigation.ts")).toContain('requiredFeaturesAll: ["roster", "employee_management"]');
+    expect(read("frontend/src/lib/navigation.ts")).toContain('requiredFeaturesAll: ["employee_management", "contract_tracking"]');
+    expect(read("frontend/src/lib/navigation.ts")).toContain('requiredFeaturesAll: ["attendance", "offline_sync"]');
+    expect(read("frontend/src/lib/navigation.ts")).toContain('requiredFeaturesAll: ["attendance", "biometric_attendance"]');
+    expect(read("frontend/src/app/router.tsx")).toContain('moduleName: "Duty Roster"');
+    expect(read("frontend/src/app/router.tsx")).toContain('moduleName: "Contract Tracking"');
     expect(read("frontend/src/features/settings/FeatureSettingsPanel.tsx")).toContain("Disabling this module hides it from normal use but does not delete existing records.");
+    expect(read("frontend/src/features/settings/FeatureSettingsPanel.tsx")).toContain("Plan employee work schedules, weekly duty rosters, shift assignments, and roster change workflows.");
+    expect(read("frontend/src/features/settings/FeatureSettingsPanel.tsx")).toContain("Track employee contracts, renewals, probation periods, linked contract documents, and contract expiry alerts.");
+    expect(read("frontend/src/features/settings/FeatureSettingsPanel.tsx")).toContain("Disabling this module hides it from normal use but does not delete existing contract records.");
+    expect(read("frontend/src/features/settings/FeatureSettingsPanel.tsx")).toContain("Track employee attendance, lateness, absences, corrections, biometric/kiosk entries, and attendance-based payroll review.");
+    expect(read("frontend/src/features/settings/FeatureSettingsPanel.tsx")).toContain("Disabling this module hides it from normal use but does not delete existing attendance records.");
+    expect(read("frontend/src/features/settings/structured-settings.ts")).toContain("Attendance Sub-Features");
+    expect(read("frontend/src/features/settings/structured-settings.ts")).toContain("Payroll Deductions from Attendance");
+    expect(read("frontend/src/features/settings/structured-settings.ts")).not.toContain("Manual attendance allowed");
+    expect(read("frontend/src/features/settings/structured-settings.ts")).not.toContain("Attendance correction allowed");
+    expect(read("frontend/src/features/settings/structured-settings.ts")).not.toContain("Kiosk attendance enabled");
+    expect(read("frontend/src/features/settings/structured-settings.ts")).not.toContain("Biometric attendance enabled");
+    expect(read("frontend/src/features/settings/structured-settings.ts")).not.toContain("Absent day deduction rule");
+    expect(read("frontend/src/features/attendance/useAttendanceSubFeatures.ts")).toContain("attendanceApi.subFeatures");
+    expect(read("frontend/src/features/attendance/AttendancePage.tsx")).toContain("attendanceSubFeatures.manualEntryEnabled && auth.hasAnyPermission");
+    expect(read("frontend/src/features/attendance/AttendancePage.tsx")).toContain("attendanceSubFeatures.correctionsEnabled && auth.hasAnyPermission");
+    expect(read("frontend/src/features/attendance/AttendanceCorrectionsPage.tsx")).toContain("attendanceSubFeatures.correctionsEnabled && auth.hasAnyPermission");
+    expect(read("frontend/src/features/devices/KioskDevicesPage.tsx")).toContain("attendanceSubFeatures.kioskEnabled && auth.hasAnyPermission");
+    expect(read("frontend/src/features/biometric/BiometricPage.tsx")).toContain("attendanceSubFeatures.biometricEnabled && auth.hasPermission");
+    expect(read("frontend/src/features/payroll-reports/PayrollReportsPage.tsx")).toContain("attendanceSubFeatures.payrollDeductionsEnabled");
+    expect(read("frontend/src/features/payroll/PayrollItemDetailDrawer.tsx")).toContain("attendanceSubFeatures.payrollDeductionsEnabled");
+    expect(read("frontend/src/features/bootstrap/FirstTimeSetupForm.tsx")).toContain("Disabled by choice: Duty Roster setup tasks will be skipped until the module is enabled in Settings.");
+    expect(read("frontend/src/features/bootstrap/FirstTimeSetupForm.tsx")).toContain("Disabled by choice: Contract Tracking setup tasks will be skipped until the module is enabled in Settings.");
+    expect(read("frontend/src/features/bootstrap/FirstTimeSetupForm.tsx")).toContain("Disabled by choice: Attendance records stay safe");
     expect(read("frontend/src/features/employees/Employee360Page.tsx")).toContain("canViewLeave");
     expect(read("frontend/src/features/employees/Employee360Page.tsx")).toContain("canViewLongLeave");
     expect(read("frontend/src/features/employees/Employee360Page.tsx")).toContain("canViewAssetsUniforms");
+    expect(read("frontend/src/features/employees/Employee360Page.tsx")).toContain('auth.hasFeature("contract_tracking")');
+    expect(read("frontend/src/features/employees/Employee360Page.tsx")).toContain("canViewAttendance");
     expect(read("frontend/src/features/import-export/ImportExportPage.tsx")).toContain("visibleExportTypes");
     expect(read("frontend/src/features/hr-reports/HrReportsPage.tsx")).toContain("visibleCategories");
     expect(read("frontend/src/features/payroll-reports/PayrollReportsPage.tsx")).toContain("visibleCategories");
     expect(read("src/modules/hr-reports/hr-reports.service.ts")).toContain("LEAVE_MANAGEMENT_DISABLED");
+    expect(read("src/modules/hr-reports/hr-reports.service.ts")).toContain("CONTRACT_TRACKING_DISABLED");
+    expect(read("src/modules/report-exports/report-exports.service.ts")).toContain("CONTRACT_TRACKING_DISABLED");
+    expect(read("src/modules/report-exports/report-exports.service.ts")).toContain("ATTENDANCE_PAYROLL_DEDUCTIONS_DISABLED");
+    expect(read("frontend/src/features/contracts/ContractFormDialog.tsx")).toContain("Document Tracking is disabled. Contract metadata can be saved");
+    expect(read("frontend/src/features/contracts/ContractDocumentAction.tsx")).toContain("linked document download requires Document Tracking");
     expect(read("src/modules/payroll-reports/payroll-reports.service.ts")).toContain("LONG_LEAVE_MANAGEMENT_DISABLED");
     expect(read("src/modules/report-exports/report-exports.service.ts")).toContain("ASSETS_UNIFORMS_REPORT_DISABLED");
     expect(read("src/modules/import-export/export-job.service.ts")).toContain("ASSET_TRACKING_DISABLED");
     expect(read("src/modules/import-export/export-job.service.ts")).toContain("LEAVE_MANAGEMENT_DISABLED");
+    expect(read("src/modules/import-export/export-job.service.ts")).toContain("ATTENDANCE_MANAGEMENT_DISABLED");
     expect(read("src/modules/imports/imports.service.ts")).toContain("ASSETS_UNIFORMS_IMPORT_DISABLED");
     expect(read("src/modules/imports/imports.service.ts")).toContain("LEAVE_MANAGEMENT_DISABLED");
+    expect(read("src/modules/imports/imports.service.ts")).toContain("assertAttendanceImportEnabled");
+    expect(read("src/modules/payroll/payroll.service.ts")).toContain("attendancePayrollDeductionsEnabled");
+    expect(read("src/modules/payroll/payroll.calculator.ts")).toContain('"attendance.payroll_deductions_enabled"');
   });
 });

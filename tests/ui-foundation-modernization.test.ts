@@ -47,7 +47,7 @@ describe("Phase 1 UI foundation and visibility guards", () => {
     const navigation = read("frontend/src/lib/navigation.ts");
 
     expect(navigation).toContain('label: "Leave"');
-    expect(navigation).toContain('moduleCode: "leave"');
+    expect(navigation).toContain('moduleCode: "leave_management"');
     expect(navigation).toContain('label: "My Leave"');
   });
 
@@ -80,6 +80,7 @@ describe("Phase 1 UI foundation and visibility guards", () => {
     const navigation = read("frontend/src/lib/navigation.ts");
 
     expect(navigation).toContain('moduleCode: "roster"');
+    expect(navigation).toContain('moduleCodesAll: ["employees", "contract_tracking"]');
     expect(navigation).toContain('moduleCode: "resignation_offboarding"');
     expect(navigation).toContain('moduleCode: "disciplinary_actions"');
   });

@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/features/auth/auth.store";
+import { useAttendanceSubFeatures } from "@/features/attendance/useAttendanceSubFeatures";
 import { searchParamNumber } from "@/lib/query-string";
 import { friendlyOperationalError, sanitizeForDisplay } from "@/lib/safe-display";
 import { biometricApi } from "./biometric.api";
@@ -40,6 +41,7 @@ export const BiometricPage = () => {
   const [reasonAction, setReasonAction] = useState<"device-status" | "rotate" | "revoke" | "disable-mapping" | "reject-log" | null>(null);
   const [oneTimeToken, setOneTimeToken] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const attendanceSubFeatures = useAttendanceSubFeatures();
 
   const filters = useMemo<BiometricFilters>(() => ({
     search: searchParams.get("search") || undefined,
@@ -73,10 +75,10 @@ export const BiometricPage = () => {
     setSearchParams(params);
   };
 
-  const devicesQuery = useQuery({ queryKey: ["biometric", "devices", filters], queryFn: () => biometricApi.listDevices(filters) });
-  const mappingsQuery = useQuery({ queryKey: ["biometric", "mappings", filters], queryFn: () => biometricApi.listMappings(filters) });
-  const logsQuery = useQuery({ queryKey: ["biometric", "logs", filters], queryFn: () => biometricApi.listLogs(filters) });
-  const unmatchedQuery = useQuery({ queryKey: ["biometric", "unmatched", filters], queryFn: () => biometricApi.listUnmatched(filters) });
+  const devicesQuery = useQuery({ queryKey: ["biometric", "devices", filters], queryFn: () => biometricApi.listDevices(filters), enabled: attendanceSubFeatures.biometricEnabled });
+  const mappingsQuery = useQuery({ queryKey: ["biometric", "mappings", filters], queryFn: () => biometricApi.listMappings(filters), enabled: attendanceSubFeatures.biometricEnabled });
+  const logsQuery = useQuery({ queryKey: ["biometric", "logs", filters], queryFn: () => biometricApi.listLogs(filters), enabled: attendanceSubFeatures.biometricEnabled });
+  const unmatchedQuery = useQuery({ queryKey: ["biometric", "unmatched", filters], queryFn: () => biometricApi.listUnmatched(filters), enabled: attendanceSubFeatures.biometricEnabled });
 
   const refresh = async () => queryClient.invalidateQueries({ queryKey: ["biometric"] });
 
@@ -151,11 +153,21 @@ export const BiometricPage = () => {
     },
   });
 
-  const canManageDevices = auth.hasPermission("biometric.manage_devices");
-  const canMap = auth.hasPermission("biometric.map_employee");
-  const canResolve = auth.hasAnyPermission(["biometric.resolve_punches", "biometric.resolve_unmatched", "biometric.sync"]);
+  const canManageDevices = attendanceSubFeatures.biometricEnabled && auth.hasPermission("biometric.manage_devices");
+  const canMap = attendanceSubFeatures.biometricEnabled && auth.hasPermission("biometric.map_employee");
+  const canResolve = attendanceSubFeatures.biometricEnabled && auth.hasAnyPermission(["biometric.resolve_punches", "biometric.resolve_unmatched", "biometric.sync"]);
 
   const actionError = deviceMutation.error ?? deviceReasonMutation.error ?? mappingMutation.error ?? disableMappingMutation.error ?? reprocessMutation.error ?? rejectLogMutation.error;
+
+  if (!attendanceSubFeatures.biometricEnabled) {
+    return (
+      <div className="p-4 md:p-6">
+        <InlineAlert title="Biometric Attendance is disabled." variant="warning">
+          Biometric setup, sync, import, mapping, and punch resolution actions are hidden until this attendance sub-feature is enabled.
+        </InlineAlert>
+      </div>
+    );
+  }
 
   return (
     <div>

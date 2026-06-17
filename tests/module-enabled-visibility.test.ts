@@ -21,7 +21,7 @@ describe("module-enabled visibility controls", () => {
     expect(navigation).toContain("canShowModuleItem");
     expect(read("frontend/src/lib/moduleAccess.ts")).toContain("isModuleEnabled(user, moduleCode)");
     expect(navigation).toContain('label: "My Leave"');
-    expect(navigation).toContain('moduleCode: "leave"');
+    expect(navigation).toContain('moduleCode: "leave_management"');
     expect(navigation).toContain('label: "My Attendance"');
     expect(navigation).toContain('moduleCode: "attendance"');
     expect(navigation).toContain('label: "Payroll"');
@@ -32,6 +32,8 @@ describe("module-enabled visibility controls", () => {
     expect(navigation).toContain('moduleCode: "documents_kyc"');
     expect(navigation).toContain('label: "Duty Rosters"');
     expect(navigation).toContain('moduleCode: "roster"');
+    expect(navigation).toContain('label: "Contracts"');
+    expect(navigation).toContain('moduleCodesAll: ["employees", "contract_tracking"]');
     expect(navigation).toContain('label: "Offboarding"');
     expect(navigation).toContain('moduleCode: "resignation_offboarding"');
     expect(navigation).toContain('label: "Disciplinary Actions"');
@@ -45,9 +47,10 @@ describe("module-enabled visibility controls", () => {
 
     expect(guards).toContain("moduleCode?: string");
     expect(guards).toContain("isModuleEnabled(user, moduleCode ?? requiredFeature)");
-    expect(router).toContain('moduleCode: "leave"');
+    expect(router).toContain('moduleCode: "leave_management"');
     expect(router).toContain('moduleCode: "attendance"');
     expect(router).toContain('moduleCode: "roster"');
+    expect(router).toContain('moduleName: "Contract Tracking"');
     expect(router).toContain('moduleCode: "documents_kyc"');
     expect(router).toContain('moduleCode: "advance_salary"');
     expect(router).toContain('moduleCode: "resignation_offboarding"');
@@ -74,6 +77,7 @@ describe("module-enabled visibility controls", () => {
     expect(employeesRoutes).toContain('requireFeature("resignation_offboarding")');
     expect(advancesRoutes).toContain('requireFeature("advance_salary")');
     expect(operationOwnershipRoutes).toContain('requireFeature("operation_ownership")');
+    expect(read("src/routes/contracts.routes.ts")).toContain('requireFeature("contract_tracking")');
   });
 
   it("seeds dedicated module switches and gates dashboard quick actions by enabled modules", () => {

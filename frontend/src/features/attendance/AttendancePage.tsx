@@ -25,6 +25,7 @@ import { AttendanceSummaryTable } from "./AttendanceSummaryTable";
 import { CorrectionRequestDialog } from "./CorrectionRequestDialog";
 import { ManualAttendanceBatchDialog } from "./ManualAttendanceBatchDialog";
 import { EmployeeAttendanceCalendarWidget } from "@/features/attendance-calendar/EmployeeAttendanceCalendarWidget";
+import { useAttendanceSubFeatures } from "./useAttendanceSubFeatures";
 import type {
   AttendanceConflict,
   AttendanceEvent,
@@ -65,6 +66,7 @@ export const AttendancePage = () => {
   const [reasonDialog, setReasonDialog] = useState<"resolve" | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [manualBatchResult, setManualBatchResult] = useState<ManualAttendanceBatchResult | undefined>();
+  const attendanceSubFeatures = useAttendanceSubFeatures();
 
   const filters = useMemo<AttendanceFilterValues>(() => ({
     date_from: searchParams.get("date_from") || isoDate(startOfWeek),
@@ -136,12 +138,12 @@ export const AttendancePage = () => {
     },
   });
 
-  const canManualEntry = auth.hasAnyPermission(["attendance.manual_entry", "attendance.edit"]);
-  const canRequestCorrection = auth.hasAnyPermission(["attendance.manual_entry", "attendance.edit"]);
+  const canManualEntry = attendanceSubFeatures.manualEntryEnabled && auth.hasAnyPermission(["attendance.manual_entry", "attendance.edit"]);
+  const canRequestCorrection = attendanceSubFeatures.correctionsEnabled && auth.hasAnyPermission(["attendance.corrections.create", "attendance.corrections.createForOthers", "attendance.manual_entry", "attendance.edit"]);
   const canResolveConflict = auth.hasPermission("attendance.resolve_conflicts");
   const canViewCalendar = auth.hasFeature("attendance") && auth.hasAnyPermission(["attendance.calendar.view", "attendance.calendar.viewTeam", "attendance.calendar.viewAll", "attendance.view", "attendance.reports.view"]);
   const canViewReports = auth.hasFeature("attendance") && auth.hasAnyPermission(["attendance.reports.view", "attendance.view"]);
-  const canViewCorrections = auth.hasFeature("attendance") && auth.hasAnyPermission(["attendance.corrections.view", "attendance.view", "approvals.requests.view"]);
+  const canViewCorrections = attendanceSubFeatures.correctionsEnabled && auth.hasFeature("attendance") && auth.hasAnyPermission(["attendance.corrections.view", "attendance.view", "approvals.requests.view"]);
   const visibleTab = tab === "calendar" && !canViewCalendar ? "summary" : tab;
 
   const selectedEvents = selectedSummary
@@ -160,6 +162,11 @@ export const AttendancePage = () => {
     <div>
       <div className="space-y-4 p-4 md:p-6">
         {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
+        {attendanceSubFeatures.isError ? (
+          <InlineAlert title="Attendance sub-feature settings could not be loaded." variant="warning">
+            Backend guards still enforce disabled attendance workflows before any change is saved.
+          </InlineAlert>
+        ) : null}
         {(summaryQuery.isError || eventsQuery.isError || conflictsQuery.isError) ? (
           <InlineAlert title="Attendance records could not be loaded." variant="error">Please adjust filters or try again.</InlineAlert>
         ) : null}
@@ -271,7 +278,7 @@ export const AttendancePage = () => {
           />
         ) : null}
       </DetailDrawer>
-      <ManualAttendanceBatchDialog
+      {attendanceSubFeatures.manualEntryEnabled ? <ManualAttendanceBatchDialog
         open={manualOpen}
         initial={{ outlet_id: selectedSummary?.outlet_id, employee_id: selectedSummary?.employee_id, attendance_date: selectedSummary?.attendance_date ?? selectedSummary?.date }}
         loading={manualMutation.isPending}
@@ -282,15 +289,15 @@ export const AttendancePage = () => {
           if (!open) setManualBatchResult(undefined);
         }}
         onSubmit={(payload: ManualAttendanceBatchPayload) => manualMutation.mutate(payload)}
-      />
-      <CorrectionRequestDialog
+      /> : null}
+      {attendanceSubFeatures.correctionsEnabled ? <CorrectionRequestDialog
         open={correctionOpen}
         initial={{ outlet_id: selectedSummary?.outlet_id, employee_id: selectedSummary?.employee_id, attendance_date: selectedSummary?.attendance_date ?? selectedSummary?.date }}
         loading={correctionMutation.isPending}
         error={correctionMutation.error}
         onOpenChange={setCorrectionOpen}
         onSubmit={(payload) => correctionMutation.mutate(payload as CorrectionRequestPayload)}
-      />
+      /> : null}
       <CorrectionRequestDialog
         open={Boolean(reasonDialog)}
         mode="reason"

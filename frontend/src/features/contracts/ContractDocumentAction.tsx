@@ -12,7 +12,8 @@ const safeFileName = (document: NonNullable<EmployeeContract["document"]>) =>
 export const ContractDocumentAction = ({ contract, compact = false }: { contract: EmployeeContract; compact?: boolean }) => {
   const auth = useAuth();
   const document = contract.document;
-  const canDownload = auth.isSuperAdmin || auth.hasPermission("documents.download");
+  const documentTrackingEnabled = auth.hasFeature("documents");
+  const canDownload = documentTrackingEnabled && (auth.isSuperAdmin || auth.hasPermission("documents.download"));
   const mutation = useMutation({
     mutationFn: async () => {
       if (!document?.id) throw new Error("Contract document is not linked.");
@@ -30,6 +31,21 @@ export const ContractDocumentAction = ({ contract, compact = false }: { contract
   });
 
   if (!document?.id) return <span className="text-muted-foreground">Missing</span>;
+
+  if (!documentTrackingEnabled) {
+    return (
+      <Button
+        type="button"
+        variant={compact ? "ghost" : "outline"}
+        size={compact ? "sm" : "default"}
+        disabled
+        title="Document Tracking is disabled. Contract metadata remains available, but linked document download requires Document Tracking."
+      >
+        <Download className="h-4 w-4" />
+        View Document
+      </Button>
+    );
+  }
 
   if (!canDownload) {
     return (

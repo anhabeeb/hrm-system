@@ -219,6 +219,30 @@ const requireCatalogItem = (reportKey: string) => {
   return item;
 };
 
+const attendancePayrollDeductionsEnabled = async (env: Env, actor: AuthActor) => {
+  const attendanceEnabled = await settingsService.isFeatureEnabled(env, actor.companyId, "attendance", actor);
+  if (!attendanceEnabled) return false;
+  const attendanceSettings = await settingsService.getAttendanceSettings(env, actor.companyId).catch(() => ({})) as Record<string, unknown>;
+  const configured =
+    attendanceSettings["attendance.payroll_deductions_enabled"] ??
+    attendanceSettings.absent_day_deduction_enabled ??
+    attendanceSettings.deduct_absent_days;
+  return configured !== false;
+};
+
+const moduleEnabledForCatalogItem = async (env: Env, actor: AuthActor, item: ReportExportCatalogItem) => {
+  if (item.category === "attendance" || item.report_key.startsWith("attendance:") || item.report_key === "payroll:overtime") {
+    return settingsService.isFeatureEnabled(env, actor.companyId, "attendance", actor);
+  }
+  if (item.report_key === "payroll:attendance-deductions") {
+    return attendancePayrollDeductionsEnabled(env, actor);
+  }
+  if (item.report_key === "hr:contracts") {
+    return settingsService.isFeatureEnabled(env, actor.companyId, "contract_tracking", actor);
+  }
+  return true;
+};
+
 const requireBoundedExport = (reportKey: string, filters: Record<string, unknown>, format: ReportExportFormat): Record<string, unknown> => {
   const hasDate = Boolean(filters.from_date || filters.to_date || filters.date || filters.month || filters.payroll_month || filters.as_of_date || filters.employee_id);
   const historyHeavy = /audit|lifecycle|history|device_punches|exceptions|employee_detail/.test(reportKey);
@@ -276,6 +300,12 @@ const runReport = async (
   const filters = requireBoundedExport(item.report_key, filtersInput, format);
   const [namespace, key] = item.report_key.split(":");
   if (namespace === "hr") {
+    if (key === "contracts") {
+      const contractTrackingEnabled = await settingsService.isFeatureEnabled(env, actor.companyId, "contract_tracking", actor);
+      if (!contractTrackingEnabled) {
+        throw new AppError("Contract Tracking is disabled. Enable it in Settings to use this module.", "CONTRACT_TRACKING_DISABLED", 403);
+      }
+    }
     if (key === "leave-balances" || key === "leave-requests") {
       const leaveEnabled = await settingsService.isFeatureEnabled(env, actor.companyId, "leave_management", actor);
       if (!leaveEnabled) {
@@ -301,6 +331,17 @@ const runReport = async (
     return normalizeDataResult(item, actor, await hrReports.runReport(env, actor, key, validated), { ...validated });
   }
   if (namespace === "payroll") {
+    if (key === "attendance-deductions") {
+      if (!(await attendancePayrollDeductionsEnabled(env, actor))) {
+        throw new AppError("Attendance Payroll Deductions are disabled. Enable them in Attendance Settings to use this report.", "ATTENDANCE_PAYROLL_DEDUCTIONS_DISABLED", 403);
+      }
+    }
+    if (key === "overtime") {
+      const attendanceEnabled = await settingsService.isFeatureEnabled(env, actor.companyId, "attendance", actor);
+      if (!attendanceEnabled) {
+        throw new AppError("Attendance Management is disabled. Enable it in Settings to use this module.", "ATTENDANCE_MANAGEMENT_DISABLED", 403);
+      }
+    }
     if (key === "leave-deductions") {
       const leaveEnabled = await settingsService.isFeatureEnabled(env, actor.companyId, "leave_management", actor);
       if (!leaveEnabled) {
@@ -317,6 +358,10 @@ const runReport = async (
     return normalizeDataResult(item, actor, await payrollReports.runReport(env, actor, key, validated), { ...validated });
   }
   if (namespace === "attendance") {
+    const attendanceEnabled = await settingsService.isFeatureEnabled(env, actor.companyId, "attendance", actor);
+    if (!attendanceEnabled) {
+      throw new AppError("Attendance Management is disabled. Enable it in Settings to use this module.", "ATTENDANCE_MANAGEMENT_DISABLED", 403);
+    }
     const reportKind = key as any;
     const queryInput = Object.fromEntries(Object.entries(filters).map(([filterKey, value]) => [filterKey, value === undefined || value === null ? undefined : String(value)])) as Record<string, string | undefined>;
     const validated = validateAttendanceReportFilters(queryInput, reportKind);
@@ -361,10 +406,18 @@ const flattenEmployeeProfile = (profile: any) => {
   return rows;
 };
 
-export const getExportCatalog = (actor: AuthActor) => ({
-  data: allCatalog().filter((item) => canExportCatalogItem(actor, item)),
-  generated_at: new Date().toISOString(),
-});
+export const getExportCatalog = async (env: Env, actor: AuthActor) => {
+  const items = await Promise.all(
+    allCatalog().map(async (item) => ({
+      item,
+      enabled: await moduleEnabledForCatalogItem(env, actor, item),
+    })),
+  );
+  return {
+    data: items.filter(({ item, enabled }) => enabled && canExportCatalogItem(actor, item)).map(({ item }) => item),
+    generated_at: new Date().toISOString(),
+  };
+};
 
 export const previewExport = async (env: Env, actor: AuthActor, input: ReportExportPreviewInput) => {
   const item = requireCatalogItem(input.report_key);

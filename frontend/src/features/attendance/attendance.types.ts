@@ -310,6 +310,14 @@ export interface ReasonPayload {
   notes?: string;
 }
 
+export interface AttendanceSubFeatureVisibility {
+  manual_entry_enabled: boolean;
+  kiosk_enabled: boolean;
+  biometric_enabled: boolean;
+  corrections_enabled: boolean;
+  payroll_deductions_enabled: boolean;
+}
+
 export interface PaginatedResult<T> {
   data: T[];
   pagination?: Pagination;

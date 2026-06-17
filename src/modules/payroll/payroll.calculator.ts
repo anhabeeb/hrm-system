@@ -687,7 +687,7 @@ export const parsePayrollSettings = (settings: Record<string, unknown>): Payroll
     requireActiveSalaryRecord: boolSetting(settings, "require_active_salary_record", true),
     roundingMethod: (["none", "nearest_lari", "nearest_rufiyaa", "round_down", "round_up"].includes(roundingMethod) ? roundingMethod : "none") as PayrollCalculationSettings["roundingMethod"],
     negativeNetPayPolicy: (["block", "allow", "carry_forward_excess_deduction"].includes(negativeNetPayPolicy) ? negativeNetPayPolicy : "block") as PayrollCalculationSettings["negativeNetPayPolicy"],
-    deductAbsentDays: boolSetting(settings, "absent_day_deduction_enabled", settings.deduct_absent_days !== false),
+    deductAbsentDays: boolSetting(settings, "attendance.payroll_deductions_enabled", boolSetting(settings, "absent_day_deduction_enabled", settings.deduct_absent_days !== false)),
     deductLateMinutes: settings.deduct_late_minutes === true,
     deductEarlyCheckout: settings.deduct_early_checkout === true,
     allowNegativeSalary: negativeNetPayPolicy === "allow",

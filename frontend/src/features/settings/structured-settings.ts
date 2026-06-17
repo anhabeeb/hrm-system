@@ -79,12 +79,24 @@ export const settingsPageDefinitions: Record<string, SettingsPageDefinition> = {
     ],
   },
   attendance: {
-    title: "Attendance",
-    description: "Attendance edit, correction, kiosk, biometric, and payroll-lock controls.",
+    title: "Attendance Management",
+    description: "Track employee attendance, lateness, absences, corrections, biometric/kiosk entries, and attendance-based payroll review.",
     group: "attendance",
     endpointPath: "attendance",
     managePermission: "attendance.settings.manage",
     sections: [
+      {
+        title: "Attendance Sub-Features",
+        description: "Enable only the attendance workflows your company is actively using. These controls are ignored while Attendance Management is disabled.",
+        settingKey: "attendance.default_rules",
+        fields: [
+          { key: "attendance.manual_entry_enabled", label: "Manual Attendance", type: "switch", help: "Allow authorized users to enter or adjust attendance manually." },
+          { key: "attendance.kiosk_enabled", label: "Kiosk Attendance", type: "switch", help: "Allow kiosk check-in/check-out flows and kiosk device setup." },
+          { key: "attendance.biometric_enabled", label: "Biometric Attendance", type: "switch", help: "Allow biometric device setup, sync, and imported punch processing." },
+          { key: "attendance.corrections_enabled", label: "Attendance Corrections", type: "switch", help: "Allow employees/managers to request, approve, or reject attendance corrections." },
+          { key: "attendance.payroll_deductions_enabled", label: "Payroll Deductions from Attendance", type: "switch", help: "Allow new absent, late, and missing-punch deductions to flow into payroll review." },
+        ],
+      },
       {
         title: "Time Rules",
         settingKey: "attendance.default_rules",
@@ -98,12 +110,10 @@ export const settingsPageDefinitions: Record<string, SettingsPageDefinition> = {
         ],
       },
       {
-        title: "Manual Attendance and Corrections",
+        title: "Manual Attendance and Correction Rules",
+        description: "Workflow enablement is controlled in Attendance Sub-Features above; these fields only tune the enabled workflows.",
         settingKey: "attendance.default_rules",
         fields: [
-          { key: "manual_attendance_enabled", label: "Manual attendance allowed", type: "switch" },
-          { key: "batch_manual_attendance_enabled", label: "Batch manual attendance allowed", type: "switch" },
-          { key: "attendance_correction_enabled", label: "Attendance correction allowed", type: "switch" },
           { key: "correction_approval_required", label: "Correction approval required", type: "switch" },
           { key: "correction_deadline_days", label: "Correction deadline days", type: "number" },
           { key: "require_outlet_for_manual_attendance", label: "Require outlet for manual attendance", type: "switch" },
@@ -115,8 +125,6 @@ export const settingsPageDefinitions: Record<string, SettingsPageDefinition> = {
         settingKey: "attendance.default_rules",
         fields: [
           { key: "payroll_lock_prevents_attendance_edits", label: "Payroll lock prevents attendance edits", type: "switch" },
-          { key: "kiosk_mode_enabled", label: "Kiosk attendance enabled", type: "switch" },
-          { key: "biometric_enabled", label: "Biometric attendance enabled", type: "switch" },
           { key: "allow_overtime", label: "Overtime enabled", type: "switch" },
           { key: "overtime_requires_approval", label: "Overtime approval required", type: "switch" },
           { key: "overtime_rounding_minutes", label: "Overtime rounding minutes", type: "number" },
@@ -218,7 +226,6 @@ export const settingsPageDefinitions: Record<string, SettingsPageDefinition> = {
         fields: [
           { key: "salary_source", label: "Salary source", type: "text", help: "Payroll continues to use employee_salary_history." },
           { key: "salary_calculation_basis", label: "Daily rate calculation method", type: "select", options: [{ label: "Calendar days", value: "calendar_days" }, { label: "Fixed 30 days", value: "fixed_30_days" }, { label: "Working days", value: "working_days" }, { label: "Custom days", value: "custom_days" }] },
-          { key: "deduct_absent_days", label: "Absent day deduction rule", type: "switch" },
           { key: "unpaid_leave_deduction_enabled", label: "Unpaid leave deduction rule", type: "switch" },
           { key: "long_leave_deduction_rule", label: "Long leave deduction rule", type: "text" },
           { key: "rounding_rule", label: "Rounding rule", type: "select", options: [{ label: "Round nearest", value: "nearest" }, { label: "Round down", value: "down" }, { label: "Round up", value: "up" }] },

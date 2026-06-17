@@ -77,6 +77,13 @@ export const summary = async (c: Context<AppContext>) => {
   return paginated(result.rows, result.pagination, "Attendance summary loaded successfully.", { requestId: c.get("requestId") });
 };
 
+export const subFeatures = async (c: Context<AppContext>) =>
+  ok(
+    { subfeatures: await service.getAttendanceSubFeatures(c.env, actor(c)) },
+    "Attendance sub-features loaded successfully.",
+    { requestId: c.get("requestId") },
+  );
+
 export const listEvents = async (c: Context<AppContext>) => {
   const result = await service.listAttendanceEvents(c.env, actor(c), filters(c));
   return paginated(result.rows, result.pagination, "Attendance events loaded successfully.", { requestId: c.get("requestId") });

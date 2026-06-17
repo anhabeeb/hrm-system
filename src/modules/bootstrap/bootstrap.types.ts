@@ -19,10 +19,17 @@ export interface BootstrapOutletInput {
   is_primary?: boolean;
 }
 
+export interface BootstrapFeatureSelections {
+  attendance?: boolean;
+  roster?: boolean;
+  contract_tracking?: boolean;
+}
+
 export interface BootstrapInitializeInput {
   company: BootstrapCompanyInput;
   super_admin: BootstrapSuperAdminInput;
   outlet?: BootstrapOutletInput;
+  features?: BootstrapFeatureSelections;
 }
 
 export interface BootstrapStatus {

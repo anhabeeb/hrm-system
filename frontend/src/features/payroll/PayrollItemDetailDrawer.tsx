@@ -2,6 +2,7 @@ import { DetailDrawer } from "@/components/data/DetailDrawer";
 import { DetailSection } from "@/components/data/DetailSection";
 import { MoneyAmount } from "@/components/data/MoneyAmount";
 import { StatusBadge } from "@/components/data/StatusBadge";
+import { useAttendanceSubFeatures } from "@/features/attendance/useAttendanceSubFeatures";
 import type { PayrollItem } from "./payroll.types";
 
 type PayrollMetadata = {
@@ -82,6 +83,7 @@ export const PayrollItemDetailDrawer = ({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) => {
+  const attendanceSubFeatures = useAttendanceSubFeatures();
   const metadata = parseMetadata(item?.calculation_metadata_json);
   const compensation = metadata.compensation_summary ?? {};
   const components = metadata.compensation_components ?? [];
@@ -201,7 +203,7 @@ export const PayrollItemDetailDrawer = ({
                 label: "Leave and attendance deductions",
                 value: (
                   <div className="grid gap-2 md:grid-cols-2">
-                    <AmountLine label="Absent-day deductions" amount={compensation.attendance_deductions} />
+                    {attendanceSubFeatures.payrollDeductionsEnabled ? <AmountLine label="Absent-day deductions" amount={compensation.attendance_deductions} /> : null}
                     <AmountLine label="Unpaid leave deductions" amount={compensation.unpaid_leave_deductions} />
                   </div>
                 ),

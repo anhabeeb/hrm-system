@@ -8,6 +8,7 @@ import { DetailDrawer } from "@/components/data/DetailDrawer";
 import { DetailSection } from "@/components/data/DetailSection";
 import { RowActions } from "@/components/data/RowActions";
 import { StatusBadge } from "@/components/data/StatusBadge";
+import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { useToast } from "@/components/feedback/useToast";
 import { AppDateRangePicker } from "@/components/forms/AppDateRangePicker";
 import { PageActionBar } from "@/components/layout/PageActionBar";
@@ -22,6 +23,7 @@ import type { TableColumn } from "@/types/common";
 import { attendanceApi } from "./attendance.api";
 import { formatDate, humanize } from "./attendance-format";
 import { CorrectionRequestDialog } from "./CorrectionRequestDialog";
+import { useAttendanceSubFeatures } from "./useAttendanceSubFeatures";
 import type { AttendanceCorrection, AttendanceFilters, CorrectionRequestPayload, ReasonPayload } from "./attendance.types";
 
 const columns: TableColumn<AttendanceCorrection>[] = [
@@ -43,6 +45,7 @@ export const AttendanceCorrectionsPage = () => {
   const [detailOpen, setDetailOpen] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
   const [reasonDialog, setReasonDialog] = useState<"approve" | "reject" | "cancel" | null>(null);
+  const attendanceSubFeatures = useAttendanceSubFeatures();
 
   const filters = useMemo<AttendanceFilters>(() => ({
     outlet_id: searchParams.get("outlet_id") || undefined,
@@ -119,15 +122,20 @@ export const AttendanceCorrectionsPage = () => {
   });
 
   const canCreateForOthers = auth.isSuperAdmin || auth.hasPermission("attendance.corrections.createForOthers");
-  const canRequest = auth.hasAnyPermission(["attendance.corrections.create", "attendance.corrections.createForOthers", "attendance.manual_entry", "attendance.edit"]);
-  const canApprove = auth.hasAnyPermission(["attendance.corrections.approve", "attendance.approve_correction", "approvals.department.approve", "approvals.hrFinal.approve"]);
-  const canReject = auth.hasAnyPermission(["attendance.corrections.reject", "attendance.reject_correction", "approvals.department.reject", "approvals.hrFinal.reject"]);
-  const canCancel = auth.hasAnyPermission(["attendance.corrections.cancel", "attendance.corrections.cancelAny", "approvals.requests.cancel", "approvals.requests.cancelAny"]);
+  const canRequest = attendanceSubFeatures.correctionsEnabled && auth.hasAnyPermission(["attendance.corrections.create", "attendance.corrections.createForOthers", "attendance.manual_entry", "attendance.edit"]);
+  const canApprove = attendanceSubFeatures.correctionsEnabled && auth.hasAnyPermission(["attendance.corrections.approve", "attendance.approve_correction", "approvals.department.approve", "approvals.hrFinal.approve"]);
+  const canReject = attendanceSubFeatures.correctionsEnabled && auth.hasAnyPermission(["attendance.corrections.reject", "attendance.reject_correction", "approvals.department.reject", "approvals.hrFinal.reject"]);
+  const canCancel = attendanceSubFeatures.correctionsEnabled && auth.hasAnyPermission(["attendance.corrections.cancel", "attendance.corrections.cancelAny", "approvals.requests.cancel", "approvals.requests.cancelAny"]);
 
   return (
     <div>
       {canRequest ? <PageActionBar label="Time corrections page actions"><Button onClick={() => setRequestOpen(true)}><Plus className="h-4 w-4" />Add correction request</Button></PageActionBar> : null}
       <div className="space-y-4 p-4 md:p-6">
+        {!attendanceSubFeatures.correctionsEnabled ? (
+          <InlineAlert title="Attendance Corrections are disabled." variant="warning">
+            Historical correction records remain visible where permitted, but request, approval, rejection, and cancellation actions are hidden.
+          </InlineAlert>
+        ) : null}
         <div className="grid gap-3 rounded-lg border bg-card p-4 md:grid-cols-5">
           <Label className="space-y-1.5 text-sm">Outlet<OutletCombobox value={filters.outlet_id} onChange={(value) => updateFilters({ outlet_id: value, employee_id: undefined })} placeholder="All accessible outlets" /></Label>
           <Label className="space-y-1.5 text-sm">Employee<EmployeeCombobox value={filters.employee_id} outletId={filters.outlet_id} onChange={(value) => updateFilters({ employee_id: value })} placeholder="All employees" /></Label>
@@ -187,7 +195,7 @@ export const AttendanceCorrectionsPage = () => {
           </div>
         ) : null}
       </DetailDrawer>
-      <CorrectionRequestDialog
+      {attendanceSubFeatures.correctionsEnabled ? <CorrectionRequestDialog
         open={requestOpen}
         loading={correctionMutation.isPending}
         error={correctionMutation.error}
@@ -195,8 +203,8 @@ export const AttendanceCorrectionsPage = () => {
         currentEmployeeId={auth.user?.employee_id ?? null}
         onOpenChange={setRequestOpen}
         onSubmit={(payload) => correctionMutation.mutate(payload as CorrectionRequestPayload)}
-      />
-      <CorrectionRequestDialog
+      /> : null}
+      {attendanceSubFeatures.correctionsEnabled ? <CorrectionRequestDialog
         open={Boolean(reasonDialog)}
         mode="reason"
         title={reasonDialog === "approve" ? "Approve correction" : reasonDialog === "reject" ? "Reject correction" : "Cancel correction"}
@@ -210,7 +218,7 @@ export const AttendanceCorrectionsPage = () => {
           if (reasonDialog === "reject" && selected) rejectMutation.mutate({ id: selected.id, payload: reasonPayload });
           if (reasonDialog === "cancel" && selected) cancelMutation.mutate({ id: selected.id, payload: reasonPayload });
         }}
-      />
+      /> : null}
     </div>
   );
 };

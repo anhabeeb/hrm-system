@@ -39,6 +39,11 @@ const defaults: SetupValues = {
   outlet_name: "",
   outlet_code: "",
   is_primary: true,
+  features: {
+    attendance: true,
+    roster: true,
+    contract_tracking: true,
+  },
   bootstrap_token: "",
 };
 
@@ -63,6 +68,11 @@ const toPayload = (values: SetupValues): BootstrapInitializePayload => ({
         is_primary: values.is_primary,
       }
     : undefined,
+  features: {
+    attendance: values.features.attendance,
+    roster: values.features.roster,
+    contract_tracking: values.features.contract_tracking,
+  },
 });
 
 export const FirstTimeSetupForm = () => {
@@ -236,6 +246,72 @@ export const FirstTimeSetupForm = () => {
               )} />
             </div>
           ) : null}
+        </section>
+
+        <Separator />
+
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-base font-semibold">Operational modules</h2>
+            <p className="text-sm text-muted-foreground">Choose optional modules to enable during setup. Disabled modules can be enabled later in Settings.</p>
+          </div>
+          <FormField control={form.control} name="features.attendance" render={({ field }) => (
+            <FormItem className="rounded-md border p-4">
+              <div className="flex items-start gap-3">
+                <FormControl><Checkbox checked={field.value} onCheckedChange={(value) => field.onChange(Boolean(value))} /></FormControl>
+                <div className="space-y-1">
+                  <FormLabel>Attendance Management</FormLabel>
+                  <FormDescription>
+                    Track employee attendance, lateness, absences, corrections, biometric/kiosk entries, and attendance-based payroll review.
+                  </FormDescription>
+                  <p className="text-xs text-muted-foreground">
+                    {field.value
+                      ? "Attendance setup can be reviewed after login."
+                      : "Disabled by choice: Attendance records stay safe and setup tasks will be skipped until the module is enabled in Settings."}
+                  </p>
+                </div>
+              </div>
+              <FormMessage />
+            </FormItem>
+          )} />
+          <FormField control={form.control} name="features.roster" render={({ field }) => (
+            <FormItem className="rounded-md border p-4">
+              <div className="flex items-start gap-3">
+                <FormControl><Checkbox checked={field.value} onCheckedChange={(value) => field.onChange(Boolean(value))} /></FormControl>
+                <div className="space-y-1">
+                  <FormLabel>Duty Roster</FormLabel>
+                  <FormDescription>
+                    Plan employee work schedules, weekly duty rosters, shift assignments, and roster change workflows.
+                  </FormDescription>
+                  <p className="text-xs text-muted-foreground">
+                    {field.value
+                      ? "Duty Roster setup can be reviewed after login."
+                      : "Disabled by choice: Duty Roster setup tasks will be skipped until the module is enabled in Settings."}
+                  </p>
+                </div>
+              </div>
+              <FormMessage />
+            </FormItem>
+          )} />
+          <FormField control={form.control} name="features.contract_tracking" render={({ field }) => (
+            <FormItem className="rounded-md border p-4">
+              <div className="flex items-start gap-3">
+                <FormControl><Checkbox checked={field.value} onCheckedChange={(value) => field.onChange(Boolean(value))} /></FormControl>
+                <div className="space-y-1">
+                  <FormLabel>Contract Tracking</FormLabel>
+                  <FormDescription>
+                    Track employee contracts, renewals, probation periods, linked contract documents, and contract expiry alerts.
+                  </FormDescription>
+                  <p className="text-xs text-muted-foreground">
+                    {field.value
+                      ? "Contract Tracking setup can be reviewed after login."
+                      : "Disabled by choice: Contract Tracking setup tasks will be skipped until the module is enabled in Settings."}
+                  </p>
+                </div>
+              </div>
+              <FormMessage />
+            </FormItem>
+          )} />
         </section>
 
         <Separator />

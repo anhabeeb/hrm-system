@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { friendlyHrmError } from "@/lib/hrm-errors";
+import { useAuth } from "@/features/auth/auth.store";
 import { label } from "./contract-format";
 import { EmployeeDocumentCombobox } from "./EmployeeDocumentCombobox";
 import type { ContractPayload, ContractRenewPayload, ContractType, EmployeeContract } from "./contracts.types";
@@ -48,7 +49,9 @@ export const ContractFormDialog = ({
   onOpenChange: (open: boolean) => void;
   onSubmit: (payload: ContractPayload | ContractRenewPayload) => void;
 }) => {
+  const auth = useAuth();
   const [payload, setPayload] = useState<ContractPayload>(blankPayload);
+  const documentTrackingEnabled = auth.hasFeature("documents");
 
   useEffect(() => {
     if (!open) return;
@@ -113,15 +116,21 @@ export const ContractFormDialog = ({
           <AppDatePicker label="End date" value={payload.end_date ?? ""} onChange={(value) => setPayload((current) => ({ ...current, end_date: value ?? "" }))} />
           <AppDatePicker label="Signed date" value={payload.signed_date ?? ""} onChange={(value) => setPayload((current) => ({ ...current, signed_date: value ?? "" }))} />
           <AppDatePicker label="Probation end date" value={payload.probation_end_date ?? ""} onChange={(value) => setPayload((current) => ({ ...current, probation_end_date: value ?? "" }))} />
-          <Label className="grid gap-1 text-sm md:col-span-2">
-            Contract document
-            <EmployeeDocumentCombobox
-              employeeId={employeeId}
-              value={payload.document_id}
-              onChange={(value) => setPayload((current) => ({ ...current, document_id: value }))}
-            />
-            <span className="text-xs font-normal text-muted-foreground">Upload the contract document in Employee Documents first, then select it here.</span>
-          </Label>
+          {documentTrackingEnabled ? (
+            <Label className="grid gap-1 text-sm md:col-span-2">
+              Contract document
+              <EmployeeDocumentCombobox
+                employeeId={employeeId}
+                value={payload.document_id}
+                onChange={(value) => setPayload((current) => ({ ...current, document_id: value }))}
+              />
+              <span className="text-xs font-normal text-muted-foreground">Upload the contract document in Employee Documents first, then select it here.</span>
+            </Label>
+          ) : (
+            <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground md:col-span-2">
+              Document Tracking is disabled. Contract metadata can be saved, but linked document upload and attachment controls require Document Tracking.
+            </div>
+          )}
           <Label className="grid gap-1 text-sm md:col-span-2">
             Notes
             <Textarea value={payload.notes ?? ""} onChange={(event) => setPayload((current) => ({ ...current, notes: event.target.value }))} />

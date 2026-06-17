@@ -18,6 +18,11 @@ export const setupSchema = z
     outlet_name: z.string().trim().optional(),
     outlet_code: z.string().trim().optional(),
     is_primary: z.boolean().default(true),
+    features: z.object({
+      attendance: z.boolean().default(true),
+      roster: z.boolean().default(true),
+      contract_tracking: z.boolean().default(true),
+    }).default({ attendance: true, roster: true, contract_tracking: true }),
     bootstrap_token: z.string().trim().min(1, "Bootstrap token is required."),
   })
   .refine((value) => value.password === value.confirm_password, {

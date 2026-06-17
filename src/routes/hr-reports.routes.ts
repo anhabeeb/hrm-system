@@ -20,7 +20,7 @@ hrReportsRoutes.get("/local-foreign", requirePermission("hr_reports.employee.vie
 hrReportsRoutes.get("/headcount", requirePermission("hr_reports.employee.view"), controller.headcount);
 hrReportsRoutes.get("/new-joiners", requirePermission("hr_reports.employee.view"), controller.newJoiners);
 hrReportsRoutes.get("/probation", requirePermission("hr_reports.employee.view"), controller.probation);
-hrReportsRoutes.get("/contracts", requirePermission("hr_reports.compliance.view"), controller.contracts);
+hrReportsRoutes.get("/contracts", requireFeature("contract_tracking"), requirePermission("hr_reports.compliance.view"), controller.contracts);
 hrReportsRoutes.get("/document-compliance", requirePermission("hr_reports.documents.view"), controller.documentCompliance);
 hrReportsRoutes.get("/foreign-compliance", requirePermission("hr_reports.compliance.view"), controller.foreignCompliance);
 hrReportsRoutes.get("/leave-balances", requireFeature("leave_management"), requirePermission("hr_reports.leave.view"), controller.leaveBalances);
@@ -64,6 +64,9 @@ hrReportsRoutes.get("/:reportKey", requireAnyPermission([
   if (key === "assets-uniforms") {
     await requireFeature("asset_tracking")(c, async () => undefined);
     await requireFeature("uniform_tracking")(c, async () => undefined);
+  }
+  if (key === "contracts") {
+    await requireFeature("contract_tracking")(c, async () => undefined);
   }
   return handler(c);
 });

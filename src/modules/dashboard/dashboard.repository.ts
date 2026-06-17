@@ -449,15 +449,19 @@ export const expiryCountsWithinDays = async (
   context: AuthActor,
   today: string,
   days: number,
+  options: { includeContracts?: boolean } = {},
 ) => {
   const scope = directOutletClause(context, "a.outlet_id");
+  const contractClause = options.includeContracts === false
+    ? " AND a.source_type NOT IN ('contract', 'probation')"
+    : "";
   return one<{ total: number }>(
     env,
     `SELECT COUNT(*) AS total
      FROM expiry_alerts a
      WHERE a.company_id = ?
        AND a.expiry_date BETWEEN ? AND date(?, ?)
-       AND a.status IN ('open', 'acknowledged', 'snoozed')${scope.sql}`,
+       AND a.status IN ('open', 'acknowledged', 'snoozed')${contractClause}${scope.sql}`,
     [context.companyId, today, today, `+${days} day`, ...scope.values],
   );
 };

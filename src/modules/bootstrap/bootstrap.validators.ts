@@ -45,6 +45,17 @@ export const validateBootstrapInitialize = (payload: unknown): BootstrapInitiali
     outlet_code: asString(payload.outlet.outlet_code) ?? null,
     is_primary: asBool(payload.outlet.is_primary) ?? true,
   } : undefined;
+  const features = isObject(payload.features) && (
+    asBool(payload.features.attendance) !== undefined ||
+    asBool(payload.features.roster) !== undefined ||
+    asBool(payload.features.contract_tracking) !== undefined
+  )
+    ? {
+        attendance: asBool(payload.features.attendance),
+        roster: asBool(payload.features.roster),
+        contract_tracking: asBool(payload.features.contract_tracking),
+      }
+    : undefined;
 
   return {
     company: {
@@ -61,5 +72,6 @@ export const validateBootstrapInitialize = (payload: unknown): BootstrapInitiali
       password,
     },
     outlet,
+    features,
   };
 };

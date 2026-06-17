@@ -2,7 +2,7 @@ import { Hono } from "hono";
 
 import { authMiddleware } from "../middleware/auth.middleware";
 import { deviceAuthMiddleware } from "../middleware/device-auth.middleware";
-import { requireFeature } from "../middleware/feature.middleware";
+import { requireAttendanceSubFeature, requireFeature } from "../middleware/feature.middleware";
 import { requireAnyPermission, requirePermission } from "../middleware/permission.middleware";
 import { requireReason } from "../middleware/reason-required.middleware";
 import * as controller from "../modules/biometric/biometric.controller";
@@ -10,14 +10,16 @@ import type { AppContext } from "../types/api.types";
 
 const biometricRoutes = new Hono<AppContext>();
 
-biometricRoutes.post("/punch", deviceAuthMiddleware, requireFeature("biometric_attendance"), controller.punch);
-biometricRoutes.post("/punches", deviceAuthMiddleware, requireFeature("biometric_attendance"), controller.punch);
-biometricRoutes.post("/batch", deviceAuthMiddleware, requireFeature("biometric_attendance"), controller.batch);
-biometricRoutes.post("/bridge/batch", deviceAuthMiddleware, requireFeature("biometric_attendance"), controller.bridgeBatch);
-biometricRoutes.get("/device-status", deviceAuthMiddleware, requireFeature("biometric_attendance"), controller.deviceStatus);
+biometricRoutes.post("/punch", deviceAuthMiddleware, requireFeature("attendance"), requireFeature("biometric_attendance"), requireAttendanceSubFeature("attendance.biometric_enabled"), controller.punch);
+biometricRoutes.post("/punches", deviceAuthMiddleware, requireFeature("attendance"), requireFeature("biometric_attendance"), requireAttendanceSubFeature("attendance.biometric_enabled"), controller.punch);
+biometricRoutes.post("/batch", deviceAuthMiddleware, requireFeature("attendance"), requireFeature("biometric_attendance"), requireAttendanceSubFeature("attendance.biometric_enabled"), controller.batch);
+biometricRoutes.post("/bridge/batch", deviceAuthMiddleware, requireFeature("attendance"), requireFeature("biometric_attendance"), requireAttendanceSubFeature("attendance.biometric_enabled"), controller.bridgeBatch);
+biometricRoutes.get("/device-status", deviceAuthMiddleware, requireFeature("attendance"), requireFeature("biometric_attendance"), requireAttendanceSubFeature("attendance.biometric_enabled"), controller.deviceStatus);
 
 biometricRoutes.use("*", authMiddleware);
+biometricRoutes.use("*", requireFeature("attendance"));
 biometricRoutes.use("*", requireFeature("biometric_attendance"));
+biometricRoutes.use("*", requireAttendanceSubFeature("attendance.biometric_enabled"));
 
 biometricRoutes.get("/devices", requireAnyPermission(["biometric.view", "biometric.manage_devices"]), controller.listDevices);
 biometricRoutes.get("/devices/:id", requirePermission("biometric.view"), controller.getDevice);

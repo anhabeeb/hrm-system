@@ -249,7 +249,8 @@ export const EmployeesPage = () => {
   const canEdit = auth.hasPermission("employees.edit");
   const canManageStatus = auth.hasPermission("employees.manage_status");
   const canManageOffboarding = auth.hasPermission("employees.offboarding.manage") || auth.hasPermission("employees.edit");
-  const canManageContracts = auth.hasAnyPermission(["employees.contracts.manage", "contracts.manage", "employees.edit"]);
+  const canViewContracts = auth.hasFeature("contract_tracking") && auth.hasAnyPermission(["employees.contracts.view", "contracts.view", "employees.view"]);
+  const canManageContracts = auth.hasFeature("contract_tracking") && auth.hasAnyPermission(["employees.contracts.manage", "contracts.manage", "employees.edit"]);
   const canManageJobChange = auth.hasAnyPermission(["employees.edit", "employees.job_change.manage", "employees.manage"]);
   const canViewSalary = auth.hasAnyPermission(["payroll.view", "employees.salary.view", "employees.view_salary", "salary.view", "salary.history"]);
   const canEditSalary = auth.hasAnyPermission(["payroll.manage", "employees.salary.manage", "employees.edit_salary", "salary.create", "salary.edit"]);
@@ -403,6 +404,7 @@ export const EmployeesPage = () => {
           canViewNotes={canViewNotes}
           canManageStatus={canManageStatus}
           canManageOffboarding={canManageOffboarding}
+          canViewContracts={canViewContracts}
           canManageContracts={canManageContracts}
         />
         <EmployeeLoginDialog

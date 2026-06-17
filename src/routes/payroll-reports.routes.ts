@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { authMiddleware } from "../middleware/auth.middleware";
-import { requireFeature } from "../middleware/feature.middleware";
+import { requireAttendanceSubFeature, requireFeature } from "../middleware/feature.middleware";
 import { requireAnyPermission, requirePermission } from "../middleware/permission.middleware";
 import * as controller from "../modules/payroll-reports/payroll-reports.controller";
 import type { AppContext } from "../types/api.types";
@@ -21,8 +21,8 @@ payrollReportsRoutes.get("/salary-changes", requirePermission("payroll_reports.s
 payrollReportsRoutes.get("/deductions", requirePermission("payroll_reports.deductions.view"), controller.deductions);
 payrollReportsRoutes.get("/advances", requirePermission("payroll_reports.advances.view"), controller.advances);
 payrollReportsRoutes.get("/salary-loans", requirePermission("payroll_reports.loans.view"), controller.salaryLoans);
-payrollReportsRoutes.get("/attendance-deductions", requirePermission("payroll_reports.attendance_deductions.view"), controller.attendanceDeductions);
-payrollReportsRoutes.get("/overtime", requirePermission("payroll_reports.overtime.view"), controller.overtime);
+payrollReportsRoutes.get("/attendance-deductions", requireFeature("attendance"), requireAttendanceSubFeature("attendance.payroll_deductions_enabled"), requirePermission("payroll_reports.attendance_deductions.view"), controller.attendanceDeductions);
+payrollReportsRoutes.get("/overtime", requireFeature("attendance"), requirePermission("payroll_reports.overtime.view"), controller.overtime);
 payrollReportsRoutes.get("/long-leave-deductions", requireFeature("long_leave_management"), requirePermission("payroll_reports.long_leave.view"), controller.longLeaveDeductions);
 payrollReportsRoutes.get("/leave-deductions", requireFeature("leave_management"), requirePermission("payroll_reports.leave_deductions.view"), controller.leaveDeductions);
 payrollReportsRoutes.get("/payslip-status", requirePermission("payroll_reports.payslips.view"), controller.payslipStatus);
@@ -73,6 +73,13 @@ payrollReportsRoutes.get("/:reportKey", requireAnyPermission([
   };
   const handler = map[key];
   if (!handler) return controller.catalog(c);
+  if (key === "attendance-deductions") {
+    await requireFeature("attendance")(c, async () => undefined);
+    await requireAttendanceSubFeature("attendance.payroll_deductions_enabled")(c, async () => undefined);
+  }
+  if (key === "overtime") {
+    await requireFeature("attendance")(c, async () => undefined);
+  }
   return handler(c);
 });
 

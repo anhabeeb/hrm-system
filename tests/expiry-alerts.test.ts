@@ -189,6 +189,10 @@ vi.mock("../src/services/audit.service", () => ({
   }),
 }));
 
+vi.mock("../src/services/settings.service", () => ({
+  isFeatureEnabled: vi.fn(async () => true),
+}));
+
 import {
   buildExpiryAlertCandidate,
   classifyExpirySeverity,

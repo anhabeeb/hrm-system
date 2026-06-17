@@ -21,8 +21,8 @@ const jsonBody = async (c: Context<AppContext>) => {
   }
 };
 
-export const catalog = (c: Context<AppContext>) =>
-  ok(service.getExportCatalog(actor(c)), "Export catalog loaded successfully.", request(c));
+export const catalog = async (c: Context<AppContext>) =>
+  ok(await service.getExportCatalog(c.env, actor(c)), "Export catalog loaded successfully.", request(c));
 
 export const jobs = async (c: Context<AppContext>) =>
   ok(await service.listExportJobs(c.env, actor(c), validateExportListFilters(c.req.query())), "Export history loaded successfully.", request(c));

@@ -1661,17 +1661,23 @@ export const getEmployeeProfile = async (
       return await fn();
     } catch (error) {
       if (error instanceof PermissionError) return null;
-      if (error instanceof AppError && ["LEAVE_MANAGEMENT_DISABLED", "LONG_LEAVE_MANAGEMENT_DISABLED"].includes(error.code)) return null;
+      if (error instanceof AppError && ["ATTENDANCE_MANAGEMENT_DISABLED", "LEAVE_MANAGEMENT_DISABLED", "LONG_LEAVE_MANAGEMENT_DISABLED", "CONTRACT_TRACKING_DISABLED", "FEATURE_DISABLED"].includes(error.code)) return null;
       throw error;
     }
   };
+  const attendanceEnabled = await settingsService
+    .isFeatureEnabled(env, context.companyId, "attendance", context)
+    .catch(() => false);
+  const contractTrackingEnabled = await settingsService
+    .isFeatureEnabled(env, context.companyId, "contract_tracking", context)
+    .catch(() => false);
 
   const [attendance, leave, long_leave, documents, contracts, assets, payroll_readiness, alerts, timeline] = await Promise.all([
-    section(() => getEmployeeProfileAttendance(env, context, employeeId, limit)),
+    attendanceEnabled ? section(() => getEmployeeProfileAttendance(env, context, employeeId, limit)) : Promise.resolve(null),
     section(() => getEmployeeProfileLeave(env, context, employeeId, limit)),
     section(() => getEmployeeProfileLongLeave(env, context, employeeId, limit)),
     section(() => getEmployeeProfileDocuments(env, context, employeeId, limit)),
-    section(() => getEmployeeProfileContracts(env, context, employeeId, limit)),
+    contractTrackingEnabled ? section(() => getEmployeeProfileContracts(env, context, employeeId, limit)) : Promise.resolve(null),
     section(() => getEmployeeProfileAssets(env, context, employeeId, limit)),
     section(() => getEmployeeProfilePayrollReadiness(env, context, employeeId, limit)),
     section(() => getEmployeeProfileAlerts(env, context, employeeId, limit)),

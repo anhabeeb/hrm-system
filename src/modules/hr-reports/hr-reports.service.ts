@@ -64,16 +64,18 @@ const result = (
 };
 
 const enabledCategories = async (env: Env, actor: AuthActor) => {
-  const [leaveEnabled, longLeaveEnabled, assetsEnabled, uniformsEnabled] = await Promise.all([
+  const [leaveEnabled, longLeaveEnabled, assetsEnabled, uniformsEnabled, contractTrackingEnabled] = await Promise.all([
     settingsService.isFeatureEnabled(env, actor.companyId, "leave_management", actor),
     settingsService.isFeatureEnabled(env, actor.companyId, "long_leave_management", actor),
     settingsService.isFeatureEnabled(env, actor.companyId, "asset_tracking", actor),
     settingsService.isFeatureEnabled(env, actor.companyId, "uniform_tracking", actor),
+    settingsService.isFeatureEnabled(env, actor.companyId, "contract_tracking", actor),
   ]);
   return {
     leave: leaveEnabled,
     long_leave: longLeaveEnabled,
     assets: assetsEnabled && uniformsEnabled,
+    contracts: contractTrackingEnabled,
   };
 };
 
@@ -83,7 +85,8 @@ export const catalog = async (env: Env, actor: AuthActor) => {
     data: HR_REPORT_DEFINITIONS.filter((definition) => canViewReport(actor, definition.required_permission))
       .filter((definition) => definition.category !== "leave" || categories.leave)
       .filter((definition) => definition.category !== "long_leave" || categories.long_leave)
-      .filter((definition) => definition.category !== "assets" || categories.assets),
+      .filter((definition) => definition.category !== "assets" || categories.assets)
+      .filter((definition) => definition.report_key !== "contracts" || categories.contracts),
     meta: {
       report_key: "catalog",
       report_name: "HR Report Catalog",
@@ -147,6 +150,9 @@ export const runReport = async (
       reportRows = await repository.probation(env, actor, filters);
       break;
     case "contracts":
+      if (!(await enabledCategories(env, actor)).contracts) {
+        throw new AppError("Contract Tracking is disabled. Enable it in Settings to use this module.", "CONTRACT_TRACKING_DISABLED", 403);
+      }
       reportRows = await repository.contracts(env, actor, filters);
       break;
     case "document-compliance":

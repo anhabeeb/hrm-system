@@ -270,6 +270,37 @@ const decorateRunTotals = async (
   return { ...run, ...totals, totals_scope: access.fullAccess && !outletId ? "company" : "accessible_outlets" };
 };
 
+const attendancePayrollDeductionsEnabled = async (env: Env, context: AuthActor) => {
+  const attendanceEnabled = await settingsService.isFeatureEnabled(env, context.companyId, "attendance", context).catch(() => false);
+  if (!attendanceEnabled) return false;
+  const attendanceSettings = await settingsService.getAttendanceSettings(env, context.companyId).catch(() => ({})) as Record<string, unknown>;
+  const configured =
+    attendanceSettings["attendance.payroll_deductions_enabled"] ??
+    attendanceSettings.absent_day_deduction_enabled ??
+    attendanceSettings.deduct_absent_days;
+  return configured !== false;
+};
+
+const loadPayrollCalculationSettings = async (env: Env, context: AuthActor) => {
+  const [payrollSettings, attendanceSettings, attendanceDeductionsEnabled] = await Promise.all([
+    settingsService.getPayrollSettings(env, context.companyId),
+    settingsService.getAttendanceSettings(env, context.companyId).catch(() => ({})),
+    attendancePayrollDeductionsEnabled(env, context),
+  ]);
+  const mergedSettings = { ...payrollSettings, ...attendanceSettings };
+  if (!attendanceDeductionsEnabled) {
+    mergedSettings["attendance.payroll_deductions_enabled"] = false;
+    mergedSettings.absent_day_deduction_enabled = false;
+    mergedSettings.deduct_absent_days = false;
+    mergedSettings.deduct_late_minutes = false;
+    mergedSettings.deduct_early_checkout = false;
+    mergedSettings.require_complete_attendance_before_calculation = false;
+    mergedSettings.require_complete_attendance_before_payroll = false;
+    mergedSettings.missing_attendance_counts_as_absent = false;
+  }
+  return calculator.parsePayrollSettings(mergedSettings);
+};
+
 const calculateRun = async (
   env: Env,
   context: AuthActor,
@@ -283,8 +314,7 @@ const calculateRun = async (
   if (existing) {
     lockService.assertPayrollRunEditable(existing);
   }
-  const payrollSettings = await settingsService.getPayrollSettings(env, context.companyId);
-  const settings = calculator.parsePayrollSettings(payrollSettings);
+  const settings = await loadPayrollCalculationSettings(env, context);
   const runId = existing?.id ?? createPrefixedId("payroll");
   const periodStart = calculator.monthStartDate(input.payroll_month);
   const periodEnd = calculator.monthEndDate(input.payroll_month);
@@ -414,8 +444,7 @@ export const previewPayrollCalculation = async (env: Env, context: AuthActor, id
   await assertFullPayrollCalculationAccess(env, context);
   const run = await ensureRun(env, context, id);
   lockService.assertPayrollRunEditable(run);
-  const payrollSettings = await settingsService.getPayrollSettings(env, context.companyId);
-  const settings = calculator.parsePayrollSettings(payrollSettings);
+  const settings = await loadPayrollCalculationSettings(env, context);
   const results = await calculatePayrollInMemory(
     env,
     context,
@@ -478,11 +507,12 @@ export const resolveException = async (env: Env, context: AuthActor, runId: stri
 };
 
 const createBlockerExceptions = async (env: Env, context: AuthActor, runId: string, payrollMonth: string) => {
+  const attendanceEnabled = await settingsService.isFeatureEnabled(env, context.companyId, "attendance", context).catch(() => false);
   const blockers = await getPayrollSyncBlockers(env, context.companyId, payrollMonth);
   let syncBlocked = false;
   let attendanceBlocked = false;
   let longLeaveBlocked = false;
-  if ((blockers.pending_sync_items ?? 0) > 0) {
+  if (attendanceEnabled && (blockers.pending_sync_items ?? 0) > 0) {
     syncBlocked = true;
     await exceptionService.createPayrollException(env, {
       companyId: context.companyId,
@@ -492,7 +522,7 @@ const createBlockerExceptions = async (env: Env, context: AuthActor, runId: stri
       message: "Payroll cannot be finalized while attendance sync is pending.",
     });
   }
-  if ((blockers.unresolved_sync_conflicts ?? 0) > 0) {
+  if (attendanceEnabled && (blockers.unresolved_sync_conflicts ?? 0) > 0) {
     syncBlocked = true;
     await exceptionService.createPayrollException(env, {
       companyId: context.companyId,
@@ -502,43 +532,45 @@ const createBlockerExceptions = async (env: Env, context: AuthActor, runId: stri
       message: "Payroll cannot be finalized while attendance sync conflicts are unresolved.",
     });
   }
-  const [attendanceConflicts, attendanceCorrections, problemSummaries] = await Promise.all([
-    repository.countPendingAttendanceConflicts(env, context.companyId, payrollMonth),
-    repository.countPendingAttendanceCorrections(env, context.companyId, payrollMonth),
-    repository.countProblemAttendanceSummaries(env, context.companyId, payrollMonth),
-  ]);
-  if (attendanceConflicts > 0) {
-    attendanceBlocked = true;
-    await exceptionService.createPayrollException(env, {
-      companyId: context.companyId,
-      payrollRunId: runId,
-      exceptionType: "unresolved_attendance_conflict",
-      severity: "critical",
-      message: "Payroll cannot be locked because there are unresolved attendance issues.",
-    });
-  }
-  if (attendanceCorrections > 0) {
-    attendanceBlocked = true;
-    await exceptionService.createPayrollException(env, {
-      companyId: context.companyId,
-      payrollRunId: runId,
-      exceptionType: "pending_attendance_correction",
-      severity: "critical",
-      message: "Payroll cannot be locked because there are unresolved attendance issues.",
-    });
-  }
-  if (problemSummaries > 0) {
-    attendanceBlocked = true;
-    await exceptionService.createPayrollException(env, {
-      companyId: context.companyId,
-      payrollRunId: runId,
-      exceptionType: "missing_clock_in",
-      severity: "critical",
-      message: "Payroll cannot be locked because there are unresolved attendance issues.",
-    });
+  if (attendanceEnabled) {
+    const [attendanceConflicts, attendanceCorrections, problemSummaries] = await Promise.all([
+      repository.countPendingAttendanceConflicts(env, context.companyId, payrollMonth),
+      repository.countPendingAttendanceCorrections(env, context.companyId, payrollMonth),
+      repository.countProblemAttendanceSummaries(env, context.companyId, payrollMonth),
+    ]);
+    if (attendanceConflicts > 0) {
+      attendanceBlocked = true;
+      await exceptionService.createPayrollException(env, {
+        companyId: context.companyId,
+        payrollRunId: runId,
+        exceptionType: "unresolved_attendance_conflict",
+        severity: "critical",
+        message: "Payroll cannot be locked because there are unresolved attendance issues.",
+      });
+    }
+    if (attendanceCorrections > 0) {
+      attendanceBlocked = true;
+      await exceptionService.createPayrollException(env, {
+        companyId: context.companyId,
+        payrollRunId: runId,
+        exceptionType: "pending_attendance_correction",
+        severity: "critical",
+        message: "Payroll cannot be locked because there are unresolved attendance issues.",
+      });
+    }
+    if (problemSummaries > 0) {
+      attendanceBlocked = true;
+      await exceptionService.createPayrollException(env, {
+        companyId: context.companyId,
+        payrollRunId: runId,
+        exceptionType: "missing_clock_in",
+        severity: "critical",
+        message: "Payroll cannot be locked because there are unresolved attendance issues.",
+      });
+    }
   }
   const payrollSettings = await settingsService.getPayrollSettings(env, context.companyId).catch(() => ({}));
-  if ((payrollSettings as Record<string, unknown>).attendance_to_payroll_enabled === true) {
+  if (attendanceEnabled && (payrollSettings as Record<string, unknown>).attendance_to_payroll_enabled === true) {
     const missingSummaries = await repository.countActiveEmployeesMissingAttendanceSummaries(env, context.companyId, payrollMonth);
     if (missingSummaries > 0) {
       attendanceBlocked = true;

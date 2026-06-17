@@ -72,7 +72,8 @@ export const HrReportsPage = () => {
   const catalogQuery = useQuery({ queryKey: ["hr-reports", "catalog"], queryFn: () => hrReportsApi.catalog() });
   const allReports = (catalogQuery.data?.data.data ?? []).filter((report) =>
     (report.category !== "leave" || auth.hasFeature("leave_management")) &&
-    (report.category !== "long_leave" || auth.hasFeature("long_leave_management")),
+    (report.category !== "long_leave" || auth.hasFeature("long_leave_management")) &&
+    (report.report_key !== "contracts" || auth.hasFeature("contract_tracking")),
   );
   const visibleReports = allReports.filter((report) => report.category === selectedCategory);
   const selectedReport = defaultReportFor(visibleReports.length ? visibleReports : allReports, selectedReportKey);

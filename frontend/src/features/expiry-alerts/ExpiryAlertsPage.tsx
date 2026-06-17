@@ -109,6 +109,8 @@ export const ExpiryAlertsPage = () => {
   const canScan = auth.hasAnyPermission(["expiry_alerts.scan", "expiry_alerts.manage"]);
   const canManage = auth.hasAnyPermission(["expiry_alerts.manage"]);
   const canManageSettings = auth.hasAnyPermission(["expiry_alerts.settings.manage"]);
+  const contractTrackingEnabled = auth.hasFeature("contract_tracking");
+  const visibleSourceTypes = sourceTypes.filter((source) => contractTrackingEnabled || !["contract", "probation"].includes(source));
   const errors = listQuery.error ?? summaryQuery.error ?? settingsQuery.error ?? actionMutation.error ?? previewMutation.error ?? runMutation.error ?? settingsMutation.error;
 
   const columns: TableColumn<ExpiryAlert>[] = [
@@ -140,7 +142,7 @@ export const ExpiryAlertsPage = () => {
         <div className="grid gap-3 rounded-lg border bg-card p-4 md:grid-cols-6">
           <Label className="space-y-1 text-xs font-medium text-muted-foreground">Status<Select value={filters.status ?? "active"} onValueChange={(value) => updateFilters({ status: value === "active" ? undefined : value, include_closed: value === "resolved" || value === "dismissed" ? true : filters.include_closed })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Active</SelectItem>{statuses.map((status) => <SelectItem key={status} value={status}>{label(status)}</SelectItem>)}</SelectContent></Select></Label>
           <Label className="space-y-1 text-xs font-medium text-muted-foreground">Severity<Select value={filters.severity ?? "all"} onValueChange={(value) => updateFilters({ severity: value === "all" ? undefined : value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All</SelectItem>{severities.map((severity) => <SelectItem key={severity} value={severity}>{label(severity)}</SelectItem>)}</SelectContent></Select></Label>
-          <Label className="space-y-1 text-xs font-medium text-muted-foreground">Source<Select value={filters.source_type ?? "all"} onValueChange={(value) => updateFilters({ source_type: value === "all" ? undefined : value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All sources</SelectItem>{sourceTypes.map((source) => <SelectItem key={source} value={source}>{label(source)}</SelectItem>)}</SelectContent></Select></Label>
+          <Label className="space-y-1 text-xs font-medium text-muted-foreground">Source<Select value={filters.source_type ?? "all"} onValueChange={(value) => updateFilters({ source_type: value === "all" ? undefined : value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All sources</SelectItem>{visibleSourceTypes.map((source) => <SelectItem key={source} value={source}>{label(source)}</SelectItem>)}</SelectContent></Select></Label>
           <div className="md:col-span-2">
             <AppDateRangePicker
               dateFrom={filters.from_date}
@@ -184,10 +186,10 @@ export const ExpiryAlertsPage = () => {
             />
           </TabsContent>
           <TabsContent value="scan">
-            <ScanPanel scan={scan} setScan={setScan} canScan={canScan} previewMutation={previewMutation} runMutation={runMutation} />
+            <ScanPanel scan={scan} setScan={setScan} sourceTypes={visibleSourceTypes} canScan={canScan} previewMutation={previewMutation} runMutation={runMutation} />
           </TabsContent>
           <TabsContent value="settings">
-            <SettingsPanel settings={settingsQuery.data?.data.settings} disabled={!canManageSettings || settingsMutation.isPending} onSave={(next) => settingsMutation.mutate(next)} />
+            <SettingsPanel settings={settingsQuery.data?.data.settings} contractTrackingEnabled={contractTrackingEnabled} disabled={!canManageSettings || settingsMutation.isPending} onSave={(next) => settingsMutation.mutate(next)} />
           </TabsContent>
         </Tabs>
       </div>
@@ -221,12 +223,14 @@ export const ExpiryAlertsPage = () => {
 const ScanPanel = ({
   scan,
   setScan,
+  sourceTypes,
   canScan,
   previewMutation,
   runMutation,
 }: {
   scan: ExpiryScanInput;
   setScan: (input: ExpiryScanInput) => void;
+  sourceTypes: string[];
   canScan: boolean;
   previewMutation: any;
   runMutation: any;
@@ -262,7 +266,7 @@ const ScanPanel = ({
   );
 };
 
-const SettingsPanel = ({ settings, disabled, onSave }: { settings?: ExpiryAlertSettings; disabled?: boolean; onSave: (settings: Partial<ExpiryAlertSettings> & { reason: string }) => void }) => {
+const SettingsPanel = ({ settings, contractTrackingEnabled, disabled, onSave }: { settings?: ExpiryAlertSettings; contractTrackingEnabled: boolean; disabled?: boolean; onSave: (settings: Partial<ExpiryAlertSettings> & { reason: string }) => void }) => {
   const [draft, setDraft] = useState<ExpiryAlertSettings | undefined>(settings);
   const [reason, setReason] = useState("");
   useEffect(() => setDraft(settings), [settings]);
@@ -282,7 +286,7 @@ const SettingsPanel = ({ settings, disabled, onSave }: { settings?: ExpiryAlertS
         <Label className="space-y-1 text-xs font-medium text-muted-foreground">Email severity<Select disabled={disabled} value={draft.minimum_email_severity} onValueChange={(minimum_email_severity) => setDraft({ ...draft, minimum_email_severity: minimum_email_severity as ExpiryAlertSettings["minimum_email_severity"] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{severities.map((value) => <SelectItem key={value} value={value}>{label(value)}</SelectItem>)}</SelectContent></Select></Label>
       </div>
       <DataTable
-        rows={Object.entries(draft.source_toggles).map(([key, enabled]) => ({ key, enabled }))}
+        rows={Object.entries(draft.source_toggles).filter(([key]) => contractTrackingEnabled || !["contracts", "probation"].includes(key)).map(([key, enabled]) => ({ key, enabled }))}
         columns={[
           { key: "key", header: "Source", cell: (row) => label(row.key) },
           { key: "enabled", header: "Enabled", cell: (row) => <Switch disabled={disabled || ["assets", "uniforms"].includes(row.key)} checked={Boolean(row.enabled)} onCheckedChange={(enabled) => updateToggle(row.key, enabled)} /> },

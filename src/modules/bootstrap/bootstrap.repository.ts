@@ -1,5 +1,5 @@
 import { SEED_COMPANY_ID } from "./bootstrap.constants";
-import type { BootstrapCompanyInput, BootstrapOutletInput, BootstrapSuperAdminInput, SystemBootstrapRow } from "./bootstrap.types";
+import type { BootstrapCompanyInput, BootstrapFeatureSelections, BootstrapOutletInput, BootstrapSuperAdminInput, SystemBootstrapRow } from "./bootstrap.types";
 
 const bind = (statement: D1PreparedStatement, values: readonly unknown[]) =>
   statement.bind(...(values as Parameters<D1PreparedStatement["bind"]>));
@@ -478,12 +478,14 @@ export const ensureProductionFallbackDefaults = async (env: Env, companyId: stri
     ["settings", "Settings"],
     ["audit_logs", "Audit Logs"],
     ["documents", "Documents"],
+    ["contract_tracking", "Contract Tracking"],
     ["asset_tracking", "Asset Tracking"],
     ["uniform_tracking", "Uniform Tracking"],
     ["leave_management", "Leave Management"],
     ["long_leave_management", "Long Leave Management"],
     ["payroll", "Payroll"],
-    ["attendance", "Attendance"],
+    ["attendance", "Attendance Management"],
+    ["roster", "Duty Roster"],
     ["approvals", "Approvals"],
     ["operation_ownership", "Operation Ownership"],
     ["payroll_adjustments", "Payroll Adjustments"],
@@ -514,4 +516,30 @@ export const ensureProductionFallbackDefaults = async (env: Env, companyId: stri
       ).bind(`${companyId}_feature_${featureKey}`, companyId, featureKey, featureName, timestamp, timestamp),
     ),
   ]);
+};
+
+export const applyBootstrapFeatureSelections = async (
+  env: Env,
+  companyId: string,
+  features: BootstrapFeatureSelections | undefined,
+) => {
+  const selections = Object.entries({
+    attendance: features?.attendance,
+    roster: features?.roster,
+    contract_tracking: features?.contract_tracking,
+  }).filter((entry): entry is [string, boolean] => typeof entry[1] === "boolean");
+
+  if (selections.length === 0) return;
+
+  const timestamp = now();
+  await copyOptionalBootstrapDefaults(env, "bootstrap_feature_selections", selections.map(([featureKey, enabled]) =>
+    env.DB.prepare(
+      `UPDATE feature_settings
+       SET is_enabled = ?,
+           status = ?,
+           updated_at = ?
+       WHERE company_id = ?
+         AND feature_key = ?`,
+    ).bind(enabled ? 1 : 0, enabled ? "enabled" : "disabled", timestamp, companyId, featureKey),
+  ));
 };

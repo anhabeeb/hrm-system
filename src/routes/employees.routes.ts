@@ -463,6 +463,7 @@ employeesRoutes.get(
 );
 employeesRoutes.get(
   "/:id/contracts",
+  requireFeature("contract_tracking"),
   requireAnyPermissionOrError(["employees.contracts.view", "contracts.view", "employees.view"], {
     code: "CONTRACT_PERMISSION_DENIED",
     message: "You do not have permission to view employee contracts.",
@@ -471,6 +472,7 @@ employeesRoutes.get(
 );
 employeesRoutes.post(
   "/:id/contracts",
+  requireFeature("contract_tracking"),
   requireAnyPermissionOrError(["employees.contracts.manage", "contracts.manage", "employees.edit"], {
     code: "CONTRACT_PERMISSION_DENIED",
     message: "You do not have permission to manage employee contracts.",
@@ -479,6 +481,7 @@ employeesRoutes.post(
 );
 employeesRoutes.get(
   "/:id/contracts/:contractId",
+  requireFeature("contract_tracking"),
   requireAnyPermissionOrError(["employees.contracts.view", "contracts.view", "employees.view"], {
     code: "CONTRACT_PERMISSION_DENIED",
     message: "You do not have permission to view employee contracts.",
@@ -487,6 +490,7 @@ employeesRoutes.get(
 );
 employeesRoutes.patch(
   "/:id/contracts/:contractId",
+  requireFeature("contract_tracking"),
   requireAnyPermissionOrError(["employees.contracts.manage", "contracts.manage", "employees.edit"], {
     code: "CONTRACT_PERMISSION_DENIED",
     message: "You do not have permission to manage employee contracts.",
@@ -495,6 +499,7 @@ employeesRoutes.patch(
 );
 employeesRoutes.post(
   "/:id/contracts/:contractId/renew",
+  requireFeature("contract_tracking"),
   requireAnyPermissionOrError(["employees.contracts.manage", "contracts.manage", "employees.edit"], {
     code: "CONTRACT_PERMISSION_DENIED",
     message: "You do not have permission to renew employee contracts.",
@@ -503,6 +508,7 @@ employeesRoutes.post(
 );
 employeesRoutes.post(
   "/:id/contracts/:contractId/archive",
+  requireFeature("contract_tracking"),
   requireAnyPermissionOrError(["employees.contracts.manage", "contracts.manage", "employees.edit"], {
     code: "CONTRACT_PERMISSION_DENIED",
     message: "You do not have permission to archive employee contracts.",
@@ -511,6 +517,7 @@ employeesRoutes.post(
 );
 employeesRoutes.get(
   "/:id/contracts/:contractId/history",
+  requireFeature("contract_tracking"),
   requireAnyPermissionOrError(["employees.contracts.view", "contracts.view", "employees.view"], {
     code: "CONTRACT_PERMISSION_DENIED",
     message: "You do not have permission to view employee contract history.",
@@ -607,6 +614,7 @@ employeesRoutes.get(
 );
 employeesRoutes.get(
   "/:id/profile/attendance",
+  requireFeature("attendance"),
   requireAnyPermissionOrError(["attendance.view", "attendance.reports.view", "dashboard.attendance.view"], {
     code: "EMPLOYEE_PROFILE_PERMISSION_DENIED",
     message: "You do not have permission to view employee attendance.",
@@ -636,6 +644,7 @@ employeesRoutes.get(
 );
 employeesRoutes.get(
   "/:id/profile/contracts",
+  requireFeature("contract_tracking"),
   requireAnyPermissionOrError(["employees.contracts.view", "contracts.view", "employees.view"], {
     code: "EMPLOYEE_PROFILE_PERMISSION_DENIED",
     message: "You do not have permission to view employee contracts.",

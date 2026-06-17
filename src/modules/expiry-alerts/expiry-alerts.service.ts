@@ -14,6 +14,7 @@ import { safeNotifyResolvedRecipients } from "../notifications/notifications.ser
 import { sanitizeNotificationMetadata } from "../notifications/notification-safety";
 import { createAuditLog } from "../../services/audit.service";
 import * as permissionService from "../../services/permission.service";
+import * as settingsService from "../../services/settings.service";
 import type { AuthActor, PaginationMeta } from "../../types/api.types";
 import { AppError, NotFoundError, PermissionError } from "../../utils/errors";
 import { createPrefixedId } from "../../utils/ids";
@@ -363,6 +364,7 @@ export const collectExpiryCandidates = async (
   const filters = { employee_id: scan.employee_id, outlet_id: scan.outlet_id, department_id: scan.department_id };
   const sourceRows: ExpirySourceRow[] = [];
   const sourceType = scan.source_type;
+  const contractTrackingEnabled = await settingsService.isFeatureEnabled(env, context.companyId, "contract_tracking", context).catch(() => false);
 
   if (!sourceType || ["employee_passport", "employee_work_permit"].includes(sourceType)) {
     const rows = await repository.listEmployeeIdentitySources(env, context.companyId, throughDate, filters, context.outletIds, context.isSuperAdmin, includeArchived, includeInactive);
@@ -371,7 +373,7 @@ export const collectExpiryCandidates = async (
   if ((!sourceType || sourceType === "employee_document") && settings.source_toggles.employee_documents) {
     sourceRows.push(...await repository.listDocumentSources(env, context.companyId, throughDate, filters, context.outletIds, context.isSuperAdmin, includeArchived, includeInactive));
   }
-  if ((!sourceType || ["contract", "probation"].includes(sourceType)) && (settings.source_toggles.contracts || settings.source_toggles.probation)) {
+  if (contractTrackingEnabled && (!sourceType || ["contract", "probation"].includes(sourceType)) && (settings.source_toggles.contracts || settings.source_toggles.probation)) {
     sourceRows.push(...sourceRowsFromContracts(
       await repository.listContractSources(env, context.companyId, throughDate, Boolean(settings.source_toggles.probation), filters, context.outletIds, context.isSuperAdmin, includeArchived, includeInactive),
       settings.source_toggles,

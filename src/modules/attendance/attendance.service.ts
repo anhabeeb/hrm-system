@@ -23,6 +23,7 @@ import type {
   ReviewInput,
 } from "./attendance.types";
 import { createAuditLog } from "../../services/audit.service";
+import * as settingsService from "../../services/settings.service";
 import { broadcastEvent } from "../../services/realtime.service";
 import * as permissionService from "../../services/permission.service";
 import type { AuthActor, DeviceAuthContext, PaginationMeta } from "../../types/api.types";
@@ -44,6 +45,49 @@ const ATTENDANCE_CORRECTION_OPERATION = "ATTENDANCE_CORRECTION" as const;
 const ATTENDANCE_CORRECTION_SUBJECT_TYPE = "ATTENDANCE_CORRECTION";
 const SUPPORTED_CORRECTION_TYPES = new Set(["clock_in_time", "clock_out_time", "status", "manual_summary_update"]);
 const sensitivePayloadKeys = new Set(["password", "password_hash", "token", "session_token", "reset_token", "totp_secret", "secret"]);
+
+type AttendanceSubFeatureKey =
+  | "attendance.manual_entry_enabled"
+  | "attendance.kiosk_enabled"
+  | "attendance.biometric_enabled"
+  | "attendance.corrections_enabled"
+  | "attendance.payroll_deductions_enabled";
+
+const attendanceSubFeatureAliases: Record<AttendanceSubFeatureKey, string[]> = {
+  "attendance.manual_entry_enabled": ["attendance.manual_entry_enabled", "manual_attendance_enabled"],
+  "attendance.kiosk_enabled": ["attendance.kiosk_enabled", "kiosk_mode_enabled"],
+  "attendance.biometric_enabled": ["attendance.biometric_enabled", "biometric_enabled"],
+  "attendance.corrections_enabled": ["attendance.corrections_enabled", "attendance_correction_enabled"],
+  "attendance.payroll_deductions_enabled": ["attendance.payroll_deductions_enabled", "absent_day_deduction_enabled", "deduct_absent_days"],
+};
+
+const attendanceSubFeatureDefaults: Record<AttendanceSubFeatureKey, boolean> = {
+  "attendance.manual_entry_enabled": true,
+  "attendance.kiosk_enabled": true,
+  "attendance.biometric_enabled": false,
+  "attendance.corrections_enabled": true,
+  "attendance.payroll_deductions_enabled": true,
+};
+
+const readAttendanceSubFeature = (
+  settings: Record<string, unknown>,
+  canonicalKey: AttendanceSubFeatureKey,
+) => {
+  const aliases = attendanceSubFeatureAliases[canonicalKey] ?? [canonicalKey];
+  const matched = aliases.find((key) => typeof settings[key] === "boolean");
+  return matched ? settings[matched] === true : attendanceSubFeatureDefaults[canonicalKey];
+};
+
+export const getAttendanceSubFeatures = async (env: Env, context: AuthActor) => {
+  const settings = await settingsService.getAttendanceSettings(env, context.companyId).catch(() => ({}));
+  return {
+    manual_entry_enabled: readAttendanceSubFeature(settings, "attendance.manual_entry_enabled"),
+    kiosk_enabled: readAttendanceSubFeature(settings, "attendance.kiosk_enabled"),
+    biometric_enabled: readAttendanceSubFeature(settings, "attendance.biometric_enabled"),
+    corrections_enabled: readAttendanceSubFeature(settings, "attendance.corrections_enabled"),
+    payroll_deductions_enabled: readAttendanceSubFeature(settings, "attendance.payroll_deductions_enabled"),
+  };
+};
 
 export const normalizeAttendanceDateTime = (
   attendanceDate: string,

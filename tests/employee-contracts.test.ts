@@ -113,8 +113,14 @@ describe("employee contract schema and routes", () => {
   });
 
   it("registers employee-scoped and global contract routes", () => {
-    expect(read("src/routes/employees.routes.ts")).toContain("/:id/contracts");
-    expect(read("src/routes/employees.routes.ts")).toContain("/:id/contracts/:contractId/renew");
+    const employeeRoutes = read("src/routes/employees.routes.ts");
+    const contractRoutes = read("src/routes/contracts.routes.ts");
+
+    expect(employeeRoutes).toContain("/:id/contracts");
+    expect(employeeRoutes).toContain("/:id/contracts/:contractId/renew");
+    expect(employeeRoutes).toContain('requireFeature("contract_tracking")');
+    expect(contractRoutes).toContain('requireFeature("employee_management")');
+    expect(contractRoutes).toContain('requireFeature("contract_tracking")');
     expect(read("src/app.ts")).toContain('apiV1.route("/contracts", contractsRoutes)');
   });
 
@@ -155,7 +161,9 @@ describe("employee contract schema and routes", () => {
     const page = read("frontend/src/features/contracts/ContractsPage.tsx");
 
     expect(action).toContain("documentsApi.download");
+    expect(action).toContain('auth.hasFeature("documents")');
     expect(action).toContain("Document download is available from Employee Documents.");
+    expect(action).toContain("linked document download requires Document Tracking");
     expect(panel).toContain("ContractDocumentAction");
     expect(page).toContain("ContractDocumentAction");
     expect(action).not.toMatch(/file_key|storage_key|r2_key|signedUrl|signed_url/);

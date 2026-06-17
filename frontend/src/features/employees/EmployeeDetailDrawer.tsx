@@ -59,6 +59,7 @@ interface EmployeeDetailDrawerProps {
   canViewNotes: boolean;
   canManageStatus: boolean;
   canManageOffboarding: boolean;
+  canViewContracts: boolean;
   canManageContracts: boolean;
 }
 
@@ -94,6 +95,7 @@ export const EmployeeDetailDrawer = ({
   canViewNotes,
   canManageStatus,
   canManageOffboarding,
+  canViewContracts,
   canManageContracts,
 }: EmployeeDetailDrawerProps) => {
   if (!employee) return null;
@@ -154,10 +156,12 @@ export const EmployeeDetailDrawer = ({
           { label: "Contract type", value: employee.contract_type ?? "Not available" },
         ]}
       />
+      {canViewContracts ? (
       <section className="space-y-3">
         <h3 className="text-sm font-semibold">Contracts</h3>
         <EmployeeContractsPanel employee={employee} canManage={canManageContracts} />
       </section>
+      ) : null}
       <section className="space-y-3">
         <h3 className="text-sm font-semibold">Lifecycle / Status History</h3>
         <EmployeeLifecyclePanel employee={employee} canManageStatus={canManageStatus} />

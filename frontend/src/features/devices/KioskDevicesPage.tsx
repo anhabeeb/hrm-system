@@ -6,6 +6,7 @@ import { TabletSmartphone } from "lucide-react";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/auth.store";
+import { useAttendanceSubFeatures } from "@/features/attendance/useAttendanceSubFeatures";
 import { searchParamNumber } from "@/lib/query-string";
 import { friendlyOperationalError, sanitizeForDisplay } from "@/lib/safe-display";
 import { DeviceDetailDrawer } from "./DeviceDetailDrawer";
@@ -30,6 +31,7 @@ export const KioskDevicesPage = () => {
   const [rotateDevice, setRotateDevice] = useState<DeviceRecord | null>(null);
   const [oneTimeToken, setOneTimeToken] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const attendanceSubFeatures = useAttendanceSubFeatures();
 
   const filters = useMemo<DeviceFilterValues>(() => ({
     search: searchParams.get("search") || undefined,
@@ -51,8 +53,8 @@ export const KioskDevicesPage = () => {
     setSearchParams(params);
   };
 
-  const devicesQuery = useQuery({ queryKey: ["devices", filters], queryFn: () => devicesApi.list(filters) });
-  const healthSummaryQuery = useQuery({ queryKey: ["devices", "reports-health"], queryFn: devicesApi.reportsHealth, retry: false });
+  const devicesQuery = useQuery({ queryKey: ["devices", filters], queryFn: () => devicesApi.list(filters), enabled: attendanceSubFeatures.kioskEnabled });
+  const healthSummaryQuery = useQuery({ queryKey: ["devices", "reports-health"], queryFn: devicesApi.reportsHealth, retry: false, enabled: attendanceSubFeatures.kioskEnabled });
 
   const refresh = async () => queryClient.invalidateQueries({ queryKey: ["devices"] });
 
@@ -85,9 +87,19 @@ export const KioskDevicesPage = () => {
     },
   });
 
-  const canRegister = auth.hasAnyPermission(["devices.register", "sync.register_device"]);
-  const canEdit = auth.hasAnyPermission(["devices.enable", "devices.disable", "sync.disable_device"]);
-  const canRotate = auth.hasPermission("devices.rotate_token");
+  const canRegister = attendanceSubFeatures.kioskEnabled && auth.hasAnyPermission(["devices.register", "sync.register_device"]);
+  const canEdit = attendanceSubFeatures.kioskEnabled && auth.hasAnyPermission(["devices.enable", "devices.disable", "sync.disable_device"]);
+  const canRotate = attendanceSubFeatures.kioskEnabled && auth.hasPermission("devices.rotate_token");
+
+  if (!attendanceSubFeatures.kioskEnabled) {
+    return (
+      <div className="p-4 md:p-6">
+        <InlineAlert title="Kiosk Attendance is disabled." variant="warning">
+          Kiosk device setup, check-in/check-out device management, and kiosk sync actions are hidden until this attendance sub-feature is enabled.
+        </InlineAlert>
+      </div>
+    );
+  }
 
   return (
     <div>

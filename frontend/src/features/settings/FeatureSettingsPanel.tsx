@@ -13,7 +13,12 @@ import { FeatureReasonDialog } from "./FeatureReasonDialog";
 import { settingsApi } from "./settings.api";
 import type { FeatureSetting } from "./settings.types";
 
-const featureDisplay: Record<string, { name: string; description: string }> = {
+const featureDisplay: Record<string, { name: string; description: string; warning?: string }> = {
+  attendance: {
+    name: "Attendance Management",
+    description: "Track employee attendance, lateness, absences, corrections, biometric/kiosk entries, and attendance-based payroll review.",
+    warning: "Disabling this module hides it from normal use but does not delete existing attendance records.",
+  },
   leave_management: {
     name: "Leave Management",
     description: "Manage employee leave requests, balances, approvals, and leave history.",
@@ -22,9 +27,18 @@ const featureDisplay: Record<string, { name: string; description: string }> = {
     name: "Long Leave Management",
     description: "Manage extended leave workflows, foreign employee long leave, salary deduction handling, and long leave history.",
   },
+  roster: {
+    name: "Duty Roster",
+    description: "Plan employee work schedules, weekly duty rosters, shift assignments, and roster change workflows.",
+  },
   documents: {
     name: "Document Tracking",
     description: "Track employee documents, KYC records, expiries, and verification status.",
+  },
+  contract_tracking: {
+    name: "Contract Tracking",
+    description: "Track employee contracts, renewals, probation periods, linked contract documents, and contract expiry alerts.",
+    warning: "Disabling this module hides it from normal use but does not delete existing contract records.",
   },
   asset_tracking: {
     name: "Asset Tracking",
@@ -77,6 +91,9 @@ export const FeatureSettingsPanel = () => {
                 <p className="font-medium">{featureDisplay[row.feature_key]?.name ?? row.feature_name}</p>
                 {featureDisplay[row.feature_key]?.description ? (
                   <p className="text-xs text-muted-foreground">{featureDisplay[row.feature_key].description}</p>
+                ) : null}
+                {featureDisplay[row.feature_key]?.warning ? (
+                  <p className="text-xs text-muted-foreground">{featureDisplay[row.feature_key].warning}</p>
                 ) : null}
               </div>
             ),

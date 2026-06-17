@@ -36,6 +36,27 @@ const reportScope = (actor: AuthActor) => ({
   scope_type: actor.isSuperAdmin || actor.isAdmin ? "company" as const : "outlet" as const,
 });
 
+const attendancePayrollDeductionsEnabled = async (env: Env, actor: AuthActor) => {
+  const attendanceEnabled = await settingsService.isFeatureEnabled(env, actor.companyId, "attendance", actor);
+  if (!attendanceEnabled) return false;
+  const attendanceSettings = await settingsService.getAttendanceSettings(env, actor.companyId).catch(() => ({})) as Record<string, unknown>;
+  const configured =
+    attendanceSettings["attendance.payroll_deductions_enabled"] ??
+    attendanceSettings.absent_day_deduction_enabled ??
+    attendanceSettings.deduct_absent_days;
+  return configured !== false;
+};
+
+const requireAttendanceForPayrollReport = async (env: Env, actor: AuthActor, reportKey: string) => {
+  const attendanceEnabled = await settingsService.isFeatureEnabled(env, actor.companyId, "attendance", actor);
+  if (!attendanceEnabled) {
+    throw new AppError("Attendance Management is disabled. Enable it in Settings to use this module.", "ATTENDANCE_MANAGEMENT_DISABLED", 403);
+  }
+  if (reportKey === "attendance-deductions" && !(await attendancePayrollDeductionsEnabled(env, actor))) {
+    throw new AppError("Attendance Payroll Deductions are disabled. Enable them in Attendance Settings to use this report.", "ATTENDANCE_PAYROLL_DEDUCTIONS_DISABLED", 403);
+  }
+};
+
 const safeRows = (
   rows: Array<Record<string, unknown>>,
   sensitiveColumns: Set<string>,
@@ -89,11 +110,15 @@ const result = async (
 };
 
 const enabledCategories = async (env: Env, actor: AuthActor) => {
-  const [leaveEnabled, longLeaveEnabled] = await Promise.all([
+  const [attendanceEnabled, leaveEnabled, longLeaveEnabled, attendanceDeductionsEnabled] = await Promise.all([
+    settingsService.isFeatureEnabled(env, actor.companyId, "attendance", actor),
     settingsService.isFeatureEnabled(env, actor.companyId, "leave_management", actor),
     settingsService.isFeatureEnabled(env, actor.companyId, "long_leave_management", actor),
+    attendancePayrollDeductionsEnabled(env, actor),
   ]);
   return {
+    attendance: attendanceEnabled,
+    attendance_deductions: attendanceDeductionsEnabled,
     leave: leaveEnabled,
     long_leave: longLeaveEnabled,
   };
@@ -103,13 +128,15 @@ export const catalog = async (env: Env, actor: AuthActor) => {
   const categories = await enabledCategories(env, actor);
   return {
     data: PAYROLL_REPORT_DEFINITIONS.filter((definition) => canViewReport(actor, definition.required_permission))
+      .filter((definition) => definition.category !== "attendance" || categories.attendance)
+      .filter((definition) => definition.report_key !== "attendance-deductions" || categories.attendance_deductions)
       .filter((definition) => definition.report_key !== "leave-deductions" || categories.leave)
       .filter((definition) => definition.category !== "long_leave" || categories.long_leave),
     meta: {
       report_key: "catalog",
       report_name: "Payroll / Finance Report Catalog",
       description: "Available payroll and finance reports for the current user.",
-      categories: ["payroll", "salary", "deductions", "advances_loans", "attendance", ...(categories.long_leave ? ["long_leave"] : []), "payslips", "approvals", "cost", "audit", "finance_summary"],
+      categories: ["payroll", "salary", "deductions", "advances_loans", ...(categories.attendance ? ["attendance"] : []), ...(categories.long_leave ? ["long_leave"] : []), "payslips", "approvals", "cost", "audit", "finance_summary"],
       export_ready: true,
       sensitive: true,
     },
@@ -177,9 +204,11 @@ export const runReport = async (
       reportRows = await repository.salaryLoans(env, actor, filters, canViewSensitive);
       break;
     case "attendance-deductions":
+      await requireAttendanceForPayrollReport(env, actor, reportKey);
       reportRows = await repository.attendanceDeductions(env, actor, filters, canViewSensitive);
       break;
     case "overtime":
+      await requireAttendanceForPayrollReport(env, actor, reportKey);
       reportRows = await repository.overtime(env, actor, filters, canViewSensitive);
       break;
     case "long-leave-deductions":

@@ -13,6 +13,11 @@ export interface SetupFormValues {
   outlet_name?: string;
   outlet_code?: string;
   is_primary: boolean;
+  features: {
+    attendance: boolean;
+    roster: boolean;
+    contract_tracking: boolean;
+  };
   bootstrap_token: string;
 }
 
@@ -34,5 +39,10 @@ export interface BootstrapInitializePayload {
     outlet_name: string;
     outlet_code?: string | null;
     is_primary: boolean;
+  };
+  features?: {
+    attendance?: boolean;
+    roster?: boolean;
+    contract_tracking?: boolean;
   };
 }

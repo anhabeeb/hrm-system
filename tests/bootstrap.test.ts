@@ -65,6 +65,26 @@ describe("bootstrap validators", () => {
     expect(input.company.currency).toBe(DEFAULT_CURRENCY);
   });
 
+  it("preserves optional module selections during bootstrap", () => {
+    const input = validateBootstrapInitialize({
+      company: { company_name: "Ahmed HRM" },
+      super_admin: {
+        full_name: "Ahmed Naish",
+        email: "admin@example.com",
+        password: "StrongPassword123!",
+      },
+      features: {
+        attendance: false,
+        roster: false,
+        contract_tracking: false,
+      },
+    });
+
+    expect(input.features?.attendance).toBe(false);
+    expect(input.features?.roster).toBe(false);
+    expect(input.features?.contract_tracking).toBe(false);
+  });
+
   it("supports optional outlet data", () => {
     const input = validateBootstrapInitialize({
       company: { company_name: "Ahmed HRM" },

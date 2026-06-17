@@ -15,6 +15,7 @@ export const MODULE_FEATURE_ALIASES: Record<string, string[]> = {
   payslips: ["payslips"],
   documents_kyc: ["documents_kyc", "documents", "kyc_update_requests"],
   document_tracking: ["documents"],
+  contract_tracking: ["contract_tracking"],
   asset_tracking: ["asset_tracking"],
   uniform_tracking: ["uniform_tracking"],
   assets_uniforms: ["assets_uniforms", "asset_tracking", "uniform_tracking"],

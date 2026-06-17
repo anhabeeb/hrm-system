@@ -89,6 +89,7 @@ export const initializeBootstrap = async (
 
   await repository.ensureCompanySuperAdminRole(env, companyId, seedRole);
   await repository.ensureProductionFallbackDefaults(env, companyId);
+  await repository.applyBootstrapFeatureSelections(env, companyId, input.features);
   const companyRole = await repository.findCompanyRoleByKey(env, companyId, "super_admin");
   if (!companyRole) {
     throw new AppError(BOOTSTRAP_MESSAGES.roleMissing, "BOOTSTRAP_ROLE_MISSING", 409);

@@ -66,6 +66,7 @@ export const SENSITIVE_SETTING_GROUPS = new Set([
 ]);
 
 export const FEATURE_DEPENDENCIES: Record<string, string[]> = {
+  attendance: ["employee_management"],
   payslips: ["payroll"],
   long_leave: ["leave_management", "payroll"],
   long_leave_management: ["leave_management", "payroll"],
@@ -78,6 +79,7 @@ export const FEATURE_DEPENDENCIES: Record<string, string[]> = {
   payroll: ["employee_management"],
   roster: ["employee_management"],
   documents: ["employee_management"],
+  contract_tracking: ["employee_management"],
   assets_uniforms: ["employee_management"],
   asset_tracking: ["employee_management"],
   uniform_tracking: ["employee_management"],
@@ -87,10 +89,12 @@ export const FEATURE_DEPENDENCY_LABELS: Record<string, string> = {
   payroll: "Payroll",
   leave_management: "Leave Management",
   long_leave_management: "Long Leave Management",
-  attendance: "Attendance",
+  attendance: "Attendance Management",
   employee_login: "Employee Login",
   employee_management: "Employee Management",
   approvals: "Approvals",
+  roster: "Duty Roster",
+  contract_tracking: "Contract Tracking",
 };
 
 export const REPORTABLE_FEATURES = [
@@ -104,6 +108,7 @@ export const REPORTABLE_FEATURES = [
   "asset_tracking",
   "uniform_tracking",
   "documents",
+  "contract_tracking",
 ] as const;
 
 type SettingsGroupKey = (typeof ALLOWED_SETTINGS_GROUPS)[number];

@@ -113,6 +113,7 @@ export const ImportExportPage = () => {
   const canViewTemplates = has("import.download_template");
   const visibleExportTypes = useMemo(
     () => exportTypes.filter((type) =>
+      (type !== "attendance" || auth.hasFeature("attendance")) &&
       (type !== "leave" || auth.hasFeature("leave_management")) &&
       (type !== "assets" || auth.hasFeature("asset_tracking")) &&
       (type !== "uniforms" || auth.hasFeature("uniform_tracking")),

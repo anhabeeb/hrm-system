@@ -162,6 +162,36 @@ describe("settings validators", () => {
     ).not.toThrow();
   });
 
+  it("blocks enabling Duty Roster until Employee Management is enabled", () => {
+    expect(() =>
+      validateFeatureDependencies("roster", true, new Set()),
+    ).toThrow("This feature cannot be enabled until Employee Management is enabled.");
+
+    expect(() =>
+      validateFeatureDependencies("roster", true, new Set(["employee_management"])),
+    ).not.toThrow();
+  });
+
+  it("blocks enabling Attendance Management until Employee Management is enabled", () => {
+    expect(() =>
+      validateFeatureDependencies("attendance", true, new Set()),
+    ).toThrow("This feature cannot be enabled until Employee Management is enabled.");
+
+    expect(() =>
+      validateFeatureDependencies("attendance", true, new Set(["employee_management"])),
+    ).not.toThrow();
+  });
+
+  it("blocks enabling Contract Tracking until Employee Management is enabled", () => {
+    expect(() =>
+      validateFeatureDependencies("contract_tracking", true, new Set()),
+    ).toThrow("This feature cannot be enabled until Employee Management is enabled.");
+
+    expect(() =>
+      validateFeatureDependencies("contract_tracking", true, new Set(["employee_management"])),
+    ).not.toThrow();
+  });
+
   it("allows valid approval mode changes", () => {
     const input = validateApprovalSettingsInput({
       approval_mode: "disabled",

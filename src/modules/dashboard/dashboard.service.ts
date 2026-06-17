@@ -54,6 +54,15 @@ const emptyExpiryCounts = () => ({
   document: 0,
 });
 
+const withoutContractExpiryCounts = <T extends Record<string, unknown> | null>(counts: T, contractTrackingEnabled: boolean): T => {
+  if (!counts || contractTrackingEnabled) return counts;
+  return {
+    ...counts,
+    contract: 0,
+    probation: 0,
+  } as T;
+};
+
 export const getEmployeeSummary = async (env: Env, ctx: DashboardQueryContext) => {
   if (!can(ctx.actor, ["dashboard.view", "dashboard.view_company", "dashboard.view_outlet"])) return null;
   const [summary, byOutlet, byDepartment, expiry] = await Promise.all([
@@ -140,11 +149,13 @@ export const getExpiryAlerts = async (env: Env, ctx: DashboardQueryContext) => {
   const linkedEmployeeId = hasScopedExpiryAccess
     ? null
     : await repository.findActorLinkedEmployeeId(env, ctx.actor.companyId, ctx.actor.actorUserId);
-  const counts = hasScopedExpiryAccess
+  const rawCounts = hasScopedExpiryAccess
     ? await repository.expiryCounts(env, ctx.actor, ctx.today)
     : linkedEmployeeId
       ? await repository.expiryCounts(env, ctx.actor, ctx.today, { employeeId: linkedEmployeeId })
       : emptyExpiryCounts();
+  const features = new Set(await repository.listEnabledFeatureKeys(env, ctx.actor.companyId));
+  const counts = withoutContractExpiryCounts(rawCounts, moduleEnabled(features, "contract_tracking"));
   return {
     critical_alerts: n(counts?.critical),
     due_today: n(counts?.due_today),
@@ -444,6 +455,7 @@ export const getCommandCenter = async (env: Env, actor: AuthActor): Promise<{ da
   const approvalsEnabled = moduleEnabled(features, "approvals");
   const payrollEnabled = moduleEnabled(features, "payroll");
   const documentsEnabled = moduleEnabled(features, "documents_kyc");
+  const contractTrackingEnabled = moduleEnabled(features, "contract_tracking");
   const rosterEnabled = moduleEnabled(features, "roster");
   const lifecycleEnabled = moduleEnabled(features, "resignation_offboarding");
   const disciplineEnabled = moduleEnabled(features, "disciplinary_actions");
@@ -491,7 +503,7 @@ export const getCommandCenter = async (env: Env, actor: AuthActor): Promise<{ da
     attendanceEnabled && canViewAttendance ? safeCommandCenterQuery("attendance corrections", null, () => repository.pendingAttendanceCorrectionCount(env, actor), commandCenterWarnings) : Promise.resolve(null),
     approvalsEnabled && canViewApprovals ? safeCommandCenterQuery("approval queue", [] as Awaited<ReturnType<typeof repository.approvalQueueCounts>>, () => repository.approvalQueueCounts(env, actor, approvalOperationTypes), commandCenterWarnings) : Promise.resolve([]),
     documentsEnabled && canViewDocuments ? safeCommandCenterQuery("document KYC", null, () => repository.documentKycCounts(env, actor), commandCenterWarnings) : Promise.resolve(null),
-    documentsEnabled && canViewDocuments ? safeCommandCenterQuery("document expiry 60 days", null, () => repository.expiryCountsWithinDays(env, actor, ctx.today, 60), commandCenterWarnings) : Promise.resolve(null),
+    documentsEnabled && canViewDocuments ? safeCommandCenterQuery("document expiry 60 days", null, () => repository.expiryCountsWithinDays(env, actor, ctx.today, 60, { includeContracts: contractTrackingEnabled }), commandCenterWarnings) : Promise.resolve(null),
     rosterEnabled && canViewRoster ? safeCommandCenterQuery("roster coverage", null, () => repository.rosterCoverage(env, actor, ctx.today), commandCenterWarnings) : Promise.resolve(null),
     lifecycleEnabled && canViewLifecycle ? safeCommandCenterQuery("lifecycle", null, () => repository.lifecycleCounts(env, actor, ctx.today), commandCenterWarnings) : Promise.resolve(null),
     disciplineEnabled && canViewDiscipline ? safeCommandCenterQuery("disciplinary follow-up", null, () => repository.disciplinaryCounts(env, actor), commandCenterWarnings) : Promise.resolve(null),
@@ -624,8 +636,8 @@ export const getCommandCenter = async (env: Env, actor: AuthActor): Promise<{ da
         status: commandCenterWarnings.some((warning) => warning.includes("document")) ? "empty" : n(data.expiry_alerts?.critical_alerts) > 0 ? "needs_review" : "ready",
         error: commandCenterWarnings.some((warning) => warning.includes("document")) ? "unavailable" : undefined,
       }),
-      roster_coverage: widget("Roster Coverage", rosterEnabled, canViewRoster, {
-        description: "Roster coverage and conflicts.",
+      roster_coverage: widget("Duty Roster Coverage", rosterEnabled, canViewRoster, {
+        description: "Duty Roster coverage and conflicts.",
         metrics: {
           scheduled_today: n(rosterCoverage?.scheduled_today),
           open_shifts: n(rosterCoverage?.open_shifts),
@@ -635,7 +647,7 @@ export const getCommandCenter = async (env: Env, actor: AuthActor): Promise<{ da
           pending_roster_changes: n(rosterCoverage?.pending_roster_changes),
         },
         actions: visibleActions(actor, features, [
-          { ...moduleAction("open-roster", "Open roster", "Review rosters", "/rosters", "rosters.view", "Roster"), moduleCode: "roster" },
+          { ...moduleAction("open-roster", "Open Duty Roster", "Review duty rosters", "/rosters", "rosters.view", "Duty Roster"), moduleCode: "roster" },
         ]),
         status: commandCenterWarnings.some((warning) => warning.includes("roster coverage")) ? "empty" : n(data.holiday_roster_context?.open_roster_conflicts) > 0 ? "needs_review" : "ready",
         error: commandCenterWarnings.some((warning) => warning.includes("roster coverage")) ? "unavailable" : undefined,

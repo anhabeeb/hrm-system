@@ -23,6 +23,7 @@ import { searchParamNumber } from "@/lib/query-string";
 import { payrollReportsApi } from "./payroll-reports.api";
 import { ReportExportActions } from "@/features/report-exports/ReportExportActions";
 import { useAuth } from "@/features/auth/auth.store";
+import { useAttendanceSubFeatures } from "@/features/attendance/useAttendanceSubFeatures";
 import type { PayrollReportDefinition, PayrollReportFilters } from "./payroll-reports.types";
 
 const categories = [
@@ -64,10 +65,14 @@ const defaultReportFor = (reports: PayrollReportDefinition[], selected?: string 
 
 export const PayrollReportsPage = () => {
   const auth = useAuth();
+  const attendanceSubFeatures = useAttendanceSubFeatures();
   const [searchParams, setSearchParams] = useSearchParams();
   const filters = useMemo(() => filtersFromParams(searchParams), [searchParams]);
   const visibleCategories = useMemo(
-    () => categories.filter((category) => category.key !== "long_leave" || auth.hasFeature("long_leave_management")),
+    () => categories.filter((category) =>
+      (category.key !== "attendance" || auth.hasFeature("attendance")) &&
+      (category.key !== "long_leave" || auth.hasFeature("long_leave_management")),
+    ),
     [auth],
   );
   const requestedCategory = searchParams.get("category") ?? "payroll";
@@ -76,6 +81,8 @@ export const PayrollReportsPage = () => {
 
   const catalogQuery = useQuery({ queryKey: ["payroll-reports", "catalog"], queryFn: () => payrollReportsApi.catalog() });
   const allReports = (catalogQuery.data?.data.data ?? []).filter((report) =>
+    (report.category !== "attendance" || auth.hasFeature("attendance")) &&
+    (report.report_key !== "attendance-deductions" || (auth.hasFeature("attendance") && attendanceSubFeatures.payrollDeductionsEnabled)) &&
     (report.report_key !== "leave-deductions" || auth.hasFeature("leave_management")) &&
     (report.category !== "long_leave" || auth.hasFeature("long_leave_management")),
   );

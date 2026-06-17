@@ -78,6 +78,9 @@ export const Employee360Page = () => {
   const profile = profileQuery.data?.data;
   const employee = profile?.summary.employee;
   const warnings = profile?.summary.warnings ?? {};
+  const canViewAttendance =
+    auth.hasFeature("attendance") &&
+    auth.hasAnyPermission(["attendance.view", "attendance.reports.view", "attendance.calendar.view", "attendance.calendar.viewTeam", "attendance.calendar.viewAll", "employees.view"]);
   const canViewAttendanceCalendar =
     auth.hasFeature("attendance") &&
     auth.hasAnyPermission(["attendance.calendar.view", "attendance.calendar.viewTeam", "attendance.calendar.viewAll", "attendance.view", "attendance.reports.view", "employees.view"]);
@@ -86,6 +89,9 @@ export const Employee360Page = () => {
   const canViewAssets = auth.hasFeature("asset_tracking") && auth.hasPermission("assets.view");
   const canViewUniforms = auth.hasFeature("uniform_tracking") && auth.hasPermission("uniforms.view");
   const canViewAssetsUniforms = canViewAssets || canViewUniforms;
+  const canViewContracts =
+    auth.hasFeature("contract_tracking") &&
+    auth.hasAnyPermission(["employees.contracts.view", "contracts.view", "employees.view"]);
   const canManageProfilePhoto = auth.hasAnyPermission(["employees.profilePhoto.upload", "employees.profilePhoto.manage", "employees.edit", "employees.manage"]);
 
   return (
@@ -133,14 +139,14 @@ export const Employee360Page = () => {
             ) : null}
 
             <Tabs defaultValue="overview">
-              <TabsList className="flex h-auto flex-wrap justify-start">
+                <TabsList className="flex h-auto flex-wrap justify-start">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="attendance">Attendance</TabsTrigger>
+                {canViewAttendance ? <TabsTrigger value="attendance">Attendance</TabsTrigger> : null}
                 {canViewAttendanceCalendar ? <TabsTrigger value="attendance-calendar">Attendance Calendar</TabsTrigger> : null}
                 {canViewLeave ? <TabsTrigger value="leave">Leave</TabsTrigger> : null}
                 {canViewLongLeave ? <TabsTrigger value="long-leave">Long Leave</TabsTrigger> : null}
                 <TabsTrigger value="documents">Documents</TabsTrigger>
-                <TabsTrigger value="contracts">Contracts</TabsTrigger>
+                {canViewContracts ? <TabsTrigger value="contracts">Contracts</TabsTrigger> : null}
                 {canViewAssetsUniforms ? <TabsTrigger value="assets">Assets/Uniforms</TabsTrigger> : null}
                 <TabsTrigger value="payroll">Payroll Readiness</TabsTrigger>
                 <TabsTrigger value="alerts">Alerts</TabsTrigger>
@@ -177,6 +183,7 @@ export const Employee360Page = () => {
                 })} columns={["metric", "value"]} />
               </TabsContent>
 
+              {canViewAttendance ? (
               <TabsContent value="attendance" className="space-y-3">
                 {profile.attendance ? (
                   <>
@@ -186,6 +193,7 @@ export const Employee360Page = () => {
                   </>
                 ) : <InlineAlert title="Attendance section is hidden for your role." />}
               </TabsContent>
+              ) : null}
 
               {canViewAttendanceCalendar ? (
                 <TabsContent value="attendance-calendar" className="space-y-3">
@@ -221,9 +229,11 @@ export const Employee360Page = () => {
                 {profile.documents ? <SimpleTable title="Documents" rows={recordRows(profile.documents.documents)} columns={["document_type", "file_name", "expiry_date", "status", "is_sensitive", "created_at"]} /> : <InlineAlert title="Documents section is hidden for your role." />}
               </TabsContent>
 
+              {canViewContracts ? (
               <TabsContent value="contracts">
                 {profile.contracts ? <SimpleTable title="Contracts" rows={recordRows(profile.contracts.contracts)} columns={["contract_number", "contract_type", "contract_status", "start_date", "end_date", "probation_end_date", "salary_snapshot_amount"]} /> : <InlineAlert title="Contracts section is hidden for your role." />}
               </TabsContent>
+              ) : null}
 
               {canViewAssetsUniforms ? (
               <TabsContent value="assets" className="space-y-3">

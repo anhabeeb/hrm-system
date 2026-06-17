@@ -291,7 +291,7 @@ export const getDepartmentWeeklyTeamView = async (
     employees: filteredEmployees,
     warnings: [
       !leaveEnabled ? "Leave module is disabled; leave and sick overlays are unavailable." : null,
-      !rosterEnabled ? "Roster module is disabled; shift labels and roster conflict metrics are unavailable." : null,
+      !rosterEnabled ? "Duty Roster module is disabled; shift labels and roster conflict metrics are unavailable." : null,
       !holidaysEnabled ? "Holiday module is disabled; holiday overlays are unavailable." : null,
       filteredEmployees.length === 0 ? "No employees found in this department." : null,
     ].filter((warning): warning is string => Boolean(warning)),
