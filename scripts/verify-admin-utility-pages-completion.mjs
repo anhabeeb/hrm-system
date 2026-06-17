@@ -20,6 +20,7 @@ const mustNotInclude = (label, source, tokens) => {
 
 const backupPage = read("frontend/src/features/backup-recovery/BackupRecoveryPage.tsx");
 const importExportPage = read("frontend/src/features/import-export/ImportExportPage.tsx");
+const importExportApi = read("frontend/src/features/import-export/import-export.api.ts");
 const importExportTypes = read("frontend/src/features/import-export/import-export.types.ts");
 const reportsPage = read("frontend/src/features/reports/ReportsPage.tsx");
 const hrReportsPage = read("frontend/src/features/hr-reports/HrReportsPage.tsx");
@@ -65,8 +66,8 @@ mustInclude("BackupRecoveryPage", backupPage, [
   "RESTORE COMPANY DATA",
 ]);
 mustNotInclude("BackupRecoveryPage", backupPage, ["fixed bottom-4", "<JsonPanel value={statusQuery"]);
-const staleBackupPlaceholderPath = ["frontend/src/features/backup-recovery", "BackupRecovery", "PlaceholderPage.tsx"].join("/");
-if (exists(staleBackupPlaceholderPath)) fail("stale backup recovery fallback file remains in the completed route area.");
+if (exists("frontend/src/features/backup-recovery/BackupRecoveryPlaceholderPage.tsx")) fail("frontend/src/features/backup-recovery/BackupRecoveryPlaceholderPage.tsx must be deleted.");
+if (exists("frontend/src/features/import-export/ImportExportPlaceholderPage.tsx")) fail("frontend/src/features/import-export/ImportExportPlaceholderPage.tsx must be deleted.");
 
 mustInclude("ImportExportPage", importExportPage, [
   "Excel workbook",
@@ -78,6 +79,8 @@ mustInclude("Import/export types", importExportTypes, ['format: "xlsx" | "pdf"',
 mustInclude("Import/export validators", importValidators, ["Only Excel .xlsx import files are supported."]);
 mustInclude("Import/export Excel parser", importValidationService, ["readZipEntries", "parseWorksheet", "requiredHeaders", "preview_rows"]);
 mustInclude("Import/export upload and apply safety", importJobService, ["0x50", "0x4b", "parseImportWorkbook", "insertImportedEmployees", "markImportApplied", "UNSUPPORTED_IMPORT_TEMPLATE"]);
+mustInclude("Import/export apply UI", importExportPage, ["Apply Import", "import.confirm", 'row.status === "validated"', 'row.import_type === "employees"']);
+mustInclude("Import/export apply API", importExportApi, ["applyImport", "/import-export/imports/${id}/apply", "failed_rows", "errors"]);
 mustNotInclude("Import/export apply", importJobService, ["IMPORT_APPLY_NOT_CONFIGURED"]);
 mustNotInclude("ImportExportPage", importExportPage, ['<SelectItem value="json"', '<SelectItem value="csv"', "CSV or JSON", "Please upload a CSV"]);
 mustNotInclude("Legacy Import Center redirect", read("frontend/src/features/imports/ImportCenterPage.tsx"), ["Template CSV", "CSV file", "csv_content", ".csv"]);

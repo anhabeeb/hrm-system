@@ -26,7 +26,7 @@ export const importExportApi = {
   },
   uploadImport: (payload: ImportUploadPayload) => api.post<{ import_job: ImportJob }>("/import-export/imports/upload", payload),
   validateImport: (id: string) => api.post<Record<string, unknown>>(`/import-export/imports/${id}/validate`),
-  applyImport: (id: string, reason: string) => api.post<{ applied?: boolean; note?: string; import_job_id?: string }>(`/import-export/imports/${id}/apply`, { reason }),
+  applyImport: (id: string, reason: string) => api.post<{ applied?: boolean; import_job_id?: string; applied_rows?: number; failed_rows?: number; errors?: Array<{ row: number; message: string }> }>(`/import-export/imports/${id}/apply`, { reason }),
   cancelImport: (id: string, reason: string) => api.post<{ import_job_id: string; status: string }>(`/import-export/imports/${id}/cancel`, { reason }),
   templates: async () => {
     const response = await api.get<ImportTemplate[]>("/import-export/templates");

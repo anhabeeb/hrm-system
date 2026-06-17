@@ -34,6 +34,7 @@ describe("admin utility pages completion", () => {
     const validators = read("src/modules/import-export/import-export.validators.ts");
     const parser = read("src/modules/import-export/import-validation.service.ts");
     const service = read("src/modules/import-export/import-job.service.ts");
+    const api = read("frontend/src/features/import-export/import-export.api.ts");
     const legacyImportCenter = read("frontend/src/features/imports/ImportCenterPage.tsx");
     expect(page).toContain("Excel workbook");
     expect(page).toContain("PDF report");
@@ -50,6 +51,12 @@ describe("admin utility pages completion", () => {
     expect(service).toContain("markImportApplied");
     expect(service).toContain("UNSUPPORTED_IMPORT_TEMPLATE");
     expect(service).not.toContain("IMPORT_APPLY_NOT_CONFIGURED");
+    expect(api).toContain("applyImport");
+    expect(api).toContain("/import-export/imports/${id}/apply");
+    expect(page).toContain("Apply Import");
+    expect(page).toContain("import.confirm");
+    expect(page).toContain('row.status === "validated"');
+    expect(page).toContain('row.import_type === "employees"');
     expect(legacyImportCenter).toContain('to="/import-export"');
     expect(legacyImportCenter).not.toContain("Template CSV");
     expect(legacyImportCenter).not.toContain("csv_content");
