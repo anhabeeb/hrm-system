@@ -71,6 +71,7 @@ const documentsController = read("src/modules/documents/documents.controller.ts"
 const reportExportsController = read("src/modules/report-exports/report-exports.controller.ts");
 const backupService = read("src/modules/backup-recovery/backup-recovery.service.ts");
 const reportExportsService = read("src/modules/report-exports/report-exports.service.ts");
+const exportFileFormat = read("src/utils/export-file-format.ts");
 const backupSnapshot = read("src/modules/backup-recovery/backup-snapshot.service.ts");
 const deviceAuth = read("src/middleware/device-auth.middleware.ts");
 const devicesService = read("src/modules/devices/devices.service.ts");
@@ -199,9 +200,10 @@ assertContains("device auth", deviceAuth, /readBearerToken[\s\S]*authenticateDev
 assertContains("device DTO", devicesService, /device_token_hash:\s*_tokenHash/, "device token hash must not be returned in DTOs.");
 assertContains("device DTO", devicesService, /rawToken[\s\S]*device_token[\s\S]*token_shown_once/, "raw device token should only appear on registration/rotation responses.");
 
-assertContains("report export", reportExportsService, /formula|spreadsheet|dangerous/i, "CSV formula injection protection must be present.");
-assertContains("report export", reportExportsService, /action === "download"[\s\S]*requireExportPermission\(actor,\s*requireCatalogItem\(job\.report_key\),\s*"download"\)/, "export download must route through job permission checks.");
-assertContains("report export", reportExportsService, /action === "download"[\s\S]*report_exports\.download/, "export download must map to report_exports.download permission.");
+assertContains("report export", `${reportExportsService}\n${exportFileFormat}`, /formula|spreadsheet|dangerous/i, "spreadsheet formula injection protection must be present.");
+assertContains("report export", reportExportsService, /requireJob\(env,\s*actor,\s*jobId,\s*"download"\)/, "export downloads must route through job permission checks.");
+assertContains("report export", reportExportsService, /action === "download"[\s\S]*requireExportPermission\(actor,\s*requireCatalogItem\(job\.report_key\),\s*"download"\)/, "export download jobs must re-check catalog download permission.");
+assertContains("report export", reportExportsService, /const actionPermission[\s\S]*report_exports\.download/, "export download must map to report_exports.download permission.");
 assertContains("backup", backupSnapshot, /excluded_fields[\s\S]*password_hash[\s\S]*device_token[\s\S]*raw_payload/, "backup snapshots must exclude secrets/tokens/raw payloads.");
 assertContains("backup", backupService, /backup_recovery\.backup\.download[\s\S]*findBackup/, "backup download must re-check permission and company scope.");
 
