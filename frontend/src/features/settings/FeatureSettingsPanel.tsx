@@ -14,6 +14,14 @@ import { settingsApi } from "./settings.api";
 import type { FeatureSetting } from "./settings.types";
 
 const featureDisplay: Record<string, { name: string; description: string }> = {
+  leave_management: {
+    name: "Leave Management",
+    description: "Manage employee leave requests, balances, approvals, and leave history.",
+  },
+  long_leave_management: {
+    name: "Long Leave Management",
+    description: "Manage extended leave workflows, foreign employee long leave, salary deduction handling, and long leave history.",
+  },
   documents: {
     name: "Document Tracking",
     description: "Track employee documents, KYC records, expiries, and verification status.",

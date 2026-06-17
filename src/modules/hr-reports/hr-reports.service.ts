@@ -64,11 +64,15 @@ const result = (
 };
 
 const enabledCategories = async (env: Env, actor: AuthActor) => {
-  const [assetsEnabled, uniformsEnabled] = await Promise.all([
+  const [leaveEnabled, longLeaveEnabled, assetsEnabled, uniformsEnabled] = await Promise.all([
+    settingsService.isFeatureEnabled(env, actor.companyId, "leave_management", actor),
+    settingsService.isFeatureEnabled(env, actor.companyId, "long_leave_management", actor),
     settingsService.isFeatureEnabled(env, actor.companyId, "asset_tracking", actor),
     settingsService.isFeatureEnabled(env, actor.companyId, "uniform_tracking", actor),
   ]);
   return {
+    leave: leaveEnabled,
+    long_leave: longLeaveEnabled,
     assets: assetsEnabled && uniformsEnabled,
   };
 };
@@ -77,12 +81,14 @@ export const catalog = async (env: Env, actor: AuthActor) => {
   const categories = await enabledCategories(env, actor);
   return {
     data: HR_REPORT_DEFINITIONS.filter((definition) => canViewReport(actor, definition.required_permission))
+      .filter((definition) => definition.category !== "leave" || categories.leave)
+      .filter((definition) => definition.category !== "long_leave" || categories.long_leave)
       .filter((definition) => definition.category !== "assets" || categories.assets),
     meta: {
       report_key: "catalog",
       report_name: "HR Report Catalog",
       description: "Available HR reports for the current user.",
-      categories: ["employee", "compliance", "documents", "leave", "long_leave", "lifecycle", ...(categories.assets ? ["assets"] : []), "summary"],
+      categories: ["employee", "compliance", "documents", ...(categories.leave ? ["leave"] : []), ...(categories.long_leave ? ["long_leave"] : []), "lifecycle", ...(categories.assets ? ["assets"] : []), "summary"],
       export_ready: true,
     },
     generated_at: new Date().toISOString(),
@@ -150,12 +156,21 @@ export const runReport = async (
       reportRows = await repository.foreignCompliance(env, actor, filters, canViewSensitiveIdentity(actor));
       break;
     case "leave-balances":
+      if (!(await enabledCategories(env, actor)).leave) {
+        throw new AppError("Leave Management is disabled. Enable it in Settings to use this module.", "LEAVE_MANAGEMENT_DISABLED", 403);
+      }
       reportRows = await repository.leaveBalances(env, actor, filters);
       break;
     case "leave-requests":
+      if (!(await enabledCategories(env, actor)).leave) {
+        throw new AppError("Leave Management is disabled. Enable it in Settings to use this module.", "LEAVE_MANAGEMENT_DISABLED", 403);
+      }
       reportRows = await repository.leaveRequests(env, actor, filters);
       break;
     case "long-leave":
+      if (!(await enabledCategories(env, actor)).long_leave) {
+        throw new AppError("Long Leave Management is disabled. Enable it in Settings to use this module.", "LONG_LEAVE_MANAGEMENT_DISABLED", 403);
+      }
       reportRows = await repository.longLeave(env, actor, filters);
       break;
     case "assets-uniforms":

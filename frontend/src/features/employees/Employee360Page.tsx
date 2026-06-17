@@ -81,6 +81,8 @@ export const Employee360Page = () => {
   const canViewAttendanceCalendar =
     auth.hasFeature("attendance") &&
     auth.hasAnyPermission(["attendance.calendar.view", "attendance.calendar.viewTeam", "attendance.calendar.viewAll", "attendance.view", "attendance.reports.view", "employees.view"]);
+  const canViewLeave = auth.hasFeature("leave_management") && auth.hasPermission("leave.view");
+  const canViewLongLeave = auth.hasFeature("long_leave_management") && auth.hasPermission("long_leave.view");
   const canViewAssets = auth.hasFeature("asset_tracking") && auth.hasPermission("assets.view");
   const canViewUniforms = auth.hasFeature("uniform_tracking") && auth.hasPermission("uniforms.view");
   const canViewAssetsUniforms = canViewAssets || canViewUniforms;
@@ -135,8 +137,8 @@ export const Employee360Page = () => {
                 <TabsTrigger value="overview">Overview</TabsTrigger>
                 <TabsTrigger value="attendance">Attendance</TabsTrigger>
                 {canViewAttendanceCalendar ? <TabsTrigger value="attendance-calendar">Attendance Calendar</TabsTrigger> : null}
-                <TabsTrigger value="leave">Leave</TabsTrigger>
-                <TabsTrigger value="long-leave">Long Leave</TabsTrigger>
+                {canViewLeave ? <TabsTrigger value="leave">Leave</TabsTrigger> : null}
+                {canViewLongLeave ? <TabsTrigger value="long-leave">Long Leave</TabsTrigger> : null}
                 <TabsTrigger value="documents">Documents</TabsTrigger>
                 <TabsTrigger value="contracts">Contracts</TabsTrigger>
                 {canViewAssetsUniforms ? <TabsTrigger value="assets">Assets/Uniforms</TabsTrigger> : null}
@@ -191,6 +193,7 @@ export const Employee360Page = () => {
                 </TabsContent>
               ) : null}
 
+              {canViewLeave ? (
               <TabsContent value="leave" className="space-y-3">
                 {profile.leave ? (
                   <>
@@ -200,7 +203,9 @@ export const Employee360Page = () => {
                   </>
                 ) : <InlineAlert title="Leave section is hidden for your role." />}
               </TabsContent>
+              ) : null}
 
+              {canViewLongLeave ? (
               <TabsContent value="long-leave" className="space-y-3">
                 {profile.long_leave ? (
                   <>
@@ -210,6 +215,7 @@ export const Employee360Page = () => {
                   </>
                 ) : <InlineAlert title="Long leave section is hidden for your role." />}
               </TabsContent>
+              ) : null}
 
               <TabsContent value="documents">
                 {profile.documents ? <SimpleTable title="Documents" rows={recordRows(profile.documents.documents)} columns={["document_type", "file_name", "expiry_date", "status", "is_sensitive", "created_at"]} /> : <InlineAlert title="Documents section is hidden for your role." />}

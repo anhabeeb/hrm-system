@@ -53,6 +53,7 @@ const fakeEnv = (rows: Record<string, unknown>[] = [{ employee_id: "emp_1", empl
         bind: (...values: unknown[]) => ({
           first: async () => {
             calls.push({ sql, values, method: "first" });
+            if (sql.includes("FROM feature_settings")) return { feature_key: values[1], is_enabled: 1, status: "enabled", applies_to_all_outlets: 1, allowed_role_ids_json: null, allowed_outlet_ids_json: null };
             if (sql.includes("SELECT currency FROM companies")) return { currency: "MVR" };
             return {
               total: rows.length,
@@ -76,8 +77,9 @@ const fakeEnv = (rows: Record<string, unknown>[] = [{ employee_id: "emp_1", empl
 const source = (path: string) => readFileSync(path, "utf8");
 
 describe("Phase 11C Payroll / Finance Reports", () => {
-  it("catalog returns payroll reports", () => {
-    const result = service.catalog(actor());
+  it("catalog returns payroll reports", async () => {
+    const { env } = fakeEnv();
+    const result = await service.catalog(env, actor());
     const keys = result.data.map((report) => report.report_key);
     expect(keys).toContain("monthly-summary");
     expect(keys).toContain("employee-detail");
@@ -85,15 +87,16 @@ describe("Phase 11C Payroll / Finance Reports", () => {
     expect(result.meta.export_ready).toBe(true);
   });
 
-  it("unavailable reports hidden by permission", () => {
-    const result = service.catalog(actor({ permissions: ["payroll_reports.view", "payroll_reports.catalog.view", "payroll_reports.summary.view"] }));
+  it("unavailable reports hidden by permission", async () => {
+    const { env } = fakeEnv();
+    const result = await service.catalog(env, actor({ permissions: ["payroll_reports.view", "payroll_reports.catalog.view", "payroll_reports.summary.view"] }));
     expect(result.data.every((report) => report.required_permission === "payroll_reports.summary.view")).toBe(true);
   });
 
   it("catalog-only permission can view catalog but cannot run report data", async () => {
     const catalogActor = actor({ permissions: ["payroll_reports.catalog.view"], roleKeys: ["auditor"] });
-    expect(service.catalog(catalogActor).meta.report_key).toBe("catalog");
     const { env } = fakeEnv();
+    expect((await service.catalog(env, catalogActor)).meta.report_key).toBe("catalog");
     await expect(service.runReport(env, catalogActor, "monthly-summary", validatePayrollReportFilters({}))).rejects.toThrow(/permission/i);
   });
 

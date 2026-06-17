@@ -61,7 +61,7 @@ export const navigationGroups: NavGroup[] = [
       { label: "My Attendance", path: "/self/attendance", icon: Clock3, moduleCode: "attendance", requiredFeature: "attendance", requiredPermission: "self.attendance.view", requiresLinkedEmployee: true },
       { id: "self-attendance-calendar", label: "My Attendance Calendar", path: "/self/attendance-calendar", icon: CalendarDays, moduleCode: "attendance", requiredFeature: "attendance", requiredPermissionsAny: ["self.attendance.calendar.view", "self.attendance.view"], requiresLinkedEmployee: true, selfServiceOnly: true },
       { label: "My Roster", path: "/self/roster", icon: CalendarDays, moduleCode: "roster", requiredFeature: "roster", requiredPermission: "self.roster.view", requiresLinkedEmployee: true },
-      { label: "My Leave", path: "/self/leave", icon: CalendarClock, moduleCode: "leave", requiredFeature: "leave_management", requiredPermission: "self.leave.view", requiresLinkedEmployee: true },
+      { label: "My Leave", path: "/self/leave", icon: CalendarClock, moduleCode: "leave_management", requiredFeature: "leave_management", requiredPermission: "self.leave.view", requiresLinkedEmployee: true },
       { label: "My Requests", path: "/self/requests", icon: ClipboardCheck, requiredPermission: "self.requests.view", requiresLinkedEmployee: true },
       { label: "My Documents / KYC", path: "/self/documents", icon: FileText, moduleCode: "documents_kyc", requiredFeature: "documents", requiredPermission: "self.documents.view", requiresLinkedEmployee: true },
       { label: "My Payslips", path: "/self/payslips", icon: ReceiptText, moduleCode: "payslips", requiredFeature: "payslips", requiredPermission: "self.payslips.view", requiresLinkedEmployee: true },
@@ -106,9 +106,9 @@ export const navigationGroups: NavGroup[] = [
   {
     label: "Leave & Payroll",
     items: [
-      { label: "Leave", path: "/leave", icon: CalendarClock, moduleCode: "leave", requiredFeature: "leave_management", requiredPermission: "leave.view" },
+      { label: "Leave", path: "/leave", icon: CalendarClock, moduleCode: "leave_management", requiredFeature: "leave_management", requiredPermission: "leave.view" },
       { label: "Holiday Calendar", path: "/holidays", icon: CalendarDays, requiredFeature: "holidays", requiredPermissionsAny: ["holidays.view", "holidays.calendar.view"] },
-      { label: "Long Leave", path: "/long-leave", icon: FileArchive, requiredFeature: "long_leave", requiredPermission: "long_leave.view" },
+      { label: "Long Leave", path: "/long-leave", icon: FileArchive, moduleCode: "long_leave_management", requiredFeature: "long_leave_management", requiredPermission: "long_leave.view" },
       { label: "Payroll", path: "/payroll", icon: Landmark, moduleCode: "payroll", requiredFeature: "payroll", requiredPermission: "payroll.view" },
       { id: "payroll-attendance-review", label: "Payroll Attendance Review", path: "/payroll/attendance-review", icon: CalendarDays, moduleCode: "payroll", moduleCodesAll: ["payroll", "attendance"], requiredFeature: "payroll", requiredFeaturesAll: ["payroll", "attendance"], requiredPermissionsAny: ["payroll.attendanceReview.view", "payroll.view"] },
       { label: "Payslips", path: "/payslips", icon: ReceiptText, moduleCode: "payslips", requiredFeature: "payslips", requiredPermission: "payslips.view" },

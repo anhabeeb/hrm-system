@@ -229,7 +229,7 @@ export const getSummary = async (env: Env, actor: AuthActor) => {
     moduleEnabled(features, "employees") ? getEmployeeSummary(env, ctx) : Promise.resolve(null),
     moduleEnabled(features, "attendance") ? getAttendanceToday(env, ctx) : Promise.resolve(null),
     moduleEnabled(features, "leave") ? getApprovals(env, ctx) : Promise.resolve(null),
-    moduleEnabled(features, "leave") ? getLongLeave(env, ctx) : Promise.resolve(null),
+    moduleEnabled(features, "long_leave_management") ? getLongLeave(env, ctx) : Promise.resolve(null),
     getExpiryAlerts(env, ctx),
     getNotificationHealth(env, ctx),
     moduleEnabled(features, "biometric") || moduleEnabled(features, "kiosk") ? getDeviceHealth(env, ctx) : Promise.resolve(null),
@@ -277,7 +277,7 @@ export const getQuickActionsForEnabledModules = async (env: Env, actor: AuthActo
     { key: "expiry-scan", label: "Run expiry scan", description: "Refresh document and contract alerts", href: "/expiry-alerts", permission: "expiry_alerts.scan", category: "Alerts" },
     { key: "attendance-exceptions", label: "Review attendance exceptions", description: "Open missing punch and exception queues", href: "/attendance/reports", permission: "attendance.reports.view", category: "Attendance", moduleCode: "attendance" },
     { key: "biometric-review", label: "Review biometric punches", description: "Resolve unmatched or ambiguous punches", href: "/biometric", permission: "biometric.resolve_punches", category: "Biometric", moduleCode: "biometric" },
-    { key: "long-leave-payroll", label: "Preview long leave payroll", description: "Review long leave salary impact", href: "/long-leave", permission: "long_leave.payroll_preview", category: "Payroll" },
+    { key: "long-leave-payroll", label: "Preview long leave payroll", description: "Review long leave salary impact", href: "/long-leave", permission: "long_leave.payroll_preview", category: "Payroll", moduleCode: "long_leave_management" },
     { key: "holiday-calendar", label: "Open holiday calendar", description: "Check upcoming holidays", href: "/holidays", permission: "holidays.calendar.view", category: "Holidays" },
     { key: "employee-360", label: "Open Employee 360 search", description: "Find an employee profile", href: "/employees", permission: "employees.view", category: "Employees", moduleCode: "employees" },
   ];

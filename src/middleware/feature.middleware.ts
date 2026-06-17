@@ -6,6 +6,8 @@ import type { AppContext } from "../types/api.types";
 import { AuthError, DeviceAuthError, FeatureDisabledError } from "../utils/errors";
 
 const disabledFeatureMessages: Record<string, string> = {
+  leave_management: "Leave Management is disabled. Enable it in Settings to use this module.",
+  long_leave_management: "Long Leave Management is disabled. Enable it in Settings to use this module.",
   asset_tracking: "Asset Tracking is disabled. Enable it in Settings to use this module.",
   uniform_tracking: "Uniform Tracking is disabled. Enable it in Settings to use this module.",
 };

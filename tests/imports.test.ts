@@ -90,6 +90,7 @@ const makeEnv = (options: {
 
   const firstFor = async (sql: string, values: unknown[]) => {
     calls.push({ sql, values, method: "first" });
+    if (sql.includes("FROM feature_settings")) return { feature_key: values[1], is_enabled: 1, status: "enabled", applies_to_all_outlets: 1, allowed_role_ids_json: null, allowed_outlet_ids_json: null };
     if (sql.includes("FROM import_jobs") && sql.includes("idempotency_key")) return job?.idempotency_key === values[1] ? job : null;
     if (sql.includes("FROM import_jobs") && sql.includes("id = ?")) return job?.id === values[1] ? job : null;
     if (sql.includes("FROM employees") && sql.includes("employee_code")) return employees[String(values[1])] ?? null;
@@ -256,8 +257,9 @@ describe("Phase 12A import templates", () => {
     expect(getTemplate("salary_compensation")?.sensitive).toBe(true);
   });
 
-  it("unsupported template returns error", () => {
-    expect(() => importsService.getTemplateDetail(actor(), "unknown_type")).toThrow();
+  it("unsupported template returns error", async () => {
+    const env = makeEnv();
+    await expect(importsService.getTemplateDetail(env, actor(), "unknown_type")).rejects.toThrow();
   });
 });
 

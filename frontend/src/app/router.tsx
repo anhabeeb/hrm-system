@@ -134,7 +134,7 @@ export const AppRouter = () => (
         <Route path="/self/attendance" element={guarded(<SelfServiceModulePage moduleKey="attendance" />, { permission: "self.attendance.view", feature: "attendance", moduleCode: "attendance", requiresLinkedEmployee: true })} />
         <Route path="/self/attendance-calendar" element={guarded(<EmployeeAttendanceCalendarPage />, { permissionsAny: ["self.attendance.calendar.view", "self.attendance.view"], feature: "attendance", moduleCode: "attendance", requiresLinkedEmployee: true })} />
         <Route path="/self/roster" element={guarded(<SelfServiceModulePage moduleKey="roster" />, { permission: "self.roster.view", feature: "roster", moduleCode: "roster", requiresLinkedEmployee: true })} />
-        <Route path="/self/leave" element={guarded(<SelfServiceModulePage moduleKey="leave" />, { permission: "self.leave.view", feature: "leave_management", moduleCode: "leave", requiresLinkedEmployee: true })} />
+        <Route path="/self/leave" element={guarded(<SelfServiceModulePage moduleKey="leave" />, { permission: "self.leave.view", feature: "leave_management", moduleCode: "leave_management", moduleName: "Leave Management", requiresLinkedEmployee: true })} />
         <Route path="/self/documents" element={guarded(<MyDocumentsKycPage />, { permission: "self.documents.view", feature: "documents", moduleCode: "documents_kyc", requiresLinkedEmployee: true })} />
         <Route path="/self/payslips" element={guarded(<SelfServiceModulePage moduleKey="payslips" />, { permission: "self.payslips.view", feature: "payslips", moduleCode: "payslips", requiresLinkedEmployee: true })} />
         <Route path="/self/department-dashboard" element={guarded(<DepartmentDashboardPage selfService />, { permissionsAny: ["department.dashboard.view", "departments.dashboard.viewTeam", "attendance.teamCalendar.view", "attendance.calendar.viewTeam", "employees.team.view"], featuresAll: ["employee_management", "attendance"], moduleCodesAll: ["employees", "attendance"], requiresLinkedEmployee: true })} />
@@ -164,9 +164,9 @@ export const AppRouter = () => (
         <Route path="/kiosk-devices" element={guarded(<KioskDevicesPage />, { permissionsAny: ["devices.view", "kiosk.view"], feature: "offline_sync" })} />
         <Route path="/sync-status" element={guarded(<SyncStatusPage />, { permission: "sync.view", feature: "offline_sync" })} />
         <Route path="/biometric" element={guarded(<BiometricPage />, { permissionsAny: ["biometric.view", "devices.view"], feature: "biometric_attendance" })} />
-        <Route path="/leave" element={guarded(<LeavePage />, { permission: "leave.view", feature: "leave_management" })} />
+        <Route path="/leave" element={guarded(<LeavePage />, { permission: "leave.view", feature: "leave_management", moduleCode: "leave_management", moduleName: "Leave Management" })} />
         <Route path="/holidays" element={guarded(<HolidayCalendarPage />, { permissionsAny: ["holidays.view", "holidays.calendar.view"], feature: "holidays" })} />
-        <Route path="/long-leave" element={guarded(<LongLeavePage />, { permission: "long_leave.view", feature: "long_leave" })} />
+        <Route path="/long-leave" element={guarded(<LongLeavePage />, { permission: "long_leave.view", feature: "long_leave_management", moduleCode: "long_leave_management", moduleName: "Long Leave Management" })} />
         <Route path="/payroll" element={guarded(<PayrollPage />, { permission: "payroll.view", feature: "payroll" })} />
         <Route path="/payroll/attendance-review" element={guarded(<EmployeeAttendanceCalendarPage />, { permissionsAny: ["payroll.attendanceReview.view", "payroll.view"], feature: "payroll", moduleCode: "payroll", featuresAll: ["payroll", "attendance"], moduleCodesAll: ["payroll", "attendance"] })} />
         <Route path="/payslips" element={guarded(<PayslipsPage />, { permission: "payslips.view", feature: "payslips" })} />

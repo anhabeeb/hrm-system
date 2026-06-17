@@ -42,6 +42,7 @@ const fakeEnv = (rows: Record<string, unknown>[] = [{ employee_id: "emp_1", empl
         bind: (...values: unknown[]) => ({
           first: async () => {
             calls.push({ sql, values, method: "first" });
+            if (sql.includes("FROM feature_settings")) return { feature_key: values[1], is_enabled: 1, status: "enabled", applies_to_all_outlets: 1, allowed_role_ids_json: null, allowed_outlet_ids_json: null };
             return { total: rows.length, employees: rows.length };
           },
           all: async () => {

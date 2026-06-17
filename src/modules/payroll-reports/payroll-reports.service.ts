@@ -1,4 +1,5 @@
 import * as permissionService from "../../services/permission.service";
+import * as settingsService from "../../services/settings.service";
 import type { AuthActor } from "../../types/api.types";
 import { AppError, PermissionError } from "../../utils/errors";
 import { PAYROLL_REPORT_BY_KEY, PAYROLL_REPORT_DEFINITIONS } from "./payroll-reports.definitions";
@@ -87,18 +88,34 @@ const result = async (
   };
 };
 
-export const catalog = (actor: AuthActor) => ({
-  data: PAYROLL_REPORT_DEFINITIONS.filter((definition) => canViewReport(actor, definition.required_permission)),
-  meta: {
-    report_key: "catalog",
-    report_name: "Payroll / Finance Report Catalog",
-    description: "Available payroll and finance reports for the current user.",
-    categories: ["payroll", "salary", "deductions", "advances_loans", "attendance", "long_leave", "payslips", "approvals", "cost", "audit", "finance_summary"],
-    export_ready: true,
-    sensitive: true,
-  },
-  generated_at: new Date().toISOString(),
-});
+const enabledCategories = async (env: Env, actor: AuthActor) => {
+  const [leaveEnabled, longLeaveEnabled] = await Promise.all([
+    settingsService.isFeatureEnabled(env, actor.companyId, "leave_management", actor),
+    settingsService.isFeatureEnabled(env, actor.companyId, "long_leave_management", actor),
+  ]);
+  return {
+    leave: leaveEnabled,
+    long_leave: longLeaveEnabled,
+  };
+};
+
+export const catalog = async (env: Env, actor: AuthActor) => {
+  const categories = await enabledCategories(env, actor);
+  return {
+    data: PAYROLL_REPORT_DEFINITIONS.filter((definition) => canViewReport(actor, definition.required_permission))
+      .filter((definition) => definition.report_key !== "leave-deductions" || categories.leave)
+      .filter((definition) => definition.category !== "long_leave" || categories.long_leave),
+    meta: {
+      report_key: "catalog",
+      report_name: "Payroll / Finance Report Catalog",
+      description: "Available payroll and finance reports for the current user.",
+      categories: ["payroll", "salary", "deductions", "advances_loans", "attendance", ...(categories.long_leave ? ["long_leave"] : []), "payslips", "approvals", "cost", "audit", "finance_summary"],
+      export_ready: true,
+      sensitive: true,
+    },
+    generated_at: new Date().toISOString(),
+  };
+};
 
 export const summary = async (env: Env, actor: AuthActor, filters: PayrollReportFilters) => {
   if (!permissionService.hasPermission(actor, "payroll_reports.view")) {
@@ -108,7 +125,7 @@ export const summary = async (env: Env, actor: AuthActor, filters: PayrollReport
   const counts = await repository.summary(env, actor, filters, canViewSensitive);
   return {
     data: {
-      available_reports: catalog(actor).data.length,
+      available_reports: (await catalog(env, actor)).data.length,
       ...counts,
       amounts_restricted: canViewSensitive ? 0 : 1,
     },
@@ -166,9 +183,15 @@ export const runReport = async (
       reportRows = await repository.overtime(env, actor, filters, canViewSensitive);
       break;
     case "long-leave-deductions":
+      if (!(await enabledCategories(env, actor)).long_leave) {
+        throw new AppError("Long Leave Management is disabled. Enable it in Settings to use this module.", "LONG_LEAVE_MANAGEMENT_DISABLED", 403);
+      }
       reportRows = await repository.longLeaveDeductions(env, actor, filters, canViewSensitive);
       break;
     case "leave-deductions":
+      if (!(await enabledCategories(env, actor)).leave) {
+        throw new AppError("Leave Management is disabled. Enable it in Settings to use this module.", "LEAVE_MANAGEMENT_DISABLED", 403);
+      }
       reportRows = await repository.leaveDeductions(env, actor, filters, canViewSensitive);
       break;
     case "payslip-status":

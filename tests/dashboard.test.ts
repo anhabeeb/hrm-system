@@ -65,7 +65,7 @@ const rowsForSql = (sql: string) => {
       { feature_key: "employee_management" },
       { feature_key: "attendance" },
       { feature_key: "leave_management" },
-      { feature_key: "long_leave" },
+      { feature_key: "long_leave_management" },
       { feature_key: "biometric_attendance" },
       { feature_key: "roster" },
       { feature_key: "payroll" },

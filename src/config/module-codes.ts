@@ -5,6 +5,8 @@ export const MODULE_FEATURE_ALIASES: Record<string, string[]> = {
   approvals: ["approvals"],
   operation_ownership: ["operation_ownership"],
   leave: ["leave", "leave_management"],
+  leave_management: ["leave_management"],
+  long_leave_management: ["long_leave_management"],
   attendance: ["attendance"],
   roster: ["roster"],
   payroll: ["payroll"],

@@ -23,9 +23,9 @@ hrReportsRoutes.get("/probation", requirePermission("hr_reports.employee.view"),
 hrReportsRoutes.get("/contracts", requirePermission("hr_reports.compliance.view"), controller.contracts);
 hrReportsRoutes.get("/document-compliance", requirePermission("hr_reports.documents.view"), controller.documentCompliance);
 hrReportsRoutes.get("/foreign-compliance", requirePermission("hr_reports.compliance.view"), controller.foreignCompliance);
-hrReportsRoutes.get("/leave-balances", requirePermission("hr_reports.leave.view"), controller.leaveBalances);
-hrReportsRoutes.get("/leave-requests", requirePermission("hr_reports.leave.view"), controller.leaveRequests);
-hrReportsRoutes.get("/long-leave", requirePermission("hr_reports.long_leave.view"), controller.longLeave);
+hrReportsRoutes.get("/leave-balances", requireFeature("leave_management"), requirePermission("hr_reports.leave.view"), controller.leaveBalances);
+hrReportsRoutes.get("/leave-requests", requireFeature("leave_management"), requirePermission("hr_reports.leave.view"), controller.leaveRequests);
+hrReportsRoutes.get("/long-leave", requireFeature("long_leave_management"), requirePermission("hr_reports.long_leave.view"), controller.longLeave);
 hrReportsRoutes.get("/assets-uniforms", requireFeature("asset_tracking"), requireFeature("uniform_tracking"), requirePermission("hr_reports.assets.view"), controller.assetsUniforms);
 hrReportsRoutes.get("/compliance-summary", requirePermission("hr_reports.compliance.view"), controller.complianceSummary);
 hrReportsRoutes.get("/lifecycle", requirePermission("hr_reports.lifecycle.view"), controller.lifecycle);

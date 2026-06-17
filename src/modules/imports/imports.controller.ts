@@ -19,14 +19,14 @@ const body = async (c: Context<AppContext>) => {
   }
 };
 
-export const templates = (c: Context<AppContext>) =>
-  ok(service.listTemplates(actor(c)), "Import templates loaded successfully.", request(c));
+export const templates = async (c: Context<AppContext>) =>
+  ok(await service.listTemplates(c.env, actor(c)), "Import templates loaded successfully.", request(c));
 
-export const templateDetail = (c: Context<AppContext>) =>
-  ok(service.getTemplateDetail(actor(c), param(c.req.param("importType"), "import type")), "Import template loaded successfully.", request(c));
+export const templateDetail = async (c: Context<AppContext>) =>
+  ok(await service.getTemplateDetail(c.env, actor(c), param(c.req.param("importType"), "import type")), "Import template loaded successfully.", request(c));
 
-export const templateCsv = (c: Context<AppContext>) => {
-  const result = service.getTemplateCsv(actor(c), param(c.req.param("importType"), "import type"));
+export const templateCsv = async (c: Context<AppContext>) => {
+  const result = await service.getTemplateCsv(c.env, actor(c), param(c.req.param("importType"), "import type"));
   return new Response(result.csv, {
     status: 200,
     headers: {

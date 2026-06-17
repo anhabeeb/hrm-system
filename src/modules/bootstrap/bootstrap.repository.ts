@@ -481,6 +481,7 @@ export const ensureProductionFallbackDefaults = async (env: Env, companyId: stri
     ["asset_tracking", "Asset Tracking"],
     ["uniform_tracking", "Uniform Tracking"],
     ["leave_management", "Leave Management"],
+    ["long_leave_management", "Long Leave Management"],
     ["payroll", "Payroll"],
     ["attendance", "Attendance"],
     ["approvals", "Approvals"],

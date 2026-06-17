@@ -68,6 +68,7 @@ export const SENSITIVE_SETTING_GROUPS = new Set([
 export const FEATURE_DEPENDENCIES: Record<string, string[]> = {
   payslips: ["payroll"],
   long_leave: ["leave_management", "payroll"],
+  long_leave_management: ["leave_management", "payroll"],
   offline_sync: ["attendance"],
   kiosk_attendance: ["attendance"],
   biometric_attendance: ["attendance"],
@@ -85,6 +86,7 @@ export const FEATURE_DEPENDENCIES: Record<string, string[]> = {
 export const FEATURE_DEPENDENCY_LABELS: Record<string, string> = {
   payroll: "Payroll",
   leave_management: "Leave Management",
+  long_leave_management: "Long Leave Management",
   attendance: "Attendance",
   employee_login: "Employee Login",
   employee_management: "Employee Management",
@@ -95,6 +97,7 @@ export const REPORTABLE_FEATURES = [
   "employee_management",
   "attendance",
   "leave_management",
+  "long_leave_management",
   "payroll",
   "roster",
   "assets_uniforms",

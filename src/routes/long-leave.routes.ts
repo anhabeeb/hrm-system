@@ -10,7 +10,7 @@ import type { AppContext } from "../types/api.types";
 const longLeaveRoutes = new Hono<AppContext>();
 
 longLeaveRoutes.use("*", authMiddleware);
-longLeaveRoutes.use("*", requireFeature("long_leave"));
+longLeaveRoutes.use("*", requireFeature("long_leave_management"));
 
 longLeaveRoutes.get("/", requirePermission("long_leave.view"), controller.listLongLeave);
 longLeaveRoutes.get("/settings", requireAnyPermission(["long_leave.view", "long_leave.settings.manage"]), controller.getSettings);

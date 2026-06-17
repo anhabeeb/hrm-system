@@ -276,6 +276,18 @@ const runReport = async (
   const filters = requireBoundedExport(item.report_key, filtersInput, format);
   const [namespace, key] = item.report_key.split(":");
   if (namespace === "hr") {
+    if (key === "leave-balances" || key === "leave-requests") {
+      const leaveEnabled = await settingsService.isFeatureEnabled(env, actor.companyId, "leave_management", actor);
+      if (!leaveEnabled) {
+        throw new AppError("Leave Management is disabled. Enable it in Settings to use this module.", "LEAVE_MANAGEMENT_DISABLED", 403);
+      }
+    }
+    if (key === "long-leave") {
+      const longLeaveEnabled = await settingsService.isFeatureEnabled(env, actor.companyId, "long_leave_management", actor);
+      if (!longLeaveEnabled) {
+        throw new AppError("Long Leave Management is disabled. Enable it in Settings to use this module.", "LONG_LEAVE_MANAGEMENT_DISABLED", 403);
+      }
+    }
     if (key === "assets-uniforms") {
       const [assetsEnabled, uniformsEnabled] = await Promise.all([
         settingsService.isFeatureEnabled(env, actor.companyId, "asset_tracking", actor),
@@ -289,6 +301,18 @@ const runReport = async (
     return normalizeDataResult(item, actor, await hrReports.runReport(env, actor, key, validated), { ...validated });
   }
   if (namespace === "payroll") {
+    if (key === "leave-deductions") {
+      const leaveEnabled = await settingsService.isFeatureEnabled(env, actor.companyId, "leave_management", actor);
+      if (!leaveEnabled) {
+        throw new AppError("Leave Management is disabled. Enable it in Settings to use this module.", "LEAVE_MANAGEMENT_DISABLED", 403);
+      }
+    }
+    if (key === "long-leave-deductions") {
+      const longLeaveEnabled = await settingsService.isFeatureEnabled(env, actor.companyId, "long_leave_management", actor);
+      if (!longLeaveEnabled) {
+        throw new AppError("Long Leave Management is disabled. Enable it in Settings to use this module.", "LONG_LEAVE_MANAGEMENT_DISABLED", 403);
+      }
+    }
     const validated = validatePayrollReportFilters(filters, { periodRequired: /audit|variance|approval-finalization|employee-detail/.test(key) });
     return normalizeDataResult(item, actor, await payrollReports.runReport(env, actor, key, validated), { ...validated });
   }

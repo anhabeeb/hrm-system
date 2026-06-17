@@ -23,8 +23,8 @@ payrollReportsRoutes.get("/advances", requirePermission("payroll_reports.advance
 payrollReportsRoutes.get("/salary-loans", requirePermission("payroll_reports.loans.view"), controller.salaryLoans);
 payrollReportsRoutes.get("/attendance-deductions", requirePermission("payroll_reports.attendance_deductions.view"), controller.attendanceDeductions);
 payrollReportsRoutes.get("/overtime", requirePermission("payroll_reports.overtime.view"), controller.overtime);
-payrollReportsRoutes.get("/long-leave-deductions", requirePermission("payroll_reports.long_leave.view"), controller.longLeaveDeductions);
-payrollReportsRoutes.get("/leave-deductions", requirePermission("payroll_reports.leave_deductions.view"), controller.leaveDeductions);
+payrollReportsRoutes.get("/long-leave-deductions", requireFeature("long_leave_management"), requirePermission("payroll_reports.long_leave.view"), controller.longLeaveDeductions);
+payrollReportsRoutes.get("/leave-deductions", requireFeature("leave_management"), requirePermission("payroll_reports.leave_deductions.view"), controller.leaveDeductions);
 payrollReportsRoutes.get("/payslip-status", requirePermission("payroll_reports.payslips.view"), controller.payslipStatus);
 payrollReportsRoutes.get("/approval-finalization", requirePermission("payroll_reports.approvals.view"), controller.approvalFinalization);
 payrollReportsRoutes.get("/outlet-cost", requirePermission("payroll_reports.cost.view"), controller.outletCost);

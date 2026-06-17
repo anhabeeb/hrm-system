@@ -142,10 +142,20 @@ describe("settings validators", () => {
     expect(() =>
       validateFeatureDependencies("long_leave", true, new Set(["payroll"])),
     ).toThrow("This feature cannot be enabled until Leave Management is enabled.");
+    expect(() =>
+      validateFeatureDependencies("long_leave_management", true, new Set(["payroll"])),
+    ).toThrow("This feature cannot be enabled until Leave Management is enabled.");
 
     expect(() =>
       validateFeatureDependencies(
         "long_leave",
+        true,
+        new Set(["leave_management", "payroll"]),
+      ),
+    ).not.toThrow();
+    expect(() =>
+      validateFeatureDependencies(
+        "long_leave_management",
         true,
         new Set(["leave_management", "payroll"]),
       ),

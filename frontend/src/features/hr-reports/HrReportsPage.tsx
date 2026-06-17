@@ -58,7 +58,11 @@ export const HrReportsPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const filters = useMemo(() => filtersFromParams(searchParams), [searchParams]);
   const visibleCategories = useMemo(
-    () => categories.filter((category) => category.key !== "assets" || (auth.hasFeature("asset_tracking") && auth.hasFeature("uniform_tracking"))),
+    () => categories.filter((category) =>
+      (category.key !== "leave" || auth.hasFeature("leave_management")) &&
+      (category.key !== "long_leave" || auth.hasFeature("long_leave_management")) &&
+      (category.key !== "assets" || (auth.hasFeature("asset_tracking") && auth.hasFeature("uniform_tracking"))),
+    ),
     [auth],
   );
   const requestedCategory = searchParams.get("category") ?? "employee";
@@ -66,7 +70,10 @@ export const HrReportsPage = () => {
   const selectedReportKey = searchParams.get("report") ?? undefined;
 
   const catalogQuery = useQuery({ queryKey: ["hr-reports", "catalog"], queryFn: () => hrReportsApi.catalog() });
-  const allReports = catalogQuery.data?.data.data ?? [];
+  const allReports = (catalogQuery.data?.data.data ?? []).filter((report) =>
+    (report.category !== "leave" || auth.hasFeature("leave_management")) &&
+    (report.category !== "long_leave" || auth.hasFeature("long_leave_management")),
+  );
   const visibleReports = allReports.filter((report) => report.category === selectedCategory);
   const selectedReport = defaultReportFor(visibleReports.length ? visibleReports : allReports, selectedReportKey);
   const reportQuery = useQuery({

@@ -1470,6 +1470,10 @@ export const getEmployeeProfileLeave = async (
   limit?: number,
 ) => {
   requireProfilePermission(context, ["leave.view", "dashboard.leave.view"], "You do not have permission to view employee leave.");
+  const leaveEnabled = await settingsService.isFeatureEnabled(env, context.companyId, "leave_management", context);
+  if (!leaveEnabled) {
+    throw new AppError("Leave Management is disabled. Enable it in Settings to use this module.", "LEAVE_MANAGEMENT_DISABLED", 403);
+  }
   await ensureEmployeeAccess(env, context, employeeId);
   const safeLimit = profileLimit(limit);
   const [balances, recent_requests, transactions] = await Promise.all([
@@ -1489,6 +1493,10 @@ export const getEmployeeProfileLongLeave = async (
   limit?: number,
 ) => {
   requireProfilePermission(context, ["long_leave.view", "dashboard.long_leave.view"], "You do not have permission to view employee long leave.");
+  const longLeaveEnabled = await settingsService.isFeatureEnabled(env, context.companyId, "long_leave_management", context);
+  if (!longLeaveEnabled) {
+    throw new AppError("Long Leave Management is disabled. Enable it in Settings to use this module.", "LONG_LEAVE_MANAGEMENT_DISABLED", 403);
+  }
   await ensureEmployeeAccess(env, context, employeeId);
   const safeLimit = profileLimit(limit);
   const [records, payroll_impacts] = await Promise.all([
@@ -1653,6 +1661,7 @@ export const getEmployeeProfile = async (
       return await fn();
     } catch (error) {
       if (error instanceof PermissionError) return null;
+      if (error instanceof AppError && ["LEAVE_MANAGEMENT_DISABLED", "LONG_LEAVE_MANAGEMENT_DISABLED"].includes(error.code)) return null;
       throw error;
     }
   };

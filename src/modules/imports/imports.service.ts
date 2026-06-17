@@ -73,6 +73,17 @@ const assertAssetsUniformsImportEnabled = async (env: Env, actor: AuthActor) => 
   }
 };
 
+const assertLeaveImportEnabled = async (env: Env, actor: AuthActor) => {
+  const enabled = await settingsService.isFeatureEnabled(env, actor.companyId, "leave_management", actor);
+  if (!enabled) {
+    throw new AppError(
+      "Leave Management is disabled. Enable it in Settings to use this module.",
+      "LEAVE_MANAGEMENT_DISABLED",
+      403,
+    );
+  }
+};
+
 const ensureOutletScope = (actor: AuthActor, outletId?: string | null) => {
   if (!outletId || actor.isAdmin || actor.isSuperAdmin || actor.outletIds.length === 0) return;
   if (!actor.outletIds.includes(outletId)) throw new PermissionError("You cannot import rows for an outlet outside your scope.", "IMPORT_PERMISSION_DENIED");
@@ -92,24 +103,49 @@ const audit = (env: Env, actor: AuthActor, action: string, details: Record<strin
     requestId: actor.requestId,
   });
 
-export const listTemplates = (actor: AuthActor) => {
+const templateFeatureEnabled = async (env: Env, actor: AuthActor, template: ImportTemplate) => {
+  if (template.import_type === "leave_balances") {
+    return settingsService.isFeatureEnabled(env, actor.companyId, "leave_management", actor);
+  }
+  if (template.import_type === "assets_uniforms") {
+    const [assetsEnabled, uniformsEnabled] = await Promise.all([
+      settingsService.isFeatureEnabled(env, actor.companyId, "asset_tracking", actor),
+      settingsService.isFeatureEnabled(env, actor.companyId, "uniform_tracking", actor),
+    ]);
+    return assetsEnabled && uniformsEnabled;
+  }
+  return true;
+};
+
+export const listTemplates = async (env: Env, actor: AuthActor) => {
   requirePermission(actor, "imports.templates.view");
+  const templates = await Promise.all(
+    IMPORT_TEMPLATES.map(async (template) => ({
+      template,
+      enabled: await templateFeatureEnabled(env, actor, template),
+    })),
+  );
   return {
-    data: IMPORT_TEMPLATES.filter((template) => permissionService.hasPermission(actor, template.required_permission)),
+    data: templates
+      .filter(({ template, enabled }) => enabled && permissionService.hasPermission(actor, template.required_permission))
+      .map(({ template }) => template),
     generated_at: nowIso(),
   };
 };
 
-export const getTemplateDetail = (actor: AuthActor, importType: string) => {
+export const getTemplateDetail = async (env: Env, actor: AuthActor, importType: string) => {
   requirePermission(actor, "imports.templates.view");
   const template = getTemplate(importType);
   if (!template) throw new NotFoundError("Import template could not be found.");
   requirePermission(actor, template.required_permission);
+  if (!(await templateFeatureEnabled(env, actor, template))) {
+    throw new AppError("This import template is not available while its module is disabled.", "IMPORT_TEMPLATE_MODULE_DISABLED", 403);
+  }
   return { data: template, generated_at: nowIso() };
 };
 
-export const getTemplateCsv = (actor: AuthActor, importType: string) => {
-  const result = getTemplateDetail(actor, importType);
+export const getTemplateCsv = async (env: Env, actor: AuthActor, importType: string) => {
+  const result = await getTemplateDetail(env, actor, importType);
   return { ...result, csv: templateToCsv(result.data) };
 };
 
@@ -303,6 +339,7 @@ const safeRow = (row: ImportJobRow, template: ImportTemplate | null | undefined,
 export const previewImport = async (env: Env, actor: AuthActor, input: ImportPreviewInput): Promise<ImportValidationResult> => {
   const template = getTemplate(input.import_type);
   if (!template) throw new AppError("This import type is not supported.", "IMPORT_TYPE_UNSUPPORTED", 404);
+  if (template.import_type === "leave_balances") await assertLeaveImportEnabled(env, actor);
   if (template.import_type === "assets_uniforms") await assertAssetsUniformsImportEnabled(env, actor);
   requireImportAccess(actor, template, "preview");
   const rows = await buildRows(env, actor, template, input.mode, input.csv_content, "preview_only");
@@ -349,6 +386,7 @@ export const previewImport = async (env: Env, actor: AuthActor, input: ImportPre
 export const createImportJob = async (env: Env, actor: AuthActor, input: ImportJobCreateInput) => {
   const template = getTemplate(input.import_type);
   if (!template) throw new AppError("This import type is not supported.", "IMPORT_TYPE_UNSUPPORTED", 404);
+  if (template.import_type === "leave_balances") await assertLeaveImportEnabled(env, actor);
   if (template.import_type === "assets_uniforms") await assertAssetsUniformsImportEnabled(env, actor);
   requireImportAccess(actor, template, "upload");
   if (!template.supported_modes.includes(input.mode)) throw new AppError("This import mode is not supported for the selected template.", "IMPORT_JOB_INVALID_STATUS", 400);
@@ -404,6 +442,7 @@ export const validateImportJob = async (env: Env, actor: AuthActor, id: string) 
   const rows = await repository.listRows(env, actor.companyId, id, { page: 1, page_size: 5000 });
   const template = getTemplate(job.import_type);
   if (!template) throw new AppError("This import type is not supported.", "IMPORT_TYPE_UNSUPPORTED", 404);
+  if (template.import_type === "leave_balances") await assertLeaveImportEnabled(env, actor);
   if (template.import_type === "assets_uniforms") await assertAssetsUniformsImportEnabled(env, actor);
   const summary = summaryFromRows(rows, template);
   await repository.updateJobValidation(env, actor.companyId, id, {
@@ -529,6 +568,7 @@ const applyRow = async (env: Env, actor: AuthActor, job: ImportJob, row: ImportJ
 
 export const applyImportJob = async (env: Env, actor: AuthActor, id: string) => {
   const job = await requireJob(env, actor, id, "apply");
+  if (job.import_type === "leave_balances") await assertLeaveImportEnabled(env, actor);
   if (job.import_type === "assets_uniforms") await assertAssetsUniformsImportEnabled(env, actor);
   if (job.status === "completed") return { job: safeJob(job), summary: { created_rows: job.created_rows, updated_rows: job.updated_rows, skipped_rows: job.skipped_rows, failed_rows: job.failed_rows }, already_applied: true };
   if (!["preview_ready", "partially_completed"].includes(job.status)) throw new AppError("Only preview-ready imports can be applied.", "IMPORT_APPLY_BLOCKED", 409);

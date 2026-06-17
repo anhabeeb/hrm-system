@@ -112,7 +112,11 @@ export const ImportExportPage = () => {
   const canViewImports = has("import.view");
   const canViewTemplates = has("import.download_template");
   const visibleExportTypes = useMemo(
-    () => exportTypes.filter((type) => (type !== "assets" || auth.hasFeature("asset_tracking")) && (type !== "uniforms" || auth.hasFeature("uniform_tracking"))),
+    () => exportTypes.filter((type) =>
+      (type !== "leave" || auth.hasFeature("leave_management")) &&
+      (type !== "assets" || auth.hasFeature("asset_tracking")) &&
+      (type !== "uniforms" || auth.hasFeature("uniform_tracking")),
+    ),
     [auth],
   );
   const activeTab = tab === "imports" && canViewImports ? "imports" : tab === "templates" && canViewTemplates ? "templates" : canViewExports ? "exports" : canViewImports ? "imports" : "templates";

@@ -22,6 +22,7 @@ import { formatMoneyMinor } from "@/lib/format";
 import { searchParamNumber } from "@/lib/query-string";
 import { payrollReportsApi } from "./payroll-reports.api";
 import { ReportExportActions } from "@/features/report-exports/ReportExportActions";
+import { useAuth } from "@/features/auth/auth.store";
 import type { PayrollReportDefinition, PayrollReportFilters } from "./payroll-reports.types";
 
 const categories = [
@@ -62,13 +63,22 @@ const defaultReportFor = (reports: PayrollReportDefinition[], selected?: string 
   reports.find((report) => report.report_key === selected) ?? reports[0] ?? null;
 
 export const PayrollReportsPage = () => {
+  const auth = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const filters = useMemo(() => filtersFromParams(searchParams), [searchParams]);
-  const selectedCategory = searchParams.get("category") ?? "payroll";
+  const visibleCategories = useMemo(
+    () => categories.filter((category) => category.key !== "long_leave" || auth.hasFeature("long_leave_management")),
+    [auth],
+  );
+  const requestedCategory = searchParams.get("category") ?? "payroll";
+  const selectedCategory = visibleCategories.some((category) => category.key === requestedCategory) ? requestedCategory : "payroll";
   const selectedReportKey = searchParams.get("report") ?? undefined;
 
   const catalogQuery = useQuery({ queryKey: ["payroll-reports", "catalog"], queryFn: () => payrollReportsApi.catalog() });
-  const allReports = catalogQuery.data?.data.data ?? [];
+  const allReports = (catalogQuery.data?.data.data ?? []).filter((report) =>
+    (report.report_key !== "leave-deductions" || auth.hasFeature("leave_management")) &&
+    (report.category !== "long_leave" || auth.hasFeature("long_leave_management")),
+  );
   const visibleReports = allReports.filter((report) => report.category === selectedCategory);
   const selectedReport = defaultReportFor(visibleReports.length ? visibleReports : allReports, selectedReportKey);
   const reportQuery = useQuery({
@@ -154,7 +164,7 @@ export const PayrollReportsPage = () => {
 
         <Tabs value={selectedCategory} onValueChange={(category) => updateParams({ category })}>
           <TabsList className="flex flex-wrap">
-            {categories.map((category) => (
+            {visibleCategories.map((category) => (
               <TabsTrigger key={category.key} value={category.key}>{category.label}</TabsTrigger>
             ))}
           </TabsList>
