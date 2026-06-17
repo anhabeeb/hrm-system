@@ -2,7 +2,7 @@ import { z } from "zod";
 
 export const exportCreateSchema = z.object({
   export_type: z.string().min(1),
-  format: z.enum(["json", "csv"]),
+  format: z.enum(["xlsx", "pdf"]),
   reason: z.string().optional(),
 });
 

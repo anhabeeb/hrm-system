@@ -456,10 +456,8 @@ INSERT OR IGNORE INTO permissions (id, permission_key, module, action, descripti
 ('perm_report_exports_download', 'report_exports.download', 'report_exports', 'download', 'Download generated report exports.', '2026-01-01T00:00:00Z'),
 ('perm_report_exports_cancel', 'report_exports.cancel', 'report_exports', 'cancel', 'Cancel pending report export jobs.', '2026-01-01T00:00:00Z'),
 ('perm_report_exports_history_view', 'report_exports.history.view', 'report_exports', 'history_view', 'View own report export history.', '2026-01-01T00:00:00Z'),
-('perm_report_exports_print', 'report_exports.print', 'report_exports', 'print', 'Open print-friendly report views.', '2026-01-01T00:00:00Z'),
 ('perm_report_exports_sensitive', 'report_exports.sensitive', 'report_exports', 'sensitive', 'Export sensitive report columns when underlying permissions also allow it.', '2026-01-01T00:00:00Z'),
 ('perm_report_exports_admin_manage', 'report_exports.admin.manage', 'report_exports', 'admin_manage', 'Manage company report export jobs and history.', '2026-01-01T00:00:00Z'),
-('perm_report_exports_employee_profile_print', 'report_exports.employee_profile.print', 'report_exports', 'employee_profile_print', 'Print allowed Employee 360 profile sections.', '2026-01-01T00:00:00Z'),
 ('perm_report_exports_audit_view', 'report_exports.audit.view', 'report_exports', 'audit_view', 'View report export audit history.', '2026-01-01T00:00:00Z');
 
 INSERT OR IGNORE INTO permissions (id, permission_key, module, action, description, created_at) VALUES

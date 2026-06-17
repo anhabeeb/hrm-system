@@ -76,8 +76,7 @@ const permissions = [
   "report_exports.download",
   "report_exports.cancel",
   "report_exports.history.view",
-  "report_exports.print",
-  "report_exports.employee_profile.print",
+  "employees.view",
   "hr_reports.view",
   "hr_reports.employee.view",
   "hr_reports.lifecycle.view",
@@ -206,7 +205,7 @@ const fakeEnv = (options: { existingJob?: Record<string, unknown> | null } = {})
 const source = (path: string) => readFileSync(path, "utf8");
 const bytesText = (body: string | Uint8Array) => typeof body === "string" ? body : new TextDecoder().decode(body);
 
-describe("Phase 11D Export / Print Reports", () => {
+describe("Phase 11D Excel/PDF report exports", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it("catalog lists exportable reports by permission", () => {
@@ -420,11 +419,15 @@ describe("Phase 11D Export / Print Reports", () => {
     expect(preview.sample_rows[0]).toMatchObject({ employee_name: "Aisha", attendance_status: "present" });
   });
 
-  it("Employee 360 print only shows allowed sections", async () => {
+  it("Employee 360 profile export only shows allowed sections", async () => {
     const { env } = fakeEnv();
-    const data = await service.printEmployeeProfile(env, actor(), "emp_1");
-    expect(data.report_key).toBe("employee-profile:profile");
-    expect(data.rows.some((row) => row.section === "Overview")).toBe(true);
+    const preview = await service.previewExport(env, actor(), {
+      report_key: "employee-profile:profile",
+      format: "xlsx",
+      filters: { employee_id: "emp_1" },
+    });
+    expect(preview.report_key).toBe("employee-profile:profile");
+    expect(preview.sample_rows.some((row) => row.section === "Overview")).toBe(true);
   });
 
   it("manager cannot export other outlet data because existing report service scoping is reused", async () => {
@@ -474,10 +477,14 @@ describe("Phase 11D Export / Print Reports", () => {
     expect(source("frontend/src/features/employees/Employee360Page.tsx")).not.toContain("Print Profile");
   });
 
-  it("sensitive fields hidden in print without permission", async () => {
+  it("sensitive fields hidden in PDF export without permission", async () => {
     const { env } = fakeEnv();
-    const data = await service.printReport(env, actor(), "payroll:employee-detail", { payroll_month: "2026-06" });
-    expect(data.rows[0]).toMatchObject({ gross_salary: "REDACTED", net_payable_salary: "REDACTED" });
+    const preview = await service.previewExport(env, actor(), {
+      report_key: "payroll:employee-detail",
+      format: "pdf",
+      filters: { payroll_month: "2026-06" },
+    });
+    expect(preview.sample_rows[0]).toMatchObject({ gross_salary: "REDACTED", net_payable_salary: "REDACTED" });
   });
 
   it("normal report actions expose Excel and PDF only", () => {

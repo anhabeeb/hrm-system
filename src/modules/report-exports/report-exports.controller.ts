@@ -58,9 +58,3 @@ export const download = async (c: Context<AppContext>) => {
 
 export const cancel = async (c: Context<AppContext>) =>
   ok(await service.cancelExportJob(c.env, actor(c), requiredParam(c.req.param("id"), "export job")), "Export job cancelled successfully.", request(c));
-
-export const print = async (c: Context<AppContext>) =>
-  ok(await service.printReport(c.env, actor(c), decodeURIComponent(requiredParam(c.req.param("reportKey"), "report key")), c.req.query()), "Print data loaded successfully.", request(c));
-
-export const printEmployee = async (c: Context<AppContext>) =>
-  ok(await service.printEmployeeProfile(c.env, actor(c), requiredParam(c.req.param("employeeId"), "employee")), "Employee profile print data loaded successfully.", request(c));

@@ -28,9 +28,7 @@ import type {
 } from "./report-exports.types";
 
 const MAX_EXPORT_ROWS = 5000;
-const MAX_PRINT_ROWS = 500;
 const supportedDownloadFormats = new Set<ReportExportFormat>(["xlsx", "pdf"]);
-type InternalReportFormat = ReportExportFormat | "print_html";
 const unsafeKeys = new Set([
   "metadata_json",
   "raw_metadata",
@@ -102,11 +100,11 @@ const expiryCatalog: ReportExportCatalogItem[] = [
 const employeeProfileCatalog: ReportExportCatalogItem[] = [
   {
     report_key: "employee-profile:profile",
-    name: "Employee 360 Profile Print",
-    description: "Print-friendly Employee 360 profile summary with only sections the actor may view.",
+    name: "Employee 360 Profile Export",
+    description: "Export-friendly Employee 360 profile summary with only sections the actor may view.",
     category: "employee_profile",
-    required_permission: "report_exports.employee_profile.print",
-    route: "/api/v1/report-exports/employee/:employeeId/print",
+    required_permission: "employees.view",
+    route: "/api/v1/report-exports/jobs",
     formats: ["xlsx", "pdf"],
     export_ready: true,
     sensitive: true,
@@ -163,16 +161,14 @@ const canExportCatalogItem = (actor: AuthActor, item: ReportExportCatalogItem) =
   permissionService.hasPermission(actor, "report_exports.catalog.view") &&
   permissionService.hasAnyPermission(actor, [item.required_permission, item.category === "attendance" ? "attendance.reports.view" : item.required_permission]);
 
-const requireExportPermission = (actor: AuthActor, item: ReportExportCatalogItem, action: "preview" | "create" | "generate" | "download" | "print") => {
+const requireExportPermission = (actor: AuthActor, item: ReportExportCatalogItem, action: "preview" | "create" | "generate" | "download") => {
   const actionPermission = action === "preview"
     ? "report_exports.preview"
     : action === "create" || action === "generate"
       ? "report_exports.create"
-      : action === "download"
-        ? "report_exports.download"
-        : "report_exports.print";
+      : "report_exports.download";
   if (!permissionService.hasPermission(actor, actionPermission)) {
-    throw new PermissionError("You do not have permission to export or print reports.", "REPORT_EXPORT_PERMISSION_DENIED");
+    throw new PermissionError("You do not have permission to export reports.", "REPORT_EXPORT_PERMISSION_DENIED");
   }
   if (!permissionService.hasAnyPermission(actor, [item.required_permission, item.category === "attendance" ? "attendance.reports.view" : item.required_permission])) {
     throw new PermissionError("You do not have permission to export this report.", "REPORT_EXPORT_PERMISSION_DENIED");
@@ -222,15 +218,14 @@ const requireCatalogItem = (reportKey: string) => {
   return item;
 };
 
-const requireBoundedExport = (reportKey: string, filters: Record<string, unknown>, format: InternalReportFormat): Record<string, unknown> => {
+const requireBoundedExport = (reportKey: string, filters: Record<string, unknown>, format: ReportExportFormat): Record<string, unknown> => {
   const hasDate = Boolean(filters.from_date || filters.to_date || filters.date || filters.month || filters.payroll_month || filters.as_of_date || filters.employee_id);
   const historyHeavy = /audit|lifecycle|history|device_punches|exceptions|employee_detail/.test(reportKey);
   if (historyHeavy && !hasDate) {
     throw new AppError("Please add a date range, month, or employee filter before exporting this history-heavy report.", "REPORT_EXPORT_FILTER_REQUIRED", 400);
   }
   const requestedPageSize = Number(filters.page_size ?? 25);
-  const maxRows = format === "print_html" ? MAX_PRINT_ROWS : MAX_EXPORT_ROWS;
-  return { ...filters, page_size: Math.min(Math.max(requestedPageSize, 1), maxRows), page: Number(filters.page ?? 1) || 1 };
+  return { ...filters, page_size: Math.min(Math.max(requestedPageSize, 1), MAX_EXPORT_ROWS), page: Number(filters.page ?? 1) || 1 };
 };
 
 const normalizeDataResult = (
@@ -275,7 +270,7 @@ const runReport = async (
   actor: AuthActor,
   item: ReportExportCatalogItem,
   filtersInput: Record<string, unknown>,
-  format: InternalReportFormat,
+  format: ReportExportFormat,
 ): Promise<ResolvedReportData> => {
   const filters = requireBoundedExport(item.report_key, filtersInput, format);
   const [namespace, key] = item.report_key.split(":");
@@ -309,7 +304,7 @@ const runReport = async (
   }
   if (namespace === "employee-profile") {
     const employeeId = String(filters.employee_id ?? "");
-    if (!employeeId) throw new AppError("Choose an employee before printing or exporting an Employee 360 profile.", "REPORT_EXPORT_FILTER_REQUIRED", 400);
+    if (!employeeId) throw new AppError("Choose an employee before exporting an Employee 360 profile.", "REPORT_EXPORT_FILTER_REQUIRED", 400);
     const profile = await employeeService.getEmployeeProfile(env, actor, employeeId, 25);
     const rows = flattenEmployeeProfile(profile);
     return normalizeDataResult(item, actor, { data: rows, generated_at: profile.meta.generated_at }, filters);
@@ -455,16 +450,6 @@ export const downloadExport = async (env: Env, actor: AuthActor, jobId: string) 
   await auditExport(env, actor, "report_export_downloaded", item, { export_job_id: jobId, row_count: data.rows.length });
   return { export_job: safeJob(job), file, data, regenerated: true };
 };
-
-export const printReport = async (env: Env, actor: AuthActor, reportKey: string, filters: Record<string, unknown>) => {
-  const item = requireCatalogItem(reportKey);
-  requireExportPermission(actor, item, "print");
-  const data = await runReport(env, actor, item, filters, "print_html");
-  return { ...data, rows: data.rows.slice(0, MAX_PRINT_ROWS), print: true };
-};
-
-export const printEmployeeProfile = (env: Env, actor: AuthActor, employeeId: string) =>
-  printReport(env, actor, "employee-profile:profile", { employee_id: employeeId });
 
 export const getExportJob = async (env: Env, actor: AuthActor, id: string) => ({
   export_job: safeJob(await requireJob(env, actor, id, "view")),

@@ -64,13 +64,13 @@ mustInclude(permissions, [
   "report_exports.download",
   "report_exports.cancel",
   "report_exports.history.view",
-  "report_exports.print",
   "report_exports.sensitive",
   "report_exports.admin.manage",
-  "report_exports.employee_profile.print",
   "report_exports.audit.view",
 ], "report export permission seeds");
+if (permissions.includes("report_exports.print") || permissions.includes("report_exports.employee_profile.print")) fail("normal report export permissions must not expose print output");
 if (!roles.includes("rp_report_exports_admin_") || !roles.includes("rp_report_exports_hr_")) fail("report export permissions are not assigned to default roles");
+if (roles.includes("report_exports.print") || roles.includes("report_exports.employee_profile.print")) fail("default roles must not assign normal report print permissions");
 
 mustInclude(service, [
   "generateExcelWorkbook",
@@ -93,9 +93,10 @@ mustInclude(service, [
   "REPORT_EXPORT_INVALID_STATUS",
   "claimProcessing",
 ], "report export service");
+if (service.includes("print_html") || service.includes("printReport") || service.includes("printEmployeeProfile")) fail("normal report export service must not expose print_html helpers");
 const getExportJobBody = between(service, "export const getExportJob", "export const listExportJobs");
 const generateExportBody = between(service, "export const generateExport", "export const downloadExport");
-const downloadExportBody = between(service, "export const downloadExport", "export const printReport");
+const downloadExportBody = between(service, "export const downloadExport", "export const getExportJob");
 if (/requireJob\(env,\s*actor,\s*id,\s*"download"\)/.test(getExportJobBody)) fail("getExportJob must not require download permission");
 if (/requireJob\(env,\s*actor,\s*jobId,\s*"download"\)/.test(generateExportBody)) fail("generateExport must not require download permission");
 if (generateExportBody.includes('if (job.status === "completed") return { export_job: safeJob(job), already_completed: true };') && !/runReport\(env,\s*actor,\s*item,\s*parseJobFilters\(job\)/.test(downloadExportBody)) {
@@ -125,7 +126,7 @@ if (employeePage.includes("Print Profile") || employeePage.includes("/print")) f
 if (/dark:/.test(`${historyPage}\n${actions}`)) fail("export UI must not add dark mode");
 if (/metadata_json/.test(historyPage)) fail("export UI must not expose raw metadata_json");
 
-if (/it\.todo|describe\.todo/.test(tests)) fail("Phase 11D export/print tests contain TODO placeholders");
+if (/it\.todo|describe\.todo/.test(tests)) fail("Phase 11D export tests contain TODO placeholders");
 mustInclude(tests, [
   "catalog lists exportable reports by permission",
   "XLSX generation returns a real ZIP/OpenXML workbook",
@@ -136,10 +137,10 @@ mustInclude(tests, [
   "cancelled job cannot be generated",
   "user with history.view can view own job detail without download permission",
   "user with create permission can generate own pending job without download permission",
-  "Employee 360 print only shows allowed sections",
+  "Employee 360 profile export only shows allowed sections",
   "manager cannot export other outlet data",
   "normal frontend routes do not expose legacy print output",
-], "export/print tests");
+], "export tests");
 
 if (!packageJson.includes("verify:export-print-schema")) fail("package.json is missing verify:export-print-schema");
 if (!buildRunner.includes('"verify:export-print-schema"')) fail("production build runner must run verify:export-print-schema");

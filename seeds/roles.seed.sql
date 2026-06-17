@@ -454,10 +454,8 @@ JOIN permissions ON permission_key IN (
   'report_exports.download',
   'report_exports.cancel',
   'report_exports.history.view',
-  'report_exports.print',
   'report_exports.sensitive',
   'report_exports.admin.manage',
-  'report_exports.employee_profile.print',
   'report_exports.audit.view'
 )
 WHERE roles.company_id = 'company_seed_default'
@@ -472,9 +470,7 @@ JOIN permissions ON permission_key IN (
   'report_exports.create',
   'report_exports.download',
   'report_exports.cancel',
-  'report_exports.history.view',
-  'report_exports.print',
-  'report_exports.employee_profile.print'
+  'report_exports.history.view'
 )
 WHERE roles.company_id = 'company_seed_default'
   AND roles.role_key IN ('hr_admin', 'hr_officer', 'outlet_manager', 'supervisor');

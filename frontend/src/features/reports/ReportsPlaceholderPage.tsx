@@ -1,8 +1,8 @@
 import { ModulePlaceholderPage } from "@/components/data/ModulePlaceholderPage";
 
 const rows = [
-  { id: "rep-1", report_name: "Attendance Summary", category: "Attendance", sensitive: "No", export: "CSV/XLSX later" },
-  { id: "rep-2", report_name: "Payroll Register", category: "Payroll", sensitive: "Yes", export: "Permission required" },
+  { id: "rep-1", report_name: "Attendance Summary", category: "Attendance", sensitive: "No", export: "Excel/PDF" },
+  { id: "rep-2", report_name: "Payroll Register", category: "Payroll", sensitive: "Yes", export: "Excel/PDF with permission" },
 ];
 
 export const ReportsPlaceholderPage = () => (
@@ -10,7 +10,7 @@ export const ReportsPlaceholderPage = () => (
     title="Reports"
     description="Reports, export jobs, and backup workflows will keep sensitive data scoped."
     tableTitle="Report catalogue"
-    tableDescription="Future reports will use filters, saved views, and export actions."
+    tableDescription="Reports use filters, saved views, and Excel/PDF export actions."
     rows={rows}
     columns={[
       { key: "report_name", header: "Report Name" },
