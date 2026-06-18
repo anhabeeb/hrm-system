@@ -90,7 +90,7 @@ const tests = `${readIfExists("tests/ui-foundation-modernization.test.ts")}\n${r
 [
   "ModuleDisabledPage",
   "LinkedEmployeeOnlyGuard",
-  "isModuleEnabled(user, moduleCode ?? requiredFeature)",
+  "isRouteFeatureAllowed(user, { moduleCode, requiredFeature, moduleCodesAll, requiredFeaturesAll })",
   "requiresLinkedEmployee && !user?.employee_id",
 ].forEach((token) => mustInclude("route guards", guards, token));
 

@@ -12,7 +12,8 @@ export const canAccessNavItem = (user: CurrentUser | null, item: NavItem) => {
   if (!hasAllPayrollSubFeatures(user, item.requiredPayrollSubFeaturesAll)) return false;
   if (!hasAttendanceSubFeature(user, item.requiredAttendanceSubFeature)) return false;
   if (!hasAllAttendanceSubFeatures(user, item.requiredAttendanceSubFeaturesAll)) return false;
-  return canShowModuleItem(user, item.moduleCode ?? item.requiredFeature, item.requiredPermission, {
+  return canShowModuleItem(user, item.moduleCode, item.requiredPermission, {
+    requiredFeature: item.requiredFeature,
     requiredPermissionsAny: item.requiredPermissionsAny,
     moduleCodesAll: item.moduleCodesAll,
     requiredFeaturesAll: item.requiredFeaturesAll,

@@ -1,13 +1,15 @@
-import type { CurrentUser, PermissionKey } from "@/types/auth";
+import type { CurrentUser, FeatureKey, PermissionKey } from "@/types/auth";
 
-import { areModulesEnabled, isModuleEnabled } from "./features";
+import { areModulesEnabled, hasFeature, isModuleEnabled } from "./features";
 import { hasAnyPermission, hasPermission } from "./permissions";
 
 export interface ModuleAccessOptions {
   requiredPermission?: PermissionKey;
   requiredPermissionsAny?: PermissionKey[];
-  moduleCodesAll?: string[];
-  requiredFeaturesAll?: string[];
+  moduleCode?: FeatureKey;
+  requiredFeature?: FeatureKey;
+  moduleCodesAll?: FeatureKey[];
+  requiredFeaturesAll?: FeatureKey[];
   requiresLinkedEmployee?: boolean;
   accountType?: "employee" | "admin" | "any";
 }
@@ -29,21 +31,32 @@ const accountTypeAllowed = (user: CurrentUser | null, accountType: ModuleAccessO
   return true;
 };
 
+const areRequiredFeaturesEnabled = (user: CurrentUser | null, features?: FeatureKey[]) =>
+  !features || features.length === 0 || features.every((feature) => hasFeature(user, feature));
+
+export const isRouteFeatureAllowed = (
+  user: CurrentUser | null,
+  options: Pick<ModuleAccessOptions, "moduleCode" | "requiredFeature" | "moduleCodesAll" | "requiredFeaturesAll"> = {},
+) =>
+  isModuleEnabled(user, options.moduleCode) &&
+  hasFeature(user, options.requiredFeature) &&
+  areModulesEnabled(user, options.moduleCodesAll) &&
+  areRequiredFeaturesEnabled(user, options.requiredFeaturesAll);
+
 export const canShowModuleItem = (
   user: CurrentUser | null,
-  moduleCode?: string,
+  moduleCode?: FeatureKey,
   permission?: PermissionKey,
   options: ModuleAccessOptions = {},
 ) =>
-  isModuleEnabled(user, moduleCode) &&
-  areModulesEnabled(user, options.moduleCodesAll ?? options.requiredFeaturesAll) &&
+  isRouteFeatureAllowed(user, { ...options, moduleCode: moduleCode ?? options.moduleCode }) &&
   hasRequiredPermission(user, permission ?? options.requiredPermission, options.requiredPermissionsAny) &&
   (!requiresLinkedEmployee(options) || canAccessSelfService(user)) &&
   accountTypeAllowed(user, options.accountType);
 
 export const canAccessModuleRoute = (
   user: CurrentUser | null,
-  moduleCode?: string,
+  moduleCode?: FeatureKey,
   permission?: PermissionKey,
   options: ModuleAccessOptions = {},
 ) => canShowModuleItem(user, moduleCode, permission, options);

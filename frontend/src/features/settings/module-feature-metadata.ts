@@ -69,6 +69,31 @@ export const featureDisplay: Record<string, { name: string; description: string;
     dependencies: ["employee_management"],
     warning: nonDestructiveModuleWarning,
   },
+  reports: {
+    name: "Reports",
+    description: "Generate HR and payroll reports using enabled modules and scoped permissions.",
+    warning: nonDestructiveModuleWarning,
+  },
+  import_export: {
+    name: "Import / Export",
+    description: "Manage supported Excel imports and Excel/PDF exports for configured HR data.",
+    warning: nonDestructiveModuleWarning,
+  },
+  backup_recovery: {
+    name: "Backup & Recovery",
+    description: "Create backups, verify backup integrity, manage retention, and control restore safety.",
+    warning: nonDestructiveModuleWarning,
+  },
+  offline_sync: {
+    name: "Devices & Sync",
+    description: "Manage offline sync, kiosk/device sync, and device-related operational settings.",
+    warning: nonDestructiveModuleWarning,
+  },
+  notifications: {
+    name: "Notifications & Alerts",
+    description: "Configure system notifications, expiry reminders, and alert delivery behavior.",
+    warning: nonDestructiveModuleWarning,
+  },
   employee_management: {
     name: "Employee Management",
     description: "Core employee records, organization structure, and employee lifecycle data.",

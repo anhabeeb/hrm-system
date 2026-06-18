@@ -63,7 +63,7 @@ export const navigationGroups: NavGroup[] = [
       { label: "My Roster", path: "/self/roster", icon: CalendarDays, moduleCode: "roster", requiredFeature: "roster", requiredPermission: "self.roster.view", requiresLinkedEmployee: true },
       { label: "My Leave", path: "/self/leave", icon: CalendarClock, moduleCode: "leave_management", requiredFeature: "leave_management", requiredPermission: "self.leave.view", requiresLinkedEmployee: true },
       { label: "My Requests", path: "/self/requests", icon: ClipboardCheck, requiredPermission: "self.requests.view", requiresLinkedEmployee: true },
-      { id: "self-documents", label: "My Documents", path: "/self/documents", icon: FileText, moduleCode: "documents_kyc", requiredFeature: "documents", requiredPermission: "self.documents.view", requiresLinkedEmployee: true },
+      { id: "self-documents", label: "My Documents", path: "/self/documents", icon: FileText, moduleCode: "document_tracking", requiredFeature: "documents", requiredPermission: "self.documents.view", requiresLinkedEmployee: true },
       { id: "self-kyc-requests", label: "My KYC Requests", path: "/profile/kyc-update", icon: IdCard, moduleCode: "documents_kyc", requiredFeature: "kyc_update_requests", requiredPermissionsAny: ["self.profile.view", "self.dashboard.view"], requiresLinkedEmployee: true },
       { label: "My Payslips", path: "/self/payslips", icon: ReceiptText, moduleCodesAll: ["payroll", "payslips"], requiredFeaturesAll: ["payroll", "payslips"], requiredPayrollSubFeature: "payslips_enabled", requiredPermission: "self.payslips.view", requiresLinkedEmployee: true },
       { id: "self-pending-approvals", label: "My Pending Approvals", path: "/self/pending-approvals", icon: FileCheck2, requiredPermissionsAny: ["department.approvals.view", "approvals.department.approve", "approvals.hrFinal.approve", "approvals.financeFinal.approve"], requiresLinkedEmployee: true, selfServiceOnly: true, badgeKey: "approvals" },
@@ -122,7 +122,7 @@ export const navigationGroups: NavGroup[] = [
     items: [
       { label: "Assets", path: "/assets", icon: PackageCheck, moduleCode: "asset_tracking", requiredFeature: "asset_tracking", requiredPermission: "assets.view" },
       { label: "Uniforms", path: "/uniforms", icon: Shirt, moduleCode: "uniform_tracking", requiredFeature: "uniform_tracking", requiredPermission: "uniforms.view" },
-      { label: "Documents", path: "/documents", icon: FileText, moduleCode: "documents_kyc", requiredFeature: "documents", requiredPermission: "documents.view" },
+      { label: "Documents", path: "/documents", icon: FileText, moduleCode: "document_tracking", requiredFeature: "documents", requiredPermission: "documents.view" },
     ],
   },
   {

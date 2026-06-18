@@ -6,7 +6,8 @@ import { FullPagePermissionDenied } from "@/components/feedback/PermissionDenied
 import { LoadingState } from "@/components/data/LoadingState";
 import { useAuth } from "@/features/auth/auth.store";
 import { getDefaultLandingPath } from "@/lib/default-landing";
-import { areModulesEnabled, isModuleEnabled } from "@/lib/features";
+import { isModuleEnabled } from "@/lib/features";
+import { isRouteFeatureAllowed } from "@/lib/moduleAccess";
 import { hasAnyPermission, hasPermission } from "@/lib/permissions";
 import { hasAllAttendanceSubFeatures, hasAllPayrollSubFeatures, hasAttendanceSubFeature, hasPayrollSubFeature, type AttendanceSubFeatureKey, type PayrollSubFeatureKey } from "@/lib/subfeatures";
 
@@ -85,8 +86,9 @@ export const ModuleRoute = ({
   if (requiresLinkedEmployee && !user?.employee_id) {
     return <LinkedEmployeeOnlyGuard>{children}</LinkedEmployeeOnlyGuard>;
   }
-  if (!isModuleEnabled(user, moduleCode ?? requiredFeature)) return <ModuleDisabledPage moduleName={moduleName} />;
-  if (!areModulesEnabled(user, moduleCodesAll ?? requiredFeaturesAll)) return <ModuleDisabledPage moduleName={moduleName} />;
+  if (!isRouteFeatureAllowed(user, { moduleCode, requiredFeature, moduleCodesAll, requiredFeaturesAll })) {
+    return <ModuleDisabledPage moduleName={moduleName} />;
+  }
   if (!hasPayrollSubFeature(user, requiredPayrollSubFeature) || !hasAllPayrollSubFeatures(user, requiredPayrollSubFeaturesAll)) return <ModuleDisabledPage moduleName={moduleName} />;
   if (!hasAttendanceSubFeature(user, requiredAttendanceSubFeature) || !hasAllAttendanceSubFeatures(user, requiredAttendanceSubFeaturesAll)) return <ModuleDisabledPage moduleName={moduleName} />;
   if (!hasPermission(user, requiredPermission)) return <FullPagePermissionDenied />;

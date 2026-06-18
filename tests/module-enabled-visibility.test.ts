@@ -48,12 +48,13 @@ describe("module-enabled visibility controls", () => {
     const router = read("frontend/src/app/router.tsx");
 
     expect(guards).toContain("moduleCode?: string");
-    expect(guards).toContain("isModuleEnabled(user, moduleCode ?? requiredFeature)");
+    expect(guards).toContain("isRouteFeatureAllowed(user, { moduleCode, requiredFeature, moduleCodesAll, requiredFeaturesAll })");
+    expect(guards).not.toContain("moduleCode ?? requiredFeature");
     expect(router).toContain('moduleCode: "leave_management"');
     expect(router).toContain('moduleCode: "attendance"');
     expect(router).toContain('moduleCode: "roster"');
     expect(router).toContain('moduleName: "Contract Tracking"');
-    expect(router).toContain('moduleCode: "documents_kyc"');
+    expect(router).toContain('moduleCode: "document_tracking"');
     expect(router).toContain('featuresAll: ["payroll", "advance_salary"]');
     expect(router).toContain('moduleCode: "resignation_offboarding"');
     expect(router).toContain('moduleCode: "disciplinary_actions"');

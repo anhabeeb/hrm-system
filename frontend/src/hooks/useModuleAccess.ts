@@ -6,9 +6,10 @@ import {
   canAccessSelfService,
   canShowModuleItem,
   hasRequiredPermission,
+  isRouteFeatureAllowed,
   type ModuleAccessOptions,
 } from "@/lib/moduleAccess";
-import { areModulesEnabled, isModuleEnabled } from "@/lib/features";
+import { isModuleEnabled } from "@/lib/features";
 import type { PermissionKey } from "@/types/auth";
 
 export const useModuleAccess = (moduleCode?: string, permission?: PermissionKey, options: ModuleAccessOptions = {}) => {
@@ -17,7 +18,7 @@ export const useModuleAccess = (moduleCode?: string, permission?: PermissionKey,
   return useMemo(
     () => ({
       enabled: isModuleEnabled(user, moduleCode),
-      allEnabled: areModulesEnabled(user, options.moduleCodesAll ?? options.requiredFeaturesAll),
+      allEnabled: isRouteFeatureAllowed(user, { ...options, moduleCode }),
       hasPermission: hasRequiredPermission(user, permission ?? options.requiredPermission, options.requiredPermissionsAny),
       linkedEmployeeAvailable: canAccessSelfService(user),
       canShow: canShowModuleItem(user, moduleCode, permission, options),

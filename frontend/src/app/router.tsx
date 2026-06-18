@@ -71,6 +71,7 @@ const CompanyInformationPage = lazyNamed(() => import("@/features/settings/compa
 const SecuritySettingsPage = lazyNamed(() => import("@/features/settings/security/SecuritySettingsPage"), "SecuritySettingsPage");
 const AttendanceSettingsPage = lazyNamed(() => import("@/features/settings/attendance/AttendanceSettingsPage"), "AttendanceSettingsPage");
 const LeaveSettingsPage = lazyNamed(() => import("@/features/settings/leave/LeaveSettingsPage"), "LeaveSettingsPage");
+const LeavePolicyRulesSettingsPage = lazyNamed(() => import("@/features/settings/leave/LeavePolicyRulesSettingsPage"), "LeavePolicyRulesSettingsPage");
 const PayrollSettingsPage = lazyNamed(() => import("@/features/settings/payroll/PayrollSettingsPage"), "PayrollSettingsPage");
 const DocumentsSettingsPage = lazyNamed(() => import("@/features/settings/documents/DocumentsSettingsPage"), "DocumentsSettingsPage");
 const AssetsSettingsPage = lazyNamed(() => import("@/features/settings/module/ModuleSettingsPages"), "AssetsSettingsPage");
@@ -146,7 +147,7 @@ export const AppRouter = () => (
         <Route path="/self/attendance-calendar" element={guarded(<EmployeeAttendanceCalendarPage />, { permissionsAny: ["self.attendance.calendar.view", "self.attendance.view"], feature: "attendance", moduleCode: "attendance", requiresLinkedEmployee: true })} />
         <Route path="/self/roster" element={guarded(<SelfServiceModulePage moduleKey="roster" />, { permission: "self.roster.view", feature: "roster", moduleCode: "roster", moduleName: "Duty Roster", requiresLinkedEmployee: true })} />
         <Route path="/self/leave" element={guarded(<SelfServiceModulePage moduleKey="leave" />, { permission: "self.leave.view", feature: "leave_management", moduleCode: "leave_management", moduleName: "Leave Management", requiresLinkedEmployee: true })} />
-        <Route path="/self/documents" element={guarded(<MyDocumentsKycPage />, { permission: "self.documents.view", feature: "documents", moduleCode: "documents_kyc", requiresLinkedEmployee: true })} />
+        <Route path="/self/documents" element={guarded(<MyDocumentsKycPage />, { permission: "self.documents.view", feature: "documents", moduleCode: "document_tracking", requiresLinkedEmployee: true })} />
         <Route path="/self/payslips" element={guarded(<SelfServiceModulePage moduleKey="payslips" />, { permission: "self.payslips.view", featuresAll: ["payroll", "payslips"], moduleCodesAll: ["payroll", "payslips"], requiredPayrollSubFeature: "payslips_enabled", moduleName: "Payslips", requiresLinkedEmployee: true })} />
         <Route path="/self/department-dashboard" element={guarded(<DepartmentDashboardPage selfService />, { permissionsAny: ["department.dashboard.view", "departments.dashboard.viewTeam", "attendance.teamCalendar.view", "attendance.calendar.viewTeam", "employees.team.view"], featuresAll: ["employee_management", "attendance"], moduleCodesAll: ["employees", "attendance"], requiresLinkedEmployee: true })} />
         <Route path="/profile" element={<ProfilePage />} />
@@ -185,7 +186,7 @@ export const AppRouter = () => (
         <Route path="/salary-loans" element={guarded(<SalaryLoansPage />, { permission: "salary_loans.view", feature: "payroll", moduleCode: "payroll", requiredPayrollSubFeature: "salary_loans_enabled", moduleName: "Salary Loans" })} />
         <Route path="/assets" element={guarded(<AssetsPage />, { permission: "assets.view", feature: "asset_tracking", moduleCode: "asset_tracking", moduleName: "Asset Tracking" })} />
         <Route path="/uniforms" element={guarded(<UniformsPage />, { permission: "uniforms.view", feature: "uniform_tracking", moduleCode: "uniform_tracking", moduleName: "Uniform Tracking" })} />
-        <Route path="/documents" element={guarded(<DocumentsPage />, { permission: "documents.view", feature: "documents", moduleCode: "documents_kyc" })} />
+        <Route path="/documents" element={guarded(<DocumentsPage />, { permission: "documents.view", feature: "documents", moduleCode: "document_tracking" })} />
         <Route path="/approvals" element={guarded(<ApprovalsPage />, { permission: "approvals.view", feature: "approvals", moduleCode: "approvals" })} />
         <Route path="/reports" element={guarded(<ReportsPage />, { permission: "reports.view", feature: "reports" })} />
         <Route path="/hr-reports" element={guarded(<HrReportsPage />, { permissionsAny: ["hr_reports.view", "hr_reports.catalog.view"], feature: "reports" })} />
@@ -200,6 +201,7 @@ export const AppRouter = () => (
         <Route path="/settings/security" element={guarded(<SecuritySettingsPage />, { permissionsAny: ["security.view", "audit_settings.view", "settings.view"], feature: "settings" })} />
         <Route path="/settings/attendance" element={guarded(<AttendanceSettingsPage />, { permissionsAny: ["attendance.settings.view", "attendance_settings.view", "settings.view"], feature: "settings" })} />
         <Route path="/settings/leave" element={guarded(<LeaveSettingsPage />, { permissionsAny: ["leave.settings.view", "leave_settings.view", "settings.view"], feature: "settings" })} />
+        <Route path="/settings/leave/policy-rules" element={guarded(<LeavePolicyRulesSettingsPage />, { permissionsAny: ["leave.settings.view", "leave_settings.view", "leave_policy_rules.manage", "settings.view"], feature: "settings" })} />
         <Route path="/settings/payroll" element={guarded(<PayrollSettingsPage />, { permissionsAny: ["payroll.settings.view", "payroll_settings.view", "settings.view"], feature: "settings" })} />
         <Route path="/settings/documents" element={guarded(<DocumentsSettingsPage />, { permissionsAny: ["documents.settings.view", "documents_settings.manage", "settings.view"], feature: "settings" })} />
         <Route path="/settings/assets" element={guarded(<AssetsSettingsPage />, { permissionsAny: ["assets_settings.manage", "settings.view"], feature: "settings" })} />
