@@ -1,6 +1,7 @@
 import type { Context } from "hono";
 
 import type { AppContext } from "../../types/api.types";
+import { ValidationError } from "../../utils/errors";
 import { ok } from "../../utils/response";
 import * as service from "./self-service.service";
 
@@ -17,6 +18,12 @@ export const accessSummary = async (c: Context<AppContext>) =>
 
 export const requests = async (c: Context<AppContext>) =>
   ok(await service.getSelfRequests(c.env, auth(c)));
+
+export const approvalChain = async (c: Context<AppContext>) => {
+  const requestId = c.req.param("requestId");
+  if (!requestId) throw new ValidationError("Request ID is required.");
+  return ok(await service.getSelfApprovalChain(c.env, auth(c), requestId));
+};
 
 export const pendingApprovals = async (c: Context<AppContext>) =>
   ok(await service.getSelfPendingApprovals(c.env, auth(c)));

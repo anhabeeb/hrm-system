@@ -38,6 +38,7 @@ selfServiceRoutes.use("*", requireLinkedEmployeeForSelfService);
 selfServiceRoutes.get("/dashboard", requirePermission("self.dashboard.view"), controller.dashboard);
 selfServiceRoutes.get("/profile", requireAnyPermission(["self.profile.view", "self.dashboard.view"]), controller.profile);
 selfServiceRoutes.get("/access-summary", requirePermission("self.accessSummary.view"), controller.accessSummary);
+selfServiceRoutes.get("/requests/:requestId/approval-chain", requireFeature("leave_management"), requirePermission("self.requests.view"), controller.approvalChain);
 selfServiceRoutes.get("/requests", requirePermission("self.requests.view"), controller.requests);
 selfServiceRoutes.get("/attendance-calendar", requireFeature("attendance"), requireAnyPermission(["self.attendance.calendar.view", "self.attendance.view"]), attendanceCalendarController.selfAttendanceCalendar);
 selfServiceRoutes.get("/department-dashboard/weekly-team-view", requireFeature("employee_management"), requireFeature("attendance"), requireAnyPermission(["department.dashboard.view", "departments.dashboard.viewTeam", "attendance.teamCalendar.view", "attendance.calendar.viewTeam", "employees.team.view"]), weeklyTeamController.selfWeeklyTeamView);

@@ -4,6 +4,7 @@ import { ArrowRight, ShieldAlert } from "lucide-react";
 import { DataTable } from "@/components/data/DataTable";
 import { EmptyState } from "@/components/data/EmptyState";
 import { EmployeeAvatar } from "@/components/employees/EmployeeAvatar";
+import { RowActions } from "@/components/data/RowActions";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -89,7 +90,17 @@ export const ProfileSummaryTable = ({ profile }: { profile: SelfProfile }) => (
   </div>
 );
 
-export const RequestsTable = ({ rows, loading, emptyTitle = "No requests found." }: { rows: SelfRequest[]; loading?: boolean; emptyTitle?: string }) => (
+export const RequestsTable = ({
+  rows,
+  loading,
+  emptyTitle = "No requests found.",
+  onViewApprovalChain,
+}: {
+  rows: SelfRequest[];
+  loading?: boolean;
+  emptyTitle?: string;
+  onViewApprovalChain?: (row: SelfRequest) => void;
+}) => (
   <DataTable
     compact
     columns={[
@@ -102,6 +113,9 @@ export const RequestsTable = ({ rows, loading, emptyTitle = "No requests found."
     rows={rows}
     loading={loading}
     getRowId={(row) => row.id}
+    rowActions={onViewApprovalChain ? (row) => (
+      <RowActions actions={[{ key: "view", label: "View Progress", onSelect: () => onViewApprovalChain(row) }]} />
+    ) : undefined}
     emptyTitle={emptyTitle}
     emptyDescription="No pending requests at the moment."
   />

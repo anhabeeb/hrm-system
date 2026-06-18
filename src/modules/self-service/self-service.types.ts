@@ -104,3 +104,61 @@ export interface SelfDashboard {
   requests: unknown[];
   pending_approvals: unknown[];
 }
+
+export type SelfServiceApprovalChainStatus =
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "waiting"
+  | "skipped"
+  | "not_required"
+  | "cancelled"
+  | "no_approval_required";
+
+export interface SelfServiceApprovalChainStep {
+  step_order: number;
+  step_key: string;
+  step_label: string;
+  status: SelfServiceApprovalChainStatus;
+  resolver_type: string;
+  approver_role_label: string | null;
+  approver_level_label: string | null;
+  approver_department_label: string | null;
+  approver_display_name: string | null;
+  approved_by_display_name: string | null;
+  approved_at: string | null;
+  rejected_by_display_name: string | null;
+  rejected_at: string | null;
+  comments_visible_to_employee: string | null;
+  is_current_step: boolean;
+  is_final_step: boolean;
+}
+
+export interface SelfServiceApprovalPolicySummary {
+  leave_request_id: string | null;
+  leave_type_name: string | null;
+  date_range: string | null;
+  document_required: boolean;
+  document_status: string | null;
+  document_required_reason: string | null;
+  salary_deduction_required: boolean;
+  deduction_mode: string | null;
+  deduction_source_label: string | null;
+  paid_percentage: number | null;
+  approval_required: boolean | null;
+  approval_workflow_key: string | null;
+  payroll_impact_label: string | null;
+}
+
+export interface SelfServiceApprovalChainResponse {
+  request_id: string;
+  request_type: string;
+  request_status: string;
+  title: string;
+  summary: string | null;
+  current_step_key: string | null;
+  current_step_label: string | null;
+  approval_setup_message: string | null;
+  policy_summary: SelfServiceApprovalPolicySummary | null;
+  approval_chain: SelfServiceApprovalChainStep[];
+}

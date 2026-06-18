@@ -173,6 +173,79 @@ export const listSelfRequests = (env: Env, companyId: string, userId: string, em
     [companyId, userId, employeeId, employeeId, employeeId, limit],
   );
 
+export const findSelfApprovalRequest = (env: Env, companyId: string, requestId: string, userId: string, employeeId: string) =>
+  one<any>(
+    env,
+    `SELECT r.id, r.company_id, r.workflow_id, r.operation_type, r.subject_type, r.subject_id,
+            r.requester_user_id, r.requester_employee_id, r.subject_employee_id, r.employee_id,
+            r.entity_type, r.entity_id, r.module, r.title, r.summary, r.status, r.current_step_id,
+            r.payload_json, r.submitted_at, r.approved_at, r.rejected_at, r.cancelled_at,
+            r.completed_at, r.updated_at, r.created_at, s.step_code AS current_step_code,
+            s.step_name AS current_step_name
+       FROM approval_requests r
+       LEFT JOIN approval_request_steps s ON s.company_id = r.company_id AND s.id = r.current_step_id
+      WHERE r.company_id = ?
+        AND r.id = ?
+        AND (r.requester_user_id = ? OR r.requester_employee_id = ? OR r.subject_employee_id = ? OR r.employee_id = ?)
+      LIMIT 1`,
+    [companyId, requestId, userId, employeeId, employeeId, employeeId],
+  );
+
+export const listSelfApprovalRequestSteps = (env: Env, companyId: string, requestId: string) =>
+  many<any>(
+    env,
+    `SELECT s.id, s.approval_request_id, s.workflow_step_id, s.step_order, s.step_code,
+            s.step_name, s.approver_resolver_type, s.assigned_approver_user_id,
+            s.assigned_approver_employee_id, s.assigned_department_id, s.required_permission,
+            s.required_role_id, s.required_min_level, s.required_max_level, s.status,
+            s.fallback_applied, s.resolved_at, s.due_at, s.approved_at, s.rejected_at,
+            s.skipped_at, s.escalated_at, s.created_at, s.updated_at,
+            u.full_name AS assigned_approver_name,
+            e.full_name AS assigned_employee_name,
+            d.name AS assigned_department_name,
+            r.role_name AS required_role_name
+       FROM approval_request_steps s
+       LEFT JOIN users u ON u.company_id = s.company_id AND u.id = s.assigned_approver_user_id
+       LEFT JOIN employees e ON e.company_id = s.company_id AND e.id = s.assigned_approver_employee_id
+       LEFT JOIN departments d ON d.company_id = s.company_id AND d.id = s.assigned_department_id
+       LEFT JOIN roles r ON r.company_id = s.company_id AND r.id = s.required_role_id
+      WHERE s.company_id = ? AND s.approval_request_id = ?
+      ORDER BY s.step_order ASC`,
+    [companyId, requestId],
+  );
+
+export const listSelfApprovalActions = (env: Env, companyId: string, requestId: string) =>
+  many<any>(
+    env,
+    `SELECT a.id, a.approval_request_id, a.approval_request_step_id, a.step_order,
+            a.action, a.actor_user_id, a.actor_employee_id, a.from_status, a.to_status,
+            a.reason, a.comment, a.metadata_json, a.created_at,
+            u.full_name AS actor_name
+       FROM approval_actions a
+       LEFT JOIN users u ON u.company_id = a.company_id AND u.id = a.actor_user_id
+      WHERE a.company_id = ? AND a.approval_request_id = ?
+      ORDER BY a.created_at ASC`,
+    [companyId, requestId],
+  );
+
+export const findSelfLeaveRequestForApproval = (env: Env, companyId: string, request: { subject_id?: string | null; entity_id?: string | null }) => {
+  const ids = [request.subject_id, request.entity_id].filter((id): id is string => Boolean(id));
+  if (!ids.length) return Promise.resolve(null);
+  const placeholders = ids.map(() => "?").join(", ");
+  return one<any>(
+    env,
+    `SELECT lr.id, lr.leave_type_id, lt.leave_name AS leave_type_name,
+            lr.start_date, lr.end_date, lr.total_days, lr.status, lr.approval_status,
+            lr.document_required, lr.document_status, lr.document_required_reason,
+            lr.policy_rule_id, lr.policy_snapshot_json, lr.affects_payroll
+       FROM leave_requests lr
+       LEFT JOIN leave_types lt ON lt.company_id = lr.company_id AND lt.id = lr.leave_type_id
+      WHERE lr.company_id = ? AND lr.id IN (${placeholders})
+      LIMIT 1`,
+    [companyId, ...ids],
+  );
+};
+
 export const listSelfPendingApprovals = (env: Env, companyId: string, userId: string, employee: { id: string; department_id: string | null; level: number | null } | null, permissions: string[], limit = 25, operationTypes: string[] = []) => {
   const clauses = ["s.assigned_approver_user_id = ?"];
   const values: unknown[] = [companyId, userId];

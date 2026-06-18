@@ -1,12 +1,21 @@
 import * as permissionService from "../../services/permission.service";
 import * as settingsService from "../../services/settings.service";
 import type { AuthActor } from "../../types/api.types";
-import { PermissionError } from "../../utils/errors";
+import { NotFoundError, PermissionError } from "../../utils/errors";
 import * as attendanceCalendarService from "../attendance/attendance-calendar.service";
 import { getEnabledApprovalOperationTypes } from "../approvals/approval-module-access.service";
 import { APPROVAL_OPERATION_TYPES } from "../approvals/approval-workflow-engine.types";
 import * as repository from "./self-service.repository";
-import type { SelfDashboardQuickAction, SelfDashboardWidget, SelfNavigationItem, SelfProfile } from "./self-service.types";
+import type {
+  SelfDashboardQuickAction,
+  SelfDashboardWidget,
+  SelfNavigationItem,
+  SelfProfile,
+  SelfServiceApprovalChainResponse,
+  SelfServiceApprovalChainStatus,
+  SelfServiceApprovalChainStep,
+  SelfServiceApprovalPolicySummary,
+} from "./self-service.types";
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 const currentMonth = () => todayIso().slice(0, 7);
@@ -17,6 +26,8 @@ const hasAny = (context: AuthActor, permissions: string[]) =>
 const feature = (features: Set<string>, key: string) => features.has(key);
 const featureAny = (features: Set<string>, keys: string[]) => keys.some((key) => features.has(key));
 const featuresAll = (features: Set<string>, groups: string[][]) => groups.every((group) => featureAny(features, group));
+const SHOW_APPROVER_NAMES_TO_EMPLOYEES = false;
+
 interface SelfServiceCapabilities {
   payslipsEnabled: boolean;
   attendanceCorrectionsEnabled: boolean;
@@ -186,6 +197,198 @@ export const getSelfRequests = async (env: Env, context: AuthActor) => {
   const profile = await getSelfProfile(env, context);
   if (!profile.employee) return [];
   return repository.listSelfRequests(env, context.companyId, context.actorUserId, profile.employee.id);
+};
+
+const safeJson = (value?: string | null): Record<string, any> => {
+  if (!value) return {};
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, any> : {};
+  } catch {
+    return {};
+  }
+};
+
+const safeApproverName = (name?: string | null) =>
+  SHOW_APPROVER_NAMES_TO_EMPLOYEES ? name ?? null : null;
+
+const humanizeResolver = (value?: string | null) =>
+  String(value ?? "")
+    .toLowerCase()
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ") || "Approver";
+
+const resolverLabel = (step: any) => {
+  const resolver = String(step.approver_resolver_type ?? "");
+  if (step.required_role_name) return step.required_role_name;
+  if (step.required_permission) return humanizeResolver(step.required_permission);
+  if (resolver === "REQUESTER_MANAGER") return "Direct Manager";
+  if (resolver === "DEPARTMENT_HEAD") return "Department Senior";
+  if (resolver === "DEPARTMENT_LEVEL") return "Department level approver";
+  if (resolver === "DEPARTMENT_ROLE") return "Department role approver";
+  if (resolver === "HR_FINAL_APPROVER") return "HR approver";
+  if (resolver === "FINANCE_FINAL_APPROVER") return "Finance approver";
+  if (resolver === "SUPER_ADMIN") return "Super Admin";
+  if (resolver === "MANUAL_ASSIGNMENT") return "Approval setup needs review by HR.";
+  if (resolver === "OPERATION_OWNER") return "Operation owner";
+  if (resolver === "SPECIFIC_USER") return "Assigned approver";
+  return step.step_name ?? humanizeResolver(resolver);
+};
+
+const levelLabel = (step: any) => {
+  const min = step.required_min_level;
+  const max = step.required_max_level;
+  if (min == null && max == null) return null;
+  if (min != null && max != null) return min === max ? `Level ${min} approver` : `Level ${min}-${max} approver`;
+  if (min != null) return `Level ${min}+ approver`;
+  return `Up to level ${max} approver`;
+};
+
+const actionForStep = (actions: any[], step: any, actionNames: string[]) =>
+  [...actions]
+    .reverse()
+    .find((action) =>
+      (
+        (action.approval_request_step_id && action.approval_request_step_id === step.id) ||
+        (!action.approval_request_step_id && Number(action.step_order ?? 0) === Number(step.step_order ?? 0))
+      ) &&
+      actionNames.includes(String(action.action ?? "").toUpperCase()),
+    );
+
+const statusForStep = (request: any, step: any, index: number, currentIndex: number): SelfServiceApprovalChainStatus => {
+  const requestStatus = String(request.status ?? "").toUpperCase();
+  const stepStatus = String(step.status ?? "").toUpperCase();
+  if (requestStatus === "CANCELLED") return stepStatus === "APPROVED" ? "approved" : "cancelled";
+  if (stepStatus === "APPROVED") return "approved";
+  if (stepStatus === "REJECTED") return "rejected";
+  if (stepStatus === "SKIPPED") return "skipped";
+  if (requestStatus === "REJECTED" && currentIndex >= 0 && index > currentIndex) return "not_required";
+  if (stepStatus === "CANCELLED") return "cancelled";
+  if (step.id === request.current_step_id || ["PENDING", "ESCALATED", "WAITING_FOR_APPROVER"].includes(stepStatus) && index === currentIndex) return "pending";
+  return "waiting";
+};
+
+const buildPolicySummary = (leaveRequest: any | null): SelfServiceApprovalPolicySummary | null => {
+  if (!leaveRequest) return null;
+  const snapshot = safeJson(leaveRequest.policy_snapshot_json);
+  const salaryDeductionRequired = Boolean(
+    snapshot.salary_deduction_required ??
+    snapshot.deduction_required ??
+    snapshot.payroll_deduction_required ??
+    leaveRequest.affects_payroll,
+  );
+  const deductionMode = snapshot.deduction_mode ?? snapshot.salary_deduction_mode ?? null;
+  const sourceLabel = snapshot.deduction_source_label ?? snapshot.deduction_component_label ?? snapshot.deduction_component ?? null;
+  return {
+    leave_request_id: leaveRequest.id ?? null,
+    leave_type_name: leaveRequest.leave_type_name ?? null,
+    date_range: leaveRequest.start_date && leaveRequest.end_date ? `${leaveRequest.start_date} to ${leaveRequest.end_date}` : null,
+    document_required: Boolean(leaveRequest.document_required ?? snapshot.document_required),
+    document_status: leaveRequest.document_status ?? (snapshot.document_required ? "missing" : "not_required"),
+    document_required_reason: leaveRequest.document_required_reason ?? snapshot.document_reason ?? snapshot.document_required_reason ?? null,
+    salary_deduction_required: salaryDeductionRequired,
+    deduction_mode: deductionMode,
+    deduction_source_label: sourceLabel,
+    paid_percentage: snapshot.paid_percentage == null ? null : Number(snapshot.paid_percentage),
+    approval_required: snapshot.approval_required == null ? null : Boolean(snapshot.approval_required),
+    approval_workflow_key: snapshot.approval_workflow_key ?? snapshot.workflow_key ?? null,
+    payroll_impact_label: salaryDeductionRequired
+      ? `Payroll impact: ${sourceLabel ? `deduction from ${sourceLabel}` : humanizeResolver(String(deductionMode ?? "configured deduction"))}`
+      : "No salary deduction required by this leave policy.",
+  };
+};
+
+const noApprovalStep = (request: any): SelfServiceApprovalChainStep => ({
+  step_order: 1,
+  step_key: "no_approval_required",
+  step_label: String(request.status ?? "").toUpperCase() === "APPROVED" ? "Automatically approved" : "No approval required",
+  status: "no_approval_required",
+  resolver_type: "NO_APPROVAL_REQUIRED",
+  approver_role_label: "No approval required",
+  approver_level_label: null,
+  approver_department_label: null,
+  approver_display_name: null,
+  approved_by_display_name: null,
+  approved_at: request.approved_at ?? request.completed_at ?? null,
+  rejected_by_display_name: null,
+  rejected_at: null,
+  comments_visible_to_employee: null,
+  is_current_step: false,
+  is_final_step: true,
+});
+
+export const getSelfApprovalChain = async (env: Env, context: AuthActor, requestId: string): Promise<SelfServiceApprovalChainResponse> => {
+  if (!has(context, "self.requests.view")) throw new PermissionError();
+  const [profile, enabledFeatures] = await Promise.all([
+    getSelfProfile(env, context),
+    repository.listEnabledFeatureKeys(env, context.companyId),
+  ]);
+  const employee = requireLinkedEmployeeForSelfService(profile);
+  const request = await repository.findSelfApprovalRequest(env, context.companyId, requestId, context.actorUserId, employee.id);
+  if (!request) throw new NotFoundError("Request not found.");
+
+  const operationType = String(request.operation_type ?? "");
+  if (operationType === "LEAVE_REQUEST" && !new Set(enabledFeatures).has("leave_management")) {
+    throw new PermissionError("Leave Management is disabled. Enable it in Settings to use this module.", "FEATURE_DISABLED");
+  }
+
+  const [steps, actions, leaveRequest] = await Promise.all([
+    repository.listSelfApprovalRequestSteps(env, context.companyId, request.id),
+    repository.listSelfApprovalActions(env, context.companyId, request.id),
+    operationType === "LEAVE_REQUEST"
+      ? repository.findSelfLeaveRequestForApproval(env, context.companyId, request).catch(() => null)
+      : Promise.resolve(null),
+  ]);
+  const policySummary = buildPolicySummary(leaveRequest);
+
+  const currentIndex = steps.findIndex((step) => step.id === request.current_step_id);
+  const rejectedIndex = steps.findIndex((step) => String(step.status ?? "").toUpperCase() === "REJECTED");
+  const approvalChain = steps.length
+    ? steps.map((step, index): SelfServiceApprovalChainStep => {
+      const approvedAction = actionForStep(actions, step, ["APPROVE", "APPROVED"]);
+      const rejectedAction = actionForStep(actions, step, ["REJECT", "REJECTED"]);
+      const stepStatus = rejectedIndex >= 0 && index > rejectedIndex ? "not_required" : statusForStep(request, step, index, currentIndex);
+      return {
+        step_order: Number(step.step_order ?? index + 1),
+        step_key: step.step_code ?? step.workflow_step_id ?? step.id,
+        step_label: step.step_name ?? resolverLabel(step),
+        status: stepStatus,
+        resolver_type: humanizeResolver(step.approver_resolver_type),
+        approver_role_label: resolverLabel(step),
+        approver_level_label: levelLabel(step),
+        approver_department_label: step.assigned_department_name ?? null,
+        approver_display_name: safeApproverName(step.assigned_approver_name ?? step.assigned_employee_name),
+        approved_by_display_name: safeApproverName(approvedAction?.actor_name),
+        approved_at: step.approved_at ?? approvedAction?.created_at ?? null,
+        rejected_by_display_name: safeApproverName(rejectedAction?.actor_name),
+        rejected_at: step.rejected_at ?? rejectedAction?.created_at ?? null,
+        comments_visible_to_employee: null,
+        is_current_step: step.id === request.current_step_id && ["pending", "waiting"].includes(stepStatus),
+        is_final_step: index === steps.length - 1,
+      };
+    })
+    : [noApprovalStep(request)];
+
+  const current = approvalChain.find((step) => step.is_current_step) ?? null;
+  const manualAssignment = steps.some((step) =>
+    String(step.approver_resolver_type ?? "") === "MANUAL_ASSIGNMENT" ||
+    String(step.status ?? "").toUpperCase() === "WAITING_FOR_APPROVER",
+  );
+
+  return {
+    request_id: request.id,
+    request_type: operationType,
+    request_status: request.status,
+    title: request.title ?? operationType,
+    summary: request.summary ?? null,
+    current_step_key: current?.step_key ?? request.current_step_code ?? null,
+    current_step_label: current?.step_label ?? request.current_step_name ?? null,
+    approval_setup_message: manualAssignment ? "Approval setup needs review by HR." : null,
+    policy_summary: policySummary,
+    approval_chain: approvalChain,
+  };
 };
 
 export const getSelfPendingApprovals = async (env: Env, context: AuthActor) => {

@@ -48,6 +48,8 @@ for (const scriptName of [
   "verify:payroll-schema",
   "verify:payslip-schema",
   "verify:production-acceptance",
+  "verify:leave-policy-rules",
+  "verify:self-service-approval-chain",
 ]) {
   assert(Boolean(scripts[scriptName]), `package.json missing ${scriptName} script.`);
 }
@@ -62,6 +64,8 @@ for (const staleFile of [
 
 for (const requiredFile of [
   "scripts/verify-final-hrm-acceptance.mjs",
+  "scripts/verify-leave-policy-rules.mjs",
+  "scripts/verify-self-service-approval-chain.mjs",
   "scripts/verify-setup-guide.mjs",
   "scripts/verify-settings-module-lifecycle.mjs",
   "scripts/verify-module-toggles.mjs",
@@ -81,6 +85,13 @@ for (const requiredFile of [
   "frontend/src/features/setup-guide/SetupGuideGate.tsx",
   "frontend/src/features/setup-guide/SetupIncompleteDashboardBanner.tsx",
   "tests/setup-guide.test.ts",
+  "tests/leave-policy-rules.test.ts",
+  "tests/self-service-approval-chain.test.ts",
+  "migrations/0087_leave_type_policy_rules.sql",
+  "migrations/0088_leave_policy_rules_component_and_document_status.sql",
+  "src/modules/leave/leave-policy.service.ts",
+  "frontend/src/features/leave/LeavePolicyRuleDialog.tsx",
+  "frontend/src/features/self-service/SelfServiceApprovalChainDialog.tsx",
 ]) {
   assert(exists(requiredFile), `${requiredFile} is missing.`);
 }
@@ -147,6 +158,45 @@ for (const marker of [
 const setupService = exists("src/modules/setup-guide/setup-guide.service.ts") ? read("src/modules/setup-guide/setup-guide.service.ts") : "";
 assert(setupService.includes("settingsService.updateFeature"), "setup guide module-choice must update real feature settings through settings service.");
 assert(setupService.includes("audit") || setupService.includes("auditLog"), "setup guide service must audit setup actions.");
+
+const leavePolicyService = exists("src/modules/leave/leave-policy.service.ts") ? read("src/modules/leave/leave-policy.service.ts") : "";
+const leavePolicyTests = exists("tests/leave-policy-rules.test.ts") ? read("tests/leave-policy-rules.test.ts") : "";
+assert(leavePolicyService.includes("requestedDays > consecutiveThreshold"), "leave policy consecutive-day document threshold must use exceeds (>) behavior.");
+for (const marker of [
+  "applies FRL document threshold",
+  "1 day",
+  "2 days",
+  "3 consecutive days",
+  "applies Sick Leave document thresholds",
+  "exactly 15 total used days",
+  "more than 15 total used days",
+  "selected allowance",
+  "pending document",
+  "LEAVE_DOCUMENT_REQUIRED",
+]) {
+  assert(leavePolicyTests.includes(marker), `leave policy tests missing marker ${marker}.`);
+}
+
+const selfServiceRoutes = exists("src/routes/self-service.routes.ts") ? read("src/routes/self-service.routes.ts") : "";
+const selfServiceService = exists("src/modules/self-service/self-service.service.ts") ? read("src/modules/self-service/self-service.service.ts") : "";
+const selfServiceRepository = exists("src/modules/self-service/self-service.repository.ts") ? read("src/modules/self-service/self-service.repository.ts") : "";
+const selfServiceTests = exists("tests/self-service-approval-chain.test.ts") ? read("tests/self-service-approval-chain.test.ts") : "";
+assert(selfServiceRoutes.includes('/requests/:requestId/approval-chain'), "self-service approval chain endpoint is missing.");
+assert(selfServiceRoutes.includes('requireFeature("leave_management")'), "self-service approval chain endpoint must respect Leave Management module state.");
+assert(selfServiceService.includes("SHOW_APPROVER_NAMES_TO_EMPLOYEES = false"), "self-service approval chain must hide approver names by default.");
+assert(selfServiceService.includes("FINANCE_FINAL_APPROVER"), "self-service approval chain must label configured Finance workflow steps.");
+assert(!/Finance[^;\n]+push|push\([^)]*Finance|step_label:\s*["']Finance/.test(selfServiceService), "self-service approval chain must not synthesize a Finance step.");
+for (const marker of ["requester_user_id = ?", "requester_employee_id = ?", "subject_employee_id = ?", "employee_id = ?", "approval_request_steps"]) {
+  assert(selfServiceRepository.includes(marker), `self-service approval chain repository missing ownership/step marker ${marker}.`);
+}
+for (const marker of [
+  "Finance does not appear when not configured",
+  "Finance appears when configured",
+  "Approver names are hidden",
+  "Leave policy document-required status",
+]) {
+  assert(selfServiceTests.includes(marker), `self-service approval chain tests missing marker ${marker}.`);
+}
 
 const setupRoutes = exists("src/routes/setup-guide.routes.ts") ? read("src/routes/setup-guide.routes.ts") : "";
 for (const routeMarker of [

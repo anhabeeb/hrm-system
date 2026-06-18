@@ -1,5 +1,5 @@
 import { api } from "@/lib/api-client";
-import type { SelfDashboard, SelfNavigationItem, SelfPendingApproval, SelfProfile, SelfRequest } from "./self-service.types";
+import type { SelfDashboard, SelfNavigationItem, SelfPendingApproval, SelfProfile, SelfRequest, SelfServiceApprovalChain } from "./self-service.types";
 
 export const selfServiceApi = {
   dashboard: () => api.get<SelfDashboard>("/self/dashboard"),
@@ -7,5 +7,6 @@ export const selfServiceApi = {
   accessSummary: () => api.get<Record<string, unknown>>("/self/access-summary"),
   navigation: () => api.get<SelfNavigationItem[]>("/self/navigation"),
   requests: () => api.get<SelfRequest[]>("/self/requests"),
+  approvalChain: (requestId: string) => api.get<SelfServiceApprovalChain>(`/self/requests/${encodeURIComponent(requestId)}/approval-chain`),
   pendingApprovals: () => api.get<SelfPendingApproval[]>("/self/pending-approvals"),
 };
