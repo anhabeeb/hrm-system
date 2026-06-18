@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { FormError } from "@/components/feedback/FormError";
+import { AppDatePicker } from "@/components/forms/AppDatePicker";
 import { LoadingButton } from "@/components/forms/LoadingButton";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -26,14 +27,16 @@ export const FeatureReasonDialog = ({
   error?: ApiError | null;
   dependencyWarning?: string | null;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (reason: string) => void;
+  onConfirm: (payload: { reason: string; effective_from: string }) => void;
 }) => {
   const [reason, setReason] = useState("");
+  const [effectiveFrom, setEffectiveFrom] = useState("");
   const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
       setReason("");
+      setEffectiveFrom("");
       setValidationError(null);
     }
   }, [open]);
@@ -44,7 +47,11 @@ export const FeatureReasonDialog = ({
       setValidationError("A reason is required for this action.");
       return;
     }
-    onConfirm(trimmed);
+    if (!effectiveFrom) {
+      setValidationError("Choose when this setting should start applying.");
+      return;
+    }
+    onConfirm({ reason: trimmed, effective_from: effectiveFrom });
   };
 
   return (
@@ -61,6 +68,18 @@ export const FeatureReasonDialog = ({
             {dependencyWarning ? <div className="mt-2 text-amber-700">{dependencyWarning}</div> : null}
           </div>
           <FormError message={error?.message ?? validationError ?? undefined} requestId={error?.requestId} />
+          <AppDatePicker
+            clearable={false}
+            label="Effective from"
+            value={effectiveFrom}
+            onChange={(value) => {
+              setEffectiveFrom(value ?? "");
+              setValidationError(null);
+            }}
+          />
+          <p className="text-xs text-muted-foreground">
+            Choose when this setting should start applying. Existing historical records are not changed automatically.
+          </p>
           <div className="space-y-2">
             <Label htmlFor="feature-change-reason">Reason</Label>
             <Textarea

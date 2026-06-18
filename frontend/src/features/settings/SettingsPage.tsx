@@ -5,9 +5,12 @@ import {
   CalendarClock,
   Clock3,
   DatabaseBackup,
+  FileSignature,
   FileText,
   Landmark,
+  PackageCheck,
   ShieldCheck,
+  Shirt,
   TabletSmartphone,
   UploadCloud,
   BarChart3,
@@ -23,6 +26,10 @@ const settingsLinks = [
   { title: "Leave", description: "Leave policies, leave types, statutory templates, and long leave rules.", path: "/settings/leave", icon: CalendarClock },
   { title: "Payroll", description: "Payroll cycle, salary calculation, loans, approval, lock, and payslip settings.", path: "/settings/payroll", icon: Landmark },
   { title: "Documents", description: "Document module, expiry warnings, categories, and foreign employee expected documents.", path: "/settings/documents", icon: FileText },
+  { title: "Asset Tracking", description: "Asset module availability, categories, issue/return rules, and preserved setup guidance.", path: "/settings/assets", icon: PackageCheck },
+  { title: "Uniform Tracking", description: "Uniform module availability, uniform types, size options, and issue/return rules.", path: "/settings/uniforms", icon: Shirt },
+  { title: "Duty Roster", description: "Roster module availability, shift templates, publishing, and roster approval guidance.", path: "/settings/roster", icon: CalendarClock },
+  { title: "Contract Tracking", description: "Contract module availability, contract rules, document requirement, and renewal approval guidance.", path: "/settings/contracts", icon: FileSignature },
   { title: "Backup & Recovery", description: "Backup frequency, retention, restore approval, and health status.", path: "/settings/backup", icon: DatabaseBackup },
   { title: "Notifications", description: "System notifications and planned email notification controls.", path: "/settings/notifications", icon: Bell },
   { title: "Reports", description: "Export formats, masking, date range defaults, and report access controls.", path: "/settings/reports", icon: BarChart3 },
@@ -61,6 +68,12 @@ const setupGuidance = [
 export const SettingsPage = () => (
   <div>
     <div className="space-y-4 p-4 md:p-6">
+      <div className="rounded-lg border bg-card p-4">
+        <h1 className="text-lg font-semibold">All Settings</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Open a module settings page to configure availability, effective date, and detailed options. Super Admins can still use the compact Feature Controls overview below.
+        </p>
+      </div>
       <FeatureSettingsPanel />
       <div className="grid gap-3 rounded-lg border bg-card p-4 md:grid-cols-2 xl:grid-cols-3">
         {setupGuidance.map((item) => (

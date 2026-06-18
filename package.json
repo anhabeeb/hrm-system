@@ -44,6 +44,7 @@
     "verify:security-hardening": "node scripts/verify-security-hardening.mjs && npm run verify:dependency-security",
     "verify:toast-alerts": "node scripts/verify-toast-alerts.mjs",
     "verify:settings": "node scripts/verify-settings.mjs",
+    "verify:settings-navigation-ux": "node scripts/verify-settings-navigation-ux.mjs",
     "verify:settings-module-lifecycle": "node scripts/verify-settings-module-lifecycle.mjs",
     "verify:setup-guide": "node scripts/verify-setup-guide.mjs",
     "verify:module-toggles": "node scripts/verify-module-toggles.mjs",

@@ -246,7 +246,7 @@ export const validateUpdateFeatureInput = (payload: unknown): UpdateFeatureInput
     !input.effective_from
   ) {
     throw new ValidationError(
-      "This setting affects payroll. Please select an effective date.",
+      "This feature availability change requires an effective date.",
     );
   }
 
@@ -398,7 +398,7 @@ export const validateNoEnabledDependentsBeforeDisable = (
 };
 
 const requiresFeatureEffectiveDate = (input: Partial<UpdateFeatureInput>): boolean =>
-  input.effective_from !== undefined ? false : false;
+  input.is_enabled !== undefined || input.status !== undefined;
 
 const validateUiPreferences = (settings: Record<string, Record<string, unknown>>) => {
   const preferences = settings["ui.preferences"];

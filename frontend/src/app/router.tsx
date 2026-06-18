@@ -73,6 +73,10 @@ const AttendanceSettingsPage = lazyNamed(() => import("@/features/settings/atten
 const LeaveSettingsPage = lazyNamed(() => import("@/features/settings/leave/LeaveSettingsPage"), "LeaveSettingsPage");
 const PayrollSettingsPage = lazyNamed(() => import("@/features/settings/payroll/PayrollSettingsPage"), "PayrollSettingsPage");
 const DocumentsSettingsPage = lazyNamed(() => import("@/features/settings/documents/DocumentsSettingsPage"), "DocumentsSettingsPage");
+const AssetsSettingsPage = lazyNamed(() => import("@/features/settings/module/ModuleSettingsPages"), "AssetsSettingsPage");
+const UniformsSettingsPage = lazyNamed(() => import("@/features/settings/module/ModuleSettingsPages"), "UniformsSettingsPage");
+const RosterSettingsPage = lazyNamed(() => import("@/features/settings/module/ModuleSettingsPages"), "RosterSettingsPage");
+const ContractsSettingsPage = lazyNamed(() => import("@/features/settings/module/ModuleSettingsPages"), "ContractsSettingsPage");
 const BackupSettingsPage = lazyNamed(() => import("@/features/settings/backup/BackupSettingsPage"), "BackupSettingsPage");
 const NotificationsSettingsPage = lazyNamed(() => import("@/features/settings/notifications/NotificationsSettingsPage"), "NotificationsSettingsPage");
 const ReportsSettingsPage = lazyNamed(() => import("@/features/settings/reports/ReportsSettingsPage"), "ReportsSettingsPage");
@@ -147,7 +151,7 @@ export const AppRouter = () => (
         <Route path="/self/department-dashboard" element={guarded(<DepartmentDashboardPage selfService />, { permissionsAny: ["department.dashboard.view", "departments.dashboard.viewTeam", "attendance.teamCalendar.view", "attendance.calendar.viewTeam", "employees.team.view"], featuresAll: ["employee_management", "attendance"], moduleCodesAll: ["employees", "attendance"], requiresLinkedEmployee: true })} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/profile/security" element={<SecurityPage />} />
-        <Route path="/profile/kyc-update" element={<KycUpdatePage />} />
+        <Route path="/profile/kyc-update" element={guarded(<KycUpdatePage />, { permissionsAny: ["self.profile.view", "self.dashboard.view"], feature: "kyc_update_requests", moduleCode: "documents_kyc", moduleName: "KYC Update Requests", requiresLinkedEmployee: true })} />
         <Route path="/notifications" element={guarded(<NotificationsPage />, { permissionsAny: ["notifications.view", "notifications.manage_own"] })} />
         <Route path="/expiry-alerts" element={guarded(<ExpiryAlertsPage />, { permissionsAny: ["expiry_alerts.view", "expiry_alerts.view_own"] })} />
         <Route path="/employees" element={guarded(<EmployeesPage />, { permission: "employees.view", feature: "employee_management" })} />
@@ -165,12 +169,12 @@ export const AppRouter = () => (
         <Route path="/organization/operation-ownership" element={guarded(<OperationOwnershipPage />, { permissionsAny: ["operationOwnership.view", "operationOwnership.matrix.view", "operationOwnership.businessFunctions.view"], feature: "operation_ownership", moduleCode: "operation_ownership" })} />
         <Route path="/attendance" element={guarded(<AttendancePage />, { permission: "attendance.view", feature: "attendance" })} />
         <Route path="/attendance/calendar" element={guarded(<EmployeeAttendanceCalendarPage />, { permissionsAny: ["attendance.calendar.view", "attendance.calendar.viewTeam", "attendance.calendar.viewAll", "attendance.view", "attendance.reports.view"], feature: "attendance", moduleCode: "attendance" })} />
-        <Route path="/attendance/corrections" element={guarded(<AttendanceCorrectionsPage />, { permission: "attendance.view", feature: "attendance" })} />
+        <Route path="/attendance/corrections" element={guarded(<AttendanceCorrectionsPage />, { permission: "attendance.view", feature: "attendance", requiredAttendanceSubFeature: "corrections_enabled", moduleName: "Attendance Corrections" })} />
         <Route path="/attendance/reports" element={guarded(<AttendanceReportsPage />, { permission: "attendance.reports.view", feature: "attendance" })} />
         <Route path="/rosters" element={guarded(<RostersPage />, { permissionsAny: ["rosters.weeklyMatrix.view", "rosters.weeklyMatrix.viewTeam", "rosters.weeklyMatrix.viewAll", "rosters.view", "roster.view"], featuresAll: ["roster", "employee_management"], moduleCodesAll: ["roster", "employees"], moduleName: "Duty Roster" })} />
-        <Route path="/kiosk-devices" element={guarded(<KioskDevicesPage />, { permissionsAny: ["devices.view", "kiosk.view"], featuresAll: ["attendance", "offline_sync"], moduleCodesAll: ["attendance", "kiosk"] })} />
+        <Route path="/kiosk-devices" element={guarded(<KioskDevicesPage />, { permissionsAny: ["devices.view", "kiosk.view"], featuresAll: ["attendance", "offline_sync"], moduleCodesAll: ["attendance", "kiosk"], requiredAttendanceSubFeature: "kiosk_enabled", moduleName: "Kiosk Attendance" })} />
         <Route path="/sync-status" element={guarded(<SyncStatusPage />, { permission: "sync.view", feature: "offline_sync" })} />
-        <Route path="/biometric" element={guarded(<BiometricPage />, { permissionsAny: ["biometric.view", "devices.view"], featuresAll: ["attendance", "biometric_attendance"], moduleCodesAll: ["attendance", "biometric"] })} />
+        <Route path="/biometric" element={guarded(<BiometricPage />, { permissionsAny: ["biometric.view", "devices.view"], featuresAll: ["attendance", "biometric_attendance"], moduleCodesAll: ["attendance", "biometric"], requiredAttendanceSubFeature: "biometric_enabled", moduleName: "Biometric Attendance" })} />
         <Route path="/leave" element={guarded(<LeavePage />, { permission: "leave.view", feature: "leave_management", moduleCode: "leave_management", moduleName: "Leave Management" })} />
         <Route path="/holidays" element={guarded(<HolidayCalendarPage />, { permissionsAny: ["holidays.view", "holidays.calendar.view"], feature: "holidays" })} />
         <Route path="/long-leave" element={guarded(<LongLeavePage />, { permission: "long_leave.view", feature: "long_leave_management", moduleCode: "long_leave_management", moduleName: "Long Leave Management" })} />
@@ -198,6 +202,10 @@ export const AppRouter = () => (
         <Route path="/settings/leave" element={guarded(<LeaveSettingsPage />, { permissionsAny: ["leave.settings.view", "leave_settings.view", "settings.view"], feature: "settings" })} />
         <Route path="/settings/payroll" element={guarded(<PayrollSettingsPage />, { permissionsAny: ["payroll.settings.view", "payroll_settings.view", "settings.view"], feature: "settings" })} />
         <Route path="/settings/documents" element={guarded(<DocumentsSettingsPage />, { permissionsAny: ["documents.settings.view", "documents_settings.manage", "settings.view"], feature: "settings" })} />
+        <Route path="/settings/assets" element={guarded(<AssetsSettingsPage />, { permissionsAny: ["assets_settings.manage", "settings.view"], feature: "settings" })} />
+        <Route path="/settings/uniforms" element={guarded(<UniformsSettingsPage />, { permissionsAny: ["assets_settings.manage", "settings.view"], feature: "settings" })} />
+        <Route path="/settings/roster" element={guarded(<RosterSettingsPage />, { permissionsAny: ["roster_settings.manage", "settings.view"], feature: "settings" })} />
+        <Route path="/settings/contracts" element={guarded(<ContractsSettingsPage />, { permissionsAny: ["documents_settings.manage", "settings.view"], feature: "settings" })} />
         <Route path="/settings/backup" element={guarded(<BackupSettingsPage />, { permissionsAny: ["backup.settings.view", "backup_settings.view", "settings.view"], feature: "settings" })} />
         <Route path="/settings/notifications" element={guarded(<NotificationsSettingsPage />, { permissionsAny: ["notifications.settings.view", "settings.view"], feature: "settings" })} />
         <Route path="/settings/reports" element={guarded(<ReportsSettingsPage />, { permissionsAny: ["reports.settings.view", "settings.view"], feature: "settings" })} />

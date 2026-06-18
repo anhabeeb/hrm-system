@@ -33,6 +33,17 @@ const mustNotInclude = (label, file, markers) => {
 
 const featurePanel = mustInclude("Feature Controls", "frontend/src/features/settings/FeatureSettingsPanel.tsx", [
   "mainFeatureOrder",
+  "Only the primary optional modules are shown here.",
+  "Sub-feature controls live inside Attendance and Payroll settings.",
+  "Dependencies",
+  "Required by:",
+  "Last changed:",
+  "Audit on",
+  "missingDependencies",
+  "activeDependents",
+  "Disable dependent modules first.",
+]);
+const featureMetadata = mustInclude("Feature Controls metadata", "frontend/src/features/settings/module-feature-metadata.ts", [
   "Document Tracking",
   "Asset Tracking",
   "Uniform Tracking",
@@ -42,21 +53,13 @@ const featurePanel = mustInclude("Feature Controls", "frontend/src/features/sett
   "Contract Tracking",
   "Attendance Management",
   "Payroll Management",
-  "Only the primary optional modules are shown here.",
-  "Sub-feature controls live inside Attendance and Payroll settings.",
-  "Dependencies",
-  "Required by:",
-  "Last changed:",
-  "Audit on",
   "Disabling this module hides it from normal use but does not delete existing records.",
-  "missingDependencies",
-  "activeDependents",
-  "Disable dependent modules first.",
 ]);
-if (featurePanel.includes('header: "Key"')) {
+const featureControls = `${featurePanel}\n${featureMetadata}`;
+if (featureControls.includes('header: "Key"')) {
   failures.push("Feature Controls: raw feature keys must not be shown as a normal user-facing column.");
 }
-if (!featurePanel.includes("mainFeatureOrder") || (featurePanel.match(/mainFeatureOrder/g) ?? []).length < 2) {
+if (!featureControls.includes("mainFeatureOrder") || (featureControls.match(/mainFeatureOrder/g) ?? []).length < 2) {
   failures.push("Feature Controls: primary module list must drive the visible rows.");
 }
 
@@ -187,6 +190,11 @@ if (/if\s*\(!isEnabling\)\s*{\s*return;\s*}/.test(validators)) {
 }
 
 mustNotInclude("Settings files", "frontend/src/features/settings/FeatureSettingsPanel.tsx", [
+  "dark:",
+  "window.alert",
+  "window.confirm",
+]);
+mustNotInclude("Settings metadata", "frontend/src/features/settings/module-feature-metadata.ts", [
   "dark:",
   "window.alert",
   "window.confirm",

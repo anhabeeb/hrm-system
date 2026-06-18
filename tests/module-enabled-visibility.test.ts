@@ -29,7 +29,8 @@ describe("module-enabled visibility controls", () => {
     expect(navigation).toContain('label: "Payslips"');
     expect(navigation).toContain('moduleCodesAll: ["payroll", "payslips"]');
     expect(navigation).toContain('requiredPayrollSubFeature: "payslips_enabled"');
-    expect(navigation).toContain('label: "My Documents / KYC"');
+    expect(navigation).toContain('label: "My Documents"');
+    expect(navigation).toContain('label: "My KYC Requests"');
     expect(navigation).toContain('moduleCode: "documents_kyc"');
     expect(navigation).toContain('label: "Duty Rosters"');
     expect(navigation).toContain('moduleCode: "roster"');

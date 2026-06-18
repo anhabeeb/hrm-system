@@ -237,7 +237,8 @@ mustInclude("navigation", "frontend/src/lib/navigation.ts", [
   'requiredFeaturesAll: ["reports", "payroll"]',
 ]);
 
-mustInclude("settings UI", "frontend/src/features/settings/FeatureSettingsPanel.tsx", [
+const featureControlsSource = `${read("frontend/src/features/settings/FeatureSettingsPanel.tsx")}\n${read("frontend/src/features/settings/module-feature-metadata.ts")}`;
+for (const marker of [
   "Leave Management",
   "Long Leave Management",
   "Document Tracking",
@@ -253,7 +254,9 @@ mustInclude("settings UI", "frontend/src/features/settings/FeatureSettingsPanel.
   "Track employee attendance, lateness, absences, corrections, biometric/kiosk entries, and attendance-based payroll review.",
   "Disabling this module hides it from normal use but does not delete existing records.",
   "Re-enabling restores access to preserved records and settings.",
-]);
+]) {
+  if (!featureControlsSource.includes(marker)) failures.push(`settings UI: missing ${marker}`);
+}
 mustInclude("attendance structured settings", "frontend/src/features/settings/structured-settings.ts", [
   "Attendance Sub-Features",
   "Manual Attendance",

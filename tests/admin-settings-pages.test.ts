@@ -101,11 +101,53 @@ describe("settings and administration frontend pages", () => {
 
     expect(settingsHub).toContain("settingsLinks");
     expect(settingsHub).toContain("Open settings");
+    expect(settingsHub).toContain("Open a module settings page to configure availability, effective date, and detailed options.");
     expect(settingsHub).toContain("Company Information");
     expect(settingsHub).toContain("Backup & Recovery");
+    expect(settingsHub).toContain("Asset Tracking");
+    expect(settingsHub).toContain("Uniform Tracking");
+    expect(settingsHub).toContain("Duty Roster");
+    expect(settingsHub).toContain("Contract Tracking");
     expect(structuredPanel).toContain("Reason for change");
+    expect(structuredPanel).toContain("AppDatePicker");
+    expect(structuredPanel).toContain("effective_date");
     expect(structuredPanel).toContain("Save changes");
     expect(structuredPanel).not.toContain("Editable structured forms for this section will be expanded");
+  });
+
+  it("module settings pages expose availability controls with effective dates", () => {
+    const availabilityPanel = read("frontend/src/features/settings/ModuleAvailabilityPanel.tsx");
+    const featureDialog = read("frontend/src/features/settings/FeatureReasonDialog.tsx");
+    const featurePanel = read("frontend/src/features/settings/FeatureSettingsPanel.tsx");
+    const modulePages = read("frontend/src/features/settings/module/ModuleSettingsPages.tsx");
+    const router = read("frontend/src/app/router.tsx");
+    const navigation = read("frontend/src/lib/navigation.ts");
+    const setupGuide = read("src/modules/setup-guide/setup-guide.service.ts");
+
+    expect(availabilityPanel).toContain("ModuleAvailabilityPanel");
+    expect(availabilityPanel).toContain("settingsApi.updateFeature");
+    expect(availabilityPanel).toContain("effective_from");
+    expect(availabilityPanel).toContain("auth.refreshMe()");
+    expect(availabilityPanel).toContain('queryKey: ["navigation"]');
+    expect(availabilityPanel).toContain('queryKey: ["dashboard"]');
+    expect(featurePanel).toContain("effective_from");
+    expect(featurePanel).toContain("auth.refreshMe()");
+    expect(featureDialog).toContain("AppDatePicker");
+    expect(featureDialog).toContain("Effective from");
+    expect(modulePages).toContain('featureKey="asset_tracking"');
+    expect(modulePages).toContain('featureKey="uniform_tracking"');
+    expect(modulePages).toContain('featureKey="roster"');
+    expect(modulePages).toContain('featureKey="contract_tracking"');
+    expect(router).toContain('path="/settings/assets"');
+    expect(router).toContain('path="/settings/uniforms"');
+    expect(router).toContain('path="/settings/roster"');
+    expect(router).toContain('path="/settings/contracts"');
+    expect(navigation).toContain('path: "/settings/assets"');
+    expect(navigation).toContain('path: "/settings/uniforms"');
+    expect(navigation).toContain('path: "/settings/roster"');
+    expect(navigation).toContain('path: "/settings/contracts"');
+    expect(setupGuide).toContain("settingsService.updateFeature");
+    expect(setupGuide).toContain("effective_from");
   });
 
   it("profile update requests page supports email update review actions", () => {

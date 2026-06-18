@@ -74,7 +74,8 @@ describe("Phase 1 UI foundation and visibility guards", () => {
 
     expect(navigation).toContain('moduleCode: "documents_kyc"');
     expect(router).toContain('moduleCode: "documents_kyc"');
-    expect(navigation).toContain('label: "My Documents / KYC"');
+    expect(navigation).toContain('label: "My Documents"');
+    expect(navigation).toContain('label: "My KYC Requests"');
   });
 
   it("disabled Roster, Offboarding, and Disciplinary modules hide their links", () => {

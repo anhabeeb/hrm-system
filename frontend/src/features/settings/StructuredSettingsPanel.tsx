@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 
 import { InlineAlert } from "@/components/feedback/InlineAlert";
+import { AppDatePicker } from "@/components/forms/AppDatePicker";
 import { toastError, toastSuccess } from "@/components/feedback/toast-helpers";
 import { useToast } from "@/components/feedback/useToast";
 import { Button } from "@/components/ui/button";
@@ -38,6 +39,7 @@ export const StructuredSettingsPanel = ({ definition }: { definition: SettingsPa
   const { user } = useAuth();
   const [editing, setEditing] = useState(false);
   const [reason, setReason] = useState("");
+  const [effectiveDate, setEffectiveDate] = useState("");
   const [values, setValues] = useState<SettingsValue>({});
   const toast = useToast();
   const canEdit = hasAnyPermission(user, [definition.managePermission, "settings.manage"]);
@@ -65,6 +67,7 @@ export const StructuredSettingsPanel = ({ definition }: { definition: SettingsPa
   const parentStateLoading = Boolean(definition.parentFeatureKey && featuresQuery.isLoading);
   const parentDisabled = Boolean(definition.parentFeatureKey && parentFeature && parentFeature.is_enabled !== 1);
   const controlsDisabled = !editing || parentDisabled || parentStateLoading;
+  const requiresEffectiveDate = ["attendance", "leave", "long_leave", "payroll", "payroll_earnings", "holidays"].includes(definition.group);
 
   useEffect(() => {
     if (!editing) setValues(loadedValues);
@@ -74,14 +77,16 @@ export const StructuredSettingsPanel = ({ definition }: { definition: SettingsPa
     if (parentDisabled && editing) {
       setEditing(false);
       setReason("");
+      setEffectiveDate("");
     }
   }, [editing, parentDisabled]);
 
   const mutation = useMutation({
-    mutationFn: () => settingsApi.updateAliasGroup(definition.endpointPath, { settings: values, reason }),
+    mutationFn: () => settingsApi.updateAliasGroup(definition.endpointPath, { settings: values, reason, effective_date: effectiveDate || undefined }),
     onSuccess: () => {
       setEditing(false);
       setReason("");
+      setEffectiveDate("");
       toastSuccess(toast, "Settings updated successfully.");
       queryClient.invalidateQueries({ queryKey: ["settings", definition.endpointPath] });
       queryClient.invalidateQueries({ queryKey: ["settings"] });
@@ -111,8 +116,8 @@ export const StructuredSettingsPanel = ({ definition }: { definition: SettingsPa
         <div className="flex gap-2">
           {editing ? (
             <>
-              <Button variant="outline" onClick={() => { setEditing(false); setReason(""); }} disabled={mutation.isPending}>Cancel</Button>
-              <Button onClick={() => mutation.mutate()} disabled={mutation.isPending || parentDisabled || parentStateLoading || reason.trim().length < 3}>Save changes</Button>
+              <Button variant="outline" onClick={() => { setEditing(false); setReason(""); setEffectiveDate(""); }} disabled={mutation.isPending}>Cancel</Button>
+              <Button onClick={() => mutation.mutate()} disabled={mutation.isPending || parentDisabled || parentStateLoading || reason.trim().length < 3 || (requiresEffectiveDate && !effectiveDate)}>Save changes</Button>
             </>
           ) : (
             <Button onClick={() => setEditing(true)} disabled={!canEdit || query.isLoading || parentDisabled || parentStateLoading}>Edit</Button>
@@ -185,9 +190,17 @@ export const StructuredSettingsPanel = ({ definition }: { definition: SettingsPa
         </section>
       ))}
       {editing ? (
-        <div className="rounded-lg border bg-card p-4">
-          <Label htmlFor={`${definition.endpointPath}-reason`}>Reason for change</Label>
-          <Textarea id={`${definition.endpointPath}-reason`} className="mt-1" value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Explain why this settings change is needed." />
+        <div className="grid gap-4 rounded-lg border bg-card p-4 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <Label htmlFor={`${definition.endpointPath}-reason`}>Reason for change</Label>
+            <Textarea id={`${definition.endpointPath}-reason`} className="mt-1" value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Explain why this settings change is needed." />
+          </div>
+          <div>
+            <AppDatePicker clearable={!requiresEffectiveDate} label={requiresEffectiveDate ? "Effective date (required)" : "Effective date"} value={effectiveDate} onChange={(value) => setEffectiveDate(value ?? "")} />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Choose when this setting should start applying. Existing historical records are not changed automatically.
+            </p>
+          </div>
         </div>
       ) : null}
     </div>

@@ -361,7 +361,7 @@ export const skipForNow = async (
 export const moduleChoice = async (
   env: Env,
   actor: AuthActor,
-  input: { module_key?: string; is_enabled?: boolean; reason?: string },
+  input: { module_key?: string; is_enabled?: boolean; reason?: string; effective_from?: string },
 ) => {
   assertCanManage(actor);
   const moduleKey = String(input.module_key ?? "");
@@ -373,6 +373,7 @@ export const moduleChoice = async (
     is_enabled: enabled,
     status: enabled ? "active" : "disabled",
     reason: input.reason ?? (enabled ? "Enabled from setup guide module choice." : "Disabled by choice from setup guide."),
+    effective_from: input.effective_from ?? nowIso().slice(0, 10),
   });
   await auditSetup(env, actor, {
     action: enabled ? "setup_wizard_module_enabled_later" : "setup_wizard_module_disabled_by_choice",

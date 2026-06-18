@@ -10,91 +10,9 @@ import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/features/auth/auth.store";
 import { ApiError } from "@/lib/api-errors";
 import { FeatureReasonDialog } from "./FeatureReasonDialog";
+import { featureDisplay, mainFeatureOrder, nonDestructiveModuleWarning, setupTargetByFeature } from "./module-feature-metadata";
 import { settingsApi } from "./settings.api";
 import type { FeatureSetting } from "./settings.types";
-
-const nonDestructiveWarning = "Disabling this module hides it from normal use but does not delete existing records.";
-
-const mainFeatureOrder = [
-  "documents",
-  "asset_tracking",
-  "uniform_tracking",
-  "leave_management",
-  "long_leave_management",
-  "roster",
-  "contract_tracking",
-  "attendance",
-  "payroll",
-] as const;
-
-const featureDisplay: Record<string, { name: string; description: string; dependencies?: string[]; warning: string }> = {
-  documents: {
-    name: "Document Tracking",
-    description: "Track employee documents, KYC records, expiries, and verification status.",
-    dependencies: ["employee_management"],
-    warning: nonDestructiveWarning,
-  },
-  asset_tracking: {
-    name: "Asset Tracking",
-    description: "Track company assets assigned to employees, including issue, return, and history.",
-    dependencies: ["employee_management"],
-    warning: nonDestructiveWarning,
-  },
-  uniform_tracking: {
-    name: "Uniform Tracking",
-    description: "Track uniforms issued to employees, including sizes, quantities, issue dates, and return status.",
-    dependencies: ["employee_management"],
-    warning: nonDestructiveWarning,
-  },
-  leave_management: {
-    name: "Leave Management",
-    description: "Manage employee leave requests, balances, approvals, and leave history.",
-    dependencies: ["employee_management"],
-    warning: nonDestructiveWarning,
-  },
-  long_leave_management: {
-    name: "Long Leave Management",
-    description: "Manage extended leave workflows, foreign employee long leave, salary deduction handling, and long leave history.",
-    dependencies: ["leave_management"],
-    warning: nonDestructiveWarning,
-  },
-  roster: {
-    name: "Duty Roster",
-    description: "Plan employee work schedules, weekly duty rosters, shift assignments, and roster change workflows.",
-    dependencies: ["employee_management"],
-    warning: nonDestructiveWarning,
-  },
-  contract_tracking: {
-    name: "Contract Tracking",
-    description: "Track employee contracts, renewals, probation periods, linked contract documents, and contract expiry alerts.",
-    dependencies: ["employee_management"],
-    warning: nonDestructiveWarning,
-  },
-  attendance: {
-    name: "Attendance Management",
-    description: "Track employee attendance, lateness, absences, corrections, biometric/kiosk entries, and attendance-based payroll review.",
-    dependencies: ["employee_management"],
-    warning: nonDestructiveWarning,
-  },
-  payroll: {
-    name: "Payroll Management",
-    description: "Process employee salaries, advances, loans, overtime, benefits, deductions, payslips, and payroll approvals.",
-    dependencies: ["employee_management"],
-    warning: nonDestructiveWarning,
-  },
-};
-
-const setupTargetByFeature: Record<string, string> = {
-  documents: "feature-document-tracking",
-  asset_tracking: "feature-asset-tracking",
-  uniform_tracking: "feature-uniform-tracking",
-  leave_management: "feature-leave-management",
-  long_leave_management: "feature-long-leave-management",
-  roster: "feature-duty-roster",
-  contract_tracking: "feature-contract-tracking",
-  attendance: "feature-attendance-management",
-  payroll: "feature-payroll-management",
-};
 
 const formatChangedAt = (value?: string) => {
   if (!value) return "Not recorded";
@@ -117,12 +35,18 @@ export const FeatureSettingsPanel = () => {
   const canManage = auth.hasAnyPermission(["feature_settings.manage", "settings.manage"]);
   const query = useQuery({ queryKey: ["settings", "features"], queryFn: settingsApi.features });
   const mutation = useMutation({
-    mutationFn: ({ feature, enabled, reason }: { feature: FeatureSetting; enabled: boolean; reason: string }) =>
-      settingsApi.updateFeature(feature.feature_key, { is_enabled: enabled, status: enabled ? "active" : "disabled", reason }),
+    mutationFn: ({ feature, enabled, reason, effective_from }: { feature: FeatureSetting; enabled: boolean; reason: string; effective_from: string }) =>
+      settingsApi.updateFeature(feature.feature_key, { is_enabled: enabled, status: enabled ? "active" : "disabled", reason, effective_from }),
     onSuccess: async () => {
       toastSuccess(toast, "Feature setting updated successfully.");
       setPendingChange(null);
       await queryClient.invalidateQueries({ queryKey: ["settings", "features"] });
+      await auth.refreshMe();
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["navigation"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["dashboard-preferences"] }),
+      ]);
     },
     onError: (error) => toastError(toast, error, "Feature setting could not be updated."),
   });
@@ -255,7 +179,7 @@ export const FeatureSettingsPanel = () => {
       <p className="text-xs text-muted-foreground">
         Only the primary optional modules are shown here. Sub-feature controls live inside Attendance and Payroll settings.
       </p>
-      <p className="text-xs text-muted-foreground">{nonDestructiveWarning} Re-enabling restores access to preserved records and settings.</p>
+      <p className="text-xs text-muted-foreground">{nonDestructiveModuleWarning} Re-enabling restores access to preserved records and settings.</p>
       {!canManage ? <p className="text-xs text-muted-foreground">Feature switches are disabled because you do not have settings management permission.</p> : null}
       <FeatureReasonDialog
         open={Boolean(pendingChange)}
@@ -274,9 +198,9 @@ export const FeatureSettingsPanel = () => {
             mutation.reset();
           }
         }}
-        onConfirm={(reason) => {
+        onConfirm={({ reason, effective_from }) => {
           if (!pendingChange) return;
-          mutation.mutate({ ...pendingChange, reason });
+          mutation.mutate({ ...pendingChange, reason, effective_from });
         }}
       />
     </div>
