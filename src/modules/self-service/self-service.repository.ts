@@ -173,9 +173,12 @@ export const listSelfRequests = (env: Env, companyId: string, userId: string, em
     [companyId, userId, employeeId, employeeId, employeeId, limit],
   );
 
-export const listSelfPendingApprovals = (env: Env, companyId: string, userId: string, employee: { id: string; department_id: string | null; level: number | null } | null, permissions: string[], limit = 25) => {
+export const listSelfPendingApprovals = (env: Env, companyId: string, userId: string, employee: { id: string; department_id: string | null; level: number | null } | null, permissions: string[], limit = 25, operationTypes: string[] = []) => {
   const clauses = ["s.assigned_approver_user_id = ?"];
   const values: unknown[] = [companyId, userId];
+  const operationTypeClause = operationTypes.length
+    ? ` AND r.operation_type IN (${operationTypes.map(() => "?").join(", ")})`
+    : " AND 1 = 0";
   if (permissions.some((permission) => ["approvals.hrFinal.approve", "approvals.hrFinal.reject"].includes(permission))) {
     clauses.push("s.approver_resolver_type = 'HR_FINAL_APPROVER'");
   }
@@ -199,11 +202,12 @@ export const listSelfPendingApprovals = (env: Env, companyId: string, userId: st
        JOIN approval_request_steps s ON s.company_id = r.company_id AND s.approval_request_id = r.id
        LEFT JOIN departments d ON d.company_id = r.company_id AND d.id = r.department_id
       WHERE r.company_id = ?
+        ${operationTypeClause}
         AND s.status IN ('PENDING', 'ESCALATED', 'WAITING_FOR_APPROVER')
         AND (${clauses.join(" OR ")})
       ORDER BY COALESCE(r.submitted_at, r.created_at) DESC
       LIMIT ?`,
-    [...values, limit],
+    [companyId, ...operationTypes, ...values.slice(1), limit],
   );
 };
 

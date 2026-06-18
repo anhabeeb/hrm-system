@@ -7,6 +7,7 @@ import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { PageActionBar } from "@/components/layout/PageActionBar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/auth.store";
+import { usePayrollSubFeatures } from "@/features/payroll/usePayrollSubFeatures";
 import { friendlyHrmError } from "@/lib/hrm-errors";
 import { searchParamNumber } from "@/lib/query-string";
 import { salaryLoansApi } from "./salary-loans.api";
@@ -19,6 +20,7 @@ import type { SalaryLoan, SalaryLoanFilters as SalaryLoanFilterValues, SalaryLoa
 
 export const SalaryLoansPage = () => {
   const auth = useAuth();
+  const payrollSubFeatures = usePayrollSubFeatures();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selected, setSelected] = useState<SalaryLoan | null>(null);
@@ -40,8 +42,8 @@ export const SalaryLoansPage = () => {
     if (!("page" in next)) params.set("page", "1");
     setSearchParams(params);
   };
-  const listQuery = useQuery({ queryKey: ["salary-loans", filters], queryFn: () => salaryLoansApi.list(filters) });
-  const installmentsQuery = useQuery({ queryKey: ["salary-loans", "installments", selected?.id], queryFn: () => salaryLoansApi.installments(selected!.id), enabled: Boolean(selected?.id) });
+  const listQuery = useQuery({ queryKey: ["salary-loans", filters], queryFn: () => salaryLoansApi.list(filters), enabled: payrollSubFeatures.salaryLoansEnabled });
+  const installmentsQuery = useQuery({ queryKey: ["salary-loans", "installments", selected?.id], queryFn: () => salaryLoansApi.installments(selected!.id), enabled: payrollSubFeatures.salaryLoansEnabled && Boolean(selected?.id) });
   const refresh = async () => queryClient.invalidateQueries({ queryKey: ["salary-loans"] });
   const createMutation = useMutation({ mutationFn: salaryLoansApi.create, onSuccess: async () => { setSuccessMessage("Salary loan created successfully."); setFormOpen(false); await refresh(); } });
   const actionMutation = useMutation<unknown, unknown, { reason: string }>({
@@ -59,12 +61,13 @@ export const SalaryLoansPage = () => {
   const error = listQuery.error ?? createMutation.error ?? actionMutation.error;
   return (
     <div>
-      {auth.hasPermission("salary_loans.create") ? <PageActionBar label="Salary loans page actions"><Button onClick={() => setFormOpen(true)}><Plus className="h-4 w-4" />New loan</Button></PageActionBar> : null}
+      {payrollSubFeatures.salaryLoansEnabled && auth.hasPermission("salary_loans.create") ? <PageActionBar label="Salary loans page actions"><Button onClick={() => setFormOpen(true)}><Plus className="h-4 w-4" />New loan</Button></PageActionBar> : null}
       <div className="space-y-4 p-4 md:p-6">
+        {!payrollSubFeatures.salaryLoansEnabled ? <InlineAlert title="Salary Loans are disabled. Loan creation, approval, pause, and settlement actions are hidden." /> : null}
         {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
         {error ? <InlineAlert title={friendlyHrmError(error, "Salary loan action could not be completed.", "payroll")} variant="error" /> : null}
         <SalaryLoanFilters filters={filters} onChange={updateFilters} onClear={() => setSearchParams(new URLSearchParams({ page: "1", page_size: String(filters.page_size) }))} />
-        <SalaryLoansTable rows={listQuery.data?.data ?? []} loading={listQuery.isLoading} pagination={listQuery.data?.pagination} canApprove={auth.hasPermission("salary_loans.approve")} canPause={auth.hasPermission("salary_loans.pause")} canSettle={auth.hasPermission("salary_loans.settle")} onView={(row) => { setSelected(row); setDrawerOpen(true); }} onApprove={(row) => { setSelected(row); setAction("approve"); }} onPause={(row) => { setSelected(row); setAction("pause"); }} onSettle={(row) => { setSelected(row); setAction("settle"); }} onPageChange={(page) => updateFilters({ page })} onPageSizeChange={(page_size) => updateFilters({ page: 1, page_size })} />
+        <SalaryLoansTable rows={listQuery.data?.data ?? []} loading={listQuery.isLoading} pagination={listQuery.data?.pagination} canApprove={payrollSubFeatures.salaryLoansEnabled && auth.hasPermission("salary_loans.approve")} canPause={payrollSubFeatures.salaryLoansEnabled && auth.hasPermission("salary_loans.pause")} canSettle={payrollSubFeatures.salaryLoansEnabled && auth.hasPermission("salary_loans.settle")} onView={(row) => { setSelected(row); setDrawerOpen(true); }} onApprove={(row) => { setSelected(row); setAction("approve"); }} onPause={(row) => { setSelected(row); setAction("pause"); }} onSettle={(row) => { setSelected(row); setAction("settle"); }} onPageChange={(page) => updateFilters({ page })} onPageSizeChange={(page_size) => updateFilters({ page: 1, page_size })} />
       </div>
       <SalaryLoanForm open={formOpen} loading={createMutation.isPending} error={createMutation.error ? friendlyHrmError(createMutation.error, "Salary loan could not be created.", "payroll") : null} onOpenChange={setFormOpen} onSubmit={(payload: SalaryLoanPayload) => createMutation.mutate(payload)} />
       <SalaryLoanDetailDrawer loan={selected} installments={installmentsQuery.data?.data.installments ?? []} installmentsLoading={installmentsQuery.isLoading} open={drawerOpen} onOpenChange={setDrawerOpen} />

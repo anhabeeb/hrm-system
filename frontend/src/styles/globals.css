@@ -55,4 +55,8 @@
   .table-surface {
     @apply overflow-hidden rounded-lg border bg-card shadow-sm;
   }
+
+  .setup-guide-target-active {
+    @apply relative rounded-lg outline outline-2 outline-offset-2 outline-amber-400 ring-4 ring-amber-100;
+  }
 }

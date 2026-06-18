@@ -7,6 +7,7 @@ export interface SettingsFieldDefinition {
   label: string;
   type: FieldType;
   help?: string;
+  defaultValue?: unknown;
   options?: Array<{ label: string; value: string }>;
 }
 
@@ -14,6 +15,8 @@ export interface SettingsSectionDefinition {
   title: string;
   description?: string;
   settingKey: string;
+  setupTarget?: string;
+  setupTargets?: string[];
   fields: SettingsFieldDefinition[];
 }
 
@@ -23,6 +26,8 @@ export interface SettingsPageDefinition {
   group: SettingsGroup;
   endpointPath: string;
   managePermission: string;
+  parentFeatureKey?: string;
+  parentFeatureLabel?: string;
   sections: SettingsSectionDefinition[];
 }
 
@@ -84,10 +89,13 @@ export const settingsPageDefinitions: Record<string, SettingsPageDefinition> = {
     group: "attendance",
     endpointPath: "attendance",
     managePermission: "attendance.settings.manage",
+    parentFeatureKey: "attendance",
+    parentFeatureLabel: "Attendance Management",
     sections: [
       {
         title: "Attendance Sub-Features",
-        description: "Enable only the attendance workflows your company is actively using. These controls are ignored while Attendance Management is disabled.",
+        setupTarget: "attendance-subfeatures",
+        description: "Enable only the attendance workflows your company is actively using. These controls are ignored while Attendance Management is disabled. Legacy aliases are kept backend-compatible but hidden from standard settings.",
         settingKey: "attendance.default_rules",
         fields: [
           { key: "attendance.manual_entry_enabled", label: "Manual Attendance", type: "switch", help: "Allow authorized users to enter or adjust attendance manually." },
@@ -99,6 +107,7 @@ export const settingsPageDefinitions: Record<string, SettingsPageDefinition> = {
       },
       {
         title: "Time Rules",
+        setupTarget: "attendance-time-rules",
         settingKey: "attendance.default_rules",
         fields: [
           { key: "grace_period_minutes", label: "Grace period minutes", type: "number" },
@@ -111,6 +120,7 @@ export const settingsPageDefinitions: Record<string, SettingsPageDefinition> = {
       },
       {
         title: "Manual Attendance and Correction Rules",
+        setupTarget: "attendance-correction-rules",
         description: "Workflow enablement is controlled in Attendance Sub-Features above; these fields only tune the enabled workflows.",
         settingKey: "attendance.default_rules",
         fields: [
@@ -146,9 +156,11 @@ export const settingsPageDefinitions: Record<string, SettingsPageDefinition> = {
       },
       {
         title: "Duty Rosters and Shift Scheduling",
+        setupTarget: "roster-mode",
+        setupTargets: ["roster-mode", "roster-approvals"],
+        description: "Duty Roster module availability is controlled from Feature Controls; these settings only tune roster/attendance interaction while enabled.",
         settingKey: "attendance.roster_rules",
         fields: [
-          { key: "roster_module_enabled", label: "Roster module enabled", type: "switch" },
           { key: "allow_roster_overlap_override", label: "Allow overlapping shift override", type: "switch" },
           { key: "allow_scheduling_on_leave", label: "Allow scheduling employees on approved leave", type: "switch" },
           { key: "allow_scheduling_on_holidays", label: "Allow scheduling on roster holidays", type: "switch" },
@@ -167,12 +179,15 @@ export const settingsPageDefinitions: Record<string, SettingsPageDefinition> = {
     group: "leave",
     endpointPath: "leave",
     managePermission: "leave.settings.manage",
+    parentFeatureKey: "leave_management",
+    parentFeatureLabel: "Leave Management",
     sections: [
       {
         title: "General Leave Policy",
+        setupTarget: "leave-approval-workflow",
+        description: "Leave Management availability is controlled from Feature Controls; these settings tune the enabled leave workflow.",
         settingKey: "leave.default_rules",
         fields: [
-          { key: "leave_module_enabled", label: "Leave module enabled", type: "switch" },
           { key: "approval_required", label: "Approval required", type: "switch" },
           { key: "allow_half_day_leave", label: "Allow half-day leave", type: "switch" },
           { key: "allow_backdated_leave_request", label: "Allow backdated leave request", type: "switch" },
@@ -182,6 +197,8 @@ export const settingsPageDefinitions: Record<string, SettingsPageDefinition> = {
       },
       {
         title: "Leave Types Summary",
+        setupTarget: "leave-types",
+        setupTargets: ["leave-types", "leave-policy-rules", "leave-document-rules"],
         description: "Leave type names and balances are managed from the Leave module; this settings page controls defaults.",
         settingKey: "leave.default_rules",
         fields: [
@@ -193,9 +210,11 @@ export const settingsPageDefinitions: Record<string, SettingsPageDefinition> = {
       },
       {
         title: "Foreign Employee Long Leave",
+        setupTarget: "long-leave-rules",
+        setupTargets: ["long-leave-rules", "leave-deduction-rules"],
+        description: "Long Leave Management is enabled from Feature Controls and depends on Leave Management.",
         settingKey: "long_leave.default_rules",
         fields: [
-          { key: "long_leave_enabled", label: "Long leave enabled", type: "switch" },
           { key: "salary_rule", label: "Long leave salary deduction rule", type: "select", options: [{ label: "Pay only days worked", value: "pay_only_worked_days" }] },
           { key: "pay_only_worked_days", label: "Pay only days worked during long leave month", type: "switch" },
           { key: "max_duration_days", label: "Max duration days", type: "number" },
@@ -204,17 +223,38 @@ export const settingsPageDefinitions: Record<string, SettingsPageDefinition> = {
     ],
   },
   payroll: {
-    title: "Payroll",
-    description: "Payroll cycle, salary calculation, advances, loans, approval, locking, and payslip controls.",
+    title: "Payroll Management",
+    description: "Process employee salaries, advances, loans, overtime, benefits, deductions, payslips, and payroll approvals.",
     group: "payroll",
     endpointPath: "payroll",
     managePermission: "payroll.settings.manage",
+    parentFeatureKey: "payroll",
+    parentFeatureLabel: "Payroll Management",
     sections: [
       {
-        title: "Payroll Cycle",
+        title: "Payroll Sub-Features",
+        setupTarget: "payroll-subfeatures",
+        setupTargets: ["payroll-subfeatures", "payroll-long-leave-deductions"],
+        description: "Enable only the payroll workflows your company is actively using. These controls are ignored while Payroll Management is disabled. Legacy aliases are kept backend-compatible but hidden from standard settings.",
         settingKey: "payroll.default_rules",
         fields: [
-          { key: "monthly_payroll_enabled", label: "Monthly payroll enabled", type: "switch" },
+          { key: "payroll.salary_processing_enabled", label: "Salary Processing", type: "switch", defaultValue: true, help: "Allow authorized users to calculate, recalculate, and finalize payroll runs." },
+          { key: "payroll.payslips_enabled", label: "Payslips", type: "switch", defaultValue: true, help: "Allow payslip generation, payroll-run payslip review, and employee payslip access where permitted." },
+          { key: "payroll.advances_enabled", label: "Advance Salary", type: "switch", defaultValue: true, help: "Allow advance salary requests, approvals, payments, and payroll deductions." },
+          { key: "payroll.salary_loans_enabled", label: "Salary Loans", type: "switch", defaultValue: true, help: "Allow salary loan schedules, approvals, pauses, settlements, and payroll deductions." },
+          { key: "payroll.overtime_enabled", label: "Overtime", type: "switch", defaultValue: true, help: "Allow overtime payroll calculations and overtime payroll reports." },
+          { key: "payroll.benefits_enabled", label: "Benefits", type: "switch", defaultValue: true, help: "Allow benefit components to participate in payroll calculations." },
+          { key: "payroll.manual_deductions_enabled", label: "Manual Deductions", type: "switch", defaultValue: true, help: "Allow payroll adjustment/manual deduction requests and application." },
+          { key: "payroll.attendance_deductions_enabled", label: "Attendance Deductions", type: "switch", defaultValue: true, help: "Allow new attendance-based deductions. Requires Attendance Management and Attendance Payroll Deductions too." },
+          { key: "payroll.long_leave_deductions_enabled", label: "Long Leave Deductions", type: "switch", defaultValue: true, help: "Allow new long-leave deduction review. Requires Long Leave Management too." },
+          { key: "payroll.approvals_enabled", label: "Payroll Approvals", type: "switch", defaultValue: true, help: "Allow payroll approval/rejection workflows. If disabled, direct-finalization rules apply where permitted." },
+        ],
+      },
+      {
+        title: "Payroll Cycle",
+        setupTarget: "payroll-cycle",
+        settingKey: "payroll.default_rules",
+        fields: [
           { key: "default_payroll_day", label: "Default payroll day", type: "number" },
           { key: "payroll_period_rule", label: "Payroll period rule", type: "select", options: [{ label: "Calendar month", value: "calendar_month" }, { label: "Custom cycle", value: "custom_cycle" }] },
           { key: "currency", label: "Default currency", type: "text" },
@@ -233,16 +273,14 @@ export const settingsPageDefinitions: Record<string, SettingsPageDefinition> = {
       },
       {
         title: "Advances, Loans, Approval, and Payslips",
+        setupTarget: "payroll-approvals",
+        description: "Operational rules only. Enable or disable payroll sub-features from the Payroll Sub-Features section above.",
         settingKey: "payroll.default_rules",
         fields: [
-          { key: "advance_payments_enabled", label: "Advance payments enabled", type: "switch" },
-          { key: "salary_loans_enabled", label: "Salary loans enabled", type: "switch" },
           { key: "max_advance_percentage", label: "Max advance percentage", type: "number" },
           { key: "deduct_advances_automatically", label: "Deduct advances automatically", type: "switch" },
-          { key: "approval_required", label: "Approval required", type: "switch" },
           { key: "payroll_lock_enabled", label: "Lock attendance after finalization", type: "switch" },
           { key: "allow_payroll_reopen", label: "Allow payroll reopen", type: "switch" },
-          { key: "payslip_generation_enabled", label: "Payslip generation enabled", type: "switch" },
           { key: "show_deductions_breakdown", label: "Show deductions breakdown", type: "switch" },
         ],
       },
@@ -278,12 +316,16 @@ export const additionalSettingsPageDefinitions: Record<string, SettingsPageDefin
     group: "documents",
     endpointPath: "documents",
     managePermission: "documents.settings.manage",
+    parentFeatureKey: "documents",
+    parentFeatureLabel: "Document Tracking",
     sections: [
       {
         title: "General Document Settings",
+        setupTarget: "documents-types",
+        setupTargets: ["documents-types", "documents-upload-permissions"],
+        description: "Document Tracking availability is controlled from Feature Controls; these fields tune the enabled document workflow.",
         settingKey: "documents.default_rules",
         fields: [
-          { key: "document_module_enabled", label: "Document module enabled", type: "switch" },
           { key: "max_file_size_mb", label: "Max file size MB", type: "number" },
           { key: "allowed_file_types", label: "Allowed file types", type: "text" },
           { key: "sensitive_documents_enabled", label: "Sensitive documents enabled", type: "switch" },
@@ -292,6 +334,7 @@ export const additionalSettingsPageDefinitions: Record<string, SettingsPageDefin
       },
       {
         title: "Expiry Warnings and Categories",
+        setupTarget: "documents-expiry-alerts",
         settingKey: "documents.default_rules",
         fields: [
           { key: "default_warning_days", label: "Default warning days", type: "number" },
@@ -304,9 +347,11 @@ export const additionalSettingsPageDefinitions: Record<string, SettingsPageDefin
       },
       {
         title: "Employee Contract Tracking",
+        setupTarget: "contract-rules",
+        setupTargets: ["contract-rules", "contract-renewal-approval"],
+        description: "Contract Tracking module availability is controlled from Feature Controls. Contract document upload also requires Document Tracking.",
         settingKey: "documents.contract_rules",
         fields: [
-          { key: "contract_tracking_enabled", label: "Contract tracking enabled", type: "switch" },
           { key: "contract_expiry_warning_days", label: "Contract expiry warning days", type: "number" },
           { key: "contract_document_required", label: "Contract document required", type: "switch" },
           { key: "require_contract_for_foreign_employees", label: "Require contracts for foreign employees", type: "switch" },
@@ -337,7 +382,7 @@ export const additionalSettingsPageDefinitions: Record<string, SettingsPageDefin
     endpointPath: "backup",
     managePermission: "backup.settings.manage",
     sections: [
-      { title: "Backup Controls", settingKey: "backup.default_rules", fields: [
+      { title: "Backup Controls", setupTarget: "backup-settings", settingKey: "backup.default_rules", fields: [
         { key: "backup_enabled", label: "Backup enabled", type: "switch" },
         { key: "backup_frequency", label: "Backup frequency", type: "select", options: [{ label: "Daily", value: "daily" }, { label: "Weekly", value: "weekly" }, { label: "Manual", value: "manual" }] },
         { key: "retention_days", label: "Retention days", type: "number" },
@@ -354,7 +399,7 @@ export const additionalSettingsPageDefinitions: Record<string, SettingsPageDefin
     endpointPath: "notifications",
     managePermission: "notifications.settings.manage",
     sections: [
-      { title: "Notification Channels and Events", settingKey: "notifications.default_rules", fields: [
+      { title: "Notification Channels and Events", setupTarget: "notification-alerts", settingKey: "notifications.default_rules", fields: [
         { key: "email_notifications_enabled", label: "Email notifications enabled (planned if mail service is absent)", type: "switch" },
         { key: "system_notifications_enabled", label: "System notifications enabled", type: "switch" },
         { key: "leave_approval_notifications", label: "Leave approval notifications", type: "switch" },
@@ -395,7 +440,7 @@ export const additionalSettingsPageDefinitions: Record<string, SettingsPageDefin
     endpointPath: "import-export",
     managePermission: "import_export.settings.manage",
     sections: [
-      { title: "Import / Export Controls", settingKey: "import_export.default_rules", fields: [
+      { title: "Import / Export Controls", setupTarget: "import-export-actions", settingKey: "import_export.default_rules", fields: [
         { key: "import_enabled", label: "Import enabled", type: "switch" },
         { key: "export_enabled", label: "Export enabled", type: "switch" },
         { key: "allowed_import_types", label: "Allowed import types", type: "text" },

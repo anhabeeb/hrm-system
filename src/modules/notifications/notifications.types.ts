@@ -9,6 +9,10 @@ export type NotificationCategory =
   | "holiday"
   | "payroll"
   | "documents"
+  | "contracts"
+  | "assets"
+  | "uniforms"
+  | "backup"
   | "system"
   | "approvals"
   | "security";
@@ -88,6 +92,7 @@ export interface RecipientResolveInput {
 export interface NotificationListFilters {
   status?: string;
   category?: string;
+  categories?: string[];
   priority?: string;
   notification_type?: string;
   entity_type?: string;

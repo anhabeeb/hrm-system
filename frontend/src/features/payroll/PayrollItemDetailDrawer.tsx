@@ -3,6 +3,7 @@ import { DetailSection } from "@/components/data/DetailSection";
 import { MoneyAmount } from "@/components/data/MoneyAmount";
 import { StatusBadge } from "@/components/data/StatusBadge";
 import { useAttendanceSubFeatures } from "@/features/attendance/useAttendanceSubFeatures";
+import { usePayrollSubFeatures } from "./usePayrollSubFeatures";
 import type { PayrollItem } from "./payroll.types";
 
 type PayrollMetadata = {
@@ -84,6 +85,7 @@ export const PayrollItemDetailDrawer = ({
   onOpenChange: (open: boolean) => void;
 }) => {
   const attendanceSubFeatures = useAttendanceSubFeatures();
+  const payrollSubFeatures = usePayrollSubFeatures();
   const metadata = parseMetadata(item?.calculation_metadata_json);
   const compensation = metadata.compensation_summary ?? {};
   const components = metadata.compensation_components ?? [];
@@ -103,7 +105,7 @@ export const PayrollItemDetailDrawer = ({
               { label: "Deductions", value: <MoneyAmount amount={item.total_deductions_amount} /> },
               { label: "Net", value: <MoneyAmount amount={item.net_amount} /> },
               { label: "Status", value: <StatusBadge status={item.status ?? "draft"} /> },
-              { label: "Payslip", value: <StatusBadge status={item.payslip_status ?? "pending"} /> },
+              ...(payrollSubFeatures.payslipsEnabled ? [{ label: "Payslip", value: <StatusBadge status={item.payslip_status ?? "pending"} /> }] : []),
               { label: "Calculation code", value: item.calculation_code ?? "Not recorded" },
               { label: "Explanation", value: item.calculation_description ?? "No calculation explanation recorded." },
             ]}
@@ -145,7 +147,7 @@ export const PayrollItemDetailDrawer = ({
                     <AmountLine label="Gross deductions" amount={compensation.recurring_gross_deductions} />
                     <AmountLine label="Net additions" amount={compensation.recurring_net_additions} />
                     <AmountLine label="Net deductions" amount={compensation.recurring_net_deductions} />
-                    <AmountLine label="Non-cash benefits" amount={compensation.non_cash_benefits} />
+                    {payrollSubFeatures.benefitsEnabled ? <AmountLine label="Non-cash benefits" amount={compensation.non_cash_benefits} /> : null}
                   </div>
                 ),
               },
@@ -203,7 +205,7 @@ export const PayrollItemDetailDrawer = ({
                 label: "Leave and attendance deductions",
                 value: (
                   <div className="grid gap-2 md:grid-cols-2">
-                    {attendanceSubFeatures.payrollDeductionsEnabled ? <AmountLine label="Absent-day deductions" amount={compensation.attendance_deductions} /> : null}
+                    {attendanceSubFeatures.payrollDeductionsEnabled && payrollSubFeatures.attendanceDeductionsEnabled ? <AmountLine label="Absent-day deductions" amount={compensation.attendance_deductions} /> : null}
                     <AmountLine label="Unpaid leave deductions" amount={compensation.unpaid_leave_deductions} />
                   </div>
                 ),
@@ -233,8 +235,8 @@ export const PayrollItemDetailDrawer = ({
                 label: "Repayment deductions",
                 value: (
                   <div className="grid gap-2 md:grid-cols-2">
-                    <AmountLine label="Advances" amount={compensation.advance_deductions} />
-                    <AmountLine label="Salary loans" amount={compensation.loan_deductions} />
+                    {payrollSubFeatures.advancesEnabled ? <AmountLine label="Advances" amount={compensation.advance_deductions} /> : null}
+                    {payrollSubFeatures.salaryLoansEnabled ? <AmountLine label="Salary loans" amount={compensation.loan_deductions} /> : null}
                     <AmountLine label="Other deductions" amount={compensation.other_deductions} />
                   </div>
                 ),
@@ -243,22 +245,22 @@ export const PayrollItemDetailDrawer = ({
                 label: "Sources",
                 value: (
                   <div className="space-y-2">
-                    {metadata.advance_sources?.map((advance, index) => (
+                    {payrollSubFeatures.advancesEnabled ? metadata.advance_sources?.map((advance, index) => (
                       <div key={`${advance.advance_id ?? "advance"}-${index}`} className="rounded-md border px-3 py-2">
                         Advance {advance.advance_id ?? "Not recorded"} for {advance.deduction_month ?? "this month"}: <MoneyAmount amount={advance.amount ?? 0} />
                       </div>
-                    ))}
-                    {metadata.loan_sources?.map((loan, index) => (
+                    )) : null}
+                    {payrollSubFeatures.salaryLoansEnabled ? metadata.loan_sources?.map((loan, index) => (
                       <div key={`${loan.installment_id ?? "loan"}-${index}`} className="rounded-md border px-3 py-2">
                         Loan installment {loan.installment_id ?? "Not recorded"}: <MoneyAmount amount={loan.amount ?? 0} />
                       </div>
-                    ))}
+                    )) : null}
                     {metadata.asset_deduction_sources?.map((asset, index) => (
                       <div key={`${asset.asset_deduction_id ?? "asset"}-${index}`} className="rounded-md border px-3 py-2">
                         Asset deduction {asset.asset_deduction_id ?? "Not recorded"}: <MoneyAmount amount={asset.amount ?? 0} />
                       </div>
                     ))}
-                    {!metadata.advance_sources?.length && !metadata.loan_sources?.length && !metadata.asset_deduction_sources?.length ? (
+                    {!(payrollSubFeatures.advancesEnabled && metadata.advance_sources?.length) && !(payrollSubFeatures.salaryLoansEnabled && metadata.loan_sources?.length) && !metadata.asset_deduction_sources?.length ? (
                       <span>No advance, loan, or asset deduction source records affected this row.</span>
                     ) : null}
                   </div>

@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const notifications: any[] = [];
 const preferences: any[] = [];
 const deliveryLogs: any[] = [];
+const disabledFeatures = new Set<string>();
+const disabledAttendanceSettings = new Set<string>();
+const disabledPayrollSettings = new Set<string>();
 const activeUsers = [
   { id: "user_hr", employee_id: "emp_hr", role_key: "hr_admin", permission_key: "leave.approvals.approve" },
   { id: "user_payroll", employee_id: "emp_payroll", role_key: "accountant", permission_key: "long_leave.payroll_apply" },
@@ -96,6 +99,22 @@ vi.mock("../src/services/audit.service", () => ({
   createAuditLog: vi.fn(async () => ({ created: true })),
 }));
 
+vi.mock("../src/services/settings.service", () => ({
+  isFeatureEnabled: vi.fn(async (_env, _companyId, featureKey) => !disabledFeatures.has(featureKey)),
+  getAttendanceSettings: vi.fn(async () => ({
+    "attendance.corrections_enabled": !disabledAttendanceSettings.has("attendance.corrections_enabled"),
+    attendance_correction_enabled: !disabledAttendanceSettings.has("attendance.corrections_enabled"),
+    "attendance.payroll_deductions_enabled": !disabledAttendanceSettings.has("attendance.payroll_deductions_enabled"),
+    absent_day_deduction_enabled: !disabledAttendanceSettings.has("attendance.payroll_deductions_enabled"),
+    deduct_absent_days: !disabledAttendanceSettings.has("attendance.payroll_deductions_enabled"),
+    "attendance.kiosk_enabled": !disabledAttendanceSettings.has("attendance.kiosk_enabled"),
+    kiosk_mode_enabled: !disabledAttendanceSettings.has("attendance.kiosk_enabled"),
+    "attendance.biometric_enabled": !disabledAttendanceSettings.has("attendance.biometric_enabled"),
+    biometric_enabled: !disabledAttendanceSettings.has("attendance.biometric_enabled"),
+  })),
+  isPayrollSubFeatureEnabled: vi.fn(async (_env, _companyId, key) => !disabledPayrollSettings.has(key)),
+}));
+
 import {
   archive,
   createNotificationsForUsers,
@@ -132,6 +151,9 @@ beforeEach(() => {
   notifications.length = 0;
   preferences.length = 0;
   deliveryLogs.length = 0;
+  disabledFeatures.clear();
+  disabledAttendanceSettings.clear();
+  disabledPayrollSettings.clear();
 });
 
 describe("Phase 10A in-app notifications", () => {
@@ -232,6 +254,129 @@ describe("Phase 10A in-app notifications", () => {
     }, { optional: true });
     expect(notifications).toHaveLength(0);
     expect(deliveryLogs.some((row) => row.status === "skipped_preference")).toBe(true);
+  });
+
+  it("does not create leave notifications when Leave Management is disabled", async () => {
+    disabledFeatures.add("leave");
+    disabledFeatures.add("leave_management");
+    const result = await createNotificationsForUsers(env, "company_1", ["user_hr"], {
+      notification_type: "leave_request_submitted",
+      category: "leave",
+      title: "Leave request",
+    });
+    expect(result.created_count).toBe(0);
+    expect(result).toMatchObject({ skipped_disabled_module: true });
+    expect(notifications).toHaveLength(0);
+  });
+
+  it("does not create attendance correction notifications when the sub-feature is disabled", async () => {
+    disabledAttendanceSettings.add("attendance.corrections_enabled");
+    const result = await createNotificationsForUsers(env, "company_1", ["user_hr"], {
+      notification_type: "attendance_correction_submitted",
+      category: "attendance",
+      title: "Correction submitted",
+      entity_type: "attendance_correction",
+    });
+    expect(result.created_count).toBe(0);
+    expect(notifications).toHaveLength(0);
+  });
+
+  it("does not create payslip notifications when payslips are disabled", async () => {
+    disabledPayrollSettings.add("payroll.payslips_enabled");
+    const result = await createNotificationsForUsers(env, "company_1", ["user_hr"], {
+      notification_type: "payslip_available",
+      category: "payroll",
+      title: "Payslip available",
+      entity_type: "payslip",
+    });
+    expect(result.created_count).toBe(0);
+    expect(notifications).toHaveLength(0);
+  });
+
+  it("uses attendance deduction settings for attendance deduction notifications", async () => {
+    disabledPayrollSettings.add("payroll.attendance_deductions_enabled");
+    const payrollDisabled = await createNotificationsForUsers(env, "company_1", ["user_hr"], {
+      notification_type: "attendance_deduction_review",
+      category: "payroll",
+      title: "Attendance deduction review",
+      entity_type: "attendance_deduction",
+    });
+    expect(payrollDisabled.created_count).toBe(0);
+
+    disabledPayrollSettings.clear();
+    disabledAttendanceSettings.add("attendance.payroll_deductions_enabled");
+    const attendanceSubFeatureDisabled = await createNotificationsForUsers(env, "company_1", ["user_hr"], {
+      notification_type: "attendance_deduction_review",
+      category: "payroll",
+      title: "Attendance deduction review",
+      entity_type: "attendance_deduction",
+    });
+    expect(attendanceSubFeatureDisabled.created_count).toBe(0);
+
+    disabledAttendanceSettings.clear();
+    disabledFeatures.add("attendance");
+    const attendanceModuleDisabled = await createNotificationsForUsers(env, "company_1", ["user_hr"], {
+      notification_type: "attendance_deduction_review",
+      category: "payroll",
+      title: "Attendance deduction review",
+      entity_type: "attendance_deduction",
+    });
+    expect(attendanceModuleDisabled.created_count).toBe(0);
+  });
+
+  it("does not let manual deduction settings control attendance deductions", async () => {
+    disabledPayrollSettings.add("payroll.manual_deductions_enabled");
+    const result = await createNotificationsForUsers(env, "company_1", ["user_hr"], {
+      notification_type: "attendance_deduction_review",
+      category: "payroll",
+      title: "Attendance deduction review",
+      entity_type: "attendance_deduction",
+    });
+    expect(result.created_count).toBe(1);
+  });
+
+  it("uses long leave deduction settings for long leave deduction notifications", async () => {
+    disabledPayrollSettings.add("payroll.long_leave_deductions_enabled");
+    const payrollDisabled = await createNotificationsForUsers(env, "company_1", ["user_hr"], {
+      notification_type: "long_leave_deduction_review",
+      category: "payroll",
+      title: "Long leave deduction review",
+      entity_type: "long_leave_deduction",
+    });
+    expect(payrollDisabled.created_count).toBe(0);
+
+    disabledPayrollSettings.clear();
+    disabledFeatures.add("long_leave_management");
+    const moduleDisabled = await createNotificationsForUsers(env, "company_1", ["user_hr"], {
+      notification_type: "long_leave_deduction_review",
+      category: "payroll",
+      title: "Long leave deduction review",
+      entity_type: "long_leave_deduction",
+    });
+    expect(moduleDisabled.created_count).toBe(0);
+  });
+
+  it("does not let manual deduction settings control long leave deductions", async () => {
+    disabledPayrollSettings.add("payroll.manual_deductions_enabled");
+    const result = await createNotificationsForUsers(env, "company_1", ["user_hr"], {
+      notification_type: "long_leave_deduction_review",
+      category: "payroll",
+      title: "Long leave deduction review",
+      entity_type: "long_leave_deduction",
+    });
+    expect(result.created_count).toBe(1);
+  });
+
+  it("uses manual deduction settings for manual deduction notifications", async () => {
+    disabledPayrollSettings.add("payroll.manual_deductions_enabled");
+    const result = await createNotificationsForUsers(env, "company_1", ["user_hr"], {
+      notification_type: "manual_deduction_review",
+      category: "payroll",
+      title: "Manual deduction review",
+      entity_type: "manual_deduction",
+    });
+    expect(result.created_count).toBe(0);
+    expect(notifications).toHaveLength(0);
   });
 
   it("user cannot mutate another user’s notification", async () => {

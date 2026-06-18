@@ -80,6 +80,7 @@ const permissions = [
   "hr_reports.view",
   "hr_reports.employee.view",
   "hr_reports.lifecycle.view",
+  "hr_reports.assets.view",
   "payroll_reports.view",
   "payroll_reports.employee.view",
   "payroll_reports.audit.view",
@@ -136,9 +137,20 @@ const exportJob = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-const fakeEnv = (options: { existingJob?: Record<string, unknown> | null } = {}) => {
+const fakeEnv = (options: { existingJob?: Record<string, unknown> | null; enabledFeatures?: string[] } = {}) => {
   const calls: DbCall[] = [];
   const job = options.existingJob ? { ...options.existingJob } : null;
+  const enabledFeatures = new Set(options.enabledFeatures ?? [
+    "attendance",
+    "payroll",
+    "documents",
+    "documents_kyc",
+    "contract_tracking",
+    "leave_management",
+    "long_leave_management",
+    "asset_tracking",
+    "uniform_tracking",
+  ]);
   const updateStatus = (sql: string) => {
     if (!job) return 0;
     if (sql.includes("SET status = 'processing'")) {
@@ -182,6 +194,44 @@ const fakeEnv = (options: { existingJob?: Record<string, unknown> | null } = {})
         bind: (...values: unknown[]) => ({
           first: async () => {
             calls.push({ sql, values, method: "first" });
+            if (sql.includes("FROM feature_settings")) {
+              const featureKey = String(values[1] ?? "");
+              return enabledFeatures.has(featureKey)
+                ? {
+                    id: `feature_${featureKey}`,
+                    company_id: values[0],
+                    feature_key: featureKey,
+                    feature_name: featureKey,
+                    is_enabled: 1,
+                    status: "enabled",
+                    applies_to_all_outlets: 1,
+                    allowed_outlet_ids_json: null,
+                    allowed_role_ids_json: null,
+                  }
+                : null;
+            }
+            if (sql.includes("FROM company_settings")) {
+              const settingKey = String(values.at(-1) ?? "");
+              if (settingKey === "payroll.default_rules" || settingKey === "attendance.default_rules") {
+                return {
+                  id: `setting_${settingKey}`,
+                  company_id: values[0],
+                  setting_key: settingKey,
+                  setting_group: settingKey.split(".")[0],
+                  setting_value_json: "{}",
+                };
+              }
+              if (settingKey === "payroll.earnings_toggles") {
+                return {
+                  id: "setting_payroll_earnings_toggles",
+                  company_id: values[0],
+                  setting_key: settingKey,
+                  setting_group: "payroll",
+                  setting_value_json: "{}",
+                };
+              }
+              return null;
+            }
             if (sql.includes("idempotency_key")) return job ?? null;
             if (sql.includes("FROM report_export_jobs WHERE company_id = ? AND id = ?")) return job;
             return { total: 0 };
@@ -476,6 +526,27 @@ describe("Phase 11D Excel/PDF report exports", () => {
     expect(router).not.toContain("/reports/print/:reportKey");
     expect(router).not.toContain("/employees/:employeeId/print");
     expect(source("frontend/src/features/employees/Employee360Page.tsx")).not.toContain("Print Profile");
+  });
+
+  it("report export catalog allows asset report when only Asset Tracking is enabled", async () => {
+    const { env } = fakeEnv({ enabledFeatures: ["asset_tracking"] });
+    const result = await service.getExportCatalog(env, actor());
+    expect(result.data.map((report) => report.report_key)).toContain("hr:assets-uniforms");
+  });
+
+  it("report export catalog allows uniform report when only Uniform Tracking is enabled", async () => {
+    const { env } = fakeEnv({ enabledFeatures: ["uniform_tracking"] });
+    const result = await service.getExportCatalog(env, actor());
+    expect(result.data.map((report) => report.report_key)).toContain("hr:assets-uniforms");
+  });
+
+  it("report export rejects asset/uniform report when both modules are disabled", async () => {
+    const { env } = fakeEnv({ enabledFeatures: [] });
+    await expect(service.previewExport(env, actor(), {
+      report_key: "hr:assets-uniforms",
+      format: "xlsx",
+      filters: {},
+    })).rejects.toMatchObject({ code: "REPORT_EXPORT_MODULE_DISABLED" });
   });
 
   it("sensitive fields hidden in PDF export without permission", async () => {

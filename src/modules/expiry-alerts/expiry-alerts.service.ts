@@ -12,9 +12,13 @@ import type {
 } from "./expiry-alerts.types";
 import { safeNotifyResolvedRecipients } from "../notifications/notifications.service";
 import { sanitizeNotificationMetadata } from "../notifications/notification-safety";
+import {
+  applyEnabledExpirySourceToggles,
+  getEnabledExpirySourceTypes,
+  isExpirySourceTypeEnabled,
+} from "../notifications/module-aware-alerts";
 import { createAuditLog } from "../../services/audit.service";
 import * as permissionService from "../../services/permission.service";
-import * as settingsService from "../../services/settings.service";
 import type { AuthActor, PaginationMeta } from "../../types/api.types";
 import { AppError, NotFoundError, PermissionError } from "../../utils/errors";
 import { createPrefixedId } from "../../utils/ids";
@@ -292,9 +296,18 @@ export const buildExpiryAlertCandidate = (
   };
 };
 
-export const getSettings = async (env: Env, context: AuthActor) => ({
-  settings: normalizeSettings(await repository.getSettings(env, context.companyId)),
-});
+export const getSettings = async (env: Env, context: AuthActor) => {
+  const settings = normalizeSettings(await repository.getSettings(env, context.companyId));
+  return {
+    settings: {
+      ...settings,
+      source_toggles: applyEnabledExpirySourceToggles(
+        settings.source_toggles,
+        await getEnabledExpirySourceTypes(env, context.companyId, context),
+      ),
+    },
+  };
+};
 
 export const updateSettings = async (env: Env, context: AuthActor, input: ExpirySettingsInput) => {
   if (!permissionService.hasAnyPermission(context, ["expiry_alerts.settings.manage"])) {
@@ -364,22 +377,26 @@ export const collectExpiryCandidates = async (
   const filters = { employee_id: scan.employee_id, outlet_id: scan.outlet_id, department_id: scan.department_id };
   const sourceRows: ExpirySourceRow[] = [];
   const sourceType = scan.source_type;
-  const contractTrackingEnabled = await settingsService.isFeatureEnabled(env, context.companyId, "contract_tracking", context).catch(() => false);
-
-  if (!sourceType || ["employee_passport", "employee_work_permit"].includes(sourceType)) {
-    const rows = await repository.listEmployeeIdentitySources(env, context.companyId, throughDate, filters, context.outletIds, context.isSuperAdmin, includeArchived, includeInactive);
-    sourceRows.push(...sourceRowsFromIdentity(rows, settings.source_toggles));
+  const enabledSourceTypes = await getEnabledExpirySourceTypes(env, context.companyId, context);
+  const sourceToggles = applyEnabledExpirySourceToggles(settings.source_toggles, enabledSourceTypes);
+  if (sourceType && !enabledSourceTypes.has(sourceType)) {
+    return { candidates: [], settings: { ...settings, source_toggles: sourceToggles }, generated_at: new Date().toISOString() };
   }
-  if ((!sourceType || sourceType === "employee_document") && settings.source_toggles.employee_documents) {
+
+  if ((!sourceType || ["employee_passport", "employee_work_permit"].includes(sourceType)) && (sourceToggles.employee_passport || sourceToggles.employee_work_permit)) {
+    const rows = await repository.listEmployeeIdentitySources(env, context.companyId, throughDate, filters, context.outletIds, context.isSuperAdmin, includeArchived, includeInactive);
+    sourceRows.push(...sourceRowsFromIdentity(rows, sourceToggles));
+  }
+  if ((!sourceType || sourceType === "employee_document") && sourceToggles.employee_documents) {
     sourceRows.push(...await repository.listDocumentSources(env, context.companyId, throughDate, filters, context.outletIds, context.isSuperAdmin, includeArchived, includeInactive));
   }
-  if (contractTrackingEnabled && (!sourceType || ["contract", "probation"].includes(sourceType)) && (settings.source_toggles.contracts || settings.source_toggles.probation)) {
+  if ((!sourceType || ["contract", "probation"].includes(sourceType)) && (sourceToggles.contracts || sourceToggles.probation)) {
     sourceRows.push(...sourceRowsFromContracts(
-      await repository.listContractSources(env, context.companyId, throughDate, Boolean(settings.source_toggles.probation), filters, context.outletIds, context.isSuperAdmin, includeArchived, includeInactive),
-      settings.source_toggles,
+      await repository.listContractSources(env, context.companyId, throughDate, Boolean(sourceToggles.probation), filters, context.outletIds, context.isSuperAdmin, includeArchived, includeInactive),
+      sourceToggles,
     ));
   }
-  if ((!sourceType || sourceType === "long_leave_return") && settings.source_toggles.long_leave_return) {
+  if ((!sourceType || sourceType === "long_leave_return") && sourceToggles.long_leave_return) {
     sourceRows.push(...await repository.listLongLeaveReturnSources(env, context.companyId, throughDate, filters, context.outletIds, context.isSuperAdmin, includeArchived, includeInactive));
   }
 
@@ -389,7 +406,7 @@ export const collectExpiryCandidates = async (
     .filter((candidate): candidate is ExpiryAlertCandidate => Boolean(candidate))
     .filter((candidate) => settings.overdue_enabled || candidate.days_until_expiry >= 0);
 
-  return { candidates, settings, generated_at: new Date().toISOString() };
+  return { candidates, settings: { ...settings, source_toggles: sourceToggles }, generated_at: new Date().toISOString() };
 };
 
 export const nextNotificationAt = (fromIso: string, settings: ExpiryAlertSettings) => {
@@ -593,6 +610,9 @@ const linkNotificationReferences = async (
 };
 
 export const notifyForAlert = async (env: Env, context: AuthActor, alert: ExpiryAlertRecord, settings: ExpiryAlertSettings, now = new Date().toISOString()) => {
+  if (!(await isExpirySourceTypeEnabled(env, context.companyId, alert.source_type, context))) {
+    return { created_count: 0, notifications: [], skipped_disabled_module: true };
+  }
   const metadata = safeJson<Record<string, unknown>>(alert.metadata_json, {});
   const allowEmail = settings.email_enabled && severityRank[String(alert.severity)] >= severityRank[settings.minimum_email_severity];
   const employeeIds = settings.notify_employee_self && alert.employee_id ? [alert.employee_id] : [];
@@ -605,7 +625,18 @@ export const notifyForAlert = async (env: Env, context: AuthActor, alert: Expiry
     fallbackToAdmins: settings.fallback_to_admins,
   }, {
     notification_type: "expiry_alert",
-    category: alert.source_type === "employee_document" ? "documents" : alert.source_type === "long_leave_return" ? "long_leave" : "system",
+    category:
+      ["employee_document", "employee_passport", "employee_work_permit"].includes(alert.source_type)
+        ? "documents"
+        : ["contract", "probation"].includes(alert.source_type)
+          ? "contracts"
+          : alert.source_type === "long_leave_return"
+            ? "long_leave"
+            : alert.source_type === "asset_assignment"
+              ? "assets"
+              : alert.source_type === "uniform_return"
+                ? "uniforms"
+                : "system",
     priority: alert.severity === "critical" ? "urgent" : alert.severity === "high" ? "high" : "normal",
     title: alert.title,
     message: alert.message,
@@ -688,16 +719,24 @@ export const listAlerts = async (env: Env, context: AuthActor, filters: ExpiryAl
     throw new PermissionError("You do not have permission to view expiry alerts.", "EXPIRY_ALERT_PERMISSION_DENIED");
   }
   const employeeIdScope = await resolveEmployeeScope(env, context);
-  const total = await repository.countAlerts(env, context.companyId, filters, context.outletIds, context.isSuperAdmin, employeeIdScope);
+  const enabledSourceTypes = await getEnabledExpirySourceTypes(env, context.companyId, context);
+  if (filters.source_type && !enabledSourceTypes.has(filters.source_type)) {
+    return { rows: [], pagination: pagination(filters, 0) };
+  }
+  const scopedFilters = { ...filters, source_types: [...enabledSourceTypes] };
+  const total = await repository.countAlerts(env, context.companyId, scopedFilters, context.outletIds, context.isSuperAdmin, employeeIdScope);
   return {
-    rows: (await repository.listAlerts(env, context.companyId, filters, context.outletIds, context.isSuperAdmin, employeeIdScope)).map(safeAlert),
-    pagination: pagination(filters, total),
+    rows: (await repository.listAlerts(env, context.companyId, scopedFilters, context.outletIds, context.isSuperAdmin, employeeIdScope)).map(safeAlert),
+    pagination: pagination(scopedFilters, total),
   };
 };
 
 export const getAlert = async (env: Env, context: AuthActor, id: string) => {
   const alert = await repository.getAlertById(env, context.companyId, id);
   if (!alert) throw new NotFoundError("Expiry alert could not be found.");
+  if (!(await isExpirySourceTypeEnabled(env, context.companyId, alert.source_type, context))) {
+    throw new NotFoundError("Expiry alert could not be found.");
+  }
   await assertCanViewAlert(env, context, alert);
   return { alert: safeAlert(alert) };
 };
@@ -752,7 +791,8 @@ export const snoozeAlert = (env: Env, context: AuthActor, id: string, input: Exp
 
 export const getSummary = async (env: Env, context: AuthActor) => {
   const employeeIdScope = await resolveEmployeeScope(env, context);
-  const summary = await repository.summary(env, context.companyId, context.outletIds, context.isSuperAdmin, employeeIdScope) ?? {
+  const enabledSourceTypes = [...(await getEnabledExpirySourceTypes(env, context.companyId, context))];
+  const summary = await repository.summary(env, context.companyId, context.outletIds, context.isSuperAdmin, employeeIdScope, enabledSourceTypes) ?? {
     active_count: 0,
     open_count: 0,
     critical_count: 0,
@@ -763,7 +803,7 @@ export const getSummary = async (env: Env, context: AuthActor) => {
     due_7_days_count: 0,
     due_30_days_count: 0,
   };
-  const sourceRows = await repository.sourceSummary(env, context.companyId, context.outletIds, context.isSuperAdmin, employeeIdScope);
+  const sourceRows = await repository.sourceSummary(env, context.companyId, context.outletIds, context.isSuperAdmin, employeeIdScope, enabledSourceTypes);
   return {
     summary: {
       ...summary,

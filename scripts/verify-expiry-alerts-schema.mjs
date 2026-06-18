@@ -74,7 +74,7 @@ for (const token of [
 ]) {
   if (!service.includes(token)) fail(`expiry alert service missing ${token}`);
 }
-if (!service.includes("assets: false") || !service.includes("uniforms: false") || !service.includes("settings.source_toggles.long_leave_return")) {
+if (!service.includes("assets: false") || !service.includes("uniforms: false") || !(service.includes("settings.source_toggles.long_leave_return") || service.includes("sourceToggles.long_leave_return"))) {
   fail("expiry scanner source toggles are incomplete");
 }
 

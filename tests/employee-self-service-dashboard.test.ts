@@ -35,11 +35,16 @@ const mocks = vi.hoisted(() => ({
     hasPermission: vi.fn(),
     hasAnyPermission: vi.fn(),
   },
+  settings: {
+    getAttendanceSettings: vi.fn(),
+    isPayrollSubFeatureEnabled: vi.fn(),
+  },
 }));
 
 vi.mock("../src/modules/self-service/self-service.repository", () => mocks.repository);
 vi.mock("../src/modules/attendance/attendance-calendar.service", () => mocks.attendanceCalendar);
 vi.mock("../src/services/permission.service", () => mocks.permissions);
+vi.mock("../src/services/settings.service", () => mocks.settings);
 
 import * as service from "../src/modules/self-service/self-service.service";
 import type { AuthActor } from "../src/types/api.types";
@@ -64,6 +69,7 @@ const actor = (overrides: Partial<AuthActor> = {}): AuthActor => ({
     "self.documents.view",
     "self.payslips.view",
     "self.accessSummary.view",
+    "attendance.corrections.create",
   ],
   outletIds: ["outlet_1"],
   isSuperAdmin: false,
@@ -107,7 +113,9 @@ beforeEach(() => {
   mocks.permissions.hasAnyPermission.mockImplementation((context: AuthActor, permissions: string[]) => context.isSuperAdmin || permissions.some((permission) => context.permissions.includes(permission)));
   mocks.repository.findSelfProfile.mockResolvedValue(profileRow);
   mocks.repository.listSelfRoleNames.mockResolvedValue([{ role_name: "Employee Self-Service" }]);
-  mocks.repository.listEnabledFeatureKeys.mockResolvedValue(["attendance", "roster", "leave_management", "documents", "payslips", "approvals"]);
+  mocks.repository.listEnabledFeatureKeys.mockResolvedValue(["attendance", "roster", "leave_management", "documents", "payroll", "payslips", "approvals"]);
+  mocks.settings.getAttendanceSettings.mockResolvedValue({ "attendance.corrections_enabled": true, attendance_correction_enabled: true });
+  mocks.settings.isPayrollSubFeatureEnabled.mockImplementation(async (_env: Env, _companyId: string, key: string) => key === "payroll.payslips_enabled");
   mocks.repository.getTodayAttendance.mockResolvedValue({ status: "present", first_clock_in: "08:00", last_clock_out: null });
   mocks.repository.getNextRosterShift.mockResolvedValue({ shift_date: "2026-06-12", start_time: "08:00", end_time: "16:00" });
   mocks.repository.getLeaveBalanceSummary.mockResolvedValue({ available_days: 12, leave_types: 2 });
@@ -318,6 +326,33 @@ describe("employee self-service dashboard foundation", () => {
     expect(dashboard.quick_actions?.some((action) => action.href === "/self/attendance-calendar")).toBe(false);
   });
 
+  it("payroll enabled with payslips sub-feature disabled hides self-service payslip data and action", async () => {
+    mocks.repository.listEnabledFeatureKeys.mockResolvedValue(["attendance", "payroll", "payslips"]);
+    mocks.settings.isPayrollSubFeatureEnabled.mockResolvedValue(false);
+
+    const dashboard = await service.getSelfDashboard(env, actor());
+    const navigation = await service.getSelfNavigation(env, actor());
+
+    expect(navigation.find((item) => item.key === "payslips")?.enabled).toBe(false);
+    expect(dashboard.modern_widgets?.payslips.visible).toBe(false);
+    expect(dashboard.quick_actions?.some((action) => action.key === "payslips")).toBe(false);
+    expect(mocks.repository.getLatestPayslip).not.toHaveBeenCalled();
+    expect(mocks.repository.getPayslipSummary).not.toHaveBeenCalled();
+  });
+
+  it("attendance enabled with corrections disabled hides correction action and avoids correction counts", async () => {
+    mocks.repository.listEnabledFeatureKeys.mockResolvedValue(["attendance"]);
+    mocks.settings.getAttendanceSettings.mockResolvedValue({ "attendance.corrections_enabled": false, attendance_correction_enabled: false });
+
+    const dashboard = await service.getSelfDashboard(env, actor());
+
+    expect(dashboard.modern_widgets?.attendance_today.visible).toBe(true);
+    expect(dashboard.quick_actions?.some((action) => action.key === "attendance-correction")).toBe(false);
+    expect(dashboard.modern_widgets?.attendance_today.actions).not.toEqual(expect.arrayContaining([expect.objectContaining({ key: "attendance-correction" })]));
+    expect(mocks.repository.getTodayAttendance).toHaveBeenCalled();
+    expect(mocks.repository.getAttendanceCorrectionCounts).not.toHaveBeenCalled();
+  });
+
   it("modern self-service dashboard frontend uses linked-employee guard and Phase 1 widgets", () => {
     const page = read("frontend/src/features/self-service/EmployeeDashboardPage.tsx");
     const header = read("frontend/src/features/self-service/dashboard/SelfServiceCommandHeader.tsx");
@@ -342,6 +377,14 @@ describe("employee self-service dashboard foundation", () => {
   it("pending approvals only returns eligible or assigned approval rows", async () => {
     await service.getSelfPendingApprovals(env, actor({ permissions: [...actor().permissions, "department.approvals.view", "approvals.department.approve"] }));
 
-    expect(mocks.repository.listSelfPendingApprovals).toHaveBeenCalledWith(expect.anything(), "company_1", "user_employee", expect.objectContaining({ department_id: "dept_ops", level: 1 }), expect.arrayContaining(["approvals.department.approve"]));
+    expect(mocks.repository.listSelfPendingApprovals).toHaveBeenCalledWith(
+      expect.anything(),
+      "company_1",
+      "user_employee",
+      expect.objectContaining({ department_id: "dept_ops", level: 1 }),
+      expect.arrayContaining(["approvals.department.approve"]),
+      25,
+      expect.arrayContaining(["LEAVE_REQUEST", "ATTENDANCE_CORRECTION", "ROSTER_CHANGE"]),
+    );
   });
 });

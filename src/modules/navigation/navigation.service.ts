@@ -2,6 +2,8 @@ import type { AuthActor } from "../../types/api.types";
 import * as permissionService from "../../services/permission.service";
 import * as settingsService from "../../services/settings.service";
 import { resolveModuleFeatureAliases } from "../../config/module-codes";
+import { getEnabledApprovalOperationTypes } from "../approvals/approval-module-access.service";
+import { APPROVAL_OPERATION_TYPES } from "../approvals/approval-workflow-engine.types";
 import type { NavigationBadgesResponse } from "./navigation.types";
 
 const hasAny = (actor: AuthActor, permissions: string[]) =>
@@ -102,8 +104,11 @@ const approvalBadgeCount = async (env: Env, actor: AuthActor, employee: ActorEmp
   if (!hasAny(actor, ["approvals.view", "approvals.requests.view", "department.approvals.view", "approvals.department.view", "approvals.department.approve", "approvals.hrFinal.approve", "approvals.financeFinal.approve"])) {
     return undefined;
   }
+  const enabledOperationTypes = await getEnabledApprovalOperationTypes(env, actor, APPROVAL_OPERATION_TYPES);
+  if (enabledOperationTypes.length === 0) return undefined;
 
   const permissionPlaceholders = actor.permissions.length ? actor.permissions.map(() => "?").join(", ") : "NULL";
+  const operationPlaceholders = enabledOperationTypes.map(() => "?").join(", ");
   const viewAllAllowed = hasAny(actor, ["approvals.view", "approvals.requests.view"]);
   const outletScope = employeeScopeClause(actor, employee, "e", {
     viewAllAllowed,
@@ -129,6 +134,7 @@ const approvalBadgeCount = async (env: Env, actor: AuthActor, employee: ActorEmp
        JOIN approval_request_steps s ON s.company_id = r.company_id AND s.approval_request_id = r.id
        LEFT JOIN employees e ON e.company_id = r.company_id AND e.id = COALESCE(r.subject_employee_id, r.employee_id, r.requester_employee_id)
       WHERE r.company_id = ?
+        AND r.operation_type IN (${operationPlaceholders})
         AND r.status IN ('PENDING', 'IN_REVIEW', 'SUBMITTED', 'pending', 'in_progress', 'submitted')
         AND s.status IN ('PENDING', 'ESCALATED', 'WAITING_FOR_APPROVER', 'pending')
         AND (
@@ -140,6 +146,7 @@ const approvalBadgeCount = async (env: Env, actor: AuthActor, employee: ActorEmp
         )${outletScope.sql}`,
     [
       actor.companyId,
+      ...enabledOperationTypes,
       viewAllAllowed ? 1 : 0,
       actor.actorUserId,
       ...actor.permissions,

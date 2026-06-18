@@ -14,11 +14,16 @@ import type { AuthActor, PaginationMeta } from "../../types/api.types";
 import { AppError, NotFoundError, PermissionError, ValidationError } from "../../utils/errors";
 import { createPrefixedId } from "../../utils/ids";
 import { sanitizeActionUrl, sanitizeFailureMessage, sanitizeNotificationMetadata } from "../notifications/notification-safety";
+import {
+  filterByEnabledCategories,
+  getEnabledNotificationCategories,
+  isNotificationPayloadModuleEnabled,
+} from "../notifications/module-aware-alerts";
 
 const nowIso = () => new Date().toISOString();
 const priorityRank: Record<string, number> = { low: 0, normal: 1, high: 2, urgent: 3 };
 const criticalCategories = new Set(["security", "system"]);
-const defaultCategories = ["leave", "long_leave", "attendance", "biometric", "roster", "holiday", "payroll", "documents", "system", "approvals", "security"];
+const defaultCategories = ["leave", "long_leave", "attendance", "biometric", "roster", "holiday", "payroll", "documents", "contracts", "assets", "uniforms", "system", "approvals", "security", "backup"];
 
 const pagination = (filters: EmailListFilters, total: number): PaginationMeta => ({
   page: filters.page,
@@ -56,10 +61,11 @@ export const getEffectiveEmailSettings = async (env: Env, companyId: string) => 
   const row = await repository.getSettings(env, companyId).catch(() => null);
   const providerStatus = getEmailProviderStatus(env);
   const envEnabled = boolEnv(env.EMAIL_NOTIFICATIONS_ENABLED);
+  const enabledCategories = await getEnabledNotificationCategories(env, companyId);
   return {
     enabled: row ? row.enabled === 1 : envEnabled,
     provider_name: row?.provider_name ?? providerStatus.provider,
-    allowed_categories: parseCategories(row?.allowed_categories_json),
+    allowed_categories: parseCategories(row?.allowed_categories_json).filter((category) => enabledCategories.has(category)),
     minimum_priority: row?.minimum_priority ?? "normal",
     send_immediately: row ? row.send_immediately === 1 : false,
     admin_failure_notifications: row ? row.admin_failure_notifications === 1 : false,
@@ -122,6 +128,10 @@ const renderPayload = (input: CreateEmailJobInput) => {
 export const createEmailJob = async (env: Env, companyId: string, input: CreateEmailJobInput) => {
   const timestamp = input.createdAt ?? nowIso();
   const priority = input.payload.priority ?? "normal";
+  const moduleCheck = await isNotificationPayloadModuleEnabled(env, companyId, input.payload);
+  if (!moduleCheck.enabled) {
+    return { job: null, duplicate: false, skipped_disabled_module: true, reason: moduleCheck.reason };
+  }
   const idempotencyKey = input.payload.idempotency_key
     ? `${input.payload.idempotency_key}:email:${input.recipientUserId ?? input.recipientEmail ?? "unknown"}`
     : null;
@@ -233,9 +243,13 @@ export const safeCreateEmailJobForNotification = async (env: Env, companyId: str
 };
 
 export const listEmailJobs = async (env: Env, context: AuthActor, filters: EmailListFilters) => {
+  const enabledCategories = await getEnabledNotificationCategories(env, context.companyId, context);
+  if (filters.category && !enabledCategories.has(filters.category)) {
+    return { rows: [], pagination: pagination(filters, 0) };
+  }
   const scopedFilters = permissionService.hasAnyPermission(context, ["email_notifications.admin.view", "email_notifications.admin.manage"])
-    ? filters
-    : { ...filters, recipient_user_id: context.actorUserId };
+    ? { ...filters, categories: [...enabledCategories] }
+    : { ...filters, categories: [...enabledCategories], recipient_user_id: context.actorUserId };
   const total = await repository.countEmailJobs(env, context.companyId, scopedFilters);
   return {
     rows: (await repository.listEmailJobs(env, context.companyId, scopedFilters)).map(safeEmailJob),
@@ -352,14 +366,21 @@ export const processPendingEmails = async (env: Env, context: AuthActor, limit =
 };
 
 export const getPreferences = async (env: Env, context: AuthActor) => ({
-  preferences: await repository.getPreferences(env, context.companyId, context.actorUserId),
+  preferences: filterByEnabledCategories(
+    await repository.getPreferences(env, context.companyId, context.actorUserId),
+    await getEnabledNotificationCategories(env, context.companyId, context),
+  ),
 });
 
 export const updatePreferences = async (env: Env, context: AuthActor, preferences: EmailPreferenceInput[]) => {
   const timestamp = nowIso();
+  const enabledCategories = await getEnabledNotificationCategories(env, context.companyId, context);
   for (const preference of preferences) {
     if (criticalCategories.has(preference.category) && preference.email_enabled === false) {
       throw new AppError("Critical system and security emails cannot be fully disabled.", "EMAIL_PREFERENCE_INVALID", 400);
+    }
+    if (!enabledCategories.has(preference.category)) {
+      throw new AppError("This email notification category is disabled because its module is disabled.", "EMAIL_CATEGORY_DISABLED", 400);
     }
     await repository.upsertPreference(env, {
       id: createPrefixedId("email_pref"),
@@ -393,13 +414,14 @@ export const getSettings = async (env: Env, context: AuthActor) => ({
 export const updateSettings = async (env: Env, context: AuthActor, input: EmailSettingsInput) => {
   if (!input.reason?.trim()) throw new ValidationError("A reason is required to update email notification settings.");
   const current = await getEffectiveEmailSettings(env, context.companyId);
+  const enabledCategories = await getEnabledNotificationCategories(env, context.companyId, context);
   const timestamp = nowIso();
   await repository.upsertSettings(env, {
     id: createPrefixedId("email_settings"),
     companyId: context.companyId,
     enabled: (input.enabled ?? current.enabled) ? 1 : 0,
     providerName: getEmailProviderStatus(env).provider,
-    allowedCategoriesJson: JSON.stringify(input.allowed_categories ?? current.allowed_categories),
+    allowedCategoriesJson: JSON.stringify((input.allowed_categories ?? current.allowed_categories).filter((category) => enabledCategories.has(category))),
     minimumPriority: input.minimum_priority ?? current.minimum_priority,
     sendImmediately: (input.send_immediately ?? current.send_immediately) ? 1 : 0,
     adminFailureNotifications: (input.admin_failure_notifications ?? current.admin_failure_notifications) ? 1 : 0,

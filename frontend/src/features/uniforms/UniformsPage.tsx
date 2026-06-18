@@ -66,8 +66,14 @@ export const UniformsPage = () => {
 
   return (
     <div>
-      {has("uniforms.issue") ? <PageActionBar label="Uniforms page actions"><Button onClick={() => setIssueOpen(true)}><Plus className="h-4 w-4" />Issue uniform</Button></PageActionBar> : null}
+      {has("uniforms.issue") ? <PageActionBar label="Uniforms page actions"><div data-setup-target="uniform-types"><Button onClick={() => setIssueOpen(true)}><Plus className="h-4 w-4" />Issue uniform</Button></div></PageActionBar> : null}
       <div className="space-y-4 p-4 md:p-6">
+        <div className="rounded-lg border bg-card p-4" data-setup-target="uniform-issue-rules">
+          <h2 className="text-sm font-semibold">Uniform issue and return rules</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Use this page to issue uniforms, track sizes and quantities, and review pending returns before payroll or clearance checks.
+          </p>
+        </div>
         {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
         {error ? <InlineAlert title={friendlyHrmError(error, "Uniform action could not be completed.")} variant="error" /> : null}
         <UniformFilters filters={filters} onChange={updateFilters} onClear={() => setSearchParams(new URLSearchParams({ page: "1", page_size: String(filters.page_size), tab: activeTab }))} />

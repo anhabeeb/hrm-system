@@ -16,6 +16,7 @@ import { SecurityPage } from "@/features/profile/SecurityPage";
 import { KycUpdatePage } from "@/features/profile/KycUpdatePage";
 import { useAuth } from "@/features/auth/auth.store";
 import { getDefaultLandingPath } from "@/lib/default-landing";
+import type { AttendanceSubFeatureKey, PayrollSubFeatureKey } from "@/lib/subfeatures";
 
 const lazyNamed = <T extends Record<string, ComponentType<any>>>(
   loader: () => Promise<T>,
@@ -64,6 +65,7 @@ const ImportExportPage = lazyNamed(() => import("@/features/import-export/Import
 const ImportCenterPage = lazyNamed(() => import("@/features/imports/ImportCenterPage"), "ImportCenterPage");
 const BackupRecoveryPage = lazyNamed(() => import("@/features/backup-recovery/BackupRecoveryPage"), "BackupRecoveryPage");
 const DataRetentionPage = lazyNamed(() => import("@/features/data-retention/DataRetentionPage"), "DataRetentionPage");
+const SetupWizardPage = lazyNamed(() => import("@/features/setup-guide/SetupWizardPage"), "SetupWizardPage");
 const SettingsPage = lazyNamed(() => import("@/features/settings/SettingsPage"), "SettingsPage");
 const CompanyInformationPage = lazyNamed(() => import("@/features/settings/company/CompanyInformationPage"), "CompanyInformationPage");
 const SecuritySettingsPage = lazyNamed(() => import("@/features/settings/security/SecuritySettingsPage"), "SecuritySettingsPage");
@@ -91,7 +93,7 @@ const routeFallback = (
 
 const guarded = (
   element: ReactNode,
-  options: { permission?: string; permissionsAny?: string[]; feature?: string; featuresAll?: string[]; moduleCode?: string; moduleCodesAll?: string[]; moduleName?: string; requiresLinkedEmployee?: boolean } = {},
+  options: { permission?: string; permissionsAny?: string[]; feature?: string; featuresAll?: string[]; moduleCode?: string; moduleCodesAll?: string[]; moduleName?: string; requiredPayrollSubFeature?: PayrollSubFeatureKey; requiredPayrollSubFeaturesAll?: PayrollSubFeatureKey[]; requiredAttendanceSubFeature?: AttendanceSubFeatureKey; requiredAttendanceSubFeaturesAll?: AttendanceSubFeatureKey[]; requiresLinkedEmployee?: boolean } = {},
 ) => (
   <ModuleRoute
     requiredPermission={options.permission}
@@ -101,6 +103,10 @@ const guarded = (
     moduleCode={options.moduleCode}
     moduleCodesAll={options.moduleCodesAll}
     moduleName={options.moduleName}
+    requiredPayrollSubFeature={options.requiredPayrollSubFeature}
+    requiredPayrollSubFeaturesAll={options.requiredPayrollSubFeaturesAll}
+    requiredAttendanceSubFeature={options.requiredAttendanceSubFeature}
+    requiredAttendanceSubFeaturesAll={options.requiredAttendanceSubFeaturesAll}
     requiresLinkedEmployee={options.requiresLinkedEmployee}
   >
     {element}
@@ -126,6 +132,7 @@ export const AppRouter = () => (
     <Route element={<ProtectedRoute />}>
       <Route element={<AppShell />}>
         <Route index element={<DefaultLandingRedirect />} />
+        <Route path="/setup-wizard" element={<SetupWizardPage />} />
         <Route path="/dashboard" element={guarded(<DashboardPage />, { permissionsAny: ["dashboard.view", "dashboard.view_company", "dashboard.view_outlet"] })} />
         <Route path="/self/dashboard" element={guarded(<EmployeeDashboardPage />, { permission: "self.dashboard.view", requiresLinkedEmployee: true })} />
         <Route path="/self/profile" element={guarded(<MyProfilePage />, { permissionsAny: ["self.profile.view", "self.dashboard.view"], requiresLinkedEmployee: true })} />
@@ -136,7 +143,7 @@ export const AppRouter = () => (
         <Route path="/self/roster" element={guarded(<SelfServiceModulePage moduleKey="roster" />, { permission: "self.roster.view", feature: "roster", moduleCode: "roster", moduleName: "Duty Roster", requiresLinkedEmployee: true })} />
         <Route path="/self/leave" element={guarded(<SelfServiceModulePage moduleKey="leave" />, { permission: "self.leave.view", feature: "leave_management", moduleCode: "leave_management", moduleName: "Leave Management", requiresLinkedEmployee: true })} />
         <Route path="/self/documents" element={guarded(<MyDocumentsKycPage />, { permission: "self.documents.view", feature: "documents", moduleCode: "documents_kyc", requiresLinkedEmployee: true })} />
-        <Route path="/self/payslips" element={guarded(<SelfServiceModulePage moduleKey="payslips" />, { permission: "self.payslips.view", feature: "payslips", moduleCode: "payslips", requiresLinkedEmployee: true })} />
+        <Route path="/self/payslips" element={guarded(<SelfServiceModulePage moduleKey="payslips" />, { permission: "self.payslips.view", featuresAll: ["payroll", "payslips"], moduleCodesAll: ["payroll", "payslips"], requiredPayrollSubFeature: "payslips_enabled", moduleName: "Payslips", requiresLinkedEmployee: true })} />
         <Route path="/self/department-dashboard" element={guarded(<DepartmentDashboardPage selfService />, { permissionsAny: ["department.dashboard.view", "departments.dashboard.viewTeam", "attendance.teamCalendar.view", "attendance.calendar.viewTeam", "employees.team.view"], featuresAll: ["employee_management", "attendance"], moduleCodesAll: ["employees", "attendance"], requiresLinkedEmployee: true })} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/profile/security" element={<SecurityPage />} />
@@ -167,18 +174,18 @@ export const AppRouter = () => (
         <Route path="/leave" element={guarded(<LeavePage />, { permission: "leave.view", feature: "leave_management", moduleCode: "leave_management", moduleName: "Leave Management" })} />
         <Route path="/holidays" element={guarded(<HolidayCalendarPage />, { permissionsAny: ["holidays.view", "holidays.calendar.view"], feature: "holidays" })} />
         <Route path="/long-leave" element={guarded(<LongLeavePage />, { permission: "long_leave.view", feature: "long_leave_management", moduleCode: "long_leave_management", moduleName: "Long Leave Management" })} />
-        <Route path="/payroll" element={guarded(<PayrollPage />, { permission: "payroll.view", feature: "payroll" })} />
-        <Route path="/payroll/attendance-review" element={guarded(<EmployeeAttendanceCalendarPage />, { permissionsAny: ["payroll.attendanceReview.view", "payroll.view"], feature: "payroll", moduleCode: "payroll", featuresAll: ["payroll", "attendance"], moduleCodesAll: ["payroll", "attendance"] })} />
-        <Route path="/payslips" element={guarded(<PayslipsPage />, { permission: "payslips.view", feature: "payslips" })} />
-        <Route path="/advances" element={guarded(<AdvancesPage />, { permission: "advances.view", feature: "advance_salary", moduleCode: "advance_salary" })} />
-        <Route path="/salary-loans" element={guarded(<SalaryLoansPage />, { permission: "salary_loans.view", feature: "payroll" })} />
+        <Route path="/payroll" element={guarded(<PayrollPage />, { permission: "payroll.view", feature: "payroll", moduleCode: "payroll", moduleName: "Payroll Management" })} />
+        <Route path="/payroll/attendance-review" element={guarded(<EmployeeAttendanceCalendarPage />, { permissionsAny: ["payroll.attendanceReview.view", "payroll.view"], feature: "payroll", moduleCode: "payroll", moduleName: "Attendance payroll deductions", featuresAll: ["payroll", "attendance"], moduleCodesAll: ["payroll", "attendance"], requiredPayrollSubFeature: "attendance_deductions_enabled", requiredAttendanceSubFeature: "payroll_deductions_enabled" })} />
+        <Route path="/payslips" element={guarded(<PayslipsPage />, { permission: "payslips.view", featuresAll: ["payroll", "payslips"], moduleCodesAll: ["payroll", "payslips"], requiredPayrollSubFeature: "payslips_enabled", moduleName: "Payslips" })} />
+        <Route path="/advances" element={guarded(<AdvancesPage />, { permission: "advances.view", featuresAll: ["payroll", "advance_salary"], moduleCodesAll: ["payroll", "advance_salary"], requiredPayrollSubFeature: "advances_enabled", moduleName: "Advance Salary" })} />
+        <Route path="/salary-loans" element={guarded(<SalaryLoansPage />, { permission: "salary_loans.view", feature: "payroll", moduleCode: "payroll", requiredPayrollSubFeature: "salary_loans_enabled", moduleName: "Salary Loans" })} />
         <Route path="/assets" element={guarded(<AssetsPage />, { permission: "assets.view", feature: "asset_tracking", moduleCode: "asset_tracking", moduleName: "Asset Tracking" })} />
         <Route path="/uniforms" element={guarded(<UniformsPage />, { permission: "uniforms.view", feature: "uniform_tracking", moduleCode: "uniform_tracking", moduleName: "Uniform Tracking" })} />
         <Route path="/documents" element={guarded(<DocumentsPage />, { permission: "documents.view", feature: "documents", moduleCode: "documents_kyc" })} />
         <Route path="/approvals" element={guarded(<ApprovalsPage />, { permission: "approvals.view", feature: "approvals", moduleCode: "approvals" })} />
         <Route path="/reports" element={guarded(<ReportsPage />, { permission: "reports.view", feature: "reports" })} />
         <Route path="/hr-reports" element={guarded(<HrReportsPage />, { permissionsAny: ["hr_reports.view", "hr_reports.catalog.view"], feature: "reports" })} />
-        <Route path="/payroll-reports" element={guarded(<PayrollReportsPage />, { permissionsAny: ["payroll_reports.view", "payroll_reports.catalog.view"], feature: "reports" })} />
+        <Route path="/payroll-reports" element={guarded(<PayrollReportsPage />, { permissionsAny: ["payroll_reports.view", "payroll_reports.catalog.view"], featuresAll: ["reports", "payroll"], moduleCodesAll: ["reports", "payroll"], moduleName: "Payroll Management" })} />
         <Route path="/report-exports" element={guarded(<ExportHistoryPage />, { permissionsAny: ["report_exports.history.view", "report_exports.admin.manage"], feature: "reports" })} />
         <Route path="/imports" element={guarded(<ImportCenterPage />, { permissionsAny: ["imports.view", "imports.upload", "imports.templates.view"], feature: "import_export" })} />
         <Route path="/import-export" element={guarded(<ImportExportPage />, { permissionsAny: ["export.view", "import.view"], feature: "import_export" })} />

@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Plus } from "lucide-react";
 
+import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { useToast } from "@/components/feedback/useToast";
 import { PageActionBar } from "@/components/layout/PageActionBar";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/features/auth/auth.store";
 import { friendlyHrmError } from "@/lib/hrm-errors";
 import { searchParamNumber } from "@/lib/query-string";
+import { usePayrollSubFeatures } from "@/features/payroll/usePayrollSubFeatures";
 import { AdvanceActionDialog } from "./AdvanceActionDialog";
 import { AdvanceDetailDrawer } from "./AdvanceDetailDrawer";
 import { AdvanceFilters } from "./AdvanceFilters";
@@ -23,6 +25,7 @@ import type { AdvanceFilters as AdvanceFilterValues, AdvancePayment, AdvancePayl
 
 export const AdvancesPage = () => {
   const auth = useAuth();
+  const payrollSubFeatures = usePayrollSubFeatures();
   const toast = useToast();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -59,12 +62,12 @@ export const AdvancesPage = () => {
     params.set("page", "1");
     setSearchParams(params);
   };
-  const listQuery = useQuery({ queryKey: ["advances", "legacy", filters], queryFn: () => advancesApi.list(filters), enabled: tab === "legacy" });
-  const salaryQuery = useQuery({ queryKey: ["advances", "salary-requests", filters], queryFn: () => advancesApi.listSalaryRequests(filters), enabled: tab === "salary-requests" });
+  const listQuery = useQuery({ queryKey: ["advances", "legacy", filters], queryFn: () => advancesApi.list(filters), enabled: payrollSubFeatures.advancesEnabled && tab === "legacy" });
+  const salaryQuery = useQuery({ queryKey: ["advances", "salary-requests", filters], queryFn: () => advancesApi.listSalaryRequests(filters), enabled: payrollSubFeatures.advancesEnabled && tab === "salary-requests" });
   const salaryTimelineQuery = useQuery({
     queryKey: ["advances", "salary-request-timeline", selectedSalary?.id],
     queryFn: () => advancesApi.salaryRequestTimeline(selectedSalary!.id),
-    enabled: Boolean(selectedSalary?.id && salaryDrawerOpen),
+    enabled: payrollSubFeatures.advancesEnabled && Boolean(selectedSalary?.id && salaryDrawerOpen),
   });
   const refresh = async () => queryClient.invalidateQueries({ queryKey: ["advances"] });
   const createMutation = useMutation({
@@ -106,12 +109,12 @@ export const AdvancesPage = () => {
     onError: (error) => toast.error(friendlyHrmError(error, "Advance salary action could not be completed.", "payroll")),
   });
   const hasAdvancePermission = (permission: string) => auth.isSuperAdmin || auth.hasPermission(permission);
-  const canCreateLegacy = hasAdvancePermission("advances.create");
-  const canCreateSalary = hasAdvancePermission("advanceSalary.requests.create") || hasAdvancePermission("advanceSalary.requests.createForOthers");
-  const canApproveSalary = hasAdvancePermission("advanceSalary.requests.approve") || hasAdvancePermission("advanceSalary.requests.review") || hasAdvancePermission("advanceSalary.requests.finalApprove") || hasAdvancePermission("approvals.department.approve") || hasAdvancePermission("approvals.financeFinal.approve");
-  const canRejectSalary = hasAdvancePermission("advanceSalary.requests.reject") || hasAdvancePermission("approvals.department.reject") || hasAdvancePermission("approvals.financeFinal.reject");
-  const canCancelSalary = hasAdvancePermission("advanceSalary.requests.cancel") || hasAdvancePermission("advanceSalary.requests.cancelAny");
-  const canExecuteSalary = hasAdvancePermission("advanceSalary.payments.execute") || hasAdvancePermission("approvals.operationExecutor.apply");
+  const canCreateLegacy = payrollSubFeatures.advancesEnabled && hasAdvancePermission("advances.create");
+  const canCreateSalary = payrollSubFeatures.advancesEnabled && (hasAdvancePermission("advanceSalary.requests.create") || hasAdvancePermission("advanceSalary.requests.createForOthers"));
+  const canApproveSalary = payrollSubFeatures.advancesEnabled && (hasAdvancePermission("advanceSalary.requests.approve") || hasAdvancePermission("advanceSalary.requests.review") || hasAdvancePermission("advanceSalary.requests.finalApprove") || hasAdvancePermission("approvals.department.approve") || hasAdvancePermission("approvals.financeFinal.approve"));
+  const canRejectSalary = payrollSubFeatures.advancesEnabled && (hasAdvancePermission("advanceSalary.requests.reject") || hasAdvancePermission("approvals.department.reject") || hasAdvancePermission("approvals.financeFinal.reject"));
+  const canCancelSalary = payrollSubFeatures.advancesEnabled && (hasAdvancePermission("advanceSalary.requests.cancel") || hasAdvancePermission("advanceSalary.requests.cancelAny"));
+  const canExecuteSalary = payrollSubFeatures.advancesEnabled && (hasAdvancePermission("advanceSalary.payments.execute") || hasAdvancePermission("approvals.operationExecutor.apply"));
   const error = tab === "salary-requests" ? salaryQuery.error ?? salaryActionMutation.error : listQuery.error ?? createMutation.error ?? actionMutation.error;
   return (
     <div>
@@ -124,6 +127,7 @@ export const AdvancesPage = () => {
         </PageActionBar>
       ) : null}
       <div className="space-y-4 p-4 md:p-6">
+        {!payrollSubFeatures.advancesEnabled ? <InlineAlert title="Advance Salary is disabled. Advance request, approval, payment, and legacy advance actions are hidden." /> : null}
         <AdvanceFilters filters={filters} onChange={updateFilters} onClear={() => setSearchParams(new URLSearchParams({ page: "1", page_size: String(filters.page_size), tab }))} />
         {error ? <p className="sr-only">{friendlyHrmError(error, "Advance action could not be completed.", "payroll")}</p> : null}
         <Tabs value={tab} onValueChange={setActiveTab}>

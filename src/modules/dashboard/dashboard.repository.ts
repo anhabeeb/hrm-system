@@ -420,11 +420,16 @@ export const expiryCounts = async (
   env: Env,
   context: AuthActor,
   today: string,
-  options: { employeeId?: string | null } = {},
+  options: { employeeId?: string | null; sourceTypes?: string[] } = {},
 ) => {
   const scope = options.employeeId
     ? { sql: " AND a.employee_id = ?", values: [options.employeeId] }
     : directOutletClause(context, "a.outlet_id");
+  const sourceClause = options.sourceTypes
+    ? options.sourceTypes.length === 0
+      ? " AND 1 = 0"
+      : ` AND a.source_type IN (${options.sourceTypes.map(() => "?").join(", ")})`
+    : "";
   return one<Record<string, number | null>>(
     env,
     `SELECT
@@ -439,8 +444,8 @@ export const expiryCounts = async (
       SUM(CASE WHEN a.source_type LIKE '%probation%' THEN 1 ELSE 0 END) AS probation,
       SUM(CASE WHEN a.source_type LIKE '%document%' THEN 1 ELSE 0 END) AS document
      FROM expiry_alerts a
-     WHERE a.company_id = ?${scope.sql}`,
-    [today, today, today, today, today, today, context.companyId, ...scope.values],
+     WHERE a.company_id = ?${sourceClause}${scope.sql}`,
+    [today, today, today, today, today, today, context.companyId, ...(options.sourceTypes ?? []), ...scope.values],
   );
 };
 
@@ -449,11 +454,16 @@ export const expiryCountsWithinDays = async (
   context: AuthActor,
   today: string,
   days: number,
-  options: { includeContracts?: boolean } = {},
+  options: { includeContracts?: boolean; sourceTypes?: string[] } = {},
 ) => {
   const scope = directOutletClause(context, "a.outlet_id");
   const contractClause = options.includeContracts === false
     ? " AND a.source_type NOT IN ('contract', 'probation')"
+    : "";
+  const sourceClause = options.sourceTypes
+    ? options.sourceTypes.length === 0
+      ? " AND 1 = 0"
+      : ` AND a.source_type IN (${options.sourceTypes.map(() => "?").join(", ")})`
     : "";
   return one<{ total: number }>(
     env,
@@ -461,8 +471,8 @@ export const expiryCountsWithinDays = async (
      FROM expiry_alerts a
      WHERE a.company_id = ?
        AND a.expiry_date BETWEEN ? AND date(?, ?)
-       AND a.status IN ('open', 'acknowledged', 'snoozed')${contractClause}${scope.sql}`,
-    [context.companyId, today, today, `+${days} day`, ...scope.values],
+       AND a.status IN ('open', 'acknowledged', 'snoozed')${contractClause}${sourceClause}${scope.sql}`,
+    [context.companyId, today, today, `+${days} day`, ...(options.sourceTypes ?? []), ...scope.values],
   );
 };
 
@@ -480,16 +490,22 @@ export const documentKycCounts = async (env: Env, context: AuthActor) => {
   );
 };
 
-export const notificationCounts = async (env: Env, context: AuthActor) =>
-  one<Record<string, number | null>>(
+export const notificationCounts = async (env: Env, context: AuthActor, categories?: string[]) => {
+  const categoryClause = categories
+    ? categories.length === 0
+      ? " AND 1 = 0"
+      : ` AND category IN (${categories.map(() => "?").join(", ")})`
+    : "";
+  return one<Record<string, number | null>>(
     env,
     `SELECT
       SUM(CASE WHEN status = 'unread' THEN 1 ELSE 0 END) AS unread,
       SUM(CASE WHEN status = 'unread' AND priority IN ('urgent', 'high') THEN 1 ELSE 0 END) AS urgent
      FROM notifications
-     WHERE company_id = ? AND recipient_user_id = ? AND (expires_at IS NULL OR expires_at >= CURRENT_TIMESTAMP)`,
-    [context.companyId, context.actorUserId],
+     WHERE company_id = ? AND recipient_user_id = ? AND (expires_at IS NULL OR expires_at >= CURRENT_TIMESTAMP)${categoryClause}`,
+    [context.companyId, context.actorUserId, ...(categories ?? [])],
   );
+};
 
 export const emailHealth = async (env: Env, context: AuthActor) =>
   one<Record<string, number | null>>(

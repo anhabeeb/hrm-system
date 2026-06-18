@@ -20,6 +20,7 @@ import { searchParamNumber } from "@/lib/query-string";
 import { formatReportValue } from "@/features/reports/report-format";
 import { ReportExportActions } from "@/features/report-exports/ReportExportActions";
 import { useAuth } from "@/features/auth/auth.store";
+import { useAttendanceSubFeatures } from "@/features/attendance/useAttendanceSubFeatures";
 import { hrReportsApi } from "./hr-reports.api";
 import type { HrReportDefinition, HrReportFilters } from "./hr-reports.types";
 
@@ -27,6 +28,7 @@ const categories = [
   { key: "employee", label: "Employee Reports" },
   { key: "compliance", label: "Compliance Reports" },
   { key: "documents", label: "Documents" },
+  { key: "attendance", label: "Attendance" },
   { key: "leave", label: "Leave Reports" },
   { key: "long_leave", label: "Long Leave" },
   { key: "assets", label: "Assets/Uniforms" },
@@ -55,26 +57,40 @@ const defaultReportFor = (reports: HrReportDefinition[], selected?: string | nul
 
 export const HrReportsPage = () => {
   const auth = useAuth();
+  const attendanceSubFeatures = useAttendanceSubFeatures();
   const [searchParams, setSearchParams] = useSearchParams();
   const filters = useMemo(() => filtersFromParams(searchParams), [searchParams]);
+  const hasAnyFeature = (...features: string[]) => features.some((feature) => auth.hasFeature(feature));
+  const documentTrackingEnabled = hasAnyFeature("documents", "documents_kyc", "kyc_update_requests");
+  const contractTrackingEnabled = auth.hasFeature("contract_tracking");
+  const leaveEnabled = auth.hasFeature("leave_management");
+  const longLeaveEnabled = auth.hasFeature("long_leave_management");
+  const attendanceEnabled = auth.hasFeature("attendance");
+  const assetTrackingEnabled = auth.hasFeature("asset_tracking");
+  const uniformTrackingEnabled = auth.hasFeature("uniform_tracking");
+  const reportAvailable = (report: Pick<HrReportDefinition, "category" | "report_key">) =>
+    (report.category !== "documents" || documentTrackingEnabled) &&
+    (report.category !== "attendance" || attendanceEnabled) &&
+    (report.category !== "leave" || leaveEnabled) &&
+    (report.category !== "long_leave" || longLeaveEnabled) &&
+    (report.category !== "assets" || assetTrackingEnabled || uniformTrackingEnabled) &&
+    (report.report_key !== "contracts" || contractTrackingEnabled) &&
+    (report.report_key !== "document-compliance" || documentTrackingEnabled) &&
+    (report.report_key !== "foreign-compliance" || documentTrackingEnabled) &&
+    (report.report_key !== "attendance-corrections" || (attendanceEnabled && attendanceSubFeatures.correctionsEnabled)) &&
+    (report.report_key !== "kiosk-attendance" || (attendanceEnabled && attendanceSubFeatures.kioskEnabled)) &&
+    (report.report_key !== "biometric-attendance" || (attendanceEnabled && attendanceSubFeatures.biometricEnabled)) &&
+    (report.report_key !== "assets-uniforms" || assetTrackingEnabled || uniformTrackingEnabled);
   const visibleCategories = useMemo(
-    () => categories.filter((category) =>
-      (category.key !== "leave" || auth.hasFeature("leave_management")) &&
-      (category.key !== "long_leave" || auth.hasFeature("long_leave_management")) &&
-      (category.key !== "assets" || (auth.hasFeature("asset_tracking") && auth.hasFeature("uniform_tracking"))),
-    ),
-    [auth],
+    () => categories.filter((category) => reportAvailable({ category: category.key, report_key: category.key })),
+    [assetTrackingEnabled, attendanceEnabled, attendanceSubFeatures.biometricEnabled, attendanceSubFeatures.correctionsEnabled, attendanceSubFeatures.kioskEnabled, contractTrackingEnabled, documentTrackingEnabled, leaveEnabled, longLeaveEnabled, uniformTrackingEnabled],
   );
   const requestedCategory = searchParams.get("category") ?? "employee";
   const selectedCategory = visibleCategories.some((category) => category.key === requestedCategory) ? requestedCategory : "employee";
   const selectedReportKey = searchParams.get("report") ?? undefined;
 
   const catalogQuery = useQuery({ queryKey: ["hr-reports", "catalog"], queryFn: () => hrReportsApi.catalog() });
-  const allReports = (catalogQuery.data?.data.data ?? []).filter((report) =>
-    (report.category !== "leave" || auth.hasFeature("leave_management")) &&
-    (report.category !== "long_leave" || auth.hasFeature("long_leave_management")) &&
-    (report.report_key !== "contracts" || auth.hasFeature("contract_tracking")),
-  );
+  const allReports = (catalogQuery.data?.data.data ?? []).filter(reportAvailable);
   const visibleReports = allReports.filter((report) => report.category === selectedCategory);
   const selectedReport = defaultReportFor(visibleReports.length ? visibleReports : allReports, selectedReportKey);
   const reportQuery = useQuery({

@@ -36,6 +36,22 @@ const scope = (context: AuthActor) => ({
   outletIds: context.outletIds,
 });
 
+export const getPayrollSubFeatures = async (env: Env, context: AuthActor) => {
+  const settings = await settingsService.getPayrollSubFeatureSettings(env, context.companyId);
+  return {
+    salary_processing_enabled: settings["payroll.salary_processing_enabled"] ?? true,
+    payslips_enabled: settings["payroll.payslips_enabled"] ?? true,
+    advances_enabled: settings["payroll.advances_enabled"] ?? true,
+    salary_loans_enabled: settings["payroll.salary_loans_enabled"] ?? true,
+    overtime_enabled: settings["payroll.overtime_enabled"] ?? true,
+    benefits_enabled: settings["payroll.benefits_enabled"] ?? true,
+    manual_deductions_enabled: settings["payroll.manual_deductions_enabled"] ?? true,
+    attendance_deductions_enabled: settings["payroll.attendance_deductions_enabled"] ?? true,
+    long_leave_deductions_enabled: settings["payroll.long_leave_deductions_enabled"] ?? true,
+    approvals_enabled: settings["payroll.approvals_enabled"] ?? true,
+  };
+};
+
 export const hasFullPayrollAccess = async (env: Env, context: AuthActor): Promise<boolean> => {
   if (context.isSuperAdmin || permissionService.isSuperAdmin(context)) return true;
   if (permissionService.hasPermission(context, "payroll.full_access")) return true;
@@ -283,7 +299,7 @@ const attendancePayrollDeductionsEnabled = async (env: Env, context: AuthActor) 
 
 const loadPayrollCalculationSettings = async (env: Env, context: AuthActor) => {
   const [payrollSettings, attendanceSettings, attendanceDeductionsEnabled] = await Promise.all([
-    settingsService.getPayrollSettings(env, context.companyId),
+    settingsService.getPayrollSubFeatureSettings(env, context.companyId),
     settingsService.getAttendanceSettings(env, context.companyId).catch(() => ({})),
     attendancePayrollDeductionsEnabled(env, context),
   ]);
@@ -569,8 +585,12 @@ const createBlockerExceptions = async (env: Env, context: AuthActor, runId: stri
       });
     }
   }
-  const payrollSettings = await settingsService.getPayrollSettings(env, context.companyId).catch(() => ({}));
-  if (attendanceEnabled && (payrollSettings as Record<string, unknown>).attendance_to_payroll_enabled === true) {
+  const payrollSettings = await settingsService.getPayrollSubFeatureSettings(env, context.companyId).catch(() => ({}));
+  if (
+    attendanceEnabled &&
+    (payrollSettings as Record<string, unknown>)["payroll.attendance_deductions_enabled"] !== false &&
+    (payrollSettings as Record<string, unknown>).attendance_to_payroll_enabled === true
+  ) {
     const missingSummaries = await repository.countActiveEmployeesMissingAttendanceSummaries(env, context.companyId, payrollMonth);
     if (missingSummaries > 0) {
       attendanceBlocked = true;

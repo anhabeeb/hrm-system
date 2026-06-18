@@ -139,6 +139,8 @@ export interface PayrollCalculationSettings {
   longLeavePayDaysWorkedOnly?: boolean;
   automaticAdvanceDeductionEnabled?: boolean;
   automaticLoanInstallmentDeductionEnabled?: boolean;
+  benefitsEnabled?: boolean;
+  manualDeductionsEnabled?: boolean;
   requireCompleteAttendanceBeforeCalculation?: boolean;
   missingAttendanceCountsAsAbsent?: boolean;
   absenceDeductionRequiresExplicitAbsentStatus?: boolean;

@@ -43,8 +43,10 @@ const assertModulePermission = (context: AuthActor, exportType: string) => {
 const moduleForExportType: Record<string, string | undefined> = {
   attendance: "attendance",
   leave: "leave_management",
+  payroll: "payroll",
   assets: "asset_tracking",
   uniforms: "uniform_tracking",
+  documents_metadata: "documents",
 };
 
 const assertExportModuleEnabled = async (env: Env, context: AuthActor, exportType: string) => {
@@ -66,11 +68,32 @@ const assertExportModuleEnabled = async (env: Env, context: AuthActor, exportTyp
         403,
       );
     }
+    if (exportType === "payroll") {
+      throw new AppError(
+        "Payroll Management is disabled. Enable it in Settings to use this module.",
+        "PAYROLL_MANAGEMENT_DISABLED",
+        403,
+      );
+    }
+    if (exportType === "documents_metadata") {
+      throw new AppError(
+        "Document Tracking is disabled. Enable it in Settings to use this module.",
+        "DOCUMENT_TRACKING_DISABLED",
+        403,
+      );
+    }
     throw new AppError(
       exportType === "assets"
         ? "Asset Tracking is disabled. Enable it in Settings to use this module."
         : "Uniform Tracking is disabled. Enable it in Settings to use this module.",
       exportType === "assets" ? "ASSET_TRACKING_DISABLED" : "UNIFORM_TRACKING_DISABLED",
+      403,
+    );
+  }
+  if (exportType === "payroll" && !(await settingsService.isPayrollSubFeatureEnabled(env, context.companyId, "payroll.salary_processing_enabled"))) {
+    throw new AppError(
+      "Salary Processing is disabled. Enable it in Payroll Settings to use this export.",
+      "PAYROLL_SALARY_PROCESSING_DISABLED",
       403,
     );
   }

@@ -3,6 +3,7 @@ export const LEAVE_REQUEST_STATUSES = [
   "submitted",
   "pending_approval",
   "pending",
+  "pending_document",
   "partially_approved",
   "approved",
   "direct_approved",
@@ -15,7 +16,7 @@ export const LEAVE_REQUEST_STATUSES = [
   "returned_for_more_info",
 ] as const;
 
-export const ACTIVE_LEAVE_STATUSES = ["submitted", "pending_approval", "pending", "partially_approved", "approved", "direct_approved", "finalized", "taken"] as const;
+export const ACTIVE_LEAVE_STATUSES = ["submitted", "pending_approval", "pending", "pending_document", "partially_approved", "approved", "direct_approved", "finalized", "taken"] as const;
 
 export const LEAVE_APPROVAL_STEP_STATUSES = ["pending", "approved", "rejected", "skipped", "delegated", "expired"] as const;
 

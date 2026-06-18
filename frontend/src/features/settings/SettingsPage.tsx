@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { FeatureSettingsPanel } from "./FeatureSettingsPanel";
 
 const settingsLinks = [
   { title: "Company Information", description: "Company identity, contact, address, timezone, currency, and logo URL.", path: "/settings/company", icon: Building2 },
@@ -29,8 +30,47 @@ const settingsLinks = [
   { title: "Devices & Sync", description: "Kiosk, biometric, local bridge, offline sync, batch, retry, and realtime controls.", path: "/settings/devices-sync", icon: TabletSmartphone },
 ];
 
+const setupGuidance = [
+  {
+    target: "employee-numbering",
+    title: "Employee numbering",
+    description: "Review employee ID format before bulk onboarding. Keep existing employee records unchanged.",
+  },
+  {
+    target: "self-service-settings",
+    title: "Self-service settings",
+    description: "Confirm what linked employees can view or request before inviting employee accounts.",
+  },
+  {
+    target: "approval-workflows",
+    title: "Approval workflows",
+    description: "Review module-aware approval routing for leave, attendance, roster, payroll, documents, and lifecycle operations.",
+  },
+  {
+    target: "asset-issue-rules",
+    title: "Asset issue rules",
+    description: "Use Assets to manage issue/return records; keep rules consistent before issuing company property.",
+  },
+  {
+    target: "uniform-issue-rules",
+    title: "Uniform issue rules",
+    description: "Use Uniforms to manage issue/return records; review return expectations before rollout.",
+  },
+];
+
 export const SettingsPage = () => (
   <div>
+    <div className="space-y-4 p-4 md:p-6">
+      <FeatureSettingsPanel />
+      <div className="grid gap-3 rounded-lg border bg-card p-4 md:grid-cols-2 xl:grid-cols-3">
+        {setupGuidance.map((item) => (
+          <div key={item.target} className="rounded-md border bg-slate-50 p-3" data-setup-target={item.target}>
+            <p className="text-sm font-medium">{item.title}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{item.description}</p>
+          </div>
+        ))}
+      </div>
+    </div>
     <div className="grid gap-4 p-4 md:grid-cols-2 md:p-6 xl:grid-cols-3">
       {settingsLinks.map((item) => {
         const Icon = item.icon;

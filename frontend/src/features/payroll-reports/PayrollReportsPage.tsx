@@ -24,6 +24,7 @@ import { payrollReportsApi } from "./payroll-reports.api";
 import { ReportExportActions } from "@/features/report-exports/ReportExportActions";
 import { useAuth } from "@/features/auth/auth.store";
 import { useAttendanceSubFeatures } from "@/features/attendance/useAttendanceSubFeatures";
+import { usePayrollSubFeatures } from "@/features/payroll/usePayrollSubFeatures";
 import type { PayrollReportDefinition, PayrollReportFilters } from "./payroll-reports.types";
 
 const categories = [
@@ -66,26 +67,41 @@ const defaultReportFor = (reports: PayrollReportDefinition[], selected?: string 
 export const PayrollReportsPage = () => {
   const auth = useAuth();
   const attendanceSubFeatures = useAttendanceSubFeatures();
+  const payrollSubFeatures = usePayrollSubFeatures();
   const [searchParams, setSearchParams] = useSearchParams();
   const filters = useMemo(() => filtersFromParams(searchParams), [searchParams]);
+  const payrollReportAvailable = (report: Pick<PayrollReportDefinition, "category" | "report_key">) =>
+    auth.hasFeature("payroll") &&
+    (!["payroll", "salary", "cost", "finance_summary"].includes(report.category) || payrollSubFeatures.salaryProcessingEnabled) &&
+    (report.category !== "deductions" || payrollSubFeatures.manualDeductionsEnabled || (auth.hasFeature("leave_management") && payrollSubFeatures.manualDeductionsEnabled)) &&
+    (report.category !== "advances_loans" || payrollSubFeatures.advancesEnabled || payrollSubFeatures.salaryLoansEnabled) &&
+    (report.category !== "attendance" || (auth.hasFeature("attendance") && (payrollSubFeatures.attendanceDeductionsEnabled || payrollSubFeatures.overtimeEnabled))) &&
+    (report.category !== "long_leave" || (auth.hasFeature("long_leave_management") && payrollSubFeatures.longLeaveDeductionsEnabled)) &&
+    (report.category !== "payslips" || payrollSubFeatures.payslipsEnabled) &&
+    (report.category !== "approvals" || payrollSubFeatures.approvalsEnabled) &&
+    (report.report_key !== "monthly-summary" || payrollSubFeatures.salaryProcessingEnabled) &&
+    (report.report_key !== "employee-detail" || payrollSubFeatures.salaryProcessingEnabled) &&
+    (report.report_key !== "salary-compensation" || payrollSubFeatures.salaryProcessingEnabled) &&
+    (report.report_key !== "salary-changes" || payrollSubFeatures.salaryProcessingEnabled) &&
+    (report.report_key !== "deductions" || payrollSubFeatures.manualDeductionsEnabled) &&
+    (report.report_key !== "advances" || payrollSubFeatures.advancesEnabled) &&
+    (report.report_key !== "salary-loans" || payrollSubFeatures.salaryLoansEnabled) &&
+    (report.report_key !== "overtime" || payrollSubFeatures.overtimeEnabled) &&
+    (report.report_key !== "payslip-status" || payrollSubFeatures.payslipsEnabled) &&
+    (report.report_key !== "approval-finalization" || payrollSubFeatures.approvalsEnabled) &&
+    (report.report_key !== "attendance-deductions" || (auth.hasFeature("attendance") && attendanceSubFeatures.payrollDeductionsEnabled && payrollSubFeatures.attendanceDeductionsEnabled)) &&
+    (report.report_key !== "leave-deductions" || (auth.hasFeature("leave_management") && payrollSubFeatures.manualDeductionsEnabled)) &&
+    (report.report_key !== "long-leave-deductions" || (auth.hasFeature("long_leave_management") && payrollSubFeatures.longLeaveDeductionsEnabled));
   const visibleCategories = useMemo(
-    () => categories.filter((category) =>
-      (category.key !== "attendance" || auth.hasFeature("attendance")) &&
-      (category.key !== "long_leave" || auth.hasFeature("long_leave_management")),
-    ),
-    [auth],
+    () => categories.filter((category) => payrollReportAvailable({ category: category.key, report_key: category.key })),
+    [auth, attendanceSubFeatures.payrollDeductionsEnabled, payrollSubFeatures.advancesEnabled, payrollSubFeatures.approvalsEnabled, payrollSubFeatures.attendanceDeductionsEnabled, payrollSubFeatures.longLeaveDeductionsEnabled, payrollSubFeatures.manualDeductionsEnabled, payrollSubFeatures.overtimeEnabled, payrollSubFeatures.payslipsEnabled, payrollSubFeatures.salaryLoansEnabled, payrollSubFeatures.salaryProcessingEnabled],
   );
   const requestedCategory = searchParams.get("category") ?? "payroll";
   const selectedCategory = visibleCategories.some((category) => category.key === requestedCategory) ? requestedCategory : "payroll";
   const selectedReportKey = searchParams.get("report") ?? undefined;
 
   const catalogQuery = useQuery({ queryKey: ["payroll-reports", "catalog"], queryFn: () => payrollReportsApi.catalog() });
-  const allReports = (catalogQuery.data?.data.data ?? []).filter((report) =>
-    (report.category !== "attendance" || auth.hasFeature("attendance")) &&
-    (report.report_key !== "attendance-deductions" || (auth.hasFeature("attendance") && attendanceSubFeatures.payrollDeductionsEnabled)) &&
-    (report.report_key !== "leave-deductions" || auth.hasFeature("leave_management")) &&
-    (report.category !== "long_leave" || auth.hasFeature("long_leave_management")),
-  );
+  const allReports = (catalogQuery.data?.data.data ?? []).filter(payrollReportAvailable);
   const visibleReports = allReports.filter((report) => report.category === selectedCategory);
   const selectedReport = defaultReportFor(visibleReports.length ? visibleReports : allReports, selectedReportKey);
   const reportQuery = useQuery({

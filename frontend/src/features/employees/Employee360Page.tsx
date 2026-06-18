@@ -16,6 +16,7 @@ import { EmployeeStatusBadge } from "./EmployeeStatusBadge";
 import { EmployeeProfilePhotoControls } from "./EmployeeProfilePhotoControls";
 import { EmployeeAttendanceCalendarWidget } from "@/features/attendance-calendar/EmployeeAttendanceCalendarWidget";
 import { useAuth } from "@/features/auth/auth.store";
+import { usePayrollSubFeatures } from "@/features/payroll/usePayrollSubFeatures";
 
 const cellValue = (value: unknown) => {
   if (value === null || value === undefined || value === "") return "Not recorded";
@@ -70,6 +71,7 @@ const SimpleTable = ({
 export const Employee360Page = () => {
   const { employeeId } = useParams();
   const auth = useAuth();
+  const payrollSubFeatures = usePayrollSubFeatures();
   const profileQuery = useQuery({
     queryKey: ["employees", employeeId, "profile"],
     queryFn: () => employeesApi.profile(employeeId ?? "", { limit: 25 }),
@@ -89,9 +91,16 @@ export const Employee360Page = () => {
   const canViewAssets = auth.hasFeature("asset_tracking") && auth.hasPermission("assets.view");
   const canViewUniforms = auth.hasFeature("uniform_tracking") && auth.hasPermission("uniforms.view");
   const canViewAssetsUniforms = canViewAssets || canViewUniforms;
+  const canViewDocuments =
+    (auth.hasFeature("documents") || auth.hasFeature("documents_kyc") || auth.hasFeature("kyc_update_requests")) &&
+    auth.hasPermission("documents.view");
   const canViewContracts =
     auth.hasFeature("contract_tracking") &&
     auth.hasAnyPermission(["employees.contracts.view", "contracts.view", "employees.view"]);
+  const canViewPayroll =
+    auth.hasFeature("payroll") &&
+    payrollSubFeatures.salaryProcessingEnabled &&
+    auth.hasAnyPermission(["payroll.view", "salary.view", "employees.salary.view", "dashboard.payroll_readiness.view"]);
   const canManageProfilePhoto = auth.hasAnyPermission(["employees.profilePhoto.upload", "employees.profilePhoto.manage", "employees.edit", "employees.manage"]);
 
   return (
@@ -120,10 +129,10 @@ export const Employee360Page = () => {
                   </div>
                 </div>
                 <div className="grid min-w-[280px] gap-2 sm:grid-cols-2">
-                  <div className="rounded-md border p-2 text-sm"><span className="text-muted-foreground">Open alerts</span><p className="font-semibold">{cellValue(warnings.unresolved_expiry_alerts)}</p></div>
-                  <div className="rounded-md border p-2 text-sm"><span className="text-muted-foreground">Missing punches</span><p className="font-semibold">{cellValue(warnings.missing_punches)}</p></div>
+                  {canViewDocuments || canViewContracts || canViewLongLeave ? <div className="rounded-md border p-2 text-sm"><span className="text-muted-foreground">Open alerts</span><p className="font-semibold">{cellValue(warnings.unresolved_expiry_alerts)}</p></div> : null}
+                  {canViewAttendance ? <div className="rounded-md border p-2 text-sm"><span className="text-muted-foreground">Missing punches</span><p className="font-semibold">{cellValue(warnings.missing_punches)}</p></div> : null}
                   <div className="rounded-md border p-2 text-sm"><span className="text-muted-foreground">Pending approvals</span><p className="font-semibold">{cellValue(warnings.pending_approvals)}</p></div>
-                  <div className="rounded-md border p-2 text-sm"><span className="text-muted-foreground">Payroll warnings</span><p className="font-semibold">{cellValue(warnings.payroll_warnings)}</p></div>
+                  {canViewPayroll ? <div className="rounded-md border p-2 text-sm"><span className="text-muted-foreground">Payroll warnings</span><p className="font-semibold">{cellValue(warnings.payroll_warnings)}</p></div> : null}
                   {canManageProfilePhoto ? (
                     <div className="sm:col-span-2">
                       <EmployeeProfilePhotoControls employeeId={employee.id} hasPhoto={Boolean(employee.profile_photo_url)} />
@@ -145,10 +154,10 @@ export const Employee360Page = () => {
                 {canViewAttendanceCalendar ? <TabsTrigger value="attendance-calendar">Attendance Calendar</TabsTrigger> : null}
                 {canViewLeave ? <TabsTrigger value="leave">Leave</TabsTrigger> : null}
                 {canViewLongLeave ? <TabsTrigger value="long-leave">Long Leave</TabsTrigger> : null}
-                <TabsTrigger value="documents">Documents</TabsTrigger>
+                {canViewDocuments ? <TabsTrigger value="documents">Documents</TabsTrigger> : null}
                 {canViewContracts ? <TabsTrigger value="contracts">Contracts</TabsTrigger> : null}
                 {canViewAssetsUniforms ? <TabsTrigger value="assets">Assets/Uniforms</TabsTrigger> : null}
-                <TabsTrigger value="payroll">Payroll Readiness</TabsTrigger>
+                {canViewPayroll ? <TabsTrigger value="payroll">Payroll Readiness</TabsTrigger> : null}
                 <TabsTrigger value="alerts">Alerts</TabsTrigger>
                 <TabsTrigger value="history">History</TabsTrigger>
               </TabsList>
@@ -225,9 +234,11 @@ export const Employee360Page = () => {
               </TabsContent>
               ) : null}
 
+              {canViewDocuments ? (
               <TabsContent value="documents">
                 {profile.documents ? <SimpleTable title="Documents" rows={recordRows(profile.documents.documents)} columns={["document_type", "file_name", "expiry_date", "status", "is_sensitive", "created_at"]} /> : <InlineAlert title="Documents section is hidden for your role." />}
               </TabsContent>
+              ) : null}
 
               {canViewContracts ? (
               <TabsContent value="contracts">
@@ -246,6 +257,7 @@ export const Employee360Page = () => {
               </TabsContent>
               ) : null}
 
+              {canViewPayroll ? (
               <TabsContent value="payroll" className="space-y-3">
                 {profile.payroll_readiness ? (
                   <>
@@ -258,6 +270,7 @@ export const Employee360Page = () => {
                   </>
                 ) : <InlineAlert title="Payroll readiness is hidden for your role." />}
               </TabsContent>
+              ) : null}
 
               <TabsContent value="alerts">
                 {profile.alerts ? <SimpleTable title="Expiry Alerts" rows={recordRows(profile.alerts.alerts)} columns={["source_type", "source_label", "expiry_date", "days_until_expiry", "severity", "status", "title"]} /> : <InlineAlert title="Alerts are hidden for your role." />}

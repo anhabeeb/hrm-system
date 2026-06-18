@@ -25,11 +25,13 @@ import type {
   LeavePolicyFilters,
   LeavePolicyInput,
   LeavePolicyUpdateInput,
+  LeavePolicyPreviewInput,
   LeaveRequestFilters,
   LeaveRequestInput,
   LeaveRequestRecord,
   LeaveRequestUpdateInput,
   LeaveTypeFilters,
+  LeaveTypePolicyRuleUpdateInput,
   LeaveTypeUpdateInput,
 } from "./leave.types";
 import { createAuditLog } from "../../services/audit.service";
@@ -523,6 +525,11 @@ const leaveSnapshotFromEngine = (approval: LeaveApprovalEngineSnapshot | null | 
   approval_submitted_at: approval?.submitted_at ?? null,
   approval_completed_at: approval?.completed_at ?? approval?.approved_at ?? approval?.rejected_at ?? approval?.cancelled_at ?? null,
 });
+
+const hasSupportingDocument = (input: Pick<LeaveRequestInput, "supporting_document_id" | "supporting_document_attached">) =>
+  Boolean(input.supporting_document_attached || input.supporting_document_id);
+
+const policySnapshotJson = (policyPreview: unknown) => JSON.stringify(policyPreview);
 
 const createLeaveEngineApprovalDraft = async (
   env: Env,
@@ -1038,6 +1045,116 @@ export const listRequests = async (env: Env, context: AuthActor, filters: LeaveR
   };
 };
 
+export const listLeaveTypePolicyRules = async (env: Env, context: AuthActor) => {
+  if (!permissionService.hasAnyPermission(context, ["leave.settings.view", "leave_settings.view", "leave.settings.manage", "leave_settings.manage", "leave.view"])) {
+    throw new PermissionError("You do not have permission to view leave policy rules.");
+  }
+  return { rows: await repository.listLeaveTypePolicyRules(env, context.companyId) };
+};
+
+export const updateLeaveTypePolicyRule = async (
+  env: Env,
+  context: AuthActor,
+  id: string,
+  input: LeaveTypePolicyRuleUpdateInput,
+) => {
+  if (!permissionService.hasAnyPermission(context, ["leave.settings.manage", "leave_settings.manage", "leave_policy_rules.manage", "leave_policy_limits.edit"])) {
+    throw new PermissionError("You do not have permission to manage leave policy rules.");
+  }
+  const before = (await repository.listLeaveTypePolicyRules(env, context.companyId)).find((rule) => rule.id === id);
+  if (!before) throw new NotFoundError("Leave policy rule could not be found.");
+  const normalizedInput: LeaveTypePolicyRuleUpdateInput = {
+    ...input,
+    document_requirement: input.document_required_mode ?? input.document_requirement,
+    document_required_mode: input.document_required_mode ?? input.document_requirement,
+    document_after_days: input.document_required_after_consecutive_days ?? input.document_after_days,
+    document_required_after_consecutive_days: input.document_required_after_consecutive_days ?? input.document_after_days,
+    document_after_used_days: input.document_required_after_used_days ?? input.document_after_used_days,
+    document_required_after_used_days: input.document_required_after_used_days ?? input.document_after_used_days,
+    deduction_component_keys_json: input.deduction_pay_component_keys ?? input.deduction_component_keys_json,
+    deduction_pay_component_keys: input.deduction_pay_component_keys ?? input.deduction_component_keys_json,
+    updated_by: context.actorUserId,
+  };
+  await repository.updateLeaveTypePolicyRule(env, context.companyId, id, normalizedInput);
+  const after = (await repository.listLeaveTypePolicyRules(env, context.companyId)).find((rule) => rule.id === id);
+  await ensureAudit(env, context, {
+    action: "leave_policy_rule_updated",
+    entityType: "leave_type_policy_rule",
+    entityId: id,
+    oldValue: before,
+    newValue: after,
+    reason: input.reason,
+  });
+  return { updated: true, policy_rule: after };
+};
+
+export const resetLeaveTypePolicyRule = async (
+  env: Env,
+  context: AuthActor,
+  id: string,
+  input: { reason?: string | null },
+) => {
+  if (!permissionService.hasAnyPermission(context, ["leave.settings.manage", "leave_settings.manage", "leave_policy_rules.manage", "leave_policy_limits.edit"])) {
+    throw new PermissionError("You do not have permission to manage leave policy rules.");
+  }
+  const before = (await repository.listLeaveTypePolicyRules(env, context.companyId)).find((rule) => rule.id === id);
+  if (!before) throw new NotFoundError("Leave policy rule could not be found.");
+  const leaveType = await repository.findLeaveType(env, context.companyId, before.leave_type_id);
+  if (!leaveType) throw new NotFoundError("Leave type could not be found.");
+  const defaults = policyService.defaultPolicyRuleForLeaveType(leaveType);
+  const asBoolean = (value: boolean | number | null | undefined) => value === true || value === 1;
+  await repository.updateLeaveTypePolicyRule(env, context.companyId, id, {
+    annual_entitlement_days: defaults.annual_entitlement_days,
+    paid_status: defaults.paid_status as LeaveTypePolicyRuleUpdateInput["paid_status"],
+    paid_percentage: defaults.paid_percentage,
+    payroll_impact_enabled: asBoolean(defaults.payroll_impact_enabled),
+    document_requirement: defaults.document_requirement as LeaveTypePolicyRuleUpdateInput["document_requirement"],
+    document_required_mode: defaults.document_required_mode as LeaveTypePolicyRuleUpdateInput["document_required_mode"],
+    document_after_days: defaults.document_after_days,
+    document_required_after_consecutive_days: defaults.document_required_after_consecutive_days,
+    document_after_used_days: defaults.document_after_used_days,
+    document_required_after_used_days: defaults.document_required_after_used_days,
+    allow_no_document_until_used_days: defaults.allow_no_document_until_used_days,
+    require_document_for_backdated_request: asBoolean(defaults.require_document_for_backdated_request),
+    require_document_for_extension: asBoolean(defaults.require_document_for_extension),
+    approval_required: asBoolean(defaults.approval_required),
+    approval_workflow_key: defaults.approval_workflow_key,
+    salary_deduction_enabled: asBoolean(defaults.salary_deduction_enabled),
+    deduction_mode: defaults.deduction_mode,
+    deduction_component: defaults.deduction_component,
+    deduction_component_keys_json: defaults.deduction_component_keys_json,
+    deduction_pay_component_keys: defaults.deduction_pay_component_keys,
+    deduction_daily_rate_method: defaults.deduction_daily_rate_method,
+    deduction_custom_divisor: defaults.deduction_custom_divisor,
+    payroll_source_label: defaults.payroll_source_label,
+    allow_half_day: asBoolean(defaults.allow_half_day),
+    allow_carry_forward: asBoolean(defaults.allow_carry_forward),
+    carry_forward_limit_days: defaults.carry_forward_limit_days,
+    reset_period: defaults.reset_period,
+    count_weekends: asBoolean(defaults.count_weekends),
+    count_public_holidays: asBoolean(defaults.count_public_holidays),
+    notes: defaults.notes,
+    is_enabled: asBoolean(defaults.is_enabled),
+    updated_by: context.actorUserId,
+    reason: input.reason ?? "Reset leave policy rule to default.",
+  });
+  const after = (await repository.listLeaveTypePolicyRules(env, context.companyId)).find((rule) => rule.id === id);
+  await ensureAudit(env, context, {
+    action: "leave_policy_rule_reset_to_default",
+    entityType: "leave_type_policy_rule",
+    entityId: id,
+    oldValue: before,
+    newValue: after,
+    reason: input.reason,
+  });
+  return { reset: true, policy_rule: after };
+};
+
+export const previewLeavePolicy = async (env: Env, context: AuthActor, input: LeavePolicyPreviewInput) => {
+  await assertLeaveRequestSubjectAllowed(env, context, input.employee_id);
+  return { policy_preview: await policyService.evaluateLeavePolicy(env, context.companyId, input) };
+};
+
 export const getRequest = async (env: Env, context: AuthActor, id: string) => {
   const request = await repository.findRequest(env, context.companyId, id);
   if (!request) throw new NotFoundError("Leave request could not be found.");
@@ -1183,7 +1300,12 @@ export const createRequest = async (env: Env, context: AuthActor, input: LeaveRe
     !requiresApproval &&
     permissionService.isAdminOrSuperAdmin(context) &&
     permissionService.hasPermission(context, "leave.approve");
-  const status = canDirectApprove ? "direct_approved" : requiresApproval ? "pending_approval" : "approved";
+  const policyPreview = await policyService.evaluateLeavePolicy(env, context.companyId, {
+    ...input,
+    total_days: validated.totalDays,
+  });
+  const missingRequiredDocument = policyPreview.document_required && !hasSupportingDocument(input);
+  const status = missingRequiredDocument ? "pending_document" : canDirectApprove ? "direct_approved" : requiresApproval ? "pending_approval" : "approved";
   const id = createPrefixedId("leave_req");
   const timestamp = nowIso();
   const request: LeaveRequestRecord = {
@@ -1198,11 +1320,11 @@ export const createRequest = async (env: Env, context: AuthActor, input: LeaveRe
     status,
     created_by: context.actorUserId,
     approval_request_id: null,
-    approval_status: canDirectApprove || !requiresApproval ? "approved" : "pending",
+    approval_status: missingRequiredDocument ? "pending_document" : canDirectApprove || !requiresApproval ? "approved" : "pending",
     submitted_at: timestamp,
     submitted_by: context.actorUserId,
-    approved_at: canDirectApprove || !requiresApproval ? timestamp : null,
-    approved_by: canDirectApprove || !requiresApproval ? context.actorUserId : null,
+    approved_at: !missingRequiredDocument && (canDirectApprove || !requiresApproval) ? timestamp : null,
+    approved_by: !missingRequiredDocument && (canDirectApprove || !requiresApproval) ? context.actorUserId : null,
     rejected_at: null,
     rejected_by: null,
     cancelled_at: null,
@@ -1210,11 +1332,16 @@ export const createRequest = async (env: Env, context: AuthActor, input: LeaveRe
     withdrawn_at: null,
     withdrawn_by: null,
     decision_reason: null,
-    affects_payroll: validated.leaveType.affects_payroll,
+    affects_payroll: policyPreview.salary_deduction_required ? 1 : validated.leaveType.affects_payroll,
+    document_required: policyPreview.document_required ? 1 : 0,
+    document_status: policyPreview.document_required ? hasSupportingDocument(input) ? "submitted" : "missing" : "not_required",
+    document_required_reason: policyPreview.document_reason,
+    policy_rule_id: policyPreview.rule_id,
+    policy_snapshot_json: policySnapshotJson(policyPreview),
     created_at: timestamp,
     updated_at: timestamp,
   };
-  const engineApproval = requiresApproval ? await submitLeaveEngineApproval(env, context, request) : null;
+  const engineApproval = !missingRequiredDocument && requiresApproval ? await submitLeaveEngineApproval(env, context, request) : null;
   if (engineApproval) {
     Object.assign(request, leaveSnapshotFromEngine(engineApproval));
   }
@@ -1234,8 +1361,8 @@ export const createRequest = async (env: Env, context: AuthActor, input: LeaveRe
     newValue: request,
     reason: input.reason,
   });
-  await broadcast(env, context, requiresApproval ? "leave.request_submitted" : "leave.request_created", { id, employee_id: input.employee_id, status });
-  if (requiresApproval) {
+  await broadcast(env, context, !missingRequiredDocument && requiresApproval ? "leave.request_submitted" : "leave.request_created", { id, employee_id: input.employee_id, status });
+  if (!missingRequiredDocument && requiresApproval) {
     void notifyLeaveEvent(env, context, "leave_request_submitted", request, {
       title: "Leave request needs approval",
       message: "A leave request has been submitted and is waiting for review.",
@@ -1252,6 +1379,7 @@ export const createRequest = async (env: Env, context: AuthActor, input: LeaveRe
   }
   return {
     leave_request: await repository.findRequest(env, context.companyId, id),
+    policy_preview: policyPreview,
     long_leave_required: Boolean(longLeaveRecord),
     long_leave_record_id: longLeaveRecord?.id,
   };
@@ -1259,7 +1387,7 @@ export const createRequest = async (env: Env, context: AuthActor, input: LeaveRe
 
 export const updateRequest = async (env: Env, context: AuthActor, id: string, input: LeaveRequestUpdateInput) => {
   const existing = await getRequest(env, context, id);
-  if (!["pending", "pending_approval", "submitted", "partially_approved", "returned_for_more_info"].includes(existing.status)) {
+  if (!["pending", "pending_approval", "submitted", "partially_approved", "returned_for_more_info", "pending_document"].includes(existing.status)) {
     throw new ConflictError("Approved, rejected, or cancelled leave requests must use the proper action endpoint.");
   }
   const nextInput: LeaveRequestInput = {
@@ -1268,11 +1396,20 @@ export const updateRequest = async (env: Env, context: AuthActor, id: string, in
     start_date: input.start_date ?? existing.start_date,
     end_date: input.end_date ?? existing.end_date,
     reason: input.reason ?? existing.reason,
+    supporting_document_id: input.supporting_document_id,
+    supporting_document_attached: input.supporting_document_attached,
   };
   if ((input.start_date || input.end_date || input.leave_type_id) && !input.reason) {
     throw new ValidationError("A reason is required for this leave change.");
   }
   const validated = await validateRequestBusinessRules(env, context, nextInput, id);
+  const policyPreview = await policyService.evaluateLeavePolicy(env, context.companyId, {
+    ...nextInput,
+    total_days: validated.totalDays,
+    exclude_request_id: id,
+  });
+  const documentSubmitted = hasSupportingDocument(nextInput) || existing.document_status === "submitted" || existing.document_status === "approved";
+  const missingRequiredDocument = policyPreview.document_required && !documentSubmitted;
   const updatedRequest: LeaveRequestRecord = {
     ...existing,
     leave_type_id: nextInput.leave_type_id,
@@ -1280,28 +1417,37 @@ export const updateRequest = async (env: Env, context: AuthActor, id: string, in
     end_date: nextInput.end_date,
     total_days: validated.totalDays,
     reason: nextInput.reason ?? null,
-    affects_payroll: validated.leaveType.affects_payroll,
+    status: missingRequiredDocument ? "pending_document" : existing.status,
+    approval_status: missingRequiredDocument ? "pending_document" : existing.approval_status,
+    affects_payroll: policyPreview.salary_deduction_required ? 1 : validated.leaveType.affects_payroll,
+    document_required: policyPreview.document_required ? 1 : 0,
+    document_status: policyPreview.document_required ? documentSubmitted ? "submitted" : "missing" : "not_required",
+    document_required_reason: policyPreview.document_reason,
+    policy_rule_id: policyPreview.rule_id,
+    policy_snapshot_json: policySnapshotJson(policyPreview),
     updated_at: nowIso(),
   };
   const rebalanceEntries = await planPendingRequestUpdateRebalance(env, context, existing, updatedRequest, validated, input.reason ?? "Leave request updated.");
   const requestUpdate = {
+    status: updatedRequest.status,
+    approval_status: updatedRequest.approval_status,
     leave_type_id: nextInput.leave_type_id,
     start_date: nextInput.start_date,
     end_date: nextInput.end_date,
     total_days: validated.totalDays,
     reason: nextInput.reason ?? null,
-    affects_payroll: validated.leaveType.affects_payroll,
+    affects_payroll: policyPreview.salary_deduction_required ? 1 : validated.leaveType.affects_payroll,
+    document_required: updatedRequest.document_required,
+    document_status: updatedRequest.document_status,
+    document_required_reason: updatedRequest.document_required_reason,
+    policy_rule_id: updatedRequest.policy_rule_id,
+    policy_snapshot_json: updatedRequest.policy_snapshot_json,
   };
   if (rebalanceEntries.length > 0) {
     await repository.updatePendingLeaveRequestWithRebalance(env, context.companyId, id, requestUpdate, rebalanceEntries);
   } else {
     await repository.updateRequest(env, context.companyId, id, {
-      leave_type_id: nextInput.leave_type_id,
-      start_date: nextInput.start_date,
-      end_date: nextInput.end_date,
-      total_days: validated.totalDays,
-      reason: nextInput.reason ?? null,
-      affects_payroll: validated.leaveType.affects_payroll,
+      ...requestUpdate,
     });
   }
   const longLeaveRecord = await ensureLongLeaveForRequest(
@@ -1322,6 +1468,7 @@ export const updateRequest = async (env: Env, context: AuthActor, id: string, in
   });
   return {
     updated: true,
+    policy_preview: policyPreview,
     long_leave_required: Boolean(longLeaveRecord),
     long_leave_record_id: longLeaveRecord?.id,
   };
@@ -1347,7 +1494,7 @@ export const submitRequest = async (env: Env, context: AuthActor, id: string, in
       return { submitted: true, already_submitted: true, already_applied: true };
     }
   }
-  if (!["draft", "submitted", "returned_for_more_info"].includes(request.status)) {
+  if (!["draft", "submitted", "returned_for_more_info", "pending_document"].includes(request.status)) {
     throw new AppError("This leave request cannot be submitted.", "LEAVE_APPROVAL_INVALID_TRANSITION", 409);
   }
   const validated = await validateRequestBusinessRules(env, context, {
@@ -1357,6 +1504,33 @@ export const submitRequest = async (env: Env, context: AuthActor, id: string, in
     end_date: request.end_date,
     reason: request.reason,
   }, id);
+  const policyPreview = await policyService.evaluateLeavePolicy(env, context.companyId, {
+    employee_id: request.employee_id,
+    leave_type_id: request.leave_type_id,
+    start_date: request.start_date,
+    end_date: request.end_date,
+    reason: request.reason,
+    total_days: validated.totalDays,
+    exclude_request_id: id,
+  });
+  const documentSubmitted = request.document_status === "submitted" || request.document_status === "approved";
+  if (policyPreview.document_required && !documentSubmitted) {
+    await repository.updateRequest(env, context.companyId, id, {
+      status: "pending_document",
+      approval_status: "pending_document",
+      document_required: 1,
+      document_status: "missing",
+      document_required_reason: policyPreview.document_reason,
+      policy_rule_id: policyPreview.rule_id,
+      policy_snapshot_json: policySnapshotJson(policyPreview),
+      affects_payroll: policyPreview.salary_deduction_required ? 1 : validated.leaveType.affects_payroll,
+    });
+    throw new AppError(
+      "Supporting document is required for this leave request because it exceeds the configured policy threshold.",
+      "LEAVE_DOCUMENT_REQUIRED",
+      400,
+    );
+  }
   const requiresApproval = await settingsService.shouldRequireApproval(env, context.companyId, "leave_request", context);
   const submittedAt = nowIso();
   const nextRequest: LeaveRequestRecord = {
@@ -1369,7 +1543,12 @@ export const submitRequest = async (env: Env, context: AuthActor, id: string, in
     approved_at: requiresApproval ? request.approved_at ?? null : submittedAt,
     approved_by: requiresApproval ? request.approved_by ?? null : context.actorUserId,
     decision_reason: input.reason,
-    affects_payroll: validated.leaveType.affects_payroll,
+    affects_payroll: policyPreview.salary_deduction_required ? 1 : validated.leaveType.affects_payroll,
+    document_required: policyPreview.document_required ? 1 : 0,
+    document_status: policyPreview.document_required ? "submitted" : "not_required",
+    document_required_reason: policyPreview.document_reason,
+    policy_rule_id: policyPreview.rule_id,
+    policy_snapshot_json: policySnapshotJson(policyPreview),
     updated_at: submittedAt,
   };
   const engineApproval = requiresApproval ? await submitLeaveEngineApproval(env, context, nextRequest) : null;
@@ -1392,7 +1571,12 @@ export const submitRequest = async (env: Env, context: AuthActor, id: string, in
     approved_by: nextRequest.approved_by,
     decision_reason: input.reason,
     total_days: validated.totalDays,
-    affects_payroll: validated.leaveType.affects_payroll,
+    affects_payroll: policyPreview.salary_deduction_required ? 1 : validated.leaveType.affects_payroll,
+    document_required: nextRequest.document_required,
+    document_status: nextRequest.document_status,
+    document_required_reason: nextRequest.document_required_reason,
+    policy_rule_id: nextRequest.policy_rule_id,
+    policy_snapshot_json: nextRequest.policy_snapshot_json,
   };
   if (requiresApproval) {
     if (balanceEntry) {

@@ -54,6 +54,13 @@ export const listPayroll = async (c: Context<AppContext>) => {
   return paginated(result.rows, result.pagination, "Payroll runs loaded successfully.", { requestId: c.get("requestId") });
 };
 
+export const subFeatures = async (c: Context<AppContext>) =>
+  ok(
+    { subfeatures: await service.getPayrollSubFeatures(c.env, actor(c)) },
+    "Payroll sub-feature settings loaded successfully.",
+    { requestId: c.get("requestId") },
+  );
+
 export const getPayroll = async (c: Context<AppContext>) =>
   ok({ payroll_run: await service.getPayroll(c.env, actor(c), id(c)) }, "Payroll run loaded successfully.", { requestId: c.get("requestId") });
 

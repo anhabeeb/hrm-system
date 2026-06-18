@@ -72,6 +72,19 @@ export interface PayrollFilters {
   page_size?: number;
 }
 
+export interface PayrollSubFeatureVisibility {
+  salary_processing_enabled: boolean;
+  payslips_enabled: boolean;
+  advances_enabled: boolean;
+  salary_loans_enabled: boolean;
+  overtime_enabled: boolean;
+  benefits_enabled: boolean;
+  manual_deductions_enabled: boolean;
+  attendance_deductions_enabled: boolean;
+  long_leave_deductions_enabled: boolean;
+  approvals_enabled: boolean;
+}
+
 export interface PayrollCalculatePayload {
   payroll_month: string;
   outlet_id?: string;

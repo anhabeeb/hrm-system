@@ -380,6 +380,12 @@ export const leaveRequests = (env: Env, context: AuthActor, filters: HrReportFil
       COALESCE(l.approval_status, l.status) AS approval_status,
       COALESCE((SELECT s.step_name FROM leave_approval_steps s WHERE s.company_id = l.company_id AND s.leave_request_id = l.id AND s.status = 'pending' ORDER BY s.step_order, s.level LIMIT 1), 'complete') AS current_step,
       l.total_days AS balance_impact,
+      l.document_required,
+      l.document_status AS document_submitted,
+      l.document_required_reason,
+      CASE WHEN COALESCE(pr.salary_deduction_enabled, 0) = 1 OR pr.paid_status IN ('unpaid', 'partial_paid', 'partially_paid') OR COALESCE(pr.paid_percentage, 100) < 100 THEN 1 ELSE 0 END AS deductible,
+      COALESCE(pr.payroll_source_label, pr.deduction_component, 'leave_policy') AS deduction_source,
+      l.policy_rule_id AS policy_rule_used,
       substr(COALESCE(l.reason, l.decision_reason, ''), 1, 120) AS reason_summary,
       l.submitted_at,
       l.approved_at,
@@ -389,6 +395,7 @@ export const leaveRequests = (env: Env, context: AuthActor, filters: HrReportFil
     JOIN employees e ON e.company_id = l.company_id AND e.id = l.employee_id
     ${employeeJoins}
     LEFT JOIN leave_types lt ON lt.company_id = l.company_id AND lt.id = l.leave_type_id
+    LEFT JOIN leave_type_policy_rules pr ON pr.company_id = l.company_id AND pr.leave_type_id = l.leave_type_id AND pr.is_enabled = 1
     WHERE ${scope.sql} AND ${extra.join(" AND ")}
     ORDER BY l.start_date DESC, e.employee_code`, values, filters);
 };
@@ -414,13 +421,19 @@ export const longLeave = (env: Env, context: AuthActor, filters: HrReportFilters
     ORDER BY ll.start_date DESC`, values, filters);
 };
 
-export const assetsUniforms = (env: Env, context: AuthActor, filters: HrReportFilters) => {
+export const assetsUniforms = (
+  env: Env,
+  context: AuthActor,
+  filters: HrReportFilters,
+  options: { includeAssets?: boolean; includeUniforms?: boolean } = { includeAssets: true, includeUniforms: true },
+) => {
   const scope = employeeScope(context, filters);
   const status = filters.asset_status ? " AND assignment_status = ?" : "";
-  const values = [...scope.values, ...scope.values, ...(filters.asset_status ? [filters.asset_status] : [])];
+  const sections: string[] = [];
+  const values: unknown[] = [];
   const employeeSelect = `${employeeColumns}`;
-  return paginate(env, `SELECT * FROM (
-      SELECT ${employeeSelect},
+  if (options.includeAssets !== false) {
+    sections.push(`SELECT ${employeeSelect},
         'asset' AS assignment_type,
         COALESCE(a.asset_name, a.asset_code, aa.asset_id) AS item_name,
         aa.issued_date AS issue_date,
@@ -432,9 +445,11 @@ export const assetsUniforms = (env: Env, context: AuthActor, filters: HrReportFi
       JOIN employees e ON e.company_id = aa.company_id AND e.id = aa.employee_id
       ${employeeJoins}
       LEFT JOIN assets a ON a.company_id = aa.company_id AND a.id = aa.asset_id
-      WHERE ${scope.sql}
-      UNION ALL
-      SELECT ${employeeSelect},
+      WHERE ${scope.sql}`);
+    values.push(...scope.values);
+  }
+  if (options.includeUniforms !== false) {
+    sections.push(`SELECT ${employeeSelect},
         'uniform' AS assignment_type,
         ui.uniform_type AS item_name,
         ui.issued_date AS issue_date,
@@ -445,7 +460,29 @@ export const assetsUniforms = (env: Env, context: AuthActor, filters: HrReportFi
       FROM uniform_issues ui
       JOIN employees e ON e.company_id = ui.company_id AND e.id = ui.employee_id
       ${employeeJoins}
-      WHERE ${scope.sql}
+      WHERE ${scope.sql}`);
+    values.push(...scope.values);
+  }
+  if (sections.length === 0) {
+    return paginate(env, `SELECT * FROM (
+      SELECT ${employeeSelect},
+        'disabled' AS assignment_type,
+        NULL AS item_name,
+        NULL AS issue_date,
+        NULL AS due_return_date,
+        NULL AS condition_status,
+        NULL AS assignment_status,
+        0 AS overdue_return
+      FROM employees e
+      ${employeeJoins}
+      WHERE 1 = 0
+    ) assignments
+    WHERE 1 = 1${status}
+    ORDER BY issue_date DESC`, filters.asset_status ? [filters.asset_status] : [], filters);
+  }
+  values.push(...(filters.asset_status ? [filters.asset_status] : []));
+  return paginate(env, `SELECT * FROM (
+      ${sections.join("\nUNION ALL\n")}
     ) assignments
     WHERE 1 = 1${status}
     ORDER BY issue_date DESC`, values, filters);

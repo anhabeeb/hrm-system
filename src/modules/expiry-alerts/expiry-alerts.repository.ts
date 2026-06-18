@@ -320,6 +320,13 @@ const buildAlertWhere = (
   if (filters.source_type) {
     clauses.push("source_type = ?");
     values.push(filters.source_type);
+  } else if (filters.source_types) {
+    if (filters.source_types.length === 0) {
+      clauses.push("1 = 0");
+    } else {
+      clauses.push(`source_type IN (${filters.source_types.map(() => "?").join(", ")})`);
+      values.push(...filters.source_types);
+    }
   }
   if (filters.employee_id) {
     clauses.push("employee_id = ?");
@@ -561,8 +568,9 @@ export const summary = async (
   outletIds: string[],
   isSuperAdmin: boolean,
   employeeIdScope?: string | null,
+  sourceTypes?: string[],
 ) => {
-  const built = buildAlertWhere(companyId, { page: 1, page_size: 1 }, outletIds, isSuperAdmin, employeeIdScope);
+  const built = buildAlertWhere(companyId, { page: 1, page_size: 1, source_types: sourceTypes }, outletIds, isSuperAdmin, employeeIdScope);
   return one<Record<string, number>>(
     env,
     `SELECT
@@ -586,8 +594,9 @@ export const sourceSummary = async (
   outletIds: string[],
   isSuperAdmin: boolean,
   employeeIdScope?: string | null,
+  sourceTypes?: string[],
 ) => {
-  const built = buildAlertWhere(companyId, { page: 1, page_size: 1 }, outletIds, isSuperAdmin, employeeIdScope);
+  const built = buildAlertWhere(companyId, { page: 1, page_size: 1, source_types: sourceTypes }, outletIds, isSuperAdmin, employeeIdScope);
   return many<{ source_type: string; total: number }>(
     env,
     `SELECT source_type, COUNT(*) AS total

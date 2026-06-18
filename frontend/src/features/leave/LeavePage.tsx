@@ -27,9 +27,10 @@ import { LeaveRequestDetailDrawer } from "./LeaveRequestDetailDrawer";
 import { LeaveRequestForm } from "./LeaveRequestForm";
 import { LeaveRequestsTable } from "./LeaveRequestsTable";
 import { LeaveTransactionsDialog } from "./LeaveTransactionsDialog";
+import { LeavePolicyRuleDialog } from "./LeavePolicyRuleDialog";
 import { LeaveTypesPanel } from "./LeaveTypesPanel";
 import { LeaveTypeSettingsDialog } from "./LeaveTypeSettingsDialog";
-import type { LeaveAccrualPayload, LeaveAccrualRow, LeaveBalance, LeaveFilters as LeaveFilterValues, LeaveRequest, LeaveRequestPayload, LeaveType, LeaveTypeUpdatePayload } from "./leave.types";
+import type { LeaveAccrualPayload, LeaveAccrualRow, LeaveBalance, LeaveFilters as LeaveFilterValues, LeaveRequest, LeaveRequestPayload, LeaveType, LeaveTypePolicyRule, LeaveTypePolicyRuleUpdatePayload, LeaveTypeUpdatePayload } from "./leave.types";
 
 export const LeavePage = () => {
   const auth = useAuth();
@@ -44,6 +45,8 @@ export const LeavePage = () => {
   const [actionBalance, setActionBalance] = useState<LeaveBalance | null>(null);
   const [transactionBalance, setTransactionBalance] = useState<LeaveBalance | null>(null);
   const [selectedLeaveType, setSelectedLeaveType] = useState<LeaveType | null>(null);
+  const [selectedPolicyRule, setSelectedPolicyRule] = useState<LeaveTypePolicyRule | null>(null);
+  const [resetPolicyRule, setResetPolicyRule] = useState<LeaveTypePolicyRule | null>(null);
   const [accrualRows, setAccrualRows] = useState<LeaveAccrualRow[]>([]);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
@@ -84,6 +87,7 @@ export const LeavePage = () => {
   const balancesQuery = useQuery({ queryKey: ["leave", "balances", filters], queryFn: () => leaveApi.listBalances(filters) });
   const typesQuery = useQuery({ queryKey: ["leave", "types", filters], queryFn: () => leaveApi.listTypes({ page_size: 100 }) });
   const policiesQuery = useQuery({ queryKey: ["leave", "policies", filters], queryFn: () => leaveApi.listPolicies({ page_size: 100 }) });
+  const policyRulesQuery = useQuery({ queryKey: ["leave", "policy-rules"], queryFn: leaveApi.listPolicyRules });
   const calendarQuery = useQuery({ queryKey: ["leave", "calendar", filters], queryFn: () => leaveApi.calendar(filters), retry: false });
   const transactionsQuery = useQuery({
     queryKey: ["leave", "transactions", transactionBalance?.employee_id, transactionBalance?.leave_type_id, transactionBalance?.year],
@@ -181,6 +185,22 @@ export const LeavePage = () => {
       await refresh();
     },
   });
+  const updatePolicyRuleMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: LeaveTypePolicyRuleUpdatePayload }) => leaveApi.updatePolicyRule(id, payload),
+    onSuccess: async () => {
+      setSuccessMessage("Leave policy rule updated.");
+      setSelectedPolicyRule(null);
+      await refresh();
+    },
+  });
+  const resetPolicyRuleMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) => leaveApi.resetPolicyRule(id, reason),
+    onSuccess: async () => {
+      setSuccessMessage("Leave policy rule reset to default.");
+      setResetPolicyRule(null);
+      await refresh();
+    },
+  });
   const delegateMutation = useMutation({
     mutationFn: ({ id, delegated_to, reason }: { id: string; delegated_to: string; reason: string }) => leaveApi.delegateRequest(id, { delegated_to, reason }),
     onSuccess: async () => {
@@ -200,13 +220,13 @@ export const LeavePage = () => {
   const canEscalate = auth.hasAnyPermission(["leave.approvals.escalate", "leave.approvals.override"]);
   const canAdjust = auth.hasAnyPermission(["leave.balances.adjust", "leave.manage_balances", "leave_policy_override.manage"]);
   const canApplyAccrual = auth.hasAnyPermission(["leave.accrual.apply", "leave.balances.manage", "leave.manage_balances"]);
-  const canManageLeaveTypes = auth.hasAnyPermission(["leave_settings.manage", "leave_policy_limits.edit", "leave_types.enable_disable"]);
+  const canManageLeaveTypes = auth.hasAnyPermission(["leave_settings.manage", "leave.settings.manage", "leave_policy_limits.edit", "leave_policy_rules.manage", "leave_types.enable_disable"]);
   const canManageApprovalSettings = auth.hasAnyPermission(["leave.approvals.settings.manage", "approval_workflows.manage", "leave_settings.manage"]);
   const canViewApprovalInbox = auth.hasAnyPermission(["leave.approvals.view", "leave.approvals.approve", "leave.approve", "approvals.requests.view", "approvals.view"]);
   const canViewBalances = auth.hasAnyPermission(["leave.balances.view", "leave.manage_balances", "leave.view"]);
   const canViewLeaveCalendar = auth.hasAnyPermission(["leave.view", "leave.approvals.view"]);
   const canViewRosterConflictReview = auth.hasFeature("roster") && auth.hasAnyPermission(["rosters.view", "roster.view", "rosters.manage", "rosters.weeklyMatrix.view", "rosters.weeklyMatrix.viewTeam"]);
-  const actionError = createMutation.error ?? actionMutation.error ?? delegateMutation.error ?? adjustMutation.error ?? balanceActionMutation.error ?? previewAccrualMutation.error ?? applyAccrualMutation.error ?? updateTypeMutation.error;
+  const actionError = createMutation.error ?? actionMutation.error ?? delegateMutation.error ?? adjustMutation.error ?? balanceActionMutation.error ?? previewAccrualMutation.error ?? applyAccrualMutation.error ?? updateTypeMutation.error ?? updatePolicyRuleMutation.error ?? resetPolicyRuleMutation.error;
   const requestRows = requestsQuery.data?.data ?? [];
   const approvalRows = approvalInboxQuery.data?.data ?? [];
   const balanceRows = balancesQuery.data?.data ?? [];
@@ -278,7 +298,7 @@ export const LeavePage = () => {
           <TabsContent value="balances"><LeaveBalancesTable rows={balancesQuery.data?.data ?? []} loading={balancesQuery.isLoading} pagination={balancesQuery.data?.pagination} canAdjust={canAdjust} onAdjust={setSelectedBalance} onOpening={openBalanceAction("opening")} onCarryForward={openBalanceAction("carry_forward")} onExpire={openBalanceAction("expiry")} onRebuild={openBalanceAction("rebuild")} onTransactions={setTransactionBalance} onPageChange={(page) => updateFilters({ page })} onPageSizeChange={(page_size) => updateFilters({ page: 1, page_size })} /></TabsContent>
           <TabsContent value="accrual"><LeaveAccrualPanel rows={accrualRows} loading={previewAccrualMutation.isPending} applying={applyAccrualMutation.isPending} error={actionError ? friendlyHrmError(actionError, "Leave accrual could not be completed.", "leave") : null} success={successMessage} canApply={canApplyAccrual} onPreview={(payload) => previewAccrualMutation.mutate(payload)} onApply={(payload) => applyAccrualMutation.mutate(payload)} /></TabsContent>
           <TabsContent value="calendar"><LeaveCalendarPlaceholder rows={calendarQuery.data?.data.calendar} /></TabsContent>
-          <TabsContent value="types"><LeaveTypesPanel types={typesQuery.data?.data ?? []} policies={policiesQuery.data?.data ?? []} loading={typesQuery.isLoading || policiesQuery.isLoading} canManage={canManageLeaveTypes} onEditType={setSelectedLeaveType} /></TabsContent>
+          <TabsContent value="types"><LeaveTypesPanel types={typesQuery.data?.data ?? []} policies={policiesQuery.data?.data ?? []} policyRules={policyRulesQuery.data?.data.policy_rules ?? []} loading={typesQuery.isLoading || policiesQuery.isLoading || policyRulesQuery.isLoading} canManage={canManageLeaveTypes} onEditType={setSelectedLeaveType} onEditPolicyRule={setSelectedPolicyRule} onResetPolicyRule={setResetPolicyRule} /></TabsContent>
           <TabsContent value="approval-settings"><LeaveApprovalSettingsPanel canManage={canManageApprovalSettings} /></TabsContent>
         </Tabs>
       </div>
@@ -299,6 +319,8 @@ export const LeavePage = () => {
       <LeaveBalanceAdjustmentDialog balance={selectedBalance} loading={adjustMutation.isPending} error={adjustMutation.error ? friendlyHrmError(adjustMutation.error, "Leave balance could not be adjusted.", "leave") : null} onOpenChange={(open) => !open && setSelectedBalance(null)} onSubmit={(employeeId, payload) => adjustMutation.mutate({ employeeId, payload })} />
       <LeaveBalanceActionDialog action={balanceAction} balance={actionBalance} loading={balanceActionMutation.isPending} error={balanceActionMutation.error ? friendlyHrmError(balanceActionMutation.error, "Leave balance action could not be completed.", "leave") : null} onOpenChange={(open) => { if (!open) { setBalanceAction(null); setActionBalance(null); } }} onSubmit={(payload) => actionBalance && balanceActionMutation.mutate({ balance: actionBalance, action: balanceAction!, ...payload })} />
       <LeaveTypeSettingsDialog leaveType={selectedLeaveType} loading={updateTypeMutation.isPending} error={updateTypeMutation.error ? friendlyHrmError(updateTypeMutation.error, "Leave type settings could not be updated.", "leave") : null} onOpenChange={(open) => !open && setSelectedLeaveType(null)} onSubmit={(id, payload) => updateTypeMutation.mutate({ id, payload })} />
+      <LeavePolicyRuleDialog rule={selectedPolicyRule} loading={updatePolicyRuleMutation.isPending} error={updatePolicyRuleMutation.error ? friendlyHrmError(updatePolicyRuleMutation.error, "Leave policy rule could not be updated.", "leave") : null} onOpenChange={(open) => !open && setSelectedPolicyRule(null)} onSubmit={(id, payload) => updatePolicyRuleMutation.mutate({ id, payload })} />
+      <ReasonDialog open={Boolean(resetPolicyRule)} title="Reset leave policy rule" description={`Reset ${resetPolicyRule?.leave_type_name ?? "this leave type"} to its system default policy. Existing leave requests and payroll records will not be changed.`} confirmLabel="Reset to default" loading={resetPolicyRuleMutation.isPending} error={resetPolicyRuleMutation.error ? friendlyHrmError(resetPolicyRuleMutation.error, "Leave policy rule could not be reset.", "leave") : null} onOpenChange={(open) => !open && setResetPolicyRule(null)} onSubmit={(reason) => resetPolicyRule && resetPolicyRuleMutation.mutate({ id: resetPolicyRule.id, reason })} />
       <LeaveTransactionsDialog balance={transactionBalance} rows={transactionsQuery.data?.data ?? []} loading={transactionsQuery.isLoading} open={Boolean(transactionBalance)} onOpenChange={(open) => !open && setTransactionBalance(null)} />
     </div>
   );

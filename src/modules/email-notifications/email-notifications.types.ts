@@ -94,6 +94,7 @@ export interface EmailSettingsInput {
 export interface EmailListFilters {
   status?: string;
   category?: string;
+  categories?: string[];
   priority?: string;
   notification_type?: string;
   recipient_user_id?: string;

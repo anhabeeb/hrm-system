@@ -1438,6 +1438,10 @@ export const getEmployeeProfileAttendance = async (
   limit?: number,
 ) => {
   requireProfilePermission(context, ["attendance.view", "attendance.reports.view", "dashboard.attendance.view"], "You do not have permission to view employee attendance.");
+  const attendanceEnabled = await settingsService.isFeatureEnabled(env, context.companyId, "attendance", context);
+  if (!attendanceEnabled) {
+    throw new AppError("Attendance Management is disabled. Enable it in Settings to use this module.", "ATTENDANCE_MANAGEMENT_DISABLED", 403);
+  }
   await ensureEmployeeAccess(env, context, employeeId);
   const safeLimit = profileLimit(limit);
   const [summary, recent_rows, source_summary] = await Promise.all([
@@ -1519,6 +1523,10 @@ export const getEmployeeProfileDocuments = async (
   limit?: number,
 ) => {
   requireProfilePermission(context, ["documents.view"], "You do not have permission to view employee documents.");
+  const documentsEnabled = await settingsService.isFeatureEnabled(env, context.companyId, "documents", context);
+  if (!documentsEnabled) {
+    throw new AppError("Document Tracking is disabled. Enable it in Settings to use this module.", "DOCUMENT_TRACKING_DISABLED", 403);
+  }
   await ensureEmployeeAccess(env, context, employeeId);
   const includeSensitive = permissionService.hasPermission(context, "documents.view_sensitive");
   const rows = await employeesRepository.profileDocuments(env, context.companyId, employeeId, profileLimit(limit));
@@ -1537,6 +1545,10 @@ export const getEmployeeProfileContracts = async (
   limit?: number,
 ) => {
   requireProfilePermission(context, ["employees.contracts.view", "contracts.view", "employees.view"], "You do not have permission to view employee contracts.");
+  const contractTrackingEnabled = await settingsService.isFeatureEnabled(env, context.companyId, "contract_tracking", context);
+  if (!contractTrackingEnabled) {
+    throw new AppError("Contract Tracking is disabled. Enable it in Settings to use this module.", "CONTRACT_TRACKING_DISABLED", 403);
+  }
   await ensureEmployeeAccess(env, context, employeeId);
   const contracts = await employeesRepository.profileContracts(env, context.companyId, employeeId, profileLimit(limit));
   return {
@@ -1579,6 +1591,16 @@ export const getEmployeeProfilePayrollReadiness = async (
   limit?: number,
 ) => {
   requireProfilePermission(context, ["payroll.view", "salary.view", "employees.salary.view", "dashboard.payroll_readiness.view"], "You do not have permission to view payroll readiness for this employee.");
+  const [payrollEnabled, salaryProcessingEnabled] = await Promise.all([
+    settingsService.isFeatureEnabled(env, context.companyId, "payroll", context),
+    settingsService.isPayrollSubFeatureEnabled(env, context.companyId, "payroll.salary_processing_enabled"),
+  ]);
+  if (!payrollEnabled) {
+    throw new AppError("Payroll Management is disabled. Enable it in Settings to use this module.", "PAYROLL_MANAGEMENT_DISABLED", 403);
+  }
+  if (!salaryProcessingEnabled) {
+    throw new AppError("Salary Processing is disabled. Enable it in Payroll Settings to use this section.", "PAYROLL_SALARY_PROCESSING_DISABLED", 403);
+  }
   await ensureEmployeeAccess(env, context, employeeId);
   const safeLimit = profileLimit(limit);
   const [salary, attendance, long_leave_impacts, leave] = await Promise.all([
@@ -1624,12 +1646,17 @@ export const getEmployeeProfileTimeline = async (
   requireProfilePermission(context, ["employees.view", "audit_logs.view"], "You do not have permission to view employee history.");
   await ensureEmployeeAccess(env, context, employeeId);
   const safeLimit = profileLimit(limit);
+  const [leaveEnabled, longLeaveEnabled, documentsEnabled] = await Promise.all([
+    settingsService.isFeatureEnabled(env, context.companyId, "leave_management", context).catch(() => false),
+    settingsService.isFeatureEnabled(env, context.companyId, "long_leave_management", context).catch(() => false),
+    settingsService.isFeatureEnabled(env, context.companyId, "documents", context).catch(() => false),
+  ]);
   const [statusHistory, jobHistory, leaveRequests, longLeave, documents, auditEvents] = await Promise.all([
     employeesRepository.profileStatusHistory(env, context.companyId, employeeId, safeLimit),
     employeesRepository.profileJobHistory(env, context.companyId, employeeId, safeLimit),
-    employeesRepository.profileLeaveRequests(env, context.companyId, employeeId, 10),
-    employeesRepository.profileLongLeave(env, context.companyId, employeeId, 10),
-    permissionService.hasPermission(context, "documents.view")
+    leaveEnabled ? employeesRepository.profileLeaveRequests(env, context.companyId, employeeId, 10) : Promise.resolve([]),
+    longLeaveEnabled ? employeesRepository.profileLongLeave(env, context.companyId, employeeId, 10) : Promise.resolve([]),
+    documentsEnabled && permissionService.hasPermission(context, "documents.view")
       ? employeesRepository.profileDocuments(env, context.companyId, employeeId, 10)
       : Promise.resolve([]),
     permissionService.hasPermission(context, "audit_logs.view")
@@ -1661,25 +1688,28 @@ export const getEmployeeProfile = async (
       return await fn();
     } catch (error) {
       if (error instanceof PermissionError) return null;
-      if (error instanceof AppError && ["ATTENDANCE_MANAGEMENT_DISABLED", "LEAVE_MANAGEMENT_DISABLED", "LONG_LEAVE_MANAGEMENT_DISABLED", "CONTRACT_TRACKING_DISABLED", "FEATURE_DISABLED"].includes(error.code)) return null;
+      if (error instanceof AppError && ["ATTENDANCE_MANAGEMENT_DISABLED", "LEAVE_MANAGEMENT_DISABLED", "LONG_LEAVE_MANAGEMENT_DISABLED", "DOCUMENT_TRACKING_DISABLED", "CONTRACT_TRACKING_DISABLED", "PAYROLL_MANAGEMENT_DISABLED", "PAYROLL_SALARY_PROCESSING_DISABLED", "FEATURE_DISABLED"].includes(error.code)) return null;
       throw error;
     }
   };
-  const attendanceEnabled = await settingsService
-    .isFeatureEnabled(env, context.companyId, "attendance", context)
-    .catch(() => false);
-  const contractTrackingEnabled = await settingsService
-    .isFeatureEnabled(env, context.companyId, "contract_tracking", context)
-    .catch(() => false);
+  const [attendanceEnabled, leaveEnabled, longLeaveEnabled, documentsEnabled, contractTrackingEnabled, payrollEnabled, salaryProcessingEnabled] = await Promise.all([
+    settingsService.isFeatureEnabled(env, context.companyId, "attendance", context).catch(() => false),
+    settingsService.isFeatureEnabled(env, context.companyId, "leave_management", context).catch(() => false),
+    settingsService.isFeatureEnabled(env, context.companyId, "long_leave_management", context).catch(() => false),
+    settingsService.isFeatureEnabled(env, context.companyId, "documents", context).catch(() => false),
+    settingsService.isFeatureEnabled(env, context.companyId, "contract_tracking", context).catch(() => false),
+    settingsService.isFeatureEnabled(env, context.companyId, "payroll", context).catch(() => false),
+    settingsService.isPayrollSubFeatureEnabled(env, context.companyId, "payroll.salary_processing_enabled").catch(() => false),
+  ]);
 
   const [attendance, leave, long_leave, documents, contracts, assets, payroll_readiness, alerts, timeline] = await Promise.all([
     attendanceEnabled ? section(() => getEmployeeProfileAttendance(env, context, employeeId, limit)) : Promise.resolve(null),
-    section(() => getEmployeeProfileLeave(env, context, employeeId, limit)),
-    section(() => getEmployeeProfileLongLeave(env, context, employeeId, limit)),
-    section(() => getEmployeeProfileDocuments(env, context, employeeId, limit)),
+    leaveEnabled ? section(() => getEmployeeProfileLeave(env, context, employeeId, limit)) : Promise.resolve(null),
+    longLeaveEnabled ? section(() => getEmployeeProfileLongLeave(env, context, employeeId, limit)) : Promise.resolve(null),
+    documentsEnabled ? section(() => getEmployeeProfileDocuments(env, context, employeeId, limit)) : Promise.resolve(null),
     contractTrackingEnabled ? section(() => getEmployeeProfileContracts(env, context, employeeId, limit)) : Promise.resolve(null),
     section(() => getEmployeeProfileAssets(env, context, employeeId, limit)),
-    section(() => getEmployeeProfilePayrollReadiness(env, context, employeeId, limit)),
+    payrollEnabled && salaryProcessingEnabled ? section(() => getEmployeeProfilePayrollReadiness(env, context, employeeId, limit)) : Promise.resolve(null),
     section(() => getEmployeeProfileAlerts(env, context, employeeId, limit)),
     section(() => getEmployeeProfileTimeline(env, context, employeeId, limit)),
   ]);

@@ -13,9 +13,12 @@ import type {
   LeaveDelegatePayload,
   LeaveOpeningBalancePayload,
   LeavePolicy,
+  LeavePolicyPreview,
   LeaveRequest,
   LeaveRequestPayload,
   LeaveType,
+  LeaveTypePolicyRule,
+  LeaveTypePolicyRuleUpdatePayload,
   LeaveTypeUpdatePayload,
 } from "./leave.types";
 
@@ -27,6 +30,7 @@ export const leaveApi = {
   getTimeline: (id: string) => api.get<LeaveApprovalDetail>(`/leave/requests/${id}/timeline`),
   getRequest: (id: string) => api.get<{ leave_request: LeaveRequest }>(`/leave/requests/${id}`),
   createRequest: (payload: LeaveRequestPayload) => api.post<{ leave_request?: LeaveRequest; long_leave_required?: boolean }>("/leave/requests", payload),
+  previewPolicy: (payload: LeaveRequestPayload) => api.post<{ policy_preview: LeavePolicyPreview }>("/leave/policy-preview", payload),
   updateRequest: (id: string, payload: Partial<LeaveRequestPayload>) => api.patch<{ leave_request?: LeaveRequest }>(`/leave/requests/${id}`, payload),
   approveRequest: (id: string, reason: string) => api.post<{ approved: boolean }>(`/leave/requests/${id}/approve`, { reason }),
   rejectRequest: (id: string, reason: string) => api.post<{ rejected: boolean }>(`/leave/requests/${id}/reject`, { reason }),
@@ -46,5 +50,8 @@ export const leaveApi = {
   listTypes: (filters: LeaveFilters = {}) => api.get<LeaveType[]>(`/leave/types${buildQueryString(filters)}`),
   updateType: (id: string, payload: LeaveTypeUpdatePayload) => api.patch<{ updated: boolean }>(`/leave/types/${id}`, payload),
   listPolicies: (filters: LeaveFilters = {}) => api.get<LeavePolicy[]>(`/leave/policies${buildQueryString(filters)}`),
+  listPolicyRules: () => api.get<{ policy_rules: LeaveTypePolicyRule[] }>("/leave/policy-rules"),
+  updatePolicyRule: (id: string, payload: LeaveTypePolicyRuleUpdatePayload) => api.patch<{ updated: boolean; policy_rule?: LeaveTypePolicyRule }>(`/leave/policy-rules/${id}`, payload),
+  resetPolicyRule: (id: string, reason: string) => api.post<{ reset: boolean; policy_rule?: LeaveTypePolicyRule }>(`/leave/policy-rules/${id}/reset-default`, { reason }),
   calendar: (filters: LeaveFilters = {}) => api.get<{ calendar: LeaveRequest[] }>(`/leave/calendar${buildQueryString(filters)}`),
 };

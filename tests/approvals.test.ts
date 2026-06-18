@@ -94,6 +94,19 @@ describe("approval validators and guards", () => {
       target_update_note: "The approval was recorded. The target module must apply the approved change.",
     });
   });
+
+  it("keeps legacy approval queues and actions module-aware", () => {
+    const service = readFileSync(resolve(process.cwd(), "src/modules/approvals/approvals.service.ts"), "utf8");
+    const moduleAccess = readFileSync(resolve(process.cwd(), "src/modules/approvals/approval-module-access.service.ts"), "utf8");
+
+    expect(moduleAccess).toContain("resolveApprovalOperationTypeForLegacyApproval");
+    expect(service).toContain("legacyApprovalOperationType");
+    expect(service).toContain("legacyModuleState");
+    expect(service).toContain("assertLegacyApprovalModuleEnabled");
+    expect(service).toContain("!moduleState.enabled && isActiveApprovalStatus(effectiveRow.status)");
+    expect(service).toContain("module_enabled: moduleState.enabled");
+    expect(service).toContain("read_only: !moduleState.enabled && isActiveApprovalStatus(request.status)");
+  });
 });
 
 

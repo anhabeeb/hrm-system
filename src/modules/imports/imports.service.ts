@@ -95,6 +95,24 @@ const assertAttendanceImportEnabled = async (env: Env, actor: AuthActor) => {
   }
 };
 
+const assertPayrollImportEnabled = async (env: Env, actor: AuthActor, subFeature?: settingsService.PayrollSubFeatureKey) => {
+  const enabled = await settingsService.isFeatureEnabled(env, actor.companyId, "payroll", actor);
+  if (!enabled) {
+    throw new AppError(
+      "Payroll Management is disabled. Enable it in Settings to use this module.",
+      "PAYROLL_MANAGEMENT_DISABLED",
+      403,
+    );
+  }
+  if (subFeature && !(await settingsService.isPayrollSubFeatureEnabled(env, actor.companyId, subFeature))) {
+    throw new AppError(
+      "This payroll import template is disabled in Payroll Settings.",
+      "PAYROLL_IMPORT_SUBFEATURE_DISABLED",
+      403,
+    );
+  }
+};
+
 const ensureOutletScope = (actor: AuthActor, outletId?: string | null) => {
   if (!outletId || actor.isAdmin || actor.isSuperAdmin || actor.outletIds.length === 0) return;
   if (!actor.outletIds.includes(outletId)) throw new PermissionError("You cannot import rows for an outlet outside your scope.", "IMPORT_PERMISSION_DENIED");
@@ -127,6 +145,17 @@ const templateFeatureEnabled = async (env: Env, actor: AuthActor, template: Impo
       settingsService.isFeatureEnabled(env, actor.companyId, "uniform_tracking", actor),
     ]);
     return assetsEnabled && uniformsEnabled;
+  }
+  if (template.import_type === "salary_compensation") {
+    return settingsService.isFeatureEnabled(env, actor.companyId, "payroll", actor);
+  }
+  if (template.import_type === "advances_loans") {
+    const [payrollEnabled, advancesEnabled, loansEnabled] = await Promise.all([
+      settingsService.isFeatureEnabled(env, actor.companyId, "payroll", actor),
+      settingsService.isPayrollSubFeatureEnabled(env, actor.companyId, "payroll.advances_enabled"),
+      settingsService.isPayrollSubFeatureEnabled(env, actor.companyId, "payroll.salary_loans_enabled"),
+    ]);
+    return payrollEnabled && (advancesEnabled || loansEnabled);
   }
   return true;
 };
@@ -356,6 +385,8 @@ export const previewImport = async (env: Env, actor: AuthActor, input: ImportPre
   if (template.import_type === "attendance") await assertAttendanceImportEnabled(env, actor);
   if (template.import_type === "leave_balances") await assertLeaveImportEnabled(env, actor);
   if (template.import_type === "assets_uniforms") await assertAssetsUniformsImportEnabled(env, actor);
+  if (template.import_type === "salary_compensation") await assertPayrollImportEnabled(env, actor, "payroll.salary_processing_enabled");
+  if (template.import_type === "advances_loans") await assertPayrollImportEnabled(env, actor);
   requireImportAccess(actor, template, "preview");
   const rows = await buildRows(env, actor, template, input.mode, input.csv_content, "preview_only");
   const now = nowIso();
@@ -404,6 +435,8 @@ export const createImportJob = async (env: Env, actor: AuthActor, input: ImportJ
   if (template.import_type === "attendance") await assertAttendanceImportEnabled(env, actor);
   if (template.import_type === "leave_balances") await assertLeaveImportEnabled(env, actor);
   if (template.import_type === "assets_uniforms") await assertAssetsUniformsImportEnabled(env, actor);
+  if (template.import_type === "salary_compensation") await assertPayrollImportEnabled(env, actor, "payroll.salary_processing_enabled");
+  if (template.import_type === "advances_loans") await assertPayrollImportEnabled(env, actor);
   requireImportAccess(actor, template, "upload");
   if (!template.supported_modes.includes(input.mode)) throw new AppError("This import mode is not supported for the selected template.", "IMPORT_JOB_INVALID_STATUS", 400);
   const idempotencyKey = input.idempotency_key ?? `${actor.actorUserId}:${input.import_type}:${input.mode}:${input.file_name ?? "csv"}:${input.csv_content.length}`;
@@ -566,6 +599,7 @@ const applyRow = async (env: Env, actor: AuthActor, job: ImportJob, row: ImportJ
     return { status: "created" as const, targetType: "holiday", targetId };
   }
   if (job.import_type === "advances_loans") {
+    await assertPayrollImportEnabled(env, actor, data.record_type === "loan" ? "payroll.salary_loans_enabled" : "payroll.advances_enabled");
     const targetId = stableTargetId(data.record_type === "loan" ? "loan" : "advance", row);
     if (data.record_type === "loan") await repository.insertLoan(env, { id: targetId, companyId: actor.companyId, employeeId: data.employee_id, amount: amountMinor(data.amount), installment: amountMinor(data.installment_amount || data.amount), startMonth: data.payroll_month || data.date.slice(0, 7), status: data.status || "pending", actorId: actor.actorUserId, now });
     else await repository.insertAdvance(env, { id: targetId, companyId: actor.companyId, employeeId: data.employee_id, amount: amountMinor(data.amount), paidDate: data.date, deductionMonth: data.payroll_month || data.date.slice(0, 7), status: data.status || "pending", reason: data.reason, actorId: actor.actorUserId, now });
@@ -588,6 +622,8 @@ export const applyImportJob = async (env: Env, actor: AuthActor, id: string) => 
   if (job.import_type === "attendance") await assertAttendanceImportEnabled(env, actor);
   if (job.import_type === "leave_balances") await assertLeaveImportEnabled(env, actor);
   if (job.import_type === "assets_uniforms") await assertAssetsUniformsImportEnabled(env, actor);
+  if (job.import_type === "salary_compensation") await assertPayrollImportEnabled(env, actor, "payroll.salary_processing_enabled");
+  if (job.import_type === "advances_loans") await assertPayrollImportEnabled(env, actor);
   if (job.status === "completed") return { job: safeJob(job), summary: { created_rows: job.created_rows, updated_rows: job.updated_rows, skipped_rows: job.skipped_rows, failed_rows: job.failed_rows }, already_applied: true };
   if (!["preview_ready", "partially_completed"].includes(job.status)) throw new AppError("Only preview-ready imports can be applied.", "IMPORT_APPLY_BLOCKED", 409);
   const rows = await repository.listValidRowsForApply(env, actor.companyId, id);

@@ -11,6 +11,8 @@ import type {
   LeavePolicyInput,
   LeavePolicyRecord,
   LeavePolicyUpdateInput,
+  LeaveTypePolicyRuleRecord,
+  LeaveTypePolicyRuleUpdateInput,
   LeaveRequestFilters,
   LeaveRequestRecord,
   LeaveTypeFilters,
@@ -102,6 +104,109 @@ export const countLeaveTypes = async (env: Env, companyId: string, filters: Leav
 
 export const findLeaveType = (env: Env, companyId: string, id: string) =>
   one<LeaveTypeRecord>(env, "SELECT * FROM leave_types WHERE company_id = ? AND id = ? LIMIT 1", [companyId, id]);
+
+export const listLeaveTypePolicyRules = (env: Env, companyId: string) =>
+  many<LeaveTypePolicyRuleRecord>(
+    env,
+    `SELECT r.*, lt.leave_name AS leave_type_name, lt.leave_key
+     FROM leave_type_policy_rules r
+     JOIN leave_types lt ON lt.company_id = r.company_id AND lt.id = r.leave_type_id
+     WHERE r.company_id = ?
+     ORDER BY lt.sort_order, lt.leave_name`,
+    [companyId],
+  );
+
+export const findLeaveTypePolicyRule = (env: Env, companyId: string, leaveTypeId: string) =>
+  one<LeaveTypePolicyRuleRecord>(
+    env,
+    `SELECT r.*, lt.leave_name AS leave_type_name, lt.leave_key
+     FROM leave_type_policy_rules r
+     JOIN leave_types lt ON lt.company_id = r.company_id AND lt.id = r.leave_type_id
+     WHERE r.company_id = ? AND r.leave_type_id = ? LIMIT 1`,
+    [companyId, leaveTypeId],
+  );
+
+export const updateLeaveTypePolicyRule = (
+  env: Env,
+  companyId: string,
+  id: string,
+  values: LeaveTypePolicyRuleUpdateInput,
+) => {
+  const allowed: Array<keyof LeaveTypePolicyRuleUpdateInput> = [
+    "paid_status",
+    "annual_entitlement_days",
+    "paid_percentage",
+    "payroll_impact_enabled",
+    "document_requirement",
+    "document_required_mode",
+    "document_after_days",
+    "document_required_after_consecutive_days",
+    "document_after_used_days",
+    "document_required_after_used_days",
+    "allow_no_document_until_used_days",
+    "require_document_for_backdated_request",
+    "require_document_for_extension",
+    "approval_required",
+    "approval_workflow_key",
+    "salary_deduction_enabled",
+    "deduction_mode",
+    "deduction_component",
+    "deduction_component_keys_json",
+    "deduction_pay_component_keys",
+    "deduction_daily_rate_method",
+    "deduction_custom_divisor",
+    "payroll_source_label",
+    "allow_half_day",
+    "allow_carry_forward",
+    "carry_forward_limit_days",
+    "reset_period",
+    "count_weekends",
+    "count_public_holidays",
+    "notes",
+    "updated_by",
+    "is_enabled",
+  ];
+  const sets: string[] = [];
+  const params: unknown[] = [];
+  for (const key of allowed) {
+    const value = values[key];
+    if (value !== undefined) {
+      sets.push(`${key} = ?`);
+      params.push(typeof value === "boolean" ? value ? 1 : 0 : value);
+    }
+  }
+  sets.push("updated_at = ?");
+  params.push(new Date().toISOString(), companyId, id);
+  return run(env, `UPDATE leave_type_policy_rules SET ${sets.join(", ")} WHERE company_id = ? AND id = ?`, params);
+};
+
+export const sumApprovedLeaveDaysForYear = async (
+  env: Env,
+  companyId: string,
+  employeeId: string,
+  leaveTypeId: string,
+  year: number,
+  excludeRequestId?: string,
+) => {
+  const clauses = [
+    "company_id = ?",
+    "employee_id = ?",
+    "leave_type_id = ?",
+    "status IN ('approved', 'direct_approved')",
+    "substr(start_date, 1, 4) = ?",
+  ];
+  const values: unknown[] = [companyId, employeeId, leaveTypeId, String(year)];
+  if (excludeRequestId) {
+    clauses.push("id <> ?");
+    values.push(excludeRequestId);
+  }
+  const row = await one<{ total: number | null }>(
+    env,
+    `SELECT SUM(total_days) AS total FROM leave_requests WHERE ${clauses.join(" AND ")}`,
+    values,
+  );
+  return Number(row?.total ?? 0);
+};
 
 export const updateLeaveType = (
   env: Env,
@@ -520,6 +625,7 @@ export const listRequests = (
       r.approval_request_id, COALESCE(r.approval_status, r.status) AS approval_status,
       r.approval_current_step, r.approval_submitted_at, r.approval_completed_at,
       r.department_approved_at, r.department_approved_by, r.hr_approved_at, r.hr_approved_by,
+      r.document_required, r.document_status, r.document_required_reason, r.policy_rule_id, r.policy_snapshot_json,
       r.created_by AS requested_by, r.submitted_at, r.approved_at, r.rejected_at, r.cancelled_at, r.withdrawn_at,
       r.created_at, 'view,approve,reject,cancel,withdraw,delegate,timeline' AS actions_available
      FROM leave_requests r
@@ -582,7 +688,7 @@ export const findOverlappingRequest = (
     env,
     `SELECT * FROM leave_requests
      WHERE company_id = ? AND employee_id = ?
-       AND status IN ('pending', 'approved', 'direct_approved')
+       AND status IN ('pending', 'pending_document', 'approved', 'direct_approved')
        AND start_date <= ? AND end_date >= ?
        ${excludeId ? "AND id <> ?" : ""}
      LIMIT 1`,
@@ -699,9 +805,10 @@ const prepareCreateRequest = (env: Env, request: LeaveRequestRecord) =>
       total_days, reason, status, created_by, approval_request_id,
       approval_status, approval_current_step, approval_submitted_at, approval_completed_at,
       department_approved_at, department_approved_by, hr_approved_at, hr_approved_by, rejection_reason,
-      submitted_at, submitted_by, affects_payroll,
+      submitted_at, submitted_by, affects_payroll, document_required, document_status,
+      document_required_reason, policy_rule_id, policy_snapshot_json,
       created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ),
     [
       request.id,
@@ -727,6 +834,11 @@ const prepareCreateRequest = (env: Env, request: LeaveRequestRecord) =>
       request.submitted_at ?? null,
       request.submitted_by ?? null,
       request.affects_payroll,
+      request.document_required ?? 0,
+      request.document_status ?? "not_required",
+      request.document_required_reason ?? null,
+      request.policy_rule_id ?? null,
+      request.policy_snapshot_json ?? null,
       request.created_at,
       request.updated_at,
     ],
@@ -742,6 +854,7 @@ const prepareUpdateRequest = (env: Env, companyId: string, id: string, values: P
     "department_approved_at", "department_approved_by", "hr_approved_at", "hr_approved_by", "rejection_reason",
     "approval_status", "submitted_at", "submitted_by", "approved_at", "approved_by", "rejected_at", "rejected_by",
     "cancelled_at", "cancelled_by", "withdrawn_at", "withdrawn_by", "decision_reason", "affects_payroll",
+    "document_required", "document_status", "document_required_reason", "policy_rule_id", "policy_snapshot_json",
   ];
   const sets: string[] = [];
   const params: unknown[] = [];
@@ -1067,7 +1180,8 @@ export const listApprovalInbox = (env: Env, companyId: string, filters: LeaveReq
     `SELECT r.id, r.employee_id, e.employee_code, e.full_name AS employee_name,
       e.primary_outlet_id AS outlet_id, o.name AS outlet_name, lt.leave_name AS leave_type_name,
       r.start_date, r.end_date, r.total_days, r.status, COALESCE(r.approval_status, 'pending') AS approval_status,
-      r.reason, r.created_by AS requested_by, r.submitted_at, r.created_at,
+      r.reason, r.document_required, r.document_status, r.document_required_reason, r.policy_rule_id, r.policy_snapshot_json,
+      r.created_by AS requested_by, r.submitted_at, r.created_at,
       s.id AS current_step_id, s.step_order AS current_step_order,
       s.approver_type, s.required_permission_key, s.delegated_to
      FROM leave_requests r
@@ -1100,6 +1214,7 @@ export const listApprovalHistory = (
     `SELECT r.id, r.employee_id, e.employee_code, e.full_name AS employee_name,
       e.primary_outlet_id AS outlet_id, o.name AS outlet_name, lt.leave_name AS leave_type_name,
       r.start_date, r.end_date, r.total_days, r.status, COALESCE(r.approval_status, r.status) AS approval_status,
+      r.document_required, r.document_status, r.document_required_reason, r.policy_rule_id, r.policy_snapshot_json,
       r.created_by AS requested_by, r.submitted_at, r.approved_at, r.rejected_at, r.cancelled_at, r.withdrawn_at, r.decision_reason, r.created_at
      FROM leave_requests r
      JOIN employees e ON e.id = r.employee_id

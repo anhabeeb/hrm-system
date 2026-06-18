@@ -19,8 +19,10 @@ import { employeeStructureChangeApi } from "@/features/employee-structure-change
 import { leaveApi } from "@/features/leave/leave.api";
 import { payrollApi } from "@/features/payroll/payroll.api";
 import { rostersApi } from "@/features/rosters/rosters.api";
+import { isModuleEnabled } from "@/lib/features";
 import { friendlyHrmError } from "@/lib/hrm-errors";
 import { searchParamNumber } from "@/lib/query-string";
+import { hasAttendanceSubFeature, hasPayrollSubFeature } from "@/lib/subfeatures";
 import { ApprovalActionDialog } from "./ApprovalActionDialog";
 import { ApprovalDetailDrawer } from "./ApprovalDetailDrawer";
 import { ApprovalEngineActionDialog } from "./ApprovalEngineActionDialog";
@@ -40,6 +42,23 @@ import type { ApprovalEngineRequest, ApprovalFilters as ApprovalFilterValues, Ap
 type ApprovalAction = "approve" | "reject" | "return" | "cancel" | "retry" | "override" | null;
 type EngineAction = "approve" | "reject" | "cancel" | "escalate" | null;
 type WorkflowStatusAction = "enableWorkflow" | "disableWorkflow" | "deleteStep" | "enableThreshold" | "disableThreshold" | null;
+
+const operationModuleEnabled = (user: ReturnType<typeof useAuth>["user"], operationType: string) => {
+  if (operationType === "LEAVE_REQUEST") return isModuleEnabled(user, "leave_management");
+  if (operationType === "ATTENDANCE_CORRECTION") return isModuleEnabled(user, "attendance") && hasAttendanceSubFeature(user, "corrections_enabled");
+  if (operationType === "ROSTER_CHANGE") return isModuleEnabled(user, "roster");
+  if (operationType === "PAYROLL_ADJUSTMENT") return isModuleEnabled(user, "payroll") && hasPayrollSubFeature(user, "manual_deductions_enabled") && hasPayrollSubFeature(user, "approvals_enabled");
+  if (operationType === "ADVANCE_SALARY_REQUEST" || operationType === "ADVANCE_PAYMENT") return isModuleEnabled(user, "payroll") && hasPayrollSubFeature(user, "advances_enabled");
+  if (operationType === "DOCUMENT_KYC_UPDATE" || operationType === "DOCUMENT_APPROVAL") return isModuleEnabled(user, "documents_kyc") || isModuleEnabled(user, "document_tracking");
+  if (operationType === "EMPLOYEE_DOCUMENT_UPDATE") return isModuleEnabled(user, "employee_management");
+  if (operationType === "EMPLOYEE_TRANSFER" || operationType === "EMPLOYEE_STRUCTURE_CHANGE") return isModuleEnabled(user, "employee_management") && isModuleEnabled(user, "employee_structure_changes");
+  if (operationType === "RESIGNATION" || operationType === "OFFBOARDING") return isModuleEnabled(user, "resignation_offboarding");
+  if (operationType === "DISCIPLINARY_ACTION") return isModuleEnabled(user, "disciplinary_actions");
+  if (operationType === "CONTRACT_RENEWAL") return isModuleEnabled(user, "contract_tracking");
+  if (operationType === "ASSET_ISSUE" || operationType === "ASSET_RETURN") return isModuleEnabled(user, "asset_tracking");
+  if (operationType === "UNIFORM_ISSUE" || operationType === "UNIFORM_RETURN") return isModuleEnabled(user, "uniform_tracking");
+  return true;
+};
 
 export const ApprovalsPage = () => {
   const auth = useAuth();
@@ -209,7 +228,17 @@ export const ApprovalsPage = () => {
   const activeQueryError = activeTab === "workflows" ? workflowsQuery.error ?? stepsQuery.error : activeTab === "thresholds" ? thresholdsQuery.error : activeTab === "settings" ? settingsQuery.error : activeTab === "requests" || activeTab === "my-pending" || activeTab === "my-requests" ? engineRequestsQuery.error : listQuery.error;
   const error = activeQueryError ?? approvalMutation.error ?? workflowMutation.error ?? stepMutation.error ?? thresholdMutation.error ?? statusMutation.error;
   const inboxRows = listQuery.data?.data ?? [];
-  const engineRows = engineRequestsQuery.data?.data ?? [];
+  const engineRows = useMemo(() =>
+    (engineRequestsQuery.data?.data ?? []).map((row) => {
+      const enabled = row.module_enabled ?? operationModuleEnabled(auth.user, row.operation_type);
+      return {
+        ...row,
+        module_enabled: enabled,
+        read_only: row.read_only || !enabled,
+        disabled_reason: row.disabled_reason ?? (!enabled ? "Module disabled" : null),
+      };
+    }),
+  [auth.user, engineRequestsQuery.data?.data]);
   const workflowRows = workflowsQuery.data?.data ?? [];
   const thresholdRows = thresholdsQuery.data?.data ?? [];
   const pendingInbox = inboxRows.filter((row) => String(row.status ?? "").toLowerCase().includes("pending")).length;

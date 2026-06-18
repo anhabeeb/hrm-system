@@ -227,6 +227,56 @@ export const getPayrollSettings = (
 ): Promise<Record<string, unknown>> =>
   getJsonSetting(env, companyId, "payroll.default_rules", {});
 
+export const PAYROLL_SUB_FEATURE_DEFAULTS = {
+  "payroll.salary_processing_enabled": true,
+  "payroll.payslips_enabled": true,
+  "payroll.advances_enabled": true,
+  "payroll.salary_loans_enabled": true,
+  "payroll.overtime_enabled": true,
+  "payroll.benefits_enabled": true,
+  "payroll.manual_deductions_enabled": true,
+  "payroll.attendance_deductions_enabled": true,
+  "payroll.long_leave_deductions_enabled": true,
+  "payroll.approvals_enabled": true,
+} as const;
+
+export type PayrollSubFeatureKey = keyof typeof PAYROLL_SUB_FEATURE_DEFAULTS;
+
+const PAYROLL_SUB_FEATURE_ALIASES: Record<PayrollSubFeatureKey, string[]> = {
+  "payroll.salary_processing_enabled": ["payroll.salary_processing_enabled", "monthly_payroll_enabled"],
+  "payroll.payslips_enabled": ["payroll.payslips_enabled", "payslip_generation_enabled"],
+  "payroll.advances_enabled": ["payroll.advances_enabled", "advance_payments_enabled"],
+  "payroll.salary_loans_enabled": ["payroll.salary_loans_enabled", "salary_loans_enabled"],
+  "payroll.overtime_enabled": ["payroll.overtime_enabled", "overtime_enabled"],
+  "payroll.benefits_enabled": ["payroll.benefits_enabled", "benefits_enabled"],
+  "payroll.manual_deductions_enabled": ["payroll.manual_deductions_enabled", "manual_deductions_enabled"],
+  "payroll.attendance_deductions_enabled": ["payroll.attendance_deductions_enabled", "attendance_to_payroll_enabled", "deduct_absent_days"],
+  "payroll.long_leave_deductions_enabled": ["payroll.long_leave_deductions_enabled", "long_leave_deductions_enabled"],
+  "payroll.approvals_enabled": ["payroll.approvals_enabled", "approval_required"],
+};
+
+export const getPayrollSubFeatureSettings = async (
+  env: Env,
+  companyId: string,
+): Promise<Record<string, unknown>> => {
+  const [payrollSettings, earningsSetting] = await Promise.all([
+    getPayrollSettings(env, companyId).catch(() => ({})),
+    getSetting(env, companyId, "payroll.earnings_toggles")
+      .then((setting) => parseJson<Record<string, unknown>>(setting?.setting_value_json, {}))
+      .catch(() => ({})),
+  ]);
+  return { ...PAYROLL_SUB_FEATURE_DEFAULTS, ...payrollSettings, ...earningsSetting };
+};
+
+export const isPayrollSubFeatureEnabled = async (
+  env: Env,
+  companyId: string,
+  key: PayrollSubFeatureKey,
+): Promise<boolean> => {
+  const settings = await getPayrollSubFeatureSettings(env, companyId);
+  return PAYROLL_SUB_FEATURE_ALIASES[key].every((alias) => settings[alias] !== false);
+};
+
 export const getAttendanceSettings = (
   env: Env,
   companyId: string,

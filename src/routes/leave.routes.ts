@@ -18,6 +18,9 @@ leaveRoutes.patch("/types/:id", requireAnyPermission(["leave_settings.manage", "
 leaveRoutes.get("/policies", requireAnyPermission(["leave.view", "leave_settings.view"]), controller.listPolicies);
 leaveRoutes.post("/policies", requireAnyPermission(["leave_settings.manage", "leave_policy_limits.edit"]), requireReason(), controller.createPolicy);
 leaveRoutes.patch("/policies/:id", requireAnyPermission(["leave_settings.manage", "leave_policy_limits.edit"]), requireReason(), controller.updatePolicy);
+leaveRoutes.get("/policy-rules", requireAnyPermission(["leave.view", "leave_settings.view", "leave.settings.view", "leave_settings.manage"]), controller.listPolicyRules);
+leaveRoutes.patch("/policy-rules/:id", requireAnyPermission(["leave_settings.manage", "leave.settings.manage", "leave_policy_rules.manage", "leave_policy_limits.edit"]), requireReason(), controller.updatePolicyRule);
+leaveRoutes.post("/policy-rules/:id/reset-default", requireAnyPermission(["leave_settings.manage", "leave.settings.manage", "leave_policy_rules.manage", "leave_policy_limits.edit"]), requireReason(), controller.resetPolicyRule);
 
 leaveRoutes.get("/balances", requireAnyPermission(["leave.balances.view", "leave.view", "leave.manage_balances"]), controller.listBalances);
 leaveRoutes.post("/balances/opening", requireAnyPermission(["leave.balances.manage", "leave.balances.adjust", "leave.manage_balances"]), requireReason(), controller.setOpeningBalance);
@@ -39,6 +42,7 @@ leaveRoutes.get("/approvals/:requestId", requireAnyPermission(["leave.approvals.
 leaveRoutes.get("/requests", requireAnyPermission(["leave.view", "leave.approvals.view", "approvals.requests.view", "approvals.department.view", "approvals.hrFinal.view", "approvals.financeFinal.view", "approvals.department.approve", "approvals.hrFinal.approve", "approvals.financeFinal.approve", "approvals.department.reject", "approvals.hrFinal.reject", "approvals.financeFinal.reject"]), controller.listRequests);
 leaveRoutes.get("/requests/:requestId/timeline", requireAnyPermission(["leave.timeline.view", "leave.approvals.view", "leave.view", "approvals.requests.view", "approvals.requests.audit.view", "approvals.department.view", "approvals.hrFinal.view", "approvals.financeFinal.view", "approvals.department.approve", "approvals.hrFinal.approve", "approvals.financeFinal.approve", "approvals.department.reject", "approvals.hrFinal.reject", "approvals.financeFinal.reject"]), controller.getTimeline);
 leaveRoutes.get("/requests/:id", requireAnyPermission(["leave.view", "leave.approvals.view", "approvals.requests.view", "approvals.department.view", "approvals.hrFinal.view", "approvals.financeFinal.view", "approvals.department.approve", "approvals.hrFinal.approve", "approvals.financeFinal.approve", "approvals.department.reject", "approvals.hrFinal.reject", "approvals.financeFinal.reject"]), controller.getRequest);
+leaveRoutes.post("/policy-preview", requireAnyPermission(["leave.create", "leave.view", "leave.requests.create_for_employee"]), controller.previewPolicy);
 leaveRoutes.post("/requests", requireAnyPermission(["leave.create", "leave.requests.create_for_employee", "approvals.requests.create", "approvals.requests.createForOthers"]), controller.createRequest);
 leaveRoutes.post("/requests/:id/submit", requireAnyPermission(["leave.requests.submit", "leave.create", "approvals.requests.create", "approvals.requests.createForOthers"]), requireReason(), controller.submitRequest);
 leaveRoutes.patch("/requests/:id", requirePermission("leave.edit"), controller.updateRequest);

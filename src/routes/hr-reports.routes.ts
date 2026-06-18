@@ -1,11 +1,15 @@
 import { Hono } from "hono";
 import { authMiddleware } from "../middleware/auth.middleware";
-import { requireFeature } from "../middleware/feature.middleware";
+import { requireAnyFeature, requireFeature } from "../middleware/feature.middleware";
 import { requireAnyPermission, requirePermission } from "../middleware/permission.middleware";
 import * as controller from "../modules/hr-reports/hr-reports.controller";
 import type { AppContext } from "../types/api.types";
 
 const hrReportsRoutes = new Hono<AppContext>();
+const requireAssetsOrUniformsFeature = requireAnyFeature(["asset_tracking", "uniform_tracking"], {
+  message: "Asset Tracking or Uniform Tracking must be enabled before viewing this report.",
+  code: "ASSETS_UNIFORMS_REPORT_DISABLED",
+});
 
 hrReportsRoutes.use("*", authMiddleware);
 hrReportsRoutes.use("*", requireFeature("reports"));
@@ -26,7 +30,7 @@ hrReportsRoutes.get("/foreign-compliance", requirePermission("hr_reports.complia
 hrReportsRoutes.get("/leave-balances", requireFeature("leave_management"), requirePermission("hr_reports.leave.view"), controller.leaveBalances);
 hrReportsRoutes.get("/leave-requests", requireFeature("leave_management"), requirePermission("hr_reports.leave.view"), controller.leaveRequests);
 hrReportsRoutes.get("/long-leave", requireFeature("long_leave_management"), requirePermission("hr_reports.long_leave.view"), controller.longLeave);
-hrReportsRoutes.get("/assets-uniforms", requireFeature("asset_tracking"), requireFeature("uniform_tracking"), requirePermission("hr_reports.assets.view"), controller.assetsUniforms);
+hrReportsRoutes.get("/assets-uniforms", requireAssetsOrUniformsFeature, requirePermission("hr_reports.assets.view"), controller.assetsUniforms);
 hrReportsRoutes.get("/compliance-summary", requirePermission("hr_reports.compliance.view"), controller.complianceSummary);
 hrReportsRoutes.get("/lifecycle", requirePermission("hr_reports.lifecycle.view"), controller.lifecycle);
 hrReportsRoutes.get("/employee-360-summary", requirePermission("hr_reports.employee_360.view"), controller.employee360Summary);
@@ -62,8 +66,7 @@ hrReportsRoutes.get("/:reportKey", requireAnyPermission([
   const handler = map[key];
   if (!handler) return controller.catalog(c);
   if (key === "assets-uniforms") {
-    await requireFeature("asset_tracking")(c, async () => undefined);
-    await requireFeature("uniform_tracking")(c, async () => undefined);
+    await requireAssetsOrUniformsFeature(c, async () => undefined);
   }
   if (key === "contracts") {
     await requireFeature("contract_tracking")(c, async () => undefined);

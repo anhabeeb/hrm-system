@@ -6,8 +6,11 @@ import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { Button } from "@/components/ui/button";
 import { DashboardGrid, WidgetCard } from "@/components/widgets";
 import { adminCommandCenterWidgetDefinitions } from "@/config/dashboardWidgets";
+import { useAuth } from "@/features/auth/auth.store";
 import { DashboardCustomizeButton } from "@/features/dashboard-personalization/DashboardCustomizeButton";
 import { usePersonalizedWidgets } from "@/features/dashboard-personalization/dashboardPreferences.utils";
+import { SetupIncompleteDashboardBanner } from "@/features/setup-guide/SetupIncompleteDashboardBanner";
+import { useSetupGuideStatus } from "@/features/setup-guide/useSetupGuide";
 import { ApiError } from "@/lib/api-errors";
 
 import { ApprovalCommandQueueWidget } from "./ApprovalCommandQueueWidget";
@@ -34,6 +37,8 @@ export const AdminCommandCenterPage = () => {
   const commandCenter = query.data?.data.data;
   const permissionDenied = isDashboardPermissionError(query.error);
   const personalization = usePersonalizedWidgets("ADMIN_COMMAND_CENTER", adminCommandCenterWidgetDefinitions);
+  const auth = useAuth();
+  const setupStatus = useSetupGuideStatus(auth.isSuperAdmin || auth.hasAnyPermission(["setup_guide.manage", "settings.manage"]));
 
   if (query.isLoading) {
     return (
@@ -105,6 +110,7 @@ export const AdminCommandCenterPage = () => {
           />
         </div>
         <CommandCenterHeader header={commandCenter.header} />
+        {setupStatus.data?.data ? <SetupIncompleteDashboardBanner progress={setupStatus.data.data} /> : null}
 
         <DashboardGrid>
           {personalization.visibleWidgets.map((widget) => (

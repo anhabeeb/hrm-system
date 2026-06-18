@@ -3,11 +3,13 @@ import { ReceiptText } from "lucide-react";
 
 import { MetricTile, WidgetCard } from "@/components/widgets";
 import { Button } from "@/components/ui/button";
+import { usePayrollSubFeatures } from "@/features/payroll/usePayrollSubFeatures";
 import type { SelfDashboardModernWidgets } from "../self-service.types";
 import { asNumber, asRecord, visible } from "./selfServiceDashboard.utils";
 
 export const MyPayslipsWidget = ({ widget }: { widget?: SelfDashboardModernWidgets["payslips"] }) => {
-  if (!visible(widget)) return null;
+  const payrollSubFeatures = usePayrollSubFeatures();
+  if (!payrollSubFeatures.payslipsEnabled || !visible(widget)) return null;
   const summary = asRecord(widget?.summary);
   const latest = asRecord(widget?.latest);
 

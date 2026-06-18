@@ -68,8 +68,8 @@ export const SENSITIVE_SETTING_GROUPS = new Set([
 export const FEATURE_DEPENDENCIES: Record<string, string[]> = {
   attendance: ["employee_management"],
   payslips: ["payroll"],
-  long_leave: ["leave_management", "payroll"],
-  long_leave_management: ["leave_management", "payroll"],
+  long_leave: ["leave_management"],
+  long_leave_management: ["leave_management"],
   offline_sync: ["attendance"],
   kiosk_attendance: ["attendance"],
   biometric_attendance: ["attendance"],
@@ -86,15 +86,122 @@ export const FEATURE_DEPENDENCIES: Record<string, string[]> = {
 };
 
 export const FEATURE_DEPENDENCY_LABELS: Record<string, string> = {
-  payroll: "Payroll",
+  payroll: "Payroll Management",
   leave_management: "Leave Management",
   long_leave_management: "Long Leave Management",
   attendance: "Attendance Management",
   employee_login: "Employee Login",
   employee_management: "Employee Management",
   approvals: "Approvals",
+  documents: "Document Tracking",
+  asset_tracking: "Asset Tracking",
+  uniform_tracking: "Uniform Tracking",
   roster: "Duty Roster",
   contract_tracking: "Contract Tracking",
+  payslips: "Payslips",
+  advance_salary: "Advance Salary",
+};
+
+export const MODULE_LIFECYCLE_METADATA: Record<string, {
+  module_key: string;
+  label: string;
+  description: string;
+  dependencies: string[];
+  setup_activities: string[];
+  disabled_by_choice: boolean;
+  needs_setup_after_enable: boolean;
+  review_recommended: boolean;
+}> = {
+  documents: {
+    module_key: "documents",
+    label: "Document Tracking",
+    description: "Track employee documents, KYC records, expiries, and verification status.",
+    dependencies: ["employee_management"],
+    setup_activities: ["document_categories", "expiry_policy", "access_permissions"],
+    disabled_by_choice: true,
+    needs_setup_after_enable: true,
+    review_recommended: true,
+  },
+  asset_tracking: {
+    module_key: "asset_tracking",
+    label: "Asset Tracking",
+    description: "Track company assets assigned to employees, including issue, return, and history.",
+    dependencies: ["employee_management"],
+    setup_activities: ["asset_categories", "issue_return_policy", "asset_permissions"],
+    disabled_by_choice: true,
+    needs_setup_after_enable: true,
+    review_recommended: true,
+  },
+  uniform_tracking: {
+    module_key: "uniform_tracking",
+    label: "Uniform Tracking",
+    description: "Track uniforms issued to employees, including sizes, quantities, issue dates, and return status.",
+    dependencies: ["employee_management"],
+    setup_activities: ["uniform_catalog", "issue_return_policy", "uniform_permissions"],
+    disabled_by_choice: true,
+    needs_setup_after_enable: true,
+    review_recommended: true,
+  },
+  leave_management: {
+    module_key: "leave_management",
+    label: "Leave Management",
+    description: "Manage employee leave requests, balances, approvals, and leave history.",
+    dependencies: ["employee_management"],
+    setup_activities: ["leave_types", "leave_balances", "approval_workflow"],
+    disabled_by_choice: true,
+    needs_setup_after_enable: true,
+    review_recommended: true,
+  },
+  long_leave_management: {
+    module_key: "long_leave_management",
+    label: "Long Leave Management",
+    description: "Manage extended leave workflows, salary treatment, and long leave history.",
+    dependencies: ["leave_management"],
+    setup_activities: ["long_leave_policy", "payroll_deduction_review", "approval_workflow"],
+    disabled_by_choice: true,
+    needs_setup_after_enable: true,
+    review_recommended: true,
+  },
+  roster: {
+    module_key: "roster",
+    label: "Duty Roster",
+    description: "Plan employee work schedules, weekly duty rosters, shift assignments, and roster change workflows.",
+    dependencies: ["employee_management"],
+    setup_activities: ["shift_catalog", "roster_permissions", "approval_workflow"],
+    disabled_by_choice: true,
+    needs_setup_after_enable: true,
+    review_recommended: true,
+  },
+  contract_tracking: {
+    module_key: "contract_tracking",
+    label: "Contract Tracking",
+    description: "Track employee contracts, renewals, probation periods, linked documents, and expiry alerts.",
+    dependencies: ["employee_management"],
+    setup_activities: ["contract_rules", "expiry_alerts", "renewal_workflow"],
+    disabled_by_choice: true,
+    needs_setup_after_enable: true,
+    review_recommended: true,
+  },
+  attendance: {
+    module_key: "attendance",
+    label: "Attendance Management",
+    description: "Track employee attendance, lateness, absences, corrections, biometric/kiosk entries, and payroll review.",
+    dependencies: ["employee_management"],
+    setup_activities: ["time_rules", "sub_features", "devices", "correction_workflow"],
+    disabled_by_choice: true,
+    needs_setup_after_enable: true,
+    review_recommended: true,
+  },
+  payroll: {
+    module_key: "payroll",
+    label: "Payroll Management",
+    description: "Process salaries, payslips, advances, loans, overtime, benefits, deductions, and approvals.",
+    dependencies: ["employee_management"],
+    setup_activities: ["payroll_cycle", "salary_rules", "sub_features", "approval_workflow"],
+    disabled_by_choice: true,
+    needs_setup_after_enable: true,
+    review_recommended: true,
+  },
 };
 
 export const REPORTABLE_FEATURES = [

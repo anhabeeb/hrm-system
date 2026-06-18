@@ -39,7 +39,7 @@ import {
 } from "../../services/session.service";
 import type { AuthActor } from "../../types/api.types";
 import { AppError, AuthError, LockedRecordError, NotFoundError, ValidationError } from "../../utils/errors";
-import { getSessionSecuritySettings } from "../../services/settings.service";
+import { getAttendanceSettings, getPayrollSubFeatureSettings, getSessionSecuritySettings } from "../../services/settings.service";
 import { createEntityId } from "../../utils/ids";
 import {
   base64ToBytes,
@@ -78,6 +78,36 @@ const toSafeUser = (user: UserRecord): SafeUserProfile => ({
 
 const isActiveUser = (user: UserRecord): boolean =>
   user.status === "active" && !user.deleted_at;
+
+const enabledByAliases = (settings: Record<string, unknown>, aliases: string[]) =>
+  aliases.every((alias) => settings[alias] !== false);
+
+const getAuthPayrollSubFeatures = async (env: Env, companyId: string) => {
+  const settings = await getPayrollSubFeatureSettings(env, companyId).catch(() => ({}));
+  return {
+    salary_processing_enabled: enabledByAliases(settings, ["payroll.salary_processing_enabled", "monthly_payroll_enabled"]),
+    payslips_enabled: enabledByAliases(settings, ["payroll.payslips_enabled", "payslip_generation_enabled"]),
+    advances_enabled: enabledByAliases(settings, ["payroll.advances_enabled", "advance_payments_enabled"]),
+    salary_loans_enabled: enabledByAliases(settings, ["payroll.salary_loans_enabled", "salary_loans_enabled"]),
+    overtime_enabled: enabledByAliases(settings, ["payroll.overtime_enabled", "overtime_enabled"]),
+    benefits_enabled: enabledByAliases(settings, ["payroll.benefits_enabled", "benefits_enabled"]),
+    manual_deductions_enabled: enabledByAliases(settings, ["payroll.manual_deductions_enabled", "manual_deductions_enabled"]),
+    attendance_deductions_enabled: enabledByAliases(settings, ["payroll.attendance_deductions_enabled", "attendance_to_payroll_enabled", "deduct_absent_days"]),
+    long_leave_deductions_enabled: enabledByAliases(settings, ["payroll.long_leave_deductions_enabled", "long_leave_deductions_enabled"]),
+    approvals_enabled: enabledByAliases(settings, ["payroll.approvals_enabled", "approval_required"]),
+  };
+};
+
+const getAuthAttendanceSubFeatures = async (env: Env, companyId: string) => {
+  const settings = await getAttendanceSettings(env, companyId).catch(() => ({}));
+  return {
+    manual_entry_enabled: enabledByAliases(settings, ["attendance.manual_entry_enabled", "manual_attendance_allowed"]),
+    kiosk_enabled: enabledByAliases(settings, ["attendance.kiosk_enabled", "kiosk_attendance_enabled"]),
+    biometric_enabled: enabledByAliases(settings, ["attendance.biometric_enabled", "biometric_attendance_enabled"]),
+    corrections_enabled: enabledByAliases(settings, ["attendance.corrections_enabled", "attendance_correction_allowed"]),
+    payroll_deductions_enabled: enabledByAliases(settings, ["attendance.payroll_deductions_enabled", "deduct_absent_days", "absent_day_deduction_rule"]),
+  };
+};
 
 const hasActiveLinkedEmployee = async (env: Env, user: UserRecord): Promise<boolean> => {
   if (!user.employee_id) return true;
@@ -780,11 +810,13 @@ export const logout = async (
 
 export const getMe = async (env: Env, userId: string) => {
   const user = await ensureAuthenticated(env, userId);
-  const [roles, permissions, outletIds, features] = await Promise.all([
+  const [roles, permissions, outletIds, features, payrollSubFeatures, attendanceSubFeatures] = await Promise.all([
     authRepository.getUserRoles(env, user.id),
     authRepository.getUserPermissions(env, user.id),
     authRepository.getUserOutletIds(env, user.id),
     authRepository.getEnabledFeatureKeys(env, user.company_id),
+    getAuthPayrollSubFeatures(env, user.company_id),
+    getAuthAttendanceSubFeatures(env, user.company_id),
   ]);
 
   return {
@@ -793,6 +825,8 @@ export const getMe = async (env: Env, userId: string) => {
     permissions,
     outlet_ids: outletIds,
     features,
+    payroll_subfeatures: payrollSubFeatures,
+    attendance_subfeatures: attendanceSubFeatures,
   };
 };
 

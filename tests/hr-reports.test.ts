@@ -34,15 +34,32 @@ const actor = (overrides: Partial<AuthActor> = {}): AuthActor => ({
 
 type CapturedCall = { sql: string; values: unknown[]; method: "first" | "all" };
 
-const fakeEnv = (rows: Record<string, unknown>[] = [{ employee_id: "emp_1", employee_code: "EMP-001", employee_name: "Aisha" }]) => {
+const fakeEnv = (
+  rows: Record<string, unknown>[] = [{ employee_id: "emp_1", employee_code: "EMP-001", employee_name: "Aisha" }],
+  options: { enabledFeatures?: string[] } = {},
+) => {
   const calls: CapturedCall[] = [];
+  const enabledFeatures = new Set(options.enabledFeatures ?? [
+    "documents",
+    "attendance",
+    "leave_management",
+    "long_leave_management",
+    "asset_tracking",
+    "uniform_tracking",
+    "contract_tracking",
+  ]);
   const env = {
     DB: {
       prepare: (sql: string) => ({
         bind: (...values: unknown[]) => ({
           first: async () => {
             calls.push({ sql, values, method: "first" });
-            if (sql.includes("FROM feature_settings")) return { feature_key: values[1], is_enabled: 1, status: "enabled", applies_to_all_outlets: 1, allowed_role_ids_json: null, allowed_outlet_ids_json: null };
+            if (sql.includes("FROM feature_settings")) {
+              const featureKey = String(values[1] ?? "");
+              return enabledFeatures.has(featureKey)
+                ? { feature_key: featureKey, is_enabled: 1, status: "enabled", applies_to_all_outlets: 1, allowed_role_ids_json: null, allowed_outlet_ids_json: null }
+                : null;
+            }
             return { total: rows.length, employees: rows.length };
           },
           all: async () => {
@@ -235,6 +252,58 @@ describe("Phase 11B HR Reports", () => {
     expect(calls.some((call) => call.sql.includes("1 = 0"))).toBe(true);
   });
 
+  it("asset tracking enabled without uniforms still allows asset report rows only", async () => {
+    const { env, calls } = fakeEnv([{ employee_id: "emp_1", assignment_type: "asset", item_name: "Laptop" }], {
+      enabledFeatures: ["asset_tracking"],
+    });
+
+    const catalog = await service.catalog(env, actor());
+    expect(catalog.data.map((report) => report.report_key)).toContain("assets-uniforms");
+
+    const result = await service.runReport(env, actor(), "assets-uniforms", validateHrReportFilters({}));
+    expect(result.data[0].assignment_type).toBe("asset");
+    const reportQuery = calls.find((call) => call.method === "all" && call.sql.includes("asset_assignments"));
+    expect(reportQuery?.sql).toContain("FROM asset_assignments");
+    expect(reportQuery?.sql).not.toContain("FROM uniform_issues");
+  });
+
+  it("uniform tracking enabled without assets still allows uniform report rows only", async () => {
+    const { env, calls } = fakeEnv([{ employee_id: "emp_1", assignment_type: "uniform", item_name: "Apron" }], {
+      enabledFeatures: ["uniform_tracking"],
+    });
+
+    const catalog = await service.catalog(env, actor());
+    expect(catalog.data.map((report) => report.report_key)).toContain("assets-uniforms");
+
+    const result = await service.runReport(env, actor(), "assets-uniforms", validateHrReportFilters({}));
+    expect(result.data[0].assignment_type).toBe("uniform");
+    const reportQuery = calls.find((call) => call.method === "all" && call.sql.includes("uniform_issues"));
+    expect(reportQuery?.sql).not.toContain("FROM asset_assignments");
+    expect(reportQuery?.sql).toContain("FROM uniform_issues");
+  });
+
+  it("asset and uniform report includes both row sources when both modules are enabled", async () => {
+    const { env, calls } = fakeEnv([{ employee_id: "emp_1", assignment_type: "asset", item_name: "Laptop" }], {
+      enabledFeatures: ["asset_tracking", "uniform_tracking"],
+    });
+
+    const catalog = await service.catalog(env, actor());
+    expect(catalog.data.map((report) => report.report_key)).toContain("assets-uniforms");
+
+    await service.runReport(env, actor(), "assets-uniforms", validateHrReportFilters({}));
+    const reportQuery = calls.find((call) => call.method === "all" && call.sql.includes("asset_assignments"));
+    expect(reportQuery?.sql).toContain("FROM asset_assignments");
+    expect(reportQuery?.sql).toContain("FROM uniform_issues");
+  });
+
+  it("asset and uniform report is hidden and rejected when both modules are disabled", async () => {
+    const { env } = fakeEnv([], { enabledFeatures: [] });
+
+    const catalog = await service.catalog(env, actor());
+    expect(catalog.data.map((report) => report.report_key)).not.toContain("assets-uniforms");
+    await expect(service.runReport(env, actor(), "assets-uniforms", validateHrReportFilters({}))).rejects.toMatchObject({ code: "ASSETS_UNIFORMS_REPORT_DISABLED" });
+  });
+
   it("Super Admin/Admin can access full report", async () => {
     const { env, calls } = fakeEnv();
     await service.runReport(env, actor({ isAdmin: true, outletIds: [] }), "employee-master", validateHrReportFilters({}));
@@ -249,6 +318,11 @@ describe("Phase 11B HR Reports", () => {
     const page = source("frontend/src/features/hr-reports/HrReportsPage.tsx");
     expect(router).toContain("/hr-reports");
     expect(routes.indexOf('"/catalog"')).toBeLessThan(routes.indexOf('requirePermission("hr_reports.view")'));
+    expect(routes).toContain('requireAnyFeature(["asset_tracking", "uniform_tracking"]');
+    expect(routes).toContain("ASSETS_UNIFORMS_REPORT_DISABLED");
+    expect(routes).toContain("requireAssetsOrUniformsFeature");
+    expect(routes).not.toContain('hrReportsRoutes.get("/assets-uniforms", requireFeature("asset_tracking"), requireFeature("uniform_tracking")');
+    expect(routes).not.toMatch(/key === "assets-uniforms"[\s\S]{0,180}requireFeature\("asset_tracking"\)[\s\S]{0,180}requireFeature\("uniform_tracking"\)/);
     expect(page).toContain("Report catalog");
     expect(page).toContain("ReportExportActions");
     expect(page).toContain("hr:");

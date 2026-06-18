@@ -8,6 +8,7 @@ import { useAuth } from "@/features/auth/auth.store";
 import { getDefaultLandingPath } from "@/lib/default-landing";
 import { areModulesEnabled, isModuleEnabled } from "@/lib/features";
 import { hasAnyPermission, hasPermission } from "@/lib/permissions";
+import { hasAllAttendanceSubFeatures, hasAllPayrollSubFeatures, hasAttendanceSubFeature, hasPayrollSubFeature, type AttendanceSubFeatureKey, type PayrollSubFeatureKey } from "@/lib/subfeatures";
 
 export const ProtectedRoute = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -58,6 +59,10 @@ export const ModuleRoute = ({
   moduleCode,
   moduleCodesAll,
   moduleName,
+  requiredPayrollSubFeature,
+  requiredPayrollSubFeaturesAll,
+  requiredAttendanceSubFeature,
+  requiredAttendanceSubFeaturesAll,
   requiresLinkedEmployee,
   children,
 }: {
@@ -68,6 +73,10 @@ export const ModuleRoute = ({
   moduleCode?: string;
   moduleCodesAll?: string[];
   moduleName?: string;
+  requiredPayrollSubFeature?: PayrollSubFeatureKey;
+  requiredPayrollSubFeaturesAll?: PayrollSubFeatureKey[];
+  requiredAttendanceSubFeature?: AttendanceSubFeatureKey;
+  requiredAttendanceSubFeaturesAll?: AttendanceSubFeatureKey[];
   requiresLinkedEmployee?: boolean;
   children: ReactNode;
 }) => {
@@ -78,6 +87,8 @@ export const ModuleRoute = ({
   }
   if (!isModuleEnabled(user, moduleCode ?? requiredFeature)) return <ModuleDisabledPage moduleName={moduleName} />;
   if (!areModulesEnabled(user, moduleCodesAll ?? requiredFeaturesAll)) return <ModuleDisabledPage moduleName={moduleName} />;
+  if (!hasPayrollSubFeature(user, requiredPayrollSubFeature) || !hasAllPayrollSubFeatures(user, requiredPayrollSubFeaturesAll)) return <ModuleDisabledPage moduleName={moduleName} />;
+  if (!hasAttendanceSubFeature(user, requiredAttendanceSubFeature) || !hasAllAttendanceSubFeatures(user, requiredAttendanceSubFeaturesAll)) return <ModuleDisabledPage moduleName={moduleName} />;
   if (!hasPermission(user, requiredPermission)) return <FullPagePermissionDenied />;
   if (!hasAnyPermission(user, requiredPermissionsAny)) return <FullPagePermissionDenied />;
 

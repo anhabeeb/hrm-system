@@ -27,13 +27,15 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 const normalizeUser = (
   user: CurrentUser,
-  options: { roles?: string[]; permissions?: string[]; outletIds?: string[]; features?: string[] } = {},
+  options: { roles?: string[]; permissions?: string[]; outletIds?: string[]; features?: string[]; payrollSubFeatures?: Record<string, boolean | undefined>; attendanceSubFeatures?: Record<string, boolean | undefined> } = {},
 ): CurrentUser => ({
   ...user,
   roles: options.roles ?? user.roles ?? [],
   permissions: options.permissions ?? user.permissions ?? [],
   outlet_ids: options.outletIds ?? user.outlet_ids ?? [],
   features: options.features ?? user.features ?? [],
+  payroll_subfeatures: options.payrollSubFeatures ?? user.payroll_subfeatures ?? {},
+  attendance_subfeatures: options.attendanceSubFeatures ?? user.attendance_subfeatures ?? {},
   is_super_admin: user.is_super_admin ?? options.roles?.includes("super_admin") ?? false,
   is_admin: user.is_admin ?? options.roles?.some((role) => role === "admin" || role === "super_admin") ?? false,
 });
@@ -46,7 +48,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [pendingTwoFactorLogin, setPendingTwoFactorLogin] = useState<(LoginInput & { challenge_id?: string }) | null>(null);
 
   const applyUser = useCallback(
-    (nextUser: CurrentUser | null, options: { roles?: string[]; permissions?: string[]; outletIds?: string[]; features?: string[] } = {}) => {
+    (nextUser: CurrentUser | null, options: { roles?: string[]; permissions?: string[]; outletIds?: string[]; features?: string[]; payrollSubFeatures?: Record<string, boolean | undefined>; attendanceSubFeatures?: Record<string, boolean | undefined> } = {}) => {
       setUser(nextUser ? normalizeUser(nextUser, options) : null);
     },
     [],
@@ -61,6 +63,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         permissions: response.data.permissions,
         outletIds: response.data.outlet_ids,
         features: response.data.features,
+        payrollSubFeatures: response.data.payroll_subfeatures,
+        attendanceSubFeatures: response.data.attendance_subfeatures,
       });
       setUser(nextUser);
       return nextUser;
@@ -164,6 +168,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const permissions = user?.permissions ?? [];
   const features = user?.features ?? [];
+  const payrollSubFeatures = user?.payroll_subfeatures ?? {};
+  const attendanceSubFeatures = user?.attendance_subfeatures ?? {};
   const roles = user?.roles ?? [];
   const outletIds = user?.outlet_ids ?? [];
   const isSuperAdmin = Boolean(user?.is_super_admin || roles.includes("super_admin"));
@@ -174,6 +180,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       user,
       permissions,
       features,
+      payrollSubFeatures,
+      attendanceSubFeatures,
       roles,
       outletIds,
       token: null,
@@ -195,7 +203,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       hasAllPermissions: (nextPermissions?: string[]) => userHasAllPermissions(user, nextPermissions),
       hasFeature: (feature?: string) => userHasFeature(user, feature),
     };
-  }, [clearPendingTwoFactorLogin, features, hasHydrated, isAdmin, isLoading, isSuperAdmin, login, logout, outletIds, pendingTwoFactorLogin, permissions, refreshMe, requires2FA, roles, user, verifyLoginTwoFactor]);
+  }, [attendanceSubFeatures, clearPendingTwoFactorLogin, features, hasHydrated, isAdmin, isLoading, isSuperAdmin, login, logout, outletIds, payrollSubFeatures, pendingTwoFactorLogin, permissions, refreshMe, requires2FA, roles, user, verifyLoginTwoFactor]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

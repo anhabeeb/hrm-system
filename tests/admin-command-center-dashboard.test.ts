@@ -167,7 +167,7 @@ describe("Admin Command Center dashboard", () => {
     expect(service).toContain('can(actor, ["payroll.view", "dashboard.payroll_readiness.view"])');
     expect(service).toContain('can(actor, ["employeeDiscipline.actions.view"');
     expect(service).toContain('can(actor, ["employeeLifecycle.exitRequests.viewAll"');
-    expect(service).toContain('payroll_readiness: widget("Payroll Readiness", payrollEnabled, canViewPayroll');
+    expect(service).toContain('payroll_readiness: widget("Payroll Readiness", payrollEnabled && payrollSalaryProcessingEnabled, canViewPayroll');
     expect(service).toContain('disciplinary_follow_up: widget("Disciplinary Follow-up", disciplineEnabled, canViewDiscipline');
   });
 

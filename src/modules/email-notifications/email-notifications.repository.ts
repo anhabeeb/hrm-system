@@ -29,6 +29,13 @@ const buildListWhere = (companyId: string, filters: EmailListFilters) => {
   if (filters.category) {
     clauses.push("category = ?");
     values.push(filters.category);
+  } else if (filters.categories) {
+    if (filters.categories.length === 0) {
+      clauses.push("1 = 0");
+    } else {
+      clauses.push(`category IN (${filters.categories.map(() => "?").join(", ")})`);
+      values.push(...filters.categories);
+    }
   }
   if (filters.priority) {
     clauses.push("priority = ?");

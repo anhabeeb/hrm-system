@@ -13,6 +13,8 @@ export interface CurrentUser {
   roles?: string[];
   permissions?: PermissionKey[];
   features?: FeatureKey[];
+  payroll_subfeatures?: Record<string, boolean | undefined>;
+  attendance_subfeatures?: Record<string, boolean | undefined>;
   outlet_ids?: string[];
   is_super_admin?: boolean;
   is_admin?: boolean;
@@ -22,6 +24,8 @@ export interface AuthStateSnapshot {
   user: CurrentUser | null;
   permissions: PermissionKey[];
   features: FeatureKey[];
+  payrollSubFeatures: Record<string, boolean | undefined>;
+  attendanceSubFeatures: Record<string, boolean | undefined>;
   roles: string[];
   outletIds: string[];
   token: string | null;

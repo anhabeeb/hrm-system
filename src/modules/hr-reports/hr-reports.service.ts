@@ -64,7 +64,9 @@ const result = (
 };
 
 const enabledCategories = async (env: Env, actor: AuthActor) => {
-  const [leaveEnabled, longLeaveEnabled, assetsEnabled, uniformsEnabled, contractTrackingEnabled] = await Promise.all([
+  const [documentsEnabled, attendanceEnabled, leaveEnabled, longLeaveEnabled, assetsEnabled, uniformsEnabled, contractTrackingEnabled] = await Promise.all([
+    settingsService.isFeatureEnabled(env, actor.companyId, "documents", actor),
+    settingsService.isFeatureEnabled(env, actor.companyId, "attendance", actor),
     settingsService.isFeatureEnabled(env, actor.companyId, "leave_management", actor),
     settingsService.isFeatureEnabled(env, actor.companyId, "long_leave_management", actor),
     settingsService.isFeatureEnabled(env, actor.companyId, "asset_tracking", actor),
@@ -72,9 +74,13 @@ const enabledCategories = async (env: Env, actor: AuthActor) => {
     settingsService.isFeatureEnabled(env, actor.companyId, "contract_tracking", actor),
   ]);
   return {
+    documents: documentsEnabled,
+    attendance: attendanceEnabled,
     leave: leaveEnabled,
     long_leave: longLeaveEnabled,
-    assets: assetsEnabled && uniformsEnabled,
+    asset_tracking: assetsEnabled,
+    uniform_tracking: uniformsEnabled,
+    assets: assetsEnabled || uniformsEnabled,
     contracts: contractTrackingEnabled,
   };
 };
@@ -83,15 +89,18 @@ export const catalog = async (env: Env, actor: AuthActor) => {
   const categories = await enabledCategories(env, actor);
   return {
     data: HR_REPORT_DEFINITIONS.filter((definition) => canViewReport(actor, definition.required_permission))
+      .filter((definition) => definition.category !== "documents" || categories.documents)
+      .filter((definition) => definition.category !== "attendance" || categories.attendance)
       .filter((definition) => definition.category !== "leave" || categories.leave)
       .filter((definition) => definition.category !== "long_leave" || categories.long_leave)
       .filter((definition) => definition.category !== "assets" || categories.assets)
+      .filter((definition) => !["document-compliance", "foreign-compliance"].includes(definition.report_key) || categories.documents)
       .filter((definition) => definition.report_key !== "contracts" || categories.contracts),
     meta: {
       report_key: "catalog",
       report_name: "HR Report Catalog",
       description: "Available HR reports for the current user.",
-      categories: ["employee", "compliance", "documents", ...(categories.leave ? ["leave"] : []), ...(categories.long_leave ? ["long_leave"] : []), "lifecycle", ...(categories.assets ? ["assets"] : []), "summary"],
+      categories: ["employee", "compliance", ...(categories.documents ? ["documents"] : []), ...(categories.attendance ? ["attendance"] : []), ...(categories.leave ? ["leave"] : []), ...(categories.long_leave ? ["long_leave"] : []), "lifecycle", ...(categories.assets ? ["assets"] : []), "summary"],
       export_ready: true,
     },
     generated_at: new Date().toISOString(),
@@ -156,9 +165,15 @@ export const runReport = async (
       reportRows = await repository.contracts(env, actor, filters);
       break;
     case "document-compliance":
+      if (!(await enabledCategories(env, actor)).documents) {
+        throw new AppError("Document Tracking is disabled. Enable it in Settings to use this module.", "DOCUMENT_TRACKING_DISABLED", 403);
+      }
       reportRows = await repository.documentCompliance(env, actor, filters);
       break;
     case "foreign-compliance":
+      if (!(await enabledCategories(env, actor)).documents) {
+        throw new AppError("Document Tracking is disabled. Enable it in Settings to use this module.", "DOCUMENT_TRACKING_DISABLED", 403);
+      }
       reportRows = await repository.foreignCompliance(env, actor, filters, canViewSensitiveIdentity(actor));
       break;
     case "leave-balances":
@@ -181,9 +196,15 @@ export const runReport = async (
       break;
     case "assets-uniforms":
       if (!(await enabledCategories(env, actor)).assets) {
-        throw new AppError("Asset Tracking and Uniform Tracking must both be enabled before viewing this report.", "ASSETS_UNIFORMS_REPORT_DISABLED", 403);
+        throw new AppError("Asset Tracking or Uniform Tracking must be enabled before viewing this report.", "ASSETS_UNIFORMS_REPORT_DISABLED", 403);
       }
-      reportRows = await repository.assetsUniforms(env, actor, filters);
+      {
+        const categories = await enabledCategories(env, actor);
+        reportRows = await repository.assetsUniforms(env, actor, filters, {
+          includeAssets: categories.asset_tracking,
+          includeUniforms: categories.uniform_tracking,
+        });
+      }
       break;
     case "compliance-summary":
       reportRows = await repository.complianceSummary(env, actor, filters);

@@ -88,7 +88,7 @@ export const CompanyInformationPage = () => {
             You need company.manage or settings.manage to edit company information.
           </InlineAlert>
         ) : null}
-        <div className="grid gap-4 rounded-lg border bg-card p-4 md:grid-cols-2">
+        <div className="grid gap-4 rounded-lg border bg-card p-4 md:grid-cols-2" data-setup-target="company-profile">
           {fields.map((field) => (
             <div key={field.key}>
               <Label htmlFor={field.key}>{field.label}</Label>

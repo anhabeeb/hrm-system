@@ -66,29 +66,31 @@ export const OutletsPage = () => {
         {query.isError ? <InlineAlert title="Outlets could not be loaded." variant="error">Please adjust filters or try again.</InlineAlert> : null}
         <div className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
           <div><h2 className="text-base font-semibold">Outlet Directory</h2><p className="text-sm text-muted-foreground">Outlet-limited users only see records returned by the backend.</p></div>
-          {canCreate ? <Button onClick={() => { setSelected(null); setError(null); setFormOpen(true); }}><Building2 className="h-4 w-4" /> Create Outlet</Button> : null}
+          {canCreate ? <Button data-setup-target="outlet-create-button" onClick={() => { setSelected(null); setError(null); setFormOpen(true); }}><Building2 className="h-4 w-4" /> Create Outlet</Button> : null}
         </div>
         <OutletFilters search={filters.search} status={filters.status} onChange={setFilterValues} onClear={() => setSearchParams(new URLSearchParams({ page: "1", page_size: String(filters.page_size) }))} />
-        <DataTable
-          compact
-          loading={query.isLoading}
-          rows={query.data?.data ?? []}
-          pagination={query.data?.pagination}
-          onPageChange={(page) => setFilterValues({ page })}
-          onPageSizeChange={(page_size) => setFilterValues({ page: 1, page_size })}
-          getRowId={(row) => row.id}
-          onRowClick={(row) => { setSelected(row); setDrawerOpen(true); }}
-          emptyTitle="No outlets found."
-          columns={[
-            { key: "code", header: "Outlet Code", cell: (row) => row.code ?? "Not set" },
-            { key: "name", header: "Outlet Name" },
-            { key: "address", header: "Location", cell: (row) => row.address ?? "Not set" },
-            { key: "status", header: "Status", cell: (row) => <StatusBadge status={row.status} /> },
-            { key: "employees", header: "Employees", cell: () => "Available in reports" },
-            { key: "devices", header: "Devices", cell: () => "Available in devices" },
-          ]}
-          rowActions={(row) => <RowActions actions={[{ key: "view", onSelect: () => { setSelected(row); setDrawerOpen(true); } }, ...(canEdit ? [{ key: "edit" as const, onSelect: () => { setSelected(row); setError(null); setFormOpen(true); } }] : [])]} />}
-        />
+        <div data-setup-target="outlets-list">
+          <DataTable
+            compact
+            loading={query.isLoading}
+            rows={query.data?.data ?? []}
+            pagination={query.data?.pagination}
+            onPageChange={(page) => setFilterValues({ page })}
+            onPageSizeChange={(page_size) => setFilterValues({ page: 1, page_size })}
+            getRowId={(row) => row.id}
+            onRowClick={(row) => { setSelected(row); setDrawerOpen(true); }}
+            emptyTitle="No outlets found."
+            columns={[
+              { key: "code", header: "Outlet Code", cell: (row) => row.code ?? "Not set" },
+              { key: "name", header: "Outlet Name" },
+              { key: "address", header: "Location", cell: (row) => row.address ?? "Not set" },
+              { key: "status", header: "Status", cell: (row) => <StatusBadge status={row.status} /> },
+              { key: "employees", header: "Employees", cell: () => "Available in reports" },
+              { key: "devices", header: "Devices", cell: () => "Available in devices" },
+            ]}
+            rowActions={(row) => <RowActions actions={[{ key: "view", onSelect: () => { setSelected(row); setDrawerOpen(true); } }, ...(canEdit ? [{ key: "edit" as const, onSelect: () => { setSelected(row); setError(null); setFormOpen(true); } }] : [])]} />}
+          />
+        </div>
         <OutletDetailDrawer outlet={selected} open={drawerOpen} canEdit={canEdit} onOpenChange={setDrawerOpen} onEdit={(row) => { setSelected(row); setFormOpen(true); }} />
         <OutletForm open={formOpen} outlet={selected} error={error} loading={mutation.isPending} onOpenChange={setFormOpen} onSubmit={(values) => mutation.mutate({ id: selected?.id, values })} />
       </div>

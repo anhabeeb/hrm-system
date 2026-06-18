@@ -472,6 +472,28 @@ export const ensureProductionFallbackDefaults = async (env: Env, companyId: stri
     require_reason_when_approvals_disabled: true,
     audit_when_approvals_disabled: true,
   });
+  const payrollRules = JSON.stringify({
+    "payroll.salary_processing_enabled": true,
+    "payroll.payslips_enabled": true,
+    "payroll.advances_enabled": true,
+    "payroll.salary_loans_enabled": true,
+    "payroll.overtime_enabled": true,
+    "payroll.benefits_enabled": true,
+    "payroll.manual_deductions_enabled": true,
+    "payroll.attendance_deductions_enabled": true,
+    "payroll.long_leave_deductions_enabled": true,
+    "payroll.approvals_enabled": true,
+    salary_calculation_basis: "fixed_30_days",
+    custom_salary_days: 30,
+    standard_working_hours: 8,
+    attendance_to_payroll_enabled: true,
+    deduct_absent_days: true,
+    deduct_late_minutes: false,
+    deduct_early_checkout: false,
+    allow_negative_salary: false,
+    carry_forward_unpaid_deductions: true,
+    payroll_lock_enabled: true,
+  });
   const features = [
     ["employee_management", "Employee Management"],
     ["user_management", "User Management"],
@@ -483,7 +505,7 @@ export const ensureProductionFallbackDefaults = async (env: Env, companyId: stri
     ["uniform_tracking", "Uniform Tracking"],
     ["leave_management", "Leave Management"],
     ["long_leave_management", "Long Leave Management"],
-    ["payroll", "Payroll"],
+    ["payroll", "Payroll Management"],
     ["attendance", "Attendance Management"],
     ["roster", "Duty Roster"],
     ["approvals", "Approvals"],
@@ -502,6 +524,12 @@ export const ensureProductionFallbackDefaults = async (env: Env, companyId: stri
         effective_from, created_by, updated_by, created_at, updated_at
       ) VALUES (?, ?, 'approvals.default_rules', 'approvals', ?, NULL, NULL, NULL, ?, ?)`,
     ).bind(`${companyId}_setting_approvals_default_rules`, companyId, approvalRules, timestamp, timestamp),
+    env.DB.prepare(
+      `INSERT OR IGNORE INTO company_settings (
+        id, company_id, setting_key, setting_group, setting_value_json,
+        effective_from, created_by, updated_by, created_at, updated_at
+      ) VALUES (?, ?, 'payroll.default_rules', 'payroll', ?, NULL, NULL, NULL, ?, ?)`,
+    ).bind(`${companyId}_setting_payroll_default_rules`, companyId, payrollRules, timestamp, timestamp),
   ]);
 
   await copyOptionalBootstrapDefaults(env, "fallback_feature_settings", [

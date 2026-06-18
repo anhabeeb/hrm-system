@@ -1,7 +1,13 @@
 import * as permissionService from "../../services/permission.service";
+import * as settingsService from "../../services/settings.service";
 import { resolveModuleFeatureAliases } from "../../config/module-codes";
 import type { AuthActor } from "../../types/api.types";
 import * as repository from "./dashboard.repository";
+import {
+  getEnabledExpirySourceTypes,
+  getEnabledNotificationCategories,
+} from "../notifications/module-aware-alerts";
+import { getEnabledApprovalOperationTypes } from "../approvals/approval-module-access.service";
 import type {
   CommandCenterResponse,
   CommandCenterWidgetState,
@@ -41,6 +47,17 @@ const can = (actor: AuthActor, permissions: string[]) =>
 const moduleEnabled = (features: Set<string>, moduleCode: string) =>
   resolveModuleFeatureAliases(moduleCode).some((feature) => features.has(feature));
 
+const attendanceSubFeatureEnabled = async (env: Env, companyId: string, key: string) => {
+  const settings = await settingsService.getAttendanceSettings(env, companyId).catch(() => ({})) as Record<string, unknown>;
+  const aliases: Record<string, string[]> = {
+    corrections_enabled: ["attendance.corrections_enabled", "attendance_correction_enabled"],
+    payroll_deductions_enabled: ["attendance.payroll_deductions_enabled", "absent_day_deduction_enabled", "deduct_absent_days"],
+    kiosk_enabled: ["attendance.kiosk_enabled", "kiosk_mode_enabled"],
+    biometric_enabled: ["attendance.biometric_enabled", "biometric_enabled"],
+  };
+  return (aliases[key] ?? [key]).every((alias) => settings[alias] !== false);
+};
+
 const emptyExpiryCounts = () => ({
   critical: 0,
   due_today: 0,
@@ -54,23 +71,27 @@ const emptyExpiryCounts = () => ({
   document: 0,
 });
 
-const withoutContractExpiryCounts = <T extends Record<string, unknown> | null>(counts: T, contractTrackingEnabled: boolean): T => {
-  if (!counts || contractTrackingEnabled) return counts;
+const withoutDisabledExpiryCounts = <T extends Record<string, unknown> | null>(counts: T, enabledSourceTypes: Set<string>): T => {
+  if (!counts) return counts;
   return {
     ...counts,
-    contract: 0,
-    probation: 0,
+    passport: enabledSourceTypes.has("employee_passport") ? counts.passport : 0,
+    work_permit: enabledSourceTypes.has("employee_work_permit") ? counts.work_permit : 0,
+    document: enabledSourceTypes.has("employee_document") ? counts.document : 0,
+    contract: enabledSourceTypes.has("contract") ? counts.contract : 0,
+    probation: enabledSourceTypes.has("probation") ? counts.probation : 0,
   } as T;
 };
 
 export const getEmployeeSummary = async (env: Env, ctx: DashboardQueryContext) => {
   if (!can(ctx.actor, ["dashboard.view", "dashboard.view_company", "dashboard.view_outlet"])) return null;
+  const enabledExpirySourceTypes = await getEnabledExpirySourceTypes(env, ctx.actor.companyId, ctx.actor);
   const [summary, byOutlet, byDepartment, expiry] = await Promise.all([
     repository.countEmployees(env, ctx.actor),
     repository.employeesByOutlet(env, ctx.actor),
     repository.employeesByDepartment(env, ctx.actor),
     can(ctx.actor, ["dashboard.expiry_alerts.view", "expiry_alerts.view"])
-      ? repository.expiryCounts(env, ctx.actor, ctx.today)
+      ? repository.expiryCounts(env, ctx.actor, ctx.today, { sourceTypes: [...enabledExpirySourceTypes] })
       : Promise.resolve(null),
   ]);
   return {
@@ -145,17 +166,17 @@ export const getLongLeave = async (env: Env, ctx: DashboardQueryContext) => {
 
 export const getExpiryAlerts = async (env: Env, ctx: DashboardQueryContext) => {
   if (!can(ctx.actor, ["dashboard.expiry_alerts.view", "expiry_alerts.view", "expiry_alerts.view_own"])) return null;
+  const enabledExpirySourceTypes = await getEnabledExpirySourceTypes(env, ctx.actor.companyId, ctx.actor);
   const hasScopedExpiryAccess = can(ctx.actor, ["dashboard.expiry_alerts.view", "expiry_alerts.view"]);
   const linkedEmployeeId = hasScopedExpiryAccess
     ? null
     : await repository.findActorLinkedEmployeeId(env, ctx.actor.companyId, ctx.actor.actorUserId);
   const rawCounts = hasScopedExpiryAccess
-    ? await repository.expiryCounts(env, ctx.actor, ctx.today)
+    ? await repository.expiryCounts(env, ctx.actor, ctx.today, { sourceTypes: [...enabledExpirySourceTypes] })
     : linkedEmployeeId
-      ? await repository.expiryCounts(env, ctx.actor, ctx.today, { employeeId: linkedEmployeeId })
+      ? await repository.expiryCounts(env, ctx.actor, ctx.today, { employeeId: linkedEmployeeId, sourceTypes: [...enabledExpirySourceTypes] })
       : emptyExpiryCounts();
-  const features = new Set(await repository.listEnabledFeatureKeys(env, ctx.actor.companyId));
-  const counts = withoutContractExpiryCounts(rawCounts, moduleEnabled(features, "contract_tracking"));
+  const counts = withoutDisabledExpiryCounts(rawCounts, enabledExpirySourceTypes);
   return {
     critical_alerts: n(counts?.critical),
     due_today: n(counts?.due_today),
@@ -170,8 +191,9 @@ export const getExpiryAlerts = async (env: Env, ctx: DashboardQueryContext) => {
 };
 
 export const getNotificationHealth = async (env: Env, ctx: DashboardQueryContext) => {
+  const enabledNotificationCategories = await getEnabledNotificationCategories(env, ctx.actor.companyId, ctx.actor);
   const notifications = can(ctx.actor, ["notifications.view", "notifications.manage_own"])
-    ? await repository.notificationCounts(env, ctx.actor)
+    ? await repository.notificationCounts(env, ctx.actor, [...enabledNotificationCategories])
     : null;
   const email = can(ctx.actor, ["dashboard.admin_health.view", "email_notifications.admin.view"])
     ? await repository.emailHealth(env, ctx.actor)
@@ -440,15 +462,6 @@ export const getCommandCenter = async (env: Env, actor: AuthActor): Promise<{ da
     () => getAttention(env, actor),
     commandCenterWarnings,
   );
-  const quickActions = visibleActions(actor, features, [
-    { ...moduleAction("add-employee", "Add employee", "Create a new employee profile", "/employees", "employees.create", "Employees"), moduleCode: "employees" },
-    { ...moduleAction("view-attendance", "View attendance", "Open today's attendance and exceptions", "/attendance", "attendance.view", "Attendance"), moduleCode: "attendance" },
-    { ...moduleAction("pending-approvals", "Pending approvals", "Open approval command queue", "/approvals", "approvals.view", "Approvals"), moduleCode: "approvals" },
-    { ...moduleAction("payroll-review", "Payroll review", "Review payroll readiness and blockers", "/payroll", "payroll.view", "Payroll"), moduleCode: "payroll" },
-    { ...moduleAction("document-expiry", "Document expiry", "Review document and KYC attention", "/documents", "documents.view", "Documents"), moduleCode: "documents_kyc" },
-    { ...moduleAction("operation-ownership", "Operation Ownership setup", "Resolve ownership setup warnings", "/organization/operation-ownership", "operationOwnership.view", "Operation Ownership"), moduleCode: "operation_ownership" },
-  ]);
-
   const employeesEnabled = moduleEnabled(features, "employees");
   const attendanceEnabled = moduleEnabled(features, "attendance");
   const leaveEnabled = moduleEnabled(features, "leave");
@@ -456,6 +469,7 @@ export const getCommandCenter = async (env: Env, actor: AuthActor): Promise<{ da
   const payrollEnabled = moduleEnabled(features, "payroll");
   const documentsEnabled = moduleEnabled(features, "documents_kyc");
   const contractTrackingEnabled = moduleEnabled(features, "contract_tracking");
+  const enabledExpirySourceTypes = await getEnabledExpirySourceTypes(env, actor.companyId, actor);
   const rosterEnabled = moduleEnabled(features, "roster");
   const lifecycleEnabled = moduleEnabled(features, "resignation_offboarding");
   const disciplineEnabled = moduleEnabled(features, "disciplinary_actions");
@@ -471,6 +485,29 @@ export const getCommandCenter = async (env: Env, actor: AuthActor): Promise<{ da
   const canViewDiscipline = can(actor, ["employeeDiscipline.actions.view", "employeeDiscipline.records.viewAll", "employeeDiscipline.tasks.view"]);
   const canViewOperationOwnership = can(actor, ["operationOwnership.view", "operationOwnership.matrix.view", "settings.view"]);
   const canViewAudit = can(actor, ["audit_logs.view", "reports.view", "dashboard.view"]);
+  const [
+    attendanceCorrectionsEnabled,
+    attendancePayrollDeductionsEnabled,
+    payrollSalaryProcessingEnabled,
+    payrollPayslipsEnabled,
+    payrollAdvancesEnabled,
+  ] = await Promise.all([
+    attendanceEnabled ? attendanceSubFeatureEnabled(env, actor.companyId, "corrections_enabled") : Promise.resolve(false),
+    attendanceEnabled ? attendanceSubFeatureEnabled(env, actor.companyId, "payroll_deductions_enabled") : Promise.resolve(false),
+    payrollEnabled ? settingsService.isPayrollSubFeatureEnabled(env, actor.companyId, "payroll.salary_processing_enabled").catch(() => false) : Promise.resolve(false),
+    payrollEnabled ? settingsService.isPayrollSubFeatureEnabled(env, actor.companyId, "payroll.payslips_enabled").catch(() => false) : Promise.resolve(false),
+    payrollEnabled ? settingsService.isPayrollSubFeatureEnabled(env, actor.companyId, "payroll.advances_enabled").catch(() => false) : Promise.resolve(false),
+  ]);
+  const quickActions = visibleActions(actor, features, [
+    { ...moduleAction("add-employee", "Add employee", "Create a new employee profile", "/employees", "employees.create", "Employees"), moduleCode: "employees" },
+    { ...moduleAction("view-attendance", "View attendance", "Open today's attendance and exceptions", "/attendance", "attendance.view", "Attendance"), moduleCode: "attendance" },
+    { ...moduleAction("pending-approvals", "Pending approvals", "Open approval command queue", "/approvals", "approvals.view", "Approvals"), moduleCode: "approvals" },
+    ...(payrollSalaryProcessingEnabled
+      ? [{ ...moduleAction("payroll-review", "Payroll review", "Review payroll readiness and blockers", "/payroll", "payroll.view", "Payroll"), moduleCode: "payroll" }]
+      : []),
+    { ...moduleAction("document-expiry", "Document expiry", "Review document and KYC attention", "/documents", "documents.view", "Documents"), moduleCode: "documents_kyc" },
+    { ...moduleAction("operation-ownership", "Operation Ownership setup", "Resolve ownership setup warnings", "/organization/operation-ownership", "operationOwnership.view", "Operation Ownership"), moduleCode: "operation_ownership" },
+  ]);
 
   const approvalOperationTypes = [
     "LEAVE_REQUEST",
@@ -485,6 +522,9 @@ export const getCommandCenter = async (env: Env, actor: AuthActor): Promise<{ da
     "OFFBOARDING",
     "DISCIPLINARY_ACTION",
   ];
+  const enabledApprovalOperationTypes = approvalsEnabled && canViewApprovals
+    ? await getEnabledApprovalOperationTypes(env, actor, approvalOperationTypes)
+    : [];
   const [
     employeeSetup,
     leaveToday,
@@ -500,10 +540,10 @@ export const getCommandCenter = async (env: Env, actor: AuthActor): Promise<{ da
   ] = await Promise.all([
     employeesEnabled && canViewEmployees ? safeCommandCenterQuery("people snapshot", null, () => repository.employeeSetupHealth(env, actor, monthStart(new Date(`${ctx.today}T00:00:00Z`))), commandCenterWarnings) : Promise.resolve(null),
     attendanceEnabled && leaveEnabled && canViewAttendance ? safeCommandCenterQuery("leave overlay", null, () => repository.leaveTodayCounts(env, actor, ctx.today), commandCenterWarnings) : Promise.resolve(null),
-    attendanceEnabled && canViewAttendance ? safeCommandCenterQuery("attendance corrections", null, () => repository.pendingAttendanceCorrectionCount(env, actor), commandCenterWarnings) : Promise.resolve(null),
-    approvalsEnabled && canViewApprovals ? safeCommandCenterQuery("approval queue", [] as Awaited<ReturnType<typeof repository.approvalQueueCounts>>, () => repository.approvalQueueCounts(env, actor, approvalOperationTypes), commandCenterWarnings) : Promise.resolve([]),
+    attendanceEnabled && attendanceCorrectionsEnabled && canViewAttendance ? safeCommandCenterQuery("attendance corrections", null, () => repository.pendingAttendanceCorrectionCount(env, actor), commandCenterWarnings) : Promise.resolve(null),
+    approvalsEnabled && canViewApprovals ? safeCommandCenterQuery("approval queue", [] as Awaited<ReturnType<typeof repository.approvalQueueCounts>>, () => repository.approvalQueueCounts(env, actor, enabledApprovalOperationTypes), commandCenterWarnings) : Promise.resolve([]),
     documentsEnabled && canViewDocuments ? safeCommandCenterQuery("document KYC", null, () => repository.documentKycCounts(env, actor), commandCenterWarnings) : Promise.resolve(null),
-    documentsEnabled && canViewDocuments ? safeCommandCenterQuery("document expiry 60 days", null, () => repository.expiryCountsWithinDays(env, actor, ctx.today, 60, { includeContracts: contractTrackingEnabled }), commandCenterWarnings) : Promise.resolve(null),
+    documentsEnabled && canViewDocuments ? safeCommandCenterQuery("document expiry 60 days", null, () => repository.expiryCountsWithinDays(env, actor, ctx.today, 60, { includeContracts: contractTrackingEnabled, sourceTypes: [...enabledExpirySourceTypes] }), commandCenterWarnings) : Promise.resolve(null),
     rosterEnabled && canViewRoster ? safeCommandCenterQuery("roster coverage", null, () => repository.rosterCoverage(env, actor, ctx.today), commandCenterWarnings) : Promise.resolve(null),
     lifecycleEnabled && canViewLifecycle ? safeCommandCenterQuery("lifecycle", null, () => repository.lifecycleCounts(env, actor, ctx.today), commandCenterWarnings) : Promise.resolve(null),
     disciplineEnabled && canViewDiscipline ? safeCommandCenterQuery("disciplinary follow-up", null, () => repository.disciplinaryCounts(env, actor), commandCenterWarnings) : Promise.resolve(null),
@@ -523,7 +563,7 @@ export const getCommandCenter = async (env: Env, actor: AuthActor): Promise<{ da
     n(data.payroll_readiness?.approved_advances_deductions) +
     n(data.payroll_readiness?.pending_leave_adjustments) +
     n(data.payroll_readiness?.approved_leave_not_finalized);
-  const payrollStatus = !payrollEnabled || !canViewPayroll ? null : payrollBlockers > 0 ? "Needs Review" : "Ready";
+  const payrollStatus = !payrollEnabled || !payrollSalaryProcessingEnabled || !canViewPayroll ? null : payrollBlockers > 0 ? "Needs Review" : "Ready";
   const operationWarnings = [
     n(operationHealth?.operations_missing_owner) > 0 ? `${n(operationHealth?.operations_missing_owner)} operations need owner setup.` : null,
     n(operationHealth?.operations_missing_final_approver) > 0 ? `${n(operationHealth?.operations_missing_final_approver)} operations need final approver setup.` : null,
@@ -534,10 +574,10 @@ export const getCommandCenter = async (env: Env, actor: AuthActor): Promise<{ da
 
   const approvalRows = [
     countApprovalRow("leave", "Leave approvals", approvalCount("LEAVE_REQUEST"), "/leave", leaveEnabled, canViewApprovals),
-    countApprovalRow("attendance-correction", "Attendance correction approvals", approvalCount("ATTENDANCE_CORRECTION"), "/attendance/corrections", attendanceEnabled, canViewApprovals),
+    countApprovalRow("attendance-correction", "Attendance correction approvals", approvalCount("ATTENDANCE_CORRECTION"), "/attendance/corrections", attendanceEnabled && attendanceCorrectionsEnabled, canViewApprovals),
     countApprovalRow("roster-change", "Roster change approvals", approvalCount("ROSTER_CHANGE"), "/rosters", rosterEnabled, canViewApprovals),
-    countApprovalRow("payroll-adjustment", "Payroll adjustment approvals", approvalCount("PAYROLL_ADJUSTMENT"), "/payroll", payrollEnabled, canViewApprovals && canViewPayroll),
-    countApprovalRow("advance-salary", "Advance salary approvals", approvalCount("ADVANCE_SALARY_REQUEST"), "/advances", moduleEnabled(features, "advance_salary"), canViewApprovals),
+    countApprovalRow("payroll-adjustment", "Payroll adjustment approvals", approvalCount("PAYROLL_ADJUSTMENT"), "/payroll", payrollEnabled && payrollSalaryProcessingEnabled, canViewApprovals && canViewPayroll),
+    countApprovalRow("advance-salary", "Advance salary approvals", approvalCount("ADVANCE_SALARY_REQUEST"), "/advances", moduleEnabled(features, "advance_salary") && payrollAdvancesEnabled, canViewApprovals),
     countApprovalRow("document-kyc", "Document/KYC approvals", approvalCount("DOCUMENT_KYC_UPDATE"), "/documents", documentsEnabled, canViewApprovals && canViewDocuments),
     countApprovalRow("employee-structure", "Employee transfer/structure approvals", approvalCount("EMPLOYEE_TRANSFER") + approvalCount("EMPLOYEE_STRUCTURE_CHANGE"), "/organization/structure-change-requests", moduleEnabled(features, "employee_structure_changes"), canViewApprovals && canViewEmployees),
     countApprovalRow("offboarding", "Resignation/offboarding approvals", approvalCount("RESIGNATION") + approvalCount("OFFBOARDING"), "/offboarding", lifecycleEnabled, canViewApprovals && canViewLifecycle),
@@ -585,11 +625,13 @@ export const getCommandCenter = async (env: Env, actor: AuthActor): Promise<{ da
           on_leave: leaveEnabled ? n(leaveToday?.on_leave) : 0,
           sick: leaveEnabled ? n(leaveToday?.sick) : 0,
           missing_punch: n(data.attendance_today?.missing_checkin_count) + n(data.attendance_today?.missing_checkout_count),
-          pending_corrections: n(pendingCorrections?.total),
+          ...(attendanceCorrectionsEnabled ? { pending_corrections: n(pendingCorrections?.total) } : {}),
         },
         actions: visibleActions(actor, features, [
           { ...moduleAction("open-attendance", "View attendance", "Open attendance module", "/attendance", "attendance.view", "Attendance"), moduleCode: "attendance" },
-          { ...moduleAction("open-corrections", "View corrections", "Open correction queue", "/attendance/corrections", "attendance.view", "Attendance"), moduleCode: "attendance" },
+          ...(attendanceCorrectionsEnabled
+            ? [{ ...moduleAction("open-corrections", "View corrections", "Open correction queue", "/attendance/corrections", "attendance.view", "Attendance"), moduleCode: "attendance" }]
+            : []),
         ]),
         status: commandCenterWarnings.some((warning) => warning.includes("attendance")) ? "empty" : n(data.attendance_today?.attendance_exceptions_open) > 0 ? "needs_review" : "ready",
         error: commandCenterWarnings.some((warning) => warning.includes("attendance")) ? "unavailable" : undefined,
@@ -603,16 +645,16 @@ export const getCommandCenter = async (env: Env, actor: AuthActor): Promise<{ da
         status: commandCenterWarnings.some((warning) => warning.includes("approval queue")) ? "empty" : approvalRows.some((row) => row.count > 0) ? "needs_review" : "empty",
         error: commandCenterWarnings.some((warning) => warning.includes("approval queue")) ? "unavailable" : undefined,
       }),
-      payroll_readiness: widget("Payroll Readiness", payrollEnabled, canViewPayroll, {
+      payroll_readiness: widget("Payroll Readiness", payrollEnabled && payrollSalaryProcessingEnabled, canViewPayroll, {
         description: "Pre-payroll blockers and setup checks.",
         metrics: {
           current_payroll_period: data.payroll_readiness?.current_payroll_period ?? null,
           pay_date: data.payroll_readiness?.pay_date ?? null,
-          pending_attendance_corrections: n(data.payroll_readiness?.attendance_exceptions),
-          missing_punches: n(data.payroll_readiness?.missing_punches),
-          approved_advances_deductions: n(data.payroll_readiness?.approved_advances_deductions),
+          pending_attendance_corrections: attendanceCorrectionsEnabled && attendancePayrollDeductionsEnabled ? n(data.payroll_readiness?.attendance_exceptions) : null,
+          missing_punches: attendancePayrollDeductionsEnabled ? n(data.payroll_readiness?.missing_punches) : null,
+          approved_advances_deductions: payrollAdvancesEnabled ? n(data.payroll_readiness?.approved_advances_deductions) : null,
           pending_payroll_adjustments: n(data.payroll_readiness?.pending_salary_changes),
-          payslip_generation_status: data.payroll_readiness?.payslip_generation_status ?? null,
+          payslip_generation_status: payrollPayslipsEnabled ? data.payroll_readiness?.payslip_generation_status ?? null : null,
           payroll_locked_or_finalized: Boolean(data.payroll_readiness?.payroll_locked_or_finalized),
         },
         actions: visibleActions(actor, features, [

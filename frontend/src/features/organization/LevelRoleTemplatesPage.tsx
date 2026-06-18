@@ -133,7 +133,7 @@ export const LevelRoleTemplatesPage = () => {
   return (
     <div className="space-y-4 p-4 md:p-6">
       {templatesQuery.isError ? <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">Level role templates could not be loaded. Please try again.</div> : null}
-      <div className="flex flex-wrap items-center justify-end gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2" data-setup-target="job-levels">
         {canManage ? <Button onClick={() => { setSelected(null); setMutationError(null); setDialogOpen(true); }}><ShieldCheck className="h-4 w-4" /> Create Template</Button> : null}
       </div>
       <FilterBar searchPlaceholder="Search templates" onSearchChange={() => undefined} onClear={() => setSearchParams(new URLSearchParams({ page: "1", page_size: String(filters.page_size) }))} onApply={() => undefined}>

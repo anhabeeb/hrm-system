@@ -45,11 +45,17 @@ const mocks = vi.hoisted(() => ({
     hasAnyPermission: vi.fn(),
     isSuperAdmin: vi.fn(),
   },
+  settings: {
+    isFeatureEnabled: vi.fn(),
+    getAttendanceSettings: vi.fn(),
+    isPayrollSubFeatureEnabled: vi.fn(),
+  },
 }));
 
 vi.mock("../src/modules/approvals/approval-workflow-engine.repository", () => mocks.repository);
 vi.mock("../src/services/audit.service", () => mocks.audit);
 vi.mock("../src/services/permission.service", () => mocks.permissions);
+vi.mock("../src/services/settings.service", () => mocks.settings);
 
 import { resolveApproversForStep } from "../src/modules/approvals/approval-approver-resolver.service";
 import * as service from "../src/modules/approvals/approval-workflow-engine.service";
@@ -186,6 +192,13 @@ beforeEach(() => {
   mocks.permissions.hasPermission.mockImplementation((context: AuthActor, permission: string) => context.permissions.includes(permission));
   mocks.permissions.hasAnyPermission.mockImplementation((context: AuthActor, permissions: string[]) => permissions.some((permission) => context.permissions.includes(permission)));
   mocks.permissions.isSuperAdmin.mockImplementation((context: AuthActor) => context.isSuperAdmin === true || context.roleKeys.includes("super_admin"));
+  mocks.settings.isFeatureEnabled.mockResolvedValue(true);
+  mocks.settings.getAttendanceSettings.mockResolvedValue({
+    "attendance.corrections_enabled": true,
+    attendance_correction_enabled: true,
+    "attendance.payroll_deductions_enabled": true,
+  });
+  mocks.settings.isPayrollSubFeatureEnabled.mockResolvedValue(true);
   mocks.repository.findWorkflowStepById.mockResolvedValue(workflowStep());
   mocks.repository.findEmployeeByUserId.mockResolvedValue({ employee_id: "emp_hr", full_name: "HR Final", department_id: "dept_hr", position_id: "pos_hr", level: 4, status: "active", archived_at: null, deleted_at: null });
   mocks.repository.listActions.mockResolvedValue([]);
@@ -901,5 +914,69 @@ describe("general approval workflow engine", () => {
     expect(serviceText).toContain("password_hash");
     expect(serviceText).toContain("reset_token");
     expect(repositoryText).not.toMatch(/password_hash|session_token|totp_secret|reset_token/);
+  });
+
+  it("blocks approval request creation when the related module or sub-feature is disabled", async () => {
+    mocks.settings.isFeatureEnabled.mockImplementation(async (_env: Env, _companyId: string, feature: string) => feature !== "leave_management");
+    await expect(service.createApprovalRequestDraft(env, actorWith({ permissions: ["approvals.requests.create"] }), {
+      operation_type: "LEAVE_REQUEST",
+      subject_type: "leave_request",
+      subject_id: "leave_disabled",
+      title: "Leave disabled",
+    })).rejects.toThrow(/Leave Management is disabled/);
+    expect(mocks.repository.createRequest).not.toHaveBeenCalled();
+
+    mocks.settings.isFeatureEnabled.mockResolvedValue(true);
+    mocks.settings.getAttendanceSettings.mockResolvedValue({ "attendance.corrections_enabled": false, attendance_correction_enabled: false });
+    await expect(service.createApprovalRequestDraft(env, actorWith({ permissions: ["approvals.requests.create"] }), {
+      operation_type: "ATTENDANCE_CORRECTION",
+      subject_type: "ATTENDANCE_CORRECTION",
+      subject_id: "correction_disabled",
+      title: "Correction disabled",
+    })).rejects.toThrow(/Attendance Corrections are disabled/);
+
+    mocks.settings.getAttendanceSettings.mockResolvedValue({ "attendance.corrections_enabled": true, attendance_correction_enabled: true });
+    mocks.settings.isPayrollSubFeatureEnabled.mockImplementation(async (_env: Env, _companyId: string, key: string) => key !== "payroll.approvals_enabled");
+    await expect(service.createApprovalRequestDraft(env, actorWith({ permissions: ["approvals.requests.create"] }), {
+      operation_type: "PAYROLL_ADJUSTMENT",
+      subject_type: "payroll_adjustment",
+      subject_id: "adjustment_disabled",
+      title: "Payroll approval disabled",
+    })).rejects.toThrow(/Payroll manual deductions or payroll approvals are disabled/);
+  });
+
+  it("filters active approval queues to enabled modules and preserves own historical requests", async () => {
+    mocks.settings.isFeatureEnabled.mockImplementation(async (_env: Env, _companyId: string, feature: string) => feature !== "leave_management");
+    mocks.repository.countRequests.mockResolvedValue(0);
+    mocks.repository.listRequests.mockResolvedValue([]);
+
+    await service.getMyPending(env, actorWith({ permissions: ["approvals.department.approve"] }), { page: 1, page_size: 25 });
+    const pendingExtra = mocks.repository.countRequests.mock.calls.at(-1)?.[3] as string;
+    const pendingValues = mocks.repository.countRequests.mock.calls.at(-1)?.[4] as unknown[];
+    expect(pendingExtra).toContain("r.operation_type IN");
+    expect(pendingValues).not.toContain("LEAVE_REQUEST");
+
+    mocks.repository.listRequests.mockResolvedValueOnce([request({ status: "APPROVED", operation_type: "LEAVE_REQUEST" })]);
+    await expect(service.getMyRequests(env, actorWith({ actorUserId: "user_requester", permissions: ["approvals.requests.create"] }), { page: 1, page_size: 25 }))
+      .resolves.toMatchObject({ rows: [expect.objectContaining({ operation_type: "LEAVE_REQUEST", module_enabled: false, read_only: false })] });
+  });
+
+  it("blocks approval actions for disabled module records without deleting history", async () => {
+    mocks.settings.isFeatureEnabled.mockImplementation(async (_env: Env, _companyId: string, feature: string) => feature !== "roster");
+    mocks.repository.findRequestById.mockResolvedValue(request({
+      operation_type: "ROSTER_CHANGE",
+      subject_type: "ROSTER_CHANGE",
+      status: "IN_REVIEW",
+      current_step_id: "req_step_1",
+      requester_user_id: "user_requester",
+    }));
+    mocks.repository.listRequestSteps.mockResolvedValue([requestStep({ assigned_approver_user_id: "user_hr" })]);
+
+    await expect(service.approveStep(env, actor, "approval_req_1", "Approved", {
+      allowModuleBoundAction: true,
+      moduleOperationType: "ROSTER_CHANGE",
+    })).rejects.toThrow(/Duty Roster is disabled/);
+    expect(mocks.repository.updateRequestStepStatus).not.toHaveBeenCalled();
+    expect(mocks.repository.createAction).not.toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ action: "APPROVE" }));
   });
 });

@@ -25,7 +25,7 @@ import type { NotificationFilters, NotificationPreference, NotificationRecord } 
 import { emailNotificationsApi } from "./email-notifications.api";
 import type { EmailNotificationRecord, EmailPreference, EmailSettings, EmailTemplate } from "./email-notifications.types";
 
-const categories = ["leave", "long_leave", "attendance", "biometric", "roster", "holiday", "payroll", "documents", "system", "approvals", "security"];
+const categories = ["leave", "long_leave", "attendance", "biometric", "roster", "holiday", "payroll", "documents", "contracts", "assets", "uniforms", "approvals", "system", "security", "backup"];
 const priorities = ["low", "normal", "high", "urgent"];
 const statuses = ["unread", "read", "archived", "dismissed"];
 
@@ -41,6 +41,27 @@ const defaultPreference = (category: string, existing?: NotificationPreference):
   minimum_priority: existing?.minimum_priority ?? "low",
   muted_until: existing?.muted_until ?? "",
 });
+
+const featureOn = (auth: ReturnType<typeof useAuth>, feature: string) => auth.hasFeature(feature);
+const payrollSubFeatureOn = (auth: ReturnType<typeof useAuth>, key: string) => auth.payrollSubFeatures?.[key] !== false;
+const attendanceSubFeatureOn = (auth: ReturnType<typeof useAuth>, key: string) => auth.attendanceSubFeatures?.[key] !== false;
+
+const notificationCategoryVisible = (auth: ReturnType<typeof useAuth>, category: string) => {
+  if (["system", "security", "backup"].includes(category)) return true;
+  if (category === "leave") return featureOn(auth, "leave") || featureOn(auth, "leave_management");
+  if (category === "long_leave") return featureOn(auth, "long_leave_management");
+  if (category === "documents") return featureOn(auth, "documents") || featureOn(auth, "documents_kyc");
+  if (category === "contracts") return featureOn(auth, "contract_tracking");
+  if (category === "assets") return featureOn(auth, "asset_tracking");
+  if (category === "uniforms") return featureOn(auth, "uniform_tracking");
+  if (category === "roster") return featureOn(auth, "roster");
+  if (category === "holiday") return featureOn(auth, "leave") || featureOn(auth, "leave_management") || featureOn(auth, "roster");
+  if (category === "biometric") return featureOn(auth, "attendance") && (featureOn(auth, "biometric") || featureOn(auth, "biometric_attendance")) && attendanceSubFeatureOn(auth, "attendance.biometric_enabled");
+  if (category === "attendance") return featureOn(auth, "attendance");
+  if (category === "payroll") return featureOn(auth, "payroll") && payrollSubFeatureOn(auth, "payroll.salary_processing_enabled");
+  if (category === "approvals") return featureOn(auth, "approvals");
+  return true;
+};
 
 export const NotificationsPage = () => {
   const auth = useAuth();
@@ -139,11 +160,17 @@ export const NotificationsPage = () => {
   const canAdminEmail = auth.hasAnyPermission(["email_notifications.admin.view", "email_notifications.admin.manage"]);
   const canRetryEmail = auth.hasAnyPermission(["email_notifications.retry", "email_notifications.admin.manage"]);
   const canManageEmailSettings = auth.hasAnyPermission(["email_notifications.settings.manage", "email_notifications.admin.manage"]);
+  const visibleCategories = useMemo(() => categories.filter((category) => notificationCategoryVisible(auth, category)), [auth]);
+  useEffect(() => {
+    if (filters.category && !visibleCategories.includes(filters.category)) {
+      updateFilters({ category: undefined });
+    }
+  }, [filters.category, visibleCategories]);
   const rows = listQuery.data?.data ?? [];
   const existingPreferences = preferencesQuery.data?.data.preferences ?? [];
-  const preferenceRows = categories.map((category) => defaultPreference(category, existingPreferences.find((row) => row.category === category)));
+  const preferenceRows = visibleCategories.map((category) => defaultPreference(category, existingPreferences.find((row) => row.category === category)));
   const existingEmailPreferences = emailPreferencesQuery.data?.data.preferences ?? [];
-  const emailPreferenceRows = categories.map((category) => defaultEmailPreference(category, existingEmailPreferences.find((row) => row.category === category)));
+  const emailPreferenceRows = visibleCategories.map((category) => defaultEmailPreference(category, existingEmailPreferences.find((row) => row.category === category)));
   const emailRows = emailListQuery.data?.data ?? [];
   const emailSettings = emailSettingsQuery.data?.data.settings;
 
@@ -166,7 +193,7 @@ export const NotificationsPage = () => {
         ) : null}
         <div className="grid gap-3 rounded-lg border bg-card p-4 md:grid-cols-5">
           <Label className="space-y-1 text-xs font-medium text-muted-foreground">Status<Select value={filters.status ?? "active"} onValueChange={(value) => updateFilters({ status: value === "active" ? undefined : value, include_archived: value === "archived" || value === "dismissed" ? true : filters.include_archived })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="active">Active</SelectItem>{statuses.map((status) => <SelectItem key={status} value={status}>{label(status)}</SelectItem>)}</SelectContent></Select></Label>
-          <Label className="space-y-1 text-xs font-medium text-muted-foreground">Category<Select value={filters.category ?? "all"} onValueChange={(value) => updateFilters({ category: value === "all" ? undefined : value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All categories</SelectItem>{categories.map((category) => <SelectItem key={category} value={category}>{label(category)}</SelectItem>)}</SelectContent></Select></Label>
+          <Label className="space-y-1 text-xs font-medium text-muted-foreground">Category<Select value={filters.category ?? "all"} onValueChange={(value) => updateFilters({ category: value === "all" ? undefined : value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All categories</SelectItem>{visibleCategories.map((category) => <SelectItem key={category} value={category}>{label(category)}</SelectItem>)}</SelectContent></Select></Label>
           <Label className="space-y-1 text-xs font-medium text-muted-foreground">Priority<Select value={filters.priority ?? "all"} onValueChange={(value) => updateFilters({ priority: value === "all" ? undefined : value })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="all">All priorities</SelectItem>{priorities.map((priority) => <SelectItem key={priority} value={priority}>{label(priority)}</SelectItem>)}</SelectContent></Select></Label>
           <div className="md:col-span-2">
             <AppDateRangePicker
@@ -229,7 +256,7 @@ export const NotificationsPage = () => {
           <TabsContent value="email-settings">
             <EmailSettingsPanel
               settings={emailSettings}
-              templates={emailTemplatesQuery.data?.data.templates ?? []}
+              templates={(emailTemplatesQuery.data?.data.templates ?? []).filter((template) => visibleCategories.includes(template.category))}
               disabled={!canManageEmailSettings || emailSettingsMutation.isPending}
               reason={emailSettingsReason}
               onReasonChange={setEmailSettingsReason}

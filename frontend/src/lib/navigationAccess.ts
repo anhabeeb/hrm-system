@@ -2,11 +2,16 @@ import type { CurrentUser } from "@/types/auth";
 import type { NavGroup, NavItem } from "@/types/navigation";
 
 import { canShowModuleItem } from "./moduleAccess";
+import { hasAllAttendanceSubFeatures, hasAllPayrollSubFeatures, hasAttendanceSubFeature, hasPayrollSubFeature } from "./subfeatures";
 
 export const canAccessNavItem = (user: CurrentUser | null, item: NavItem) => {
   if (item.hidden) return false;
   if (item.adminOnly && !user?.is_admin && !user?.is_super_admin) return false;
   if (item.selfServiceOnly && !user?.employee_id) return false;
+  if (!hasPayrollSubFeature(user, item.requiredPayrollSubFeature)) return false;
+  if (!hasAllPayrollSubFeatures(user, item.requiredPayrollSubFeaturesAll)) return false;
+  if (!hasAttendanceSubFeature(user, item.requiredAttendanceSubFeature)) return false;
+  if (!hasAllAttendanceSubFeatures(user, item.requiredAttendanceSubFeaturesAll)) return false;
   return canShowModuleItem(user, item.moduleCode ?? item.requiredFeature, item.requiredPermission, {
     requiredPermissionsAny: item.requiredPermissionsAny,
     moduleCodesAll: item.moduleCodesAll,

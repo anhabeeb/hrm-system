@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/features/auth/auth.store";
+import { usePayrollSubFeatures } from "@/features/payroll/usePayrollSubFeatures";
 import { friendlyHrmError } from "@/lib/hrm-errors";
 import { searchParamNumber } from "@/lib/query-string";
 import { sanitizeForDisplay } from "@/lib/safe-display";
@@ -98,6 +99,7 @@ const ImportUploadDialog = ({ open, loading, error, onOpenChange, onSubmit }: { 
 
 export const ImportExportPage = () => {
   const auth = useAuth();
+  const payrollSubFeatures = usePayrollSubFeatures();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [tab, setTab] = useState(searchParams.get("tab") ?? "exports");
@@ -111,14 +113,17 @@ export const ImportExportPage = () => {
   const canViewExports = has("export.view");
   const canViewImports = has("import.view");
   const canViewTemplates = has("import.download_template");
+  const documentTrackingEnabled = auth.hasFeature("documents") || auth.hasFeature("documents_kyc") || auth.hasFeature("kyc_update_requests");
   const visibleExportTypes = useMemo(
     () => exportTypes.filter((type) =>
       (type !== "attendance" || auth.hasFeature("attendance")) &&
       (type !== "leave" || auth.hasFeature("leave_management")) &&
+      (type !== "payroll" || (auth.hasFeature("payroll") && payrollSubFeatures.salaryProcessingEnabled)) &&
       (type !== "assets" || auth.hasFeature("asset_tracking")) &&
-      (type !== "uniforms" || auth.hasFeature("uniform_tracking")),
+      (type !== "uniforms" || auth.hasFeature("uniform_tracking")) &&
+      (type !== "documents_metadata" || documentTrackingEnabled),
     ),
-    [auth],
+    [auth, documentTrackingEnabled, payrollSubFeatures.salaryProcessingEnabled],
   );
   const activeTab = tab === "imports" && canViewImports ? "imports" : tab === "templates" && canViewTemplates ? "templates" : canViewExports ? "exports" : canViewImports ? "imports" : "templates";
   const filters = useMemo<ImportExportFilters>(() => ({ status: searchParams.get("status") || undefined, type: searchParams.get("type") || undefined, page: searchParamNumber(searchParams, "page", 1), page_size: searchParamNumber(searchParams, "page_size", 25) }), [searchParams]);
@@ -156,7 +161,7 @@ export const ImportExportPage = () => {
   const mutationError = createExportMutation.error ?? uploadMutation.error ?? downloadMutation.error ?? reasonMutation.error;
   return (
     <div>
-      <PageActionBar label="Import and export page actions"><div className="flex flex-wrap items-center justify-end gap-2">{canViewExports && has("export.create") ? <Button onClick={() => setExportOpen(true)}><Plus className="h-4 w-4" />Create export</Button> : null}{canViewImports && has("import.create") ? <Button variant="outline" onClick={() => setImportOpen(true)}><Upload className="h-4 w-4" />Upload import</Button> : null}</div></PageActionBar>
+      <PageActionBar label="Import and export page actions"><div className="flex flex-wrap items-center justify-end gap-2" data-setup-target="import-export-actions">{canViewExports && has("export.create") ? <Button onClick={() => setExportOpen(true)}><Plus className="h-4 w-4" />Create export</Button> : null}{canViewImports && has("import.create") ? <Button variant="outline" onClick={() => setImportOpen(true)}><Upload className="h-4 w-4" />Upload import</Button> : null}</div></PageActionBar>
       <div className="space-y-4 p-4 md:p-6">
         {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
         {(activeError || mutationError) ? <InlineAlert title={friendlyHrmError(activeError ?? mutationError, "Import/export data could not be loaded.")} variant="error" /> : null}

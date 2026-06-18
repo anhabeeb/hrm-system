@@ -15,6 +15,7 @@ export const FeatureReasonDialog = ({
   nextEnabled,
   loading,
   error,
+  dependencyWarning,
   onOpenChange,
   onConfirm,
 }: {
@@ -23,6 +24,7 @@ export const FeatureReasonDialog = ({
   nextEnabled: boolean;
   loading?: boolean;
   error?: ApiError | null;
+  dependencyWarning?: string | null;
   onOpenChange: (open: boolean) => void;
   onConfirm: (reason: string) => void;
 }) => {
@@ -56,6 +58,7 @@ export const FeatureReasonDialog = ({
           <div className="rounded-md border bg-muted/30 p-3 text-sm">
             <div className="font-medium">{feature?.feature_name ?? "Feature setting"}</div>
             <div className="text-muted-foreground">New status: {nextEnabled ? "Enabled" : "Disabled"}</div>
+            {dependencyWarning ? <div className="mt-2 text-amber-700">{dependencyWarning}</div> : null}
           </div>
           <FormError message={error?.message ?? validationError ?? undefined} requestId={error?.requestId} />
           <div className="space-y-2">

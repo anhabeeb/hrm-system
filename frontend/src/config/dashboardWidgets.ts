@@ -1,4 +1,5 @@
 import type { PermissionKey } from "@/types/auth";
+import type { AttendanceSubFeatureKey, PayrollSubFeatureKey } from "@/lib/subfeatures";
 
 export type DashboardType = "ADMIN_COMMAND_CENTER" | "SELF_SERVICE_DASHBOARD";
 export type DashboardWidgetSize = "small" | "medium" | "wide";
@@ -15,6 +16,10 @@ export interface DashboardWidgetDefinition {
   requiredFeaturesAll?: string[];
   requiredPermission?: PermissionKey;
   requiredPermissionsAny?: PermissionKey[];
+  requiredPayrollSubFeature?: PayrollSubFeatureKey;
+  requiredPayrollSubFeaturesAll?: PayrollSubFeatureKey[];
+  requiredAttendanceSubFeature?: AttendanceSubFeatureKey;
+  requiredAttendanceSubFeaturesAll?: AttendanceSubFeatureKey[];
   requiresLinkedEmployee?: boolean;
   sensitive?: boolean;
 }
@@ -222,6 +227,7 @@ export const selfServiceWidgetDefinitions: DashboardWidgetDefinition[] = [
     defaultVisible: true,
     defaultOrder: 70,
     requiredFeaturesAll: ["payroll", "payslips"],
+    requiredPayrollSubFeature: "payslips_enabled",
     requiresLinkedEmployee: true,
     requiredPermissionsAny: ["self.payslips.view", "payslips.view_own", "payroll.self.view"],
     sensitive: true,

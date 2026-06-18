@@ -2,6 +2,7 @@ export type HrReportCategory =
   | "employee"
   | "compliance"
   | "documents"
+  | "attendance"
   | "leave"
   | "long_leave"
   | "lifecycle"

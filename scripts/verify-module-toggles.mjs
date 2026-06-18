@@ -30,6 +30,9 @@ if (!exists("migrations/0083_contract_tracking_feature_setting.sql")) {
 if (!exists("migrations/0084_attendance_management_feature_settings.sql")) {
   failures.push("migration: 0084_attendance_management_feature_settings.sql is missing.");
 }
+if (!exists("migrations/0085_payroll_management_feature_settings.sql")) {
+  failures.push("migration: 0085_payroll_management_feature_settings.sql is missing.");
+}
 
 const migration = exists("migrations/0080_asset_uniform_tracking_feature_settings.sql")
   ? read("migrations/0080_asset_uniform_tracking_feature_settings.sql")
@@ -79,19 +82,33 @@ for (const marker of ["INSERT OR IGNORE INTO feature_settings", "Attendance Mana
 if (/DROP\s+|DELETE\s+FROM|UPDATE\s+feature_settings/i.test(attendanceMigration)) {
   failures.push("attendance management migration: must remain additive and must not drop/delete/update existing data.");
 }
+const payrollMigration = exists("migrations/0085_payroll_management_feature_settings.sql")
+  ? read("migrations/0085_payroll_management_feature_settings.sql")
+  : "";
+for (const marker of ["INSERT OR IGNORE INTO feature_settings", "Payroll Management", "payroll.salary_processing_enabled", "payroll.payslips_enabled", "payroll.advances_enabled", "payroll.salary_loans_enabled", "payroll.overtime_enabled", "payroll.benefits_enabled", "payroll.manual_deductions_enabled", "payroll.attendance_deductions_enabled", "payroll.long_leave_deductions_enabled", "payroll.approvals_enabled", "WHERE c.deleted_at IS NULL"]) {
+  if (!payrollMigration.includes(marker)) failures.push(`payroll management migration: missing ${marker}`);
+}
+if (/DROP\s+|DELETE\s+FROM/i.test(payrollMigration)) {
+  failures.push("payroll management migration: must not drop/delete production data.");
+}
+if (/status\s*=\s*'disabled'|is_enabled\s*=\s*0/i.test(payrollMigration)) {
+  failures.push("payroll management migration: must not disable existing payroll features.");
+}
 
-mustInclude("feature seed", "seeds/feature-settings.seed.sql", ["asset_tracking", "Asset Tracking", "uniform_tracking", "Uniform Tracking", "leave_management", "Leave Management", "long_leave_management", "Long Leave Management", "roster", "Duty Roster", "contract_tracking", "Contract Tracking", "attendance", "Attendance Management"]);
-mustInclude("company settings seed", "seeds/company-settings.seed.sql", ["attendance.manual_entry_enabled", "attendance.kiosk_enabled", "attendance.biometric_enabled", "attendance.corrections_enabled", "attendance.payroll_deductions_enabled"]);
-mustInclude("bootstrap defaults", "src/modules/bootstrap/bootstrap.repository.ts", ["asset_tracking", "uniform_tracking", "leave_management", "long_leave_management", "roster", "Duty Roster", "contract_tracking", "Contract Tracking", "attendance", "Attendance Management", "applyBootstrapFeatureSelections"]);
+mustInclude("feature seed", "seeds/feature-settings.seed.sql", ["asset_tracking", "Asset Tracking", "uniform_tracking", "Uniform Tracking", "leave_management", "Leave Management", "long_leave_management", "Long Leave Management", "roster", "Duty Roster", "contract_tracking", "Contract Tracking", "attendance", "Attendance Management", "payroll", "Payroll Management"]);
+mustInclude("company settings seed", "seeds/company-settings.seed.sql", ["attendance.manual_entry_enabled", "attendance.kiosk_enabled", "attendance.biometric_enabled", "attendance.corrections_enabled", "attendance.payroll_deductions_enabled", "payroll.salary_processing_enabled", "payroll.payslips_enabled", "payroll.advances_enabled", "payroll.salary_loans_enabled", "payroll.overtime_enabled", "payroll.benefits_enabled", "payroll.manual_deductions_enabled", "payroll.attendance_deductions_enabled", "payroll.long_leave_deductions_enabled", "payroll.approvals_enabled"]);
+mustInclude("bootstrap defaults", "src/modules/bootstrap/bootstrap.repository.ts", ["asset_tracking", "uniform_tracking", "leave_management", "long_leave_management", "roster", "Duty Roster", "contract_tracking", "Contract Tracking", "attendance", "Attendance Management", "payroll", "Payroll Management", "payroll.salary_processing_enabled", "applyBootstrapFeatureSelections"]);
 mustInclude("backend module aliases", "src/config/module-codes.ts", ["asset_tracking", "uniform_tracking", "contract_tracking"]);
 mustInclude("frontend module aliases", "frontend/src/config/moduleCodes.ts", ["asset_tracking", "uniform_tracking", "contract_tracking"]);
 mustInclude("settings feature dependencies", "src/modules/settings/settings.constants.ts", [
-  "long_leave_management: [\"leave_management\", \"payroll\"]",
+  "long_leave_management: [\"leave_management\"]",
   "asset_tracking: [\"employee_management\"]",
   "uniform_tracking: [\"employee_management\"]",
   "roster: [\"employee_management\"]",
   "contract_tracking: [\"employee_management\"]",
   "attendance: [\"employee_management\"]",
+  "payroll: [\"employee_management\"]",
+  "payroll: \"Payroll Management\"",
   "roster: \"Duty Roster\"",
   "contract_tracking: \"Contract Tracking\"",
   "attendance: \"Attendance Management\"",
@@ -109,6 +126,12 @@ mustInclude("attendance sub-feature lookup route", "src/routes/attendance.routes
 mustInclude("kiosk routes", "src/routes/kiosk.routes.ts", ['requireFeature("attendance")', 'requireAttendanceSubFeature("attendance.kiosk_enabled")']);
 mustInclude("biometric routes", "src/routes/biometric.routes.ts", ['requireFeature("attendance")', 'requireAttendanceSubFeature("attendance.biometric_enabled")']);
 mustInclude("payroll report attendance route guards", "src/routes/payroll-reports.routes.ts", ['requireFeature("attendance")', 'requireAttendanceSubFeature("attendance.payroll_deductions_enabled")']);
+mustInclude("payroll routes", "src/routes/payroll.routes.ts", ['requireFeature("payroll")', '"/subfeatures"', "controller.subFeatures", 'requirePayrollSubFeature("payroll.salary_processing_enabled")', 'requirePayrollSubFeature("payroll.payslips_enabled")', 'requirePayrollSubFeature("payroll.approvals_enabled")']);
+mustInclude("payroll child routes", "src/routes/payroll.routes.ts", ['requirePayrollSubFeature("payroll.manual_deductions_enabled")']);
+mustInclude("payroll advances routes", "src/routes/advances.routes.ts", ['requireFeature("payroll")', 'requireFeature("advance_salary")', 'requirePayrollSubFeature("payroll.advances_enabled")']);
+mustInclude("payroll salary loans routes", "src/routes/salary-loans.routes.ts", ['requireFeature("payroll")', 'requirePayrollSubFeature("payroll.salary_loans_enabled")']);
+mustInclude("payslips routes", "src/routes/payslips.routes.ts", ['requireFeature("payroll")', 'requireFeature("payslips")', 'requirePayrollSubFeature("payroll.payslips_enabled")']);
+mustInclude("payroll reports routes", "src/routes/payroll-reports.routes.ts", ['requireFeature("payroll")', 'requirePayrollSubFeature("payroll.advances_enabled")', 'requirePayrollSubFeature("payroll.salary_loans_enabled")', 'requirePayrollSubFeature("payroll.overtime_enabled")', 'requirePayrollSubFeature("payroll.long_leave_deductions_enabled")']);
 if (assetRoutes.includes('requireFeature("assets_uniforms")')) failures.push("asset routes: must not use legacy combined assets_uniforms guard.");
 if (uniformRoutes.includes('requireFeature("assets_uniforms")')) failures.push("uniform routes: must not use legacy combined assets_uniforms guard.");
 
@@ -125,6 +148,31 @@ mustInclude("feature middleware disabled messages", "src/middleware/feature.midd
   "Biometric Attendance is disabled.",
   "Attendance Corrections are disabled.",
   "Attendance Payroll Deductions are disabled.",
+  "Payroll Management is disabled. Enable it in Settings to use this module.",
+  "Salary Processing is disabled.",
+  "Payslips are disabled.",
+  "Advance Salary is disabled.",
+  "Salary Loans are disabled.",
+  "Payroll Approvals are disabled.",
+]);
+mustInclude("payroll sub-feature settings helper", "src/services/settings.service.ts", [
+  "PAYROLL_SUB_FEATURE_DEFAULTS",
+  "getPayrollSubFeatureSettings",
+  "isPayrollSubFeatureEnabled",
+  "payroll.salary_processing_enabled",
+  "payroll.attendance_deductions_enabled",
+]);
+mustInclude("payroll sub-feature lookup service", "src/modules/payroll/payroll.service.ts", [
+  "getPayrollSubFeatures",
+  "salary_processing_enabled",
+  "manual_deductions_enabled",
+  "attendance_deductions_enabled",
+]);
+mustInclude("auth me sub-feature snapshot", "src/modules/auth/auth.service.ts", [
+  "payroll_subfeatures",
+  "attendance_subfeatures",
+  "getAuthPayrollSubFeatures",
+  "getAuthAttendanceSubFeatures",
 ]);
 mustInclude("attendance sub-feature lookup service", "src/modules/attendance/attendance.service.ts", [
   "getAttendanceSubFeatures",
@@ -155,6 +203,12 @@ mustInclude("frontend router", "frontend/src/app/router.tsx", [
   'featuresAll: ["employee_management", "contract_tracking"]',
   'moduleName: "Contract Tracking"',
   'feature: "attendance"',
+  'feature: "payroll"',
+  'moduleCode: "payroll"',
+  'moduleName: "Payroll Management"',
+  'featuresAll: ["payroll", "payslips"]',
+  'featuresAll: ["payroll", "advance_salary"]',
+  'featuresAll: ["reports", "payroll"]',
   'featuresAll: ["attendance", "offline_sync"]',
   'featuresAll: ["attendance", "biometric_attendance"]',
 ]);
@@ -176,6 +230,11 @@ mustInclude("navigation", "frontend/src/lib/navigation.ts", [
   'requiredFeaturesAll: ["attendance", "offline_sync"]',
   'moduleCodesAll: ["attendance", "biometric"]',
   'requiredFeaturesAll: ["attendance", "biometric_attendance"]',
+  'moduleCodesAll: ["payroll", "payslips"]',
+  'requiredFeaturesAll: ["payroll", "payslips"]',
+  'moduleCodesAll: ["payroll", "advance_salary"]',
+  'requiredFeaturesAll: ["payroll", "advance_salary"]',
+  'requiredFeaturesAll: ["reports", "payroll"]',
 ]);
 
 mustInclude("settings UI", "frontend/src/features/settings/FeatureSettingsPanel.tsx", [
@@ -187,12 +246,13 @@ mustInclude("settings UI", "frontend/src/features/settings/FeatureSettingsPanel.
   "Duty Roster",
   "Contract Tracking",
   "Attendance Management",
+  "Payroll Management",
+  "Process employee salaries, advances, loans, overtime, benefits, deductions, payslips, and payroll approvals.",
   "Plan employee work schedules, weekly duty rosters, shift assignments, and roster change workflows.",
   "Track employee contracts, renewals, probation periods, linked contract documents, and contract expiry alerts.",
   "Track employee attendance, lateness, absences, corrections, biometric/kiosk entries, and attendance-based payroll review.",
-  "Disabling this module hides it from normal use but does not delete existing attendance records.",
-  "Disabling this module hides it from normal use but does not delete existing contract records.",
   "Disabling this module hides it from normal use but does not delete existing records.",
+  "Re-enabling restores access to preserved records and settings.",
 ]);
 mustInclude("attendance structured settings", "frontend/src/features/settings/structured-settings.ts", [
   "Attendance Sub-Features",
@@ -202,9 +262,26 @@ mustInclude("attendance structured settings", "frontend/src/features/settings/st
   "Attendance Corrections",
   "Payroll Deductions from Attendance",
 ]);
+mustInclude("payroll structured settings", "frontend/src/features/settings/structured-settings.ts", [
+  "Payroll Management",
+  "Payroll Sub-Features",
+  "Salary Processing",
+  "Payslips",
+  "Advance Salary",
+  "Salary Loans",
+  "Overtime",
+  "Benefits",
+  "Manual Deductions",
+  "Attendance Deductions",
+  "Long Leave Deductions",
+  "Payroll Approvals",
+]);
 const structuredSettings = read("frontend/src/features/settings/structured-settings.ts");
 for (const duplicate of ["Manual attendance allowed", "Attendance correction allowed", "Kiosk attendance enabled", "Biometric attendance enabled", "Absent day deduction rule"]) {
   if (structuredSettings.includes(duplicate)) failures.push(`attendance settings UI: duplicate legacy switch is still visible: ${duplicate}`);
+}
+for (const duplicate of ["Monthly payroll enabled", "Advance payments enabled", "Salary loans enabled", "Payslip generation enabled"]) {
+  if (structuredSettings.includes(duplicate)) failures.push(`payroll settings UI: duplicate legacy switch is still visible: ${duplicate}`);
 }
 mustInclude("attendance sub-feature frontend helper", "frontend/src/features/attendance/useAttendanceSubFeatures.ts", [
   "attendanceApi.subFeatures",
@@ -237,6 +314,82 @@ mustInclude("biometric page sub-feature UI guards", "frontend/src/features/biome
 mustInclude("payroll attendance deduction frontend guards", "frontend/src/features/payroll-reports/PayrollReportsPage.tsx", [
   "useAttendanceSubFeatures",
   "attendanceSubFeatures.payrollDeductionsEnabled",
+]);
+mustInclude("payroll sub-feature frontend helper", "frontend/src/features/payroll/usePayrollSubFeatures.ts", [
+  "payrollApi.subFeatures",
+  "salaryProcessingEnabled",
+  "payslipsEnabled",
+  "advancesEnabled",
+  "salaryLoansEnabled",
+  "overtimeEnabled",
+  "benefitsEnabled",
+  "manualDeductionsEnabled",
+  "attendanceDeductionsEnabled",
+  "longLeaveDeductionsEnabled",
+  "approvalsEnabled",
+]);
+mustInclude("frontend auth sub-feature snapshot", "frontend/src/features/auth/auth.store.tsx", [
+  "payroll_subfeatures",
+  "attendance_subfeatures",
+  "payrollSubFeatures",
+  "attendanceSubFeatures",
+]);
+mustInclude("navigation sub-feature access helper", "frontend/src/lib/navigationAccess.ts", [
+  "hasPayrollSubFeature",
+  "hasAttendanceSubFeature",
+  "requiredPayrollSubFeature",
+  "requiredAttendanceSubFeature",
+]);
+mustInclude("route guard sub-feature access", "frontend/src/features/auth/route-guards.tsx", [
+  "requiredPayrollSubFeature",
+  "requiredAttendanceSubFeature",
+  "hasPayrollSubFeature",
+  "hasAttendanceSubFeature",
+  "ModuleDisabledPage",
+]);
+mustInclude("payroll page sub-feature UI guards", "frontend/src/features/payroll/PayrollPage.tsx", [
+  "usePayrollSubFeatures",
+  "payrollSubFeatures.salaryProcessingEnabled && hasPayrollPermission",
+  "payrollSubFeatures.manualDeductionsEnabled &&",
+  "payrollSubFeatures.approvalsEnabled &&",
+  "Manual Deductions are disabled.",
+]);
+mustInclude("advances page sub-feature UI guards", "frontend/src/features/advances/AdvancesPage.tsx", [
+  "usePayrollSubFeatures",
+  "payrollSubFeatures.advancesEnabled &&",
+  "Advance Salary is disabled.",
+]);
+mustInclude("salary loans page sub-feature UI guards", "frontend/src/features/salary-loans/SalaryLoansPage.tsx", [
+  "usePayrollSubFeatures",
+  "payrollSubFeatures.salaryLoansEnabled &&",
+  "Salary Loans are disabled.",
+]);
+mustInclude("payslips page sub-feature UI guards", "frontend/src/features/payslips/PayslipsPage.tsx", [
+  "usePayrollSubFeatures",
+  "payrollSubFeatures.payslipsEnabled &&",
+  "Payslips are disabled.",
+]);
+mustInclude("payroll item drawer sub-feature UI guards", "frontend/src/features/payroll/PayrollItemDetailDrawer.tsx", [
+  "usePayrollSubFeatures",
+  "payrollSubFeatures.payslipsEnabled",
+  "payrollSubFeatures.benefitsEnabled",
+  "payrollSubFeatures.attendanceDeductionsEnabled",
+  "payrollSubFeatures.advancesEnabled",
+  "payrollSubFeatures.salaryLoansEnabled",
+]);
+mustInclude("payroll sub-feature navigation", "frontend/src/lib/navigation.ts", [
+  'requiredPayrollSubFeature: "payslips_enabled"',
+  'requiredPayrollSubFeature: "advances_enabled"',
+  'requiredPayrollSubFeature: "salary_loans_enabled"',
+  'requiredPayrollSubFeature: "attendance_deductions_enabled"',
+  'requiredAttendanceSubFeature: "payroll_deductions_enabled"',
+]);
+mustInclude("payroll sub-feature direct routes", "frontend/src/app/router.tsx", [
+  'requiredPayrollSubFeature: "payslips_enabled"',
+  'requiredPayrollSubFeature: "advances_enabled"',
+  'requiredPayrollSubFeature: "salary_loans_enabled"',
+  'requiredPayrollSubFeature: "attendance_deductions_enabled"',
+  'requiredAttendanceSubFeature: "payroll_deductions_enabled"',
 ]);
 mustInclude("bootstrap setup UI", "frontend/src/features/bootstrap/FirstTimeSetupForm.tsx", [
   "Operational modules",
@@ -277,22 +430,28 @@ mustInclude("employee profile backend", "src/modules/employees/employees.service
 ]);
 
 mustInclude("reports route", "src/routes/reports.routes.ts", ['requireFeature("asset_tracking")']);
-mustInclude("HR reports route", "src/routes/hr-reports.routes.ts", ['requireFeature("leave_management")', 'requireFeature("long_leave_management")', 'requireFeature("asset_tracking")', 'requireFeature("uniform_tracking")']);
+const hrReportsRoute = mustInclude("HR reports route", "src/routes/hr-reports.routes.ts", ['requireFeature("leave_management")', 'requireFeature("long_leave_management")', 'requireAnyFeature(["asset_tracking", "uniform_tracking"]', "ASSETS_UNIFORMS_REPORT_DISABLED"]);
+if (hrReportsRoute.includes('hrReportsRoutes.get("/assets-uniforms", requireFeature("asset_tracking"), requireFeature("uniform_tracking")')) {
+  failures.push("HR reports route: assets-uniforms must use an either-module guard, not sequential asset/uniform feature guards.");
+}
+if (/key === "assets-uniforms"[\s\S]{0,180}requireFeature\("asset_tracking"\)[\s\S]{0,180}requireFeature\("uniform_tracking"\)/.test(hrReportsRoute)) {
+  failures.push("HR reports dynamic route: assets-uniforms must use an either-module guard, not sequential asset/uniform feature guards.");
+}
 mustInclude("HR reports route contract guard", "src/routes/hr-reports.routes.ts", ['requireFeature("contract_tracking")']);
 mustInclude("HR reports service", "src/modules/hr-reports/hr-reports.service.ts", ["enabledCategories", "LEAVE_MANAGEMENT_DISABLED", "LONG_LEAVE_MANAGEMENT_DISABLED", "ASSETS_UNIFORMS_REPORT_DISABLED", "CONTRACT_TRACKING_DISABLED"]);
-mustInclude("Payroll reports service", "src/modules/payroll-reports/payroll-reports.service.ts", ["enabledCategories", "LEAVE_MANAGEMENT_DISABLED", "LONG_LEAVE_MANAGEMENT_DISABLED"]);
+mustInclude("Payroll reports service", "src/modules/payroll-reports/payroll-reports.service.ts", ["enabledCategories", "LEAVE_MANAGEMENT_DISABLED", "LONG_LEAVE_MANAGEMENT_DISABLED", "PAYROLL_MANAGEMENT_DISABLED", "payrollSubFeatureEnabled"]);
 mustInclude("Payroll attendance deduction service", "src/modules/payroll-reports/payroll-reports.service.ts", ["ATTENDANCE_MANAGEMENT_DISABLED", "ATTENDANCE_PAYROLL_DEDUCTIONS_DISABLED", "attendancePayrollDeductionsEnabled"]);
 mustInclude("payroll calculator attendance deduction switch", "src/modules/payroll/payroll.calculator.ts", ['"attendance.payroll_deductions_enabled"']);
 mustInclude("payroll service attendance deduction switch", "src/modules/payroll/payroll.service.ts", ["attendancePayrollDeductionsEnabled", "loadPayrollCalculationSettings"]);
-mustInclude("report exports service", "src/modules/report-exports/report-exports.service.ts", ["asset_tracking", "uniform_tracking", "ASSETS_UNIFORMS_REPORT_DISABLED", "ATTENDANCE_MANAGEMENT_DISABLED", "ATTENDANCE_PAYROLL_DEDUCTIONS_DISABLED"]);
+mustInclude("report exports service", "src/modules/report-exports/report-exports.service.ts", ["asset_tracking", "uniform_tracking", "ASSETS_UNIFORMS_REPORT_DISABLED", "ATTENDANCE_MANAGEMENT_DISABLED", "ATTENDANCE_PAYROLL_DEDUCTIONS_DISABLED", "PAYROLL_MANAGEMENT_DISABLED", "payrollReportEnabledForKey"]);
 mustInclude("report exports contract gating", "src/modules/report-exports/report-exports.service.ts", ["contract_tracking", "CONTRACT_TRACKING_DISABLED", "moduleEnabledForCatalogItem"]);
-mustInclude("import-export service", "src/modules/import-export/export-job.service.ts", ["attendance", "leave_management", "asset_tracking", "uniform_tracking", "ATTENDANCE_MANAGEMENT_DISABLED", "LEAVE_MANAGEMENT_DISABLED", "ASSET_TRACKING_DISABLED", "UNIFORM_TRACKING_DISABLED"]);
-mustInclude("legacy imports service", "src/modules/imports/imports.service.ts", ["assertAttendanceImportEnabled", "assertLeaveImportEnabled", "assertAssetsUniformsImportEnabled", "ATTENDANCE_MANAGEMENT_DISABLED", "LEAVE_MANAGEMENT_DISABLED", "ASSETS_UNIFORMS_IMPORT_DISABLED"]);
-mustInclude("import/export frontend", "frontend/src/features/import-export/ImportExportPage.tsx", ["visibleExportTypes", 'auth.hasFeature("attendance")', 'auth.hasFeature("leave_management")', 'auth.hasFeature("asset_tracking")', 'auth.hasFeature("uniform_tracking")']);
+mustInclude("import-export service", "src/modules/import-export/export-job.service.ts", ["attendance", "leave_management", "payroll", "asset_tracking", "uniform_tracking", "ATTENDANCE_MANAGEMENT_DISABLED", "LEAVE_MANAGEMENT_DISABLED", "PAYROLL_MANAGEMENT_DISABLED", "ASSET_TRACKING_DISABLED", "UNIFORM_TRACKING_DISABLED"]);
+mustInclude("legacy imports service", "src/modules/imports/imports.service.ts", ["assertAttendanceImportEnabled", "assertLeaveImportEnabled", "assertAssetsUniformsImportEnabled", "assertPayrollImportEnabled", "ATTENDANCE_MANAGEMENT_DISABLED", "LEAVE_MANAGEMENT_DISABLED", "ASSETS_UNIFORMS_IMPORT_DISABLED", "PAYROLL_MANAGEMENT_DISABLED"]);
+mustInclude("import/export frontend", "frontend/src/features/import-export/ImportExportPage.tsx", ["visibleExportTypes", "usePayrollSubFeatures", 'auth.hasFeature("attendance")', 'auth.hasFeature("leave_management")', 'auth.hasFeature("payroll")', "payrollSubFeatures.salaryProcessingEnabled", 'auth.hasFeature("asset_tracking")', 'auth.hasFeature("uniform_tracking")']);
 mustInclude("HR reports frontend", "frontend/src/features/hr-reports/HrReportsPage.tsx", ["visibleCategories", 'auth.hasFeature("leave_management")', 'auth.hasFeature("long_leave_management")', 'auth.hasFeature("asset_tracking")', 'auth.hasFeature("uniform_tracking")']);
 mustInclude("contract document independence", "frontend/src/features/contracts/ContractFormDialog.tsx", ["Document Tracking is disabled. Contract metadata can be saved"]);
 mustInclude("contract document downloads", "frontend/src/features/contracts/ContractDocumentAction.tsx", ["linked document download requires Document Tracking"]);
-mustInclude("Payroll reports frontend", "frontend/src/features/payroll-reports/PayrollReportsPage.tsx", ["visibleCategories", 'auth.hasFeature("attendance")', 'auth.hasFeature("leave_management")', 'auth.hasFeature("long_leave_management")']);
+mustInclude("Payroll reports frontend", "frontend/src/features/payroll-reports/PayrollReportsPage.tsx", ["visibleCategories", "usePayrollSubFeatures", 'auth.hasFeature("payroll")', 'auth.hasFeature("attendance")', 'auth.hasFeature("leave_management")', 'auth.hasFeature("long_leave_management")', "payrollSubFeatures.advancesEnabled", "payrollSubFeatures.salaryLoansEnabled", "payrollSubFeatures.overtimeEnabled", "payrollSubFeatures.payslipsEnabled", "payrollSubFeatures.approvalsEnabled", "payrollSubFeatures.longLeaveDeductionsEnabled"]);
 
 if (failures.length) {
   console.error("Module toggle verification failed:");

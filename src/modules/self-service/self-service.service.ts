@@ -1,7 +1,10 @@
 import * as permissionService from "../../services/permission.service";
+import * as settingsService from "../../services/settings.service";
 import type { AuthActor } from "../../types/api.types";
 import { PermissionError } from "../../utils/errors";
 import * as attendanceCalendarService from "../attendance/attendance-calendar.service";
+import { getEnabledApprovalOperationTypes } from "../approvals/approval-module-access.service";
+import { APPROVAL_OPERATION_TYPES } from "../approvals/approval-workflow-engine.types";
 import * as repository from "./self-service.repository";
 import type { SelfDashboardQuickAction, SelfDashboardWidget, SelfNavigationItem, SelfProfile } from "./self-service.types";
 
@@ -14,6 +17,34 @@ const hasAny = (context: AuthActor, permissions: string[]) =>
 const feature = (features: Set<string>, key: string) => features.has(key);
 const featureAny = (features: Set<string>, keys: string[]) => keys.some((key) => features.has(key));
 const featuresAll = (features: Set<string>, groups: string[][]) => groups.every((group) => featureAny(features, group));
+interface SelfServiceCapabilities {
+  payslipsEnabled: boolean;
+  attendanceCorrectionsEnabled: boolean;
+}
+
+const attendanceCorrectionsSubFeatureEnabled = async (env: Env, companyId: string) => {
+  const settings = await settingsService.getAttendanceSettings(env, companyId).catch(() => ({})) as Record<string, unknown>;
+  return ["attendance.corrections_enabled", "attendance_correction_enabled"].every((alias) => settings[alias] !== false);
+};
+
+const resolveSelfServiceCapabilities = async (
+  env: Env,
+  companyId: string,
+  features: Set<string>,
+): Promise<SelfServiceCapabilities> => {
+  const attendanceEnabled = feature(features, "attendance");
+  const payrollEnabled = feature(features, "payroll");
+  const payslipsFeatureEnabled = feature(features, "payslips");
+  const [attendanceCorrectionsEnabled, payrollPayslipsEnabled] = await Promise.all([
+    attendanceEnabled ? attendanceCorrectionsSubFeatureEnabled(env, companyId) : Promise.resolve(false),
+    payrollEnabled ? settingsService.isPayrollSubFeatureEnabled(env, companyId, "payroll.payslips_enabled").catch(() => false) : Promise.resolve(false),
+  ]);
+  return {
+    attendanceCorrectionsEnabled,
+    payslipsEnabled: payrollEnabled && payslipsFeatureEnabled && payrollPayslipsEnabled,
+  };
+};
+
 const safe = async <T>(factory: () => Promise<T> | T, fallback: T): Promise<T> => {
   try {
     const result = await factory();
@@ -92,7 +123,15 @@ export const getSelfProfile = async (env: Env, context: AuthActor): Promise<Self
   return profile;
 };
 
-export const resolveEmployeeNavigation = (context: AuthActor, profile: SelfProfile, features: Set<string>): SelfNavigationItem[] => {
+export const resolveEmployeeNavigation = (
+  context: AuthActor,
+  profile: SelfProfile,
+  features: Set<string>,
+  capabilities: SelfServiceCapabilities = {
+    payslipsEnabled: feature(features, "payroll") && feature(features, "payslips"),
+    attendanceCorrectionsEnabled: feature(features, "attendance"),
+  },
+): SelfNavigationItem[] => {
   const linked = profile.linked_employee;
   const item = (key: string, label: string, path: string, permission: string, enabled = true, reason?: string): SelfNavigationItem => ({
     key,
@@ -117,7 +156,7 @@ export const resolveEmployeeNavigation = (context: AuthActor, profile: SelfProfi
     item("leave", "My Leave", "/self/leave", "self.leave.view", feature(features, "leave_management"), "Leave module is not enabled."),
     item("requests", "My Requests", "/self/requests", "self.requests.view"),
     item("documents", "My Documents / KYC", "/self/documents", "self.documents.view", feature(features, "documents") || feature(features, "kyc_update_requests"), "Documents/KYC module is not enabled."),
-    item("payslips", "My Payslips", "/self/payslips", "self.payslips.view", feature(features, "payslips") || feature(features, "payroll"), "Payslips module is not enabled."),
+    item("payslips", "My Payslips", "/self/payslips", "self.payslips.view", capabilities.payslipsEnabled, "Payslips are not enabled."),
     item("pending-approvals", "My Pending Approvals", "/self/pending-approvals", "department.approvals.view", true),
     itemAny(
       "department-dashboard",
@@ -135,7 +174,9 @@ export const getSelfNavigation = async (env: Env, context: AuthActor) => {
     getSelfProfile(env, context),
     repository.listEnabledFeatureKeys(env, context.companyId),
   ]);
-  return resolveEmployeeNavigation(context, profile, new Set(enabledFeatures));
+  const featureSet = new Set(enabledFeatures);
+  const capabilities = await resolveSelfServiceCapabilities(env, context.companyId, featureSet);
+  return resolveEmployeeNavigation(context, profile, featureSet, capabilities);
 };
 
 const widget = (input: SelfDashboardWidget): SelfDashboardWidget => input;
@@ -150,11 +191,12 @@ export const getSelfRequests = async (env: Env, context: AuthActor) => {
 export const getSelfPendingApprovals = async (env: Env, context: AuthActor) => {
   if (!hasAny(context, ["department.approvals.view", "approvals.department.approve", "approvals.hrFinal.approve", "approvals.financeFinal.approve"])) throw new PermissionError();
   const profile = await getSelfProfile(env, context);
+  const enabledApprovalOperationTypes = await getEnabledApprovalOperationTypes(env, context, APPROVAL_OPERATION_TYPES);
   return repository.listSelfPendingApprovals(env, context.companyId, context.actorUserId, profile.employee ? {
     id: profile.employee.id,
     department_id: profile.employee.department_id,
     level: profile.employee.level,
-  } : null, context.permissions ?? []);
+  } : null, context.permissions ?? [], 25, enabledApprovalOperationTypes);
 };
 
 export const getSelfAccessSummary = async (env: Env, context: AuthActor) => {
@@ -167,7 +209,12 @@ export const getSelfAccessSummary = async (env: Env, context: AuthActor) => {
     level: profile.employee?.level ?? null,
     roles: profile.roles,
     permissions: (context.permissions ?? []).filter((permission) => !/password|token|secret|session/i.test(permission)),
-    navigation: resolveEmployeeNavigation(context, profile, new Set(enabledFeatures)),
+    navigation: resolveEmployeeNavigation(
+      context,
+      profile,
+      new Set(enabledFeatures),
+      await resolveSelfServiceCapabilities(env, context.companyId, new Set(enabledFeatures)),
+    ),
   };
 };
 
@@ -178,7 +225,8 @@ export const getSelfDashboard = async (env: Env, context: AuthActor) => {
     repository.listEnabledFeatureKeys(env, context.companyId),
   ]);
   const featureSet = new Set(enabledFeatures);
-  const navigation = resolveEmployeeNavigation(context, profile, featureSet);
+  const capabilities = await resolveSelfServiceCapabilities(env, context.companyId, featureSet);
+  const navigation = resolveEmployeeNavigation(context, profile, featureSet, capabilities);
   const employee = requireLinkedEmployeeForSelfService(profile);
 
   const today = todayIso();
@@ -186,23 +234,28 @@ export const getSelfDashboard = async (env: Env, context: AuthActor) => {
   const rosterEnabled = feature(featureSet, "roster");
   const leaveEnabled = feature(featureSet, "leave_management");
   const documentsEnabled = feature(featureSet, "documents") || feature(featureSet, "kyc_update_requests");
-  const payslipsEnabled = feature(featureSet, "payslips") || feature(featureSet, "payroll");
+  const payslipsEnabled = capabilities.payslipsEnabled;
   const approvalsEnabled = feature(featureSet, "approvals");
   const lifecycleEnabled = feature(featureSet, "employee_lifecycle") || feature(featureSet, "resignation_offboarding");
   const disciplineEnabled = feature(featureSet, "employee_discipline") || feature(featureSet, "disciplinary_actions");
   const noAccessMessage = "You do not have access to this module.";
   const canViewAttendance = attendanceEnabled && has(context, "self.attendance.view");
   const canViewAttendanceCalendar = attendanceEnabled && hasAny(context, ["self.attendance.calendar.view", "self.attendance.view"]);
+  const canViewAttendanceCorrections = canViewAttendance && capabilities.attendanceCorrectionsEnabled;
+  const canRequestAttendanceCorrection = attendanceEnabled && capabilities.attendanceCorrectionsEnabled && hasAny(context, ["attendance.corrections.create", "attendance.corrections.createForOthers"]);
   const canViewRoster = rosterEnabled && has(context, "self.roster.view");
   const canViewLeave = leaveEnabled && has(context, "self.leave.view");
   const canViewDocuments = documentsEnabled && has(context, "self.documents.view");
   const canViewPayslips = payslipsEnabled && has(context, "self.payslips.view");
+  const enabledApprovalOperationTypes = approvalsEnabled
+    ? await getEnabledApprovalOperationTypes(env, context, APPROVAL_OPERATION_TYPES)
+    : [];
   const [attendance, roster, leaveBalance, leaveCounts, correctionCounts, documents, notifications, payslip, requests, pendingApprovals] = await Promise.all([
     canViewAttendance ? repository.getTodayAttendance(env, context.companyId, employee.id, today).catch(() => null) : Promise.resolve(null),
     canViewRoster ? repository.getNextRosterShift(env, context.companyId, employee.id, today).catch(() => null) : Promise.resolve(null),
     canViewLeave ? repository.getLeaveBalanceSummary(env, context.companyId, employee.id).catch(() => null) : Promise.resolve(null),
     canViewLeave ? repository.getLeaveRequestCounts(env, context.companyId, employee.id).catch(() => null) : Promise.resolve(null),
-    canViewAttendance ? repository.getAttendanceCorrectionCounts(env, context.companyId, employee.id, context.actorUserId).catch(() => null) : Promise.resolve(null),
+    canViewAttendanceCorrections ? repository.getAttendanceCorrectionCounts(env, context.companyId, employee.id, context.actorUserId).catch(() => null) : Promise.resolve(null),
     canViewDocuments ? repository.getDocumentSummary(env, context.companyId, employee.id, today).catch(() => null) : Promise.resolve(null),
     repository.getUnreadNotificationCount(env, context.companyId, context.actorUserId).catch(() => null),
     canViewPayslips ? repository.getLatestPayslip(env, context.companyId, employee.id).catch(() => null) : Promise.resolve(null),
@@ -212,7 +265,7 @@ export const getSelfDashboard = async (env: Env, context: AuthActor) => {
         id: employee.id,
         department_id: employee.department_id,
         level: employee.level,
-      }, context.permissions ?? [], 5).catch(() => [])
+      }, context.permissions ?? [], 5, enabledApprovalOperationTypes).catch(() => [])
       : Promise.resolve([]),
   ]);
 
@@ -343,7 +396,7 @@ export const getSelfDashboard = async (env: Env, context: AuthActor) => {
   const quick_actions = [
     quickAction("attendance-calendar", "View attendance calendar", "/self/attendance-calendar", canViewAttendanceCalendar, "attendance", "self.attendance.calendar.view"),
     quickAction("leave-request", "Request leave", "/self/leave", canViewLeave, "leave", "self.leave.view"),
-    quickAction("attendance-correction", "Request attendance correction", "/self/attendance", canViewAttendance, "attendance", "self.attendance.view"),
+    quickAction("attendance-correction", "Request attendance correction", "/self/attendance", canRequestAttendanceCorrection, "attendance", "attendance.corrections.create"),
     quickAction("roster", "View roster", "/self/roster", canViewRoster, "roster", "self.roster.view"),
     quickAction("payslips", "View payslips", "/self/payslips", canViewPayslips, "payslips", "self.payslips.view"),
     quickAction("documents", "Update documents / KYC", "/self/documents", canViewDocuments, "documents_kyc", "self.documents.view"),

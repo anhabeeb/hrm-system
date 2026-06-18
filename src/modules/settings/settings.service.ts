@@ -18,6 +18,7 @@ import type {
   UpdateSettingsGroupInput,
 } from "./settings.types";
 import {
+  FeatureDependencyError,
   validateFeatureDependencies,
 } from "./settings.validators";
 
@@ -126,6 +127,143 @@ const getEnabledFeatureSet = (features: FeatureSettingRecord[]): Set<string> =>
       .map((feature) => feature.feature_key),
   );
 
+const mergeSettingValue = async (
+  env: Env,
+  companyId: string,
+  settingKey: string,
+  nextValue: Record<string, unknown> | undefined,
+) => {
+  const existing = await settingsRepository.getSetting(env, companyId, settingKey);
+  return {
+    ...parseJson<Record<string, unknown>>(existing?.setting_value_json, {}),
+    ...(nextValue ?? {}),
+  };
+};
+
+const validateSettingsLifecycleDependencies = async (
+  env: Env,
+  context: AuthActor,
+  group: SettingsGroup,
+  settings: Record<string, Record<string, unknown>>,
+) => {
+  if (!["attendance", "payroll", "leave", "documents"].includes(group)) return;
+
+  const enabledFeatures = getEnabledFeatureSet(await settingsRepository.listFeatureSettings(env, context.companyId));
+  const featureEnabled = (featureKey: string) => enabledFeatures.has(featureKey);
+
+  if (group === "attendance") {
+    const attendanceRules = await mergeSettingValue(env, context.companyId, "attendance.default_rules", settings["attendance.default_rules"]);
+    const nextAttendanceRules = settings["attendance.default_rules"] ?? {};
+    if (
+      nextAttendanceRules["attendance.payroll_deductions_enabled"] === true &&
+      (!featureEnabled("attendance") || !featureEnabled("payroll"))
+    ) {
+      throw new ValidationError("Attendance payroll deductions require Payroll Management to be enabled first.");
+    }
+    if (
+      nextAttendanceRules.correction_approval_required === true &&
+      attendanceRules["attendance.corrections_enabled"] !== true
+    ) {
+      throw new ValidationError("Attendance correction workflow settings require Attendance Corrections to be enabled first.");
+    }
+  }
+
+  if (group === "payroll") {
+    const payrollRules = await mergeSettingValue(env, context.companyId, "payroll.default_rules", settings["payroll.default_rules"]);
+    const nextPayrollRules = settings["payroll.default_rules"] ?? {};
+    if (
+      nextPayrollRules["payroll.attendance_deductions_enabled"] === true &&
+      (!featureEnabled("payroll") || !featureEnabled("attendance"))
+    ) {
+      throw new ValidationError("Payroll attendance deductions require Attendance Management to be enabled first.");
+    }
+    if (
+      nextPayrollRules["payroll.attendance_deductions_enabled"] === true &&
+      (await mergeSettingValue(env, context.companyId, "attendance.default_rules", {}))["attendance.payroll_deductions_enabled"] !== true
+    ) {
+      throw new ValidationError("Payroll attendance deductions require Attendance Payroll Deductions to be enabled first.");
+    }
+    if (
+      nextPayrollRules["payroll.long_leave_deductions_enabled"] === true &&
+      (!featureEnabled("payroll") || !featureEnabled("long_leave_management"))
+    ) {
+      throw new ValidationError("Payroll long leave deductions require Long Leave Management to be enabled first.");
+    }
+    for (const [subFeatureKey, label] of [
+      ["payroll.payslips_enabled", "Payslips"],
+      ["payroll.advances_enabled", "Advance Salary"],
+      ["payroll.salary_loans_enabled", "Salary Loans"],
+      ["payroll.salary_processing_enabled", "Salary Processing"],
+    ] as const) {
+      if (nextPayrollRules[subFeatureKey] === true && !featureEnabled("payroll")) {
+        throw new ValidationError(`${label} require Payroll Management to be enabled first.`);
+      }
+    }
+  }
+
+  if (group === "leave" && featureEnabled("long_leave_management") && !featureEnabled("leave_management")) {
+    throw new ValidationError("Long Leave Management requires Leave Management to be enabled first.");
+  }
+
+  if (group === "documents") {
+    const contractRules = await mergeSettingValue(env, context.companyId, "documents.contract_rules", settings["documents.contract_rules"]);
+    const nextContractRules = settings["documents.contract_rules"] ?? {};
+    if (
+      nextContractRules.contract_document_required === true &&
+      (!featureEnabled("contract_tracking") || !featureEnabled("documents"))
+    ) {
+      throw new ValidationError("Contract document upload requires Contract Tracking and Document Tracking to be enabled first.");
+    }
+  }
+};
+
+const activeBooleanSetting = (settings: Record<string, unknown>, key: string) =>
+  settings[key] === true;
+
+const validateFeatureDisableSettingsDependencies = async (
+  env: Env,
+  context: AuthActor,
+  featureKey: string,
+) => {
+  if (!["attendance", "payroll", "documents", "contract_tracking"].includes(featureKey)) return;
+
+  const [attendanceRules, payrollRules, contractRules] = await Promise.all([
+    mergeSettingValue(env, context.companyId, "attendance.default_rules", {}),
+    mergeSettingValue(env, context.companyId, "payroll.default_rules", {}),
+    mergeSettingValue(env, context.companyId, "documents.contract_rules", {}),
+  ]);
+
+  if (
+    featureKey === "attendance" &&
+    (activeBooleanSetting(attendanceRules, "attendance.payroll_deductions_enabled") ||
+      activeBooleanSetting(payrollRules, "payroll.attendance_deductions_enabled"))
+  ) {
+    throw new FeatureDependencyError(
+      "Disable Attendance Payroll Deductions and Payroll Attendance Deductions before disabling Attendance Management.",
+    );
+  }
+
+  if (
+    featureKey === "payroll" &&
+    (activeBooleanSetting(attendanceRules, "attendance.payroll_deductions_enabled") ||
+      activeBooleanSetting(payrollRules, "payroll.attendance_deductions_enabled") ||
+      activeBooleanSetting(payrollRules, "payroll.long_leave_deductions_enabled"))
+  ) {
+    throw new FeatureDependencyError(
+      "Disable payroll deduction sub-features before disabling Payroll Management.",
+    );
+  }
+
+  if (
+    (featureKey === "documents" || featureKey === "contract_tracking") &&
+    activeBooleanSetting(contractRules, "contract_document_required")
+  ) {
+    throw new FeatureDependencyError(
+      "Disable contract document upload requirements before disabling Contract Tracking or Document Tracking.",
+    );
+  }
+};
+
 const featureRequiresEffectiveDate = (feature: FeatureSettingRecord): boolean =>
   feature.affects_payroll === 1 ||
   feature.affects_attendance === 1 ||
@@ -178,6 +316,7 @@ export const updateSettingsGroup = async (
 ) => {
   const storageGroup = groupStorageName(group);
   const updated: string[] = [];
+  await validateSettingsLifecycleDependencies(env, context, group, input.settings);
 
   for (const [settingKey, value] of Object.entries(input.settings)) {
     const existing = await settingsRepository.getSetting(
@@ -305,6 +444,10 @@ export const updateFeature = async (
   if (input.is_enabled === true || input.status === "enabled" || input.status === "active") {
     enabledFeatures.add(featureKey);
     validateFeatureDependencies(featureKey, true, enabledFeatures);
+  }
+  if (input.is_enabled === false || input.status === "disabled" || input.status === "inactive") {
+    validateFeatureDependencies(featureKey, false, enabledFeatures);
+    await validateFeatureDisableSettingsDependencies(env, context, featureKey);
   }
 
   await settingsRepository.updateFeatureSetting(env, {

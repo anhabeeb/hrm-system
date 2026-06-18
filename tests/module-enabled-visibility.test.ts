@@ -27,7 +27,8 @@ describe("module-enabled visibility controls", () => {
     expect(navigation).toContain('label: "Payroll"');
     expect(navigation).toContain('moduleCode: "payroll"');
     expect(navigation).toContain('label: "Payslips"');
-    expect(navigation).toContain('moduleCode: "payslips"');
+    expect(navigation).toContain('moduleCodesAll: ["payroll", "payslips"]');
+    expect(navigation).toContain('requiredPayrollSubFeature: "payslips_enabled"');
     expect(navigation).toContain('label: "My Documents / KYC"');
     expect(navigation).toContain('moduleCode: "documents_kyc"');
     expect(navigation).toContain('label: "Duty Rosters"');
@@ -52,7 +53,7 @@ describe("module-enabled visibility controls", () => {
     expect(router).toContain('moduleCode: "roster"');
     expect(router).toContain('moduleName: "Contract Tracking"');
     expect(router).toContain('moduleCode: "documents_kyc"');
-    expect(router).toContain('moduleCode: "advance_salary"');
+    expect(router).toContain('featuresAll: ["payroll", "advance_salary"]');
     expect(router).toContain('moduleCode: "resignation_offboarding"');
     expect(router).toContain('moduleCode: "disciplinary_actions"');
     expect(router).toContain("requiresLinkedEmployee: true");

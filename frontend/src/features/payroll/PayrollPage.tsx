@@ -28,6 +28,7 @@ import { PayrollRunDetailDrawer } from "./PayrollRunDetailDrawer";
 import { PayrollRunForm } from "./PayrollRunForm";
 import { PayrollRunsTable } from "./PayrollRunsTable";
 import { EmployeeAttendanceCalendarWidget } from "@/features/attendance-calendar/EmployeeAttendanceCalendarWidget";
+import { usePayrollSubFeatures } from "./usePayrollSubFeatures";
 import type { PayrollAdjustment, PayrollCalculatePayload, PayrollException, PayrollFilters as PayrollFilterValues, PayrollItem, PayrollRun } from "./payroll.types";
 
 type PayrollAction = "recalculate" | "submit" | "approve" | "reject" | "finalize" | "resolveException" | null;
@@ -35,6 +36,7 @@ type PayrollAdjustmentAction = "approveAdjustment" | "rejectAdjustment" | "cance
 
 export const PayrollPage = () => {
   const auth = useAuth();
+  const payrollSubFeatures = usePayrollSubFeatures();
   const toast = useToast();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -140,24 +142,24 @@ export const PayrollPage = () => {
 
   const error = runsQuery.error ?? itemsQuery.error ?? exceptionsQuery.error ?? adjustmentsQuery.error ?? calculateMutation.error ?? actionMutation.error ?? adjustmentMutation.error;
   const hasPayrollPermission = (permission: string) => auth.isSuperAdmin || auth.hasPermission(permission);
-  const canCalculate = hasPayrollPermission("payroll.calculate");
-  const canCreateAdjustment = hasPayrollPermission("payroll.adjustments.create") || hasPayrollPermission("payroll.adjustments.createForOthers");
-  const canRecalculate = hasPayrollPermission("payroll.recalculate");
-  const canSubmitForApproval = hasPayrollPermission("payroll.review");
-  const canApprove = hasPayrollPermission("payroll.approve");
-  const canReject = hasPayrollPermission("payroll.reject");
-  const canFinalize = hasPayrollPermission("payroll.finalize");
+  const canCalculate = payrollSubFeatures.salaryProcessingEnabled && hasPayrollPermission("payroll.calculate");
+  const canCreateAdjustment = payrollSubFeatures.manualDeductionsEnabled && (hasPayrollPermission("payroll.adjustments.create") || hasPayrollPermission("payroll.adjustments.createForOthers"));
+  const canRecalculate = payrollSubFeatures.salaryProcessingEnabled && hasPayrollPermission("payroll.recalculate");
+  const canSubmitForApproval = payrollSubFeatures.approvalsEnabled && hasPayrollPermission("payroll.review");
+  const canApprove = payrollSubFeatures.approvalsEnabled && hasPayrollPermission("payroll.approve");
+  const canReject = payrollSubFeatures.approvalsEnabled && hasPayrollPermission("payroll.reject");
+  const canFinalize = payrollSubFeatures.salaryProcessingEnabled && hasPayrollPermission("payroll.finalize");
   const canResolve = auth.hasPermission("payroll.resolve_exceptions");
-  const canApproveAdjustment = hasPayrollPermission("payroll.adjustments.approve") || hasPayrollPermission("payroll.adjustments.review") || hasPayrollPermission("payroll.adjustments.finalApprove") || hasPayrollPermission("approvals.department.approve") || hasPayrollPermission("approvals.financeFinal.approve");
-  const canRejectAdjustment = hasPayrollPermission("payroll.adjustments.reject") || hasPayrollPermission("approvals.department.reject") || hasPayrollPermission("approvals.financeFinal.reject");
+  const canApproveAdjustment = payrollSubFeatures.approvalsEnabled && (hasPayrollPermission("payroll.adjustments.approve") || hasPayrollPermission("payroll.adjustments.review") || hasPayrollPermission("payroll.adjustments.finalApprove") || hasPayrollPermission("approvals.department.approve") || hasPayrollPermission("approvals.financeFinal.approve"));
+  const canRejectAdjustment = payrollSubFeatures.approvalsEnabled && (hasPayrollPermission("payroll.adjustments.reject") || hasPayrollPermission("approvals.department.reject") || hasPayrollPermission("approvals.financeFinal.reject"));
   const canCancelAdjustment = hasPayrollPermission("payroll.adjustments.cancel") || hasPayrollPermission("payroll.adjustments.cancelAny");
-  const canApplyAdjustment = hasPayrollPermission("payroll.adjustments.apply");
+  const canApplyAdjustment = payrollSubFeatures.manualDeductionsEnabled && hasPayrollPermission("payroll.adjustments.apply");
   const canViewAttendanceReview =
     isModuleEnabled(auth.user, "payroll") &&
     isModuleEnabled(auth.user, "attendance") &&
     auth.hasAnyPermission(["payroll.attendanceReview.view", "payroll.view"]);
-  const canUsePayrollAdjustments = isModuleEnabled(auth.user, "payroll_adjustments") && (canCreateAdjustment || auth.hasAnyPermission(["payroll.adjustments.view", "payroll.adjustments.review", "payroll.view"]));
-  const visibleTab = tab === "attendance-review" && !canViewAttendanceReview ? "runs" : tab;
+  const canUsePayrollAdjustments = payrollSubFeatures.manualDeductionsEnabled && isModuleEnabled(auth.user, "payroll_adjustments") && (canCreateAdjustment || auth.hasAnyPermission(["payroll.adjustments.view", "payroll.adjustments.review", "payroll.view"]));
+  const visibleTab = tab === "attendance-review" && !canViewAttendanceReview ? "runs" : tab === "adjustments" && !canUsePayrollAdjustments ? "runs" : tab;
 
   const actionCopy = {
     recalculate: ["Recalculate payroll", "Recalculate this draft payroll run using current attendance, leave, and deduction data.", "Recalculate"],
@@ -190,6 +192,9 @@ export const PayrollPage = () => {
       <div className="space-y-4 p-4 md:p-6">
         {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
         {error ? <InlineAlert title={friendlyHrmError(error, "Payroll action could not be completed.", "payroll")} variant="error" /> : null}
+        {!payrollSubFeatures.salaryProcessingEnabled ? <InlineAlert title="Salary Processing is disabled. Payroll run calculation, recalculation, and finalization actions are hidden." /> : null}
+        {!payrollSubFeatures.manualDeductionsEnabled ? <InlineAlert title="Manual Deductions are disabled. Payroll adjustment creation and application actions are hidden." /> : null}
+        {!payrollSubFeatures.approvalsEnabled ? <InlineAlert title="Payroll Approvals are disabled. Submit, approve, and reject payroll actions are hidden." /> : null}
         <ModuleLandingShell>
           <ModuleLandingHeader
             title="Payroll"
@@ -207,7 +212,7 @@ export const PayrollPage = () => {
             <ModuleSummaryTile label="Current payroll period" value={currentRunSummary?.payroll_month ?? currentRunSummary?.period_label ?? "Not configured"} helperText="Latest visible run" />
             <ModuleSummaryTile label="Pay date" value={currentRunSummary?.pay_date ?? "Not configured"} />
             <ModuleSummaryTile label="Payroll status" value={currentRun?.status ?? "No visible run"} status={currentRun?.status ? "info" : "neutral"} />
-            <ModuleSummaryTile label="Pending adjustments" value={adjustmentsQuery.isFetched ? pendingAdjustments : "—"} helperText={adjustmentsQuery.isFetched ? "Loaded adjustment rows" : "Open the Adjustments tab to load details."} status={pendingAdjustments ? "warning" : "neutral"} />
+            {payrollSubFeatures.manualDeductionsEnabled ? <ModuleSummaryTile label="Pending adjustments" value={adjustmentsQuery.isFetched ? pendingAdjustments : "—"} helperText={adjustmentsQuery.isFetched ? "Loaded adjustment rows" : "Open the Adjustments tab to load details."} status={pendingAdjustments ? "warning" : "neutral"} /> : null}
             <ModuleSummaryTile label="Review blockers" value={selectedRun ? unresolvedExceptions : "—"} helperText={selectedRun ? "Exceptions for selected run" : "Select a payroll run to load exception blockers."} status={unresolvedExceptions ? "danger" : "neutral"} />
             <ModuleSummaryTile label="Finalized runs" value={finalizedRuns} status={finalizedRuns ? "success" : "neutral"} />
           </ModuleSummaryGrid>
@@ -216,7 +221,7 @@ export const PayrollPage = () => {
             items={[
               selectedRun ? null : "Select a payroll run to load items and exception blockers.",
               unresolvedExceptions ? `${unresolvedExceptions} payroll exception(s) need review for the selected run.` : null,
-              pendingAdjustments ? `${pendingAdjustments} loaded payroll adjustment(s) are pending.` : null,
+              payrollSubFeatures.manualDeductionsEnabled && pendingAdjustments ? `${pendingAdjustments} loaded payroll adjustment(s) are pending.` : null,
               canViewAttendanceReview ? "Attendance review is available before final payroll processing." : null,
             ]}
           />
@@ -224,7 +229,7 @@ export const PayrollPage = () => {
         <PayrollFlowStepper status={selectedRun?.status} />
         <PayrollFilters filters={filters} onChange={updateFilters} onClear={() => setSearchParams(new URLSearchParams({ page: "1", page_size: String(filters.page_size), tab }))} />
         <Tabs value={visibleTab} onValueChange={setActiveTab}>
-          <TabsList><TabsTrigger value="runs">Runs</TabsTrigger><TabsTrigger value="items">Items</TabsTrigger><TabsTrigger value="exceptions">Exceptions</TabsTrigger><TabsTrigger value="adjustments">Adjustments</TabsTrigger>{canViewAttendanceReview ? <TabsTrigger value="attendance-review">Attendance Review</TabsTrigger> : null}</TabsList>
+          <TabsList><TabsTrigger value="runs">Runs</TabsTrigger><TabsTrigger value="items">Items</TabsTrigger><TabsTrigger value="exceptions">Exceptions</TabsTrigger>{canUsePayrollAdjustments ? <TabsTrigger value="adjustments">Adjustments</TabsTrigger> : null}{canViewAttendanceReview ? <TabsTrigger value="attendance-review">Attendance Review</TabsTrigger> : null}</TabsList>
           <TabsContent value="runs">
             <PayrollRunsTable
               rows={runsQuery.data?.data ?? []}
@@ -251,7 +256,7 @@ export const PayrollPage = () => {
           <TabsContent value="exceptions">
             {selectedRun ? <PayrollExceptionsTable rows={exceptionsQuery.data?.data ?? []} loading={exceptionsQuery.isLoading} pagination={exceptionsQuery.data?.pagination} canResolve={canResolve} onResolve={(row) => { setSelectedException(row); setAction("resolveException"); }} onPageChange={(page) => updateFilters({ page })} onPageSizeChange={(page_size) => updateFilters({ page: 1, page_size })} /> : <EmptyState title="Select a payroll run" description="Open a payroll run first to review exceptions and blockers." />}
           </TabsContent>
-          <TabsContent value="adjustments">
+          {canUsePayrollAdjustments ? <TabsContent value="adjustments">
             <PayrollAdjustmentsTable
               rows={adjustmentsQuery.data?.data ?? []}
               loading={adjustmentsQuery.isLoading}
@@ -268,7 +273,7 @@ export const PayrollPage = () => {
               onPageChange={(page) => updateFilters({ page })}
               onPageSizeChange={(page_size) => updateFilters({ page: 1, page_size })}
             />
-          </TabsContent>
+          </TabsContent> : null}
           {canViewAttendanceReview ? (
             <TabsContent value="attendance-review">
               <EmployeeAttendanceCalendarWidget source="payroll" />

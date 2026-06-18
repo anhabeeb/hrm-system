@@ -7,6 +7,11 @@ import type {
   RecipientResolveInput,
 } from "./notifications.types";
 import { sanitizeActionUrl, sanitizeNotificationMetadata } from "./notification-safety";
+import {
+  filterByEnabledCategories,
+  getEnabledNotificationCategories,
+  isNotificationPayloadModuleEnabled,
+} from "./module-aware-alerts";
 import { safeCreateEmailJobForNotification } from "../email-notifications/email-notifications.service";
 import { createAuditLog } from "../../services/audit.service";
 import * as permissionService from "../../services/permission.service";
@@ -100,6 +105,16 @@ export const createNotificationsForUsers = async (
   payload: NotificationPayload,
   options: { actorId?: string | null; optional?: boolean; excludeActor?: boolean } = {},
 ) => {
+  const moduleCheck = await isNotificationPayloadModuleEnabled(env, companyId, payload);
+  if (!moduleCheck.enabled) {
+    return {
+      created_count: 0,
+      duplicate_count: 0,
+      notifications: [],
+      skipped_disabled_module: true,
+      reason: moduleCheck.reason,
+    };
+  }
   const recipients = await resolveRecipients(env, companyId, {
     userIds,
     excludeUserId: options.excludeActor ? options.actorId : null,
@@ -290,10 +305,15 @@ export const notifyApprovalAssignees = (
   }, payload, options);
 
 export const listNotifications = async (env: Env, context: AuthActor, filters: NotificationListFilters) => {
-  const total = await repository.countNotifications(env, context.companyId, context.actorUserId, filters);
+  const enabledCategories = await getEnabledNotificationCategories(env, context.companyId, context);
+  if (filters.category && !enabledCategories.has(filters.category)) {
+    return { rows: [], pagination: pagination(filters, 0) };
+  }
+  const scopedFilters = { ...filters, categories: [...enabledCategories] };
+  const total = await repository.countNotifications(env, context.companyId, context.actorUserId, scopedFilters);
   return {
-    rows: (await repository.listNotifications(env, context.companyId, context.actorUserId, filters)).map(safeNotification),
-    pagination: pagination(filters, total),
+    rows: (await repository.listNotifications(env, context.companyId, context.actorUserId, scopedFilters)).map(safeNotification),
+    pagination: pagination(scopedFilters, total),
   };
 };
 
@@ -304,7 +324,8 @@ export const getNotification = async (env: Env, context: AuthActor, id: string) 
 };
 
 export const getUnreadCount = async (env: Env, context: AuthActor) => {
-  const row = await repository.unreadCount(env, context.companyId, context.actorUserId);
+  const enabledCategories = await getEnabledNotificationCategories(env, context.companyId, context);
+  const row = await repository.unreadCount(env, context.companyId, context.actorUserId, [...enabledCategories]);
   return {
     unread_count: Number(row?.unread_count ?? 0),
     urgent_count: Number(row?.urgent_count ?? 0),
@@ -324,19 +345,28 @@ export const archive = (env: Env, context: AuthActor, id: string) => mutateStatu
 export const dismiss = (env: Env, context: AuthActor, id: string) => mutateStatus(env, context, id, "dismissed");
 
 export const markAllRead = async (env: Env, context: AuthActor, filters: NotificationListFilters) => {
-  await repository.markAllRead(env, context.companyId, context.actorUserId, filters, nowIso());
+  const enabledCategories = await getEnabledNotificationCategories(env, context.companyId, context);
+  if (filters.category && !enabledCategories.has(filters.category)) return getUnreadCount(env, context);
+  await repository.markAllRead(env, context.companyId, context.actorUserId, { ...filters, categories: [...enabledCategories] }, nowIso());
   return getUnreadCount(env, context);
 };
 
 export const getPreferences = async (env: Env, context: AuthActor) => ({
-  preferences: await repository.getPreferences(env, context.companyId, context.actorUserId),
+  preferences: filterByEnabledCategories(
+    await repository.getPreferences(env, context.companyId, context.actorUserId),
+    await getEnabledNotificationCategories(env, context.companyId, context),
+  ),
 });
 
 export const updatePreferences = async (env: Env, context: AuthActor, preferences: NotificationPreferenceInput[]) => {
   const timestamp = nowIso();
+  const enabledCategories = await getEnabledNotificationCategories(env, context.companyId, context);
   for (const preference of preferences) {
     if (criticalCategories.has(preference.category) && preference.enabled === false) {
       throw new AppError("Critical system and security notifications cannot be fully disabled.", "NOTIFICATION_PREFERENCE_INVALID", 400);
+    }
+    if (!enabledCategories.has(preference.category)) {
+      throw new AppError("This notification category is disabled because its module is disabled.", "NOTIFICATION_CATEGORY_DISABLED", 400);
     }
     await repository.upsertPreference(env, {
       id: createPrefixedId("notif_pref"),

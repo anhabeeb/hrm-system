@@ -8,6 +8,12 @@ import { AppError, NotFoundError, OutletAccessError, PermissionError, ReasonRequ
 import { assertApprovalIsActionable, assertNotSelfApproval } from "./approval-action.service";
 import { getApprovalDirectDecision } from "./approval-direct.service";
 import { applyApprovedTargetChange, applyRejectedTargetChange, findAppliedTargetChange } from "./approval-integration.service";
+import {
+  assertApprovalOperationModuleEnabled,
+  isActiveApprovalStatus,
+  isApprovalOperationModuleEnabled,
+  resolveApprovalOperationTypeForLegacyApproval,
+} from "./approval-module-access.service";
 import { canActorApproveStep, findNextRequiredStep } from "./approval-step.service";
 import * as thresholdService from "./approval-threshold.service";
 import * as workflowService from "./approval-workflow.service";
@@ -84,27 +90,47 @@ const thresholdList = (value: unknown): string[] => {
   }
 };
 
+const legacyApprovalOperationType = (request: any) => resolveApprovalOperationTypeForLegacyApproval({
+  operation_type: request.operation_type,
+  workflow_key: request.workflow_key,
+  workflowKey: request.workflowKey,
+  module: request.module,
+  entity_type: request.entity_type,
+  entityType: request.entityType,
+  subject_type: request.subject_type,
+});
+
+const legacyModuleState = async (env: Env, context: AuthActor, request: any) =>
+  isApprovalOperationModuleEnabled(env, context, legacyApprovalOperationType(request));
+
+const assertLegacyApprovalModuleEnabled = async (env: Env, context: AuthActor, request: any) =>
+  assertApprovalOperationModuleEnabled(env, context, legacyApprovalOperationType(request));
+
 const requestToResponse = async (env: Env, context: AuthActor, request: any) => {
   const step = await repository.findStep(env, context.companyId, request.workflow_id, Number(request.current_step ?? 1));
   const threshold = thresholdFromPayload(request.payload_json);
   const salarySettings = await settingsService.getSalaryApprovalSettings(env, context.companyId);
+  const moduleState = await legacyModuleState(env, context, request);
   const terminal = (TERMINAL_APPROVAL_STATUSES as readonly string[]).includes(request.status);
-  const normalActionable = !terminal && !["applying", "failed"].includes(request.status);
+  const moduleActionable = moduleState.enabled || !isActiveApprovalStatus(request.status);
+  const normalActionable = moduleActionable && !terminal && !["applying", "failed"].includes(request.status);
   const assigned = canActorApproveStep(context, step, threshold);
   const isRequester = request.requested_by === context.actorUserId;
   const selfApprovalAllowed = !isRequester || salarySettings.allow_requester_self_approval;
   const applyingRetryReady = await isApplyingRecoveryReady(env, context.companyId, request);
   const retryAuthorized = assigned || permissionService.isSuperAdmin(context);
   const canApprove = normalActionable && assigned && selfApprovalAllowed;
-  const disabledReason = isRequester && !salarySettings.allow_requester_self_approval
-    ? "Self-approval is disabled for this company."
-    : request.status === "applying" && !applyingRetryReady
-      ? "This approval request is currently applying. Please wait before retrying."
-      : request.status === "applying"
-        ? "This approval request appears stuck and can be retried."
-        : request.status === "failed" && request.failure_message
-          ? request.failure_message
-          : null;
+  const disabledReason = !moduleState.enabled && isActiveApprovalStatus(request.status)
+    ? moduleState.reason ?? "Module disabled"
+    : isRequester && !salarySettings.allow_requester_self_approval
+      ? "Self-approval is disabled for this company."
+      : request.status === "applying" && !applyingRetryReady
+        ? "This approval request is currently applying. Please wait before retrying."
+        : request.status === "applying"
+          ? "This approval request appears stuck and can be retried."
+          : request.status === "failed" && request.failure_message
+            ? request.failure_message
+            : null;
   return {
     id: request.id,
     workflow_id: request.workflow_id,
@@ -137,15 +163,18 @@ const requestToResponse = async (env: Env, context: AuthActor, request: any) => 
     applying_started_at: request.applying_started_at,
     failure_code: request.failure_code,
     failure_message: request.failure_message,
+    module_enabled: moduleState.enabled,
+    read_only: !moduleState.enabled && isActiveApprovalStatus(request.status),
+    disabled_reason: !moduleState.enabled ? moduleState.reason ?? "Module disabled" : null,
     actions_available: {
       can_approve: canApprove,
       can_reject: normalActionable && assigned && !isRequester,
       can_return: normalActionable && assigned && !isRequester,
-      can_cancel: ["pending", "in_progress"].includes(request.status) && (request.requested_by === context.actorUserId || assigned || permissionService.isSuperAdmin(context)),
+      can_cancel: moduleActionable && ["pending", "in_progress"].includes(request.status) && (request.requested_by === context.actorUserId || assigned || permissionService.isSuperAdmin(context)),
       can_retry: request.status === "failed"
-        ? retryAuthorized
-        : request.status === "applying" && applyingRetryReady && retryAuthorized,
-      can_override: !terminal && request.status !== "applying" && permissionService.isSuperAdmin(context) && salarySettings.allow_super_admin_override,
+        ? moduleActionable && retryAuthorized
+        : moduleActionable && request.status === "applying" && applyingRetryReady && retryAuthorized,
+      can_override: moduleActionable && !terminal && request.status !== "applying" && permissionService.isSuperAdmin(context) && salarySettings.allow_super_admin_override,
       disabled_reason: disabledReason,
     },
   };
@@ -485,6 +514,10 @@ export const listApprovalRequests = async (env: Env, context: AuthActor, filters
   const accessible: any[] = [];
   for (const row of candidates) {
     const effectiveRow = await expireRequestIfNeeded(env, context, row);
+    const moduleState = await legacyModuleState(env, context, effectiveRow);
+    if (!moduleState.enabled && isActiveApprovalStatus(effectiveRow.status)) {
+      continue;
+    }
     const step = await repository.findStep(env, context.companyId, effectiveRow.workflow_id, Number(effectiveRow.current_step ?? 1));
     if (canUserAccessApproval(context, effectiveRow, step, "view")) {
       if (!filters.assigned_to_me || canActorApproveStep(context, step, thresholdFromPayload(effectiveRow.payload_json))) {
@@ -529,6 +562,7 @@ const actOnApproval = async (
   const steps = await repository.listSteps(env, context.companyId, request.workflow_id);
   const currentStep = steps.find((step) => Number(step.step_order) === Number(request.current_step ?? 1));
   assertAccess(context, request, currentStep, "act");
+  await assertLegacyApprovalModuleEnabled(env, context, request);
   assertApprovalIsActionable(request.status);
   await assertNotExpired(env, context, request);
   if (action === "approve" || action === "reject") {
@@ -616,6 +650,7 @@ export const cancelApprovalRequest = async (env: Env, context: AuthActor, id: st
   if (!canCancel) {
     throw new PermissionError("You do not have permission to cancel this approval request.");
   }
+  await assertLegacyApprovalModuleEnabled(env, context, request);
   if (!["pending", "in_progress"].includes(request.status)) {
     throw new AppError("Only pending approval requests can be cancelled.", "APPROVAL_REQUEST_NOT_PENDING", 409);
   }
@@ -652,6 +687,7 @@ export const retryApprovalRequest = async (env: Env, context: AuthActor, id: str
   if (!request) throw new NotFoundError("Approval request not found.");
   const step = await repository.findStep(env, context.companyId, request.workflow_id, Number(request.current_step ?? 1));
   assertAccess(context, request, step, "act");
+  await assertLegacyApprovalModuleEnabled(env, context, request);
   assertCurrentStepAccess(context, step, request);
   await assertSelfApprovalAllowed(env, context, request);
   await assertNotExpired(env, context, request);
@@ -887,6 +923,7 @@ export const overrideApprovalRequest = async (env: Env, context: AuthActor, id: 
   }
   const request = await repository.findRequestById(env, context.companyId, id);
   if (!request) throw new NotFoundError("Approval request not found.");
+  await assertLegacyApprovalModuleEnabled(env, context, request);
   assertApprovalIsActionable(request.status);
   await assertNotExpired(env, context, request);
 
@@ -934,6 +971,11 @@ export const createApprovalRequestForWorkflow = async (
   if (!workflow || workflow.is_enabled !== 1) {
     return { approval_required: false, direct_action_allowed: true, approval_request_id: null, message: "Approval workflow is not enabled for this action." };
   }
+  await assertApprovalOperationModuleEnabled(env, context, resolveApprovalOperationTypeForLegacyApproval({
+    workflowKey: input.workflowKey,
+    module: input.module,
+    entityType: input.entityType,
+  }));
 
   const decision = await getApprovalDirectDecision(env, context.companyId, context, workflow.approval_mode);
   if (!decision.approval_required) {

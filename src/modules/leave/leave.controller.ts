@@ -12,6 +12,8 @@ import {
   validateLeaveDelegate,
   validateLeaveRequestCreate,
   validateLeaveRequestUpdate,
+  validateLeavePolicyPreview,
+  validateLeaveTypePolicyRuleUpdate,
   validateLeaveTypeFilters,
   validateLeaveTypeUpdate,
   validateOpeningBalance,
@@ -75,6 +77,15 @@ export const createPolicy = async (c: Context<AppContext>) =>
 
 export const updatePolicy = async (c: Context<AppContext>) =>
   ok(await service.updatePolicy(c.env, actor(c), id(c), validatePolicyUpdate(await body(c))), "Leave policy updated successfully.", { requestId: c.get("requestId") });
+
+export const listPolicyRules = async (c: Context<AppContext>) =>
+  ok({ policy_rules: (await service.listLeaveTypePolicyRules(c.env, actor(c))).rows }, "Leave policy rules loaded successfully.", { requestId: c.get("requestId") });
+
+export const updatePolicyRule = async (c: Context<AppContext>) =>
+  ok(await service.updateLeaveTypePolicyRule(c.env, actor(c), id(c), validateLeaveTypePolicyRuleUpdate(await body(c))), "Leave policy rule updated successfully.", { requestId: c.get("requestId") });
+
+export const resetPolicyRule = async (c: Context<AppContext>) =>
+  ok(await service.resetLeaveTypePolicyRule(c.env, actor(c), id(c), await body(c)), "Leave policy rule reset to default successfully.", { requestId: c.get("requestId") });
 
 export const listBalances = async (c: Context<AppContext>) => {
   const result = await service.listBalances(c.env, actor(c), validateBalanceFilters(query(c)));
@@ -141,6 +152,9 @@ export const getTimeline = async (c: Context<AppContext>) =>
 
 export const getRequest = async (c: Context<AppContext>) =>
   ok({ leave_request: await service.getRequest(c.env, actor(c), id(c)) }, "Leave request loaded successfully.", { requestId: c.get("requestId") });
+
+export const previewPolicy = async (c: Context<AppContext>) =>
+  ok(await service.previewLeavePolicy(c.env, actor(c), validateLeavePolicyPreview(await body(c))), "Leave policy preview generated successfully.", { requestId: c.get("requestId") });
 
 export const createRequest = async (c: Context<AppContext>) =>
   {

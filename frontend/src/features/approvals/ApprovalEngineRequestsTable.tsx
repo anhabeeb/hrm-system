@@ -23,6 +23,8 @@ const statusTone = (status: string) => {
   return "bg-slate-100 text-slate-700";
 };
 
+const canAct = (row: ApprovalEngineRequest) => row.module_enabled !== false && row.read_only !== true;
+
 export const ApprovalEngineRequestsTable = ({
   rows,
   loading,
@@ -57,6 +59,11 @@ export const ApprovalEngineRequestsTable = ({
             <TableCell>
               <div className="font-medium">{row.title}</div>
               <div className="text-xs text-muted-foreground">{row.summary || row.subject_type}</div>
+              {row.module_enabled === false ? (
+                <div className="mt-1 text-xs font-medium text-amber-700">
+                  Module disabled · Read-only while module is disabled
+                </div>
+              ) : null}
             </TableCell>
             <TableCell>{row.operation_type}</TableCell>
             <TableCell>{row.requester_name || "Unknown"}</TableCell>
@@ -66,9 +73,9 @@ export const ApprovalEngineRequestsTable = ({
             <TableCell>
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <Button type="button" size="icon" variant="ghost" aria-label="View approval request" onClick={() => onView(row)}><Eye className="h-4 w-4" /></Button>
-                {canApprove ? <Button type="button" size="icon" variant="ghost" aria-label="Approve request" onClick={() => onApprove?.(row)}><Check className="h-4 w-4" /></Button> : null}
-                {canReject ? <Button type="button" size="icon" variant="ghost" aria-label="Reject request" onClick={() => onReject?.(row)}><X className="h-4 w-4" /></Button> : null}
-                {canCancel ? <Button type="button" size="sm" variant="outline" onClick={() => onCancel?.(row)}>Cancel</Button> : null}
+                {canApprove && canAct(row) ? <Button type="button" size="icon" variant="ghost" aria-label="Approve request" onClick={() => onApprove?.(row)}><Check className="h-4 w-4" /></Button> : null}
+                {canReject && canAct(row) ? <Button type="button" size="icon" variant="ghost" aria-label="Reject request" onClick={() => onReject?.(row)}><X className="h-4 w-4" /></Button> : null}
+                {canCancel && canAct(row) ? <Button type="button" size="sm" variant="outline" onClick={() => onCancel?.(row)}>Cancel</Button> : null}
               </div>
             </TableCell>
           </TableRow>

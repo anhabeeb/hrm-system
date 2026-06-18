@@ -28,7 +28,7 @@ INSERT OR IGNORE INTO feature_settings (
 ('feature_leave_management', 'company_seed_default', 'leave_management', 'Leave Management', 1, 'enabled', 1, NULL, NULL, 0, 0, 1, 0, 0, 1, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
 ('feature_long_leave', 'company_seed_default', 'long_leave', 'Long Leave', 1, 'enabled', 1, NULL, NULL, 1, 0, 1, 0, 0, 1, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
 ('feature_long_leave_management', 'company_seed_default', 'long_leave_management', 'Long Leave Management', 1, 'enabled', 1, NULL, NULL, 1, 0, 1, 0, 0, 1, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
-('feature_payroll', 'company_seed_default', 'payroll', 'Payroll', 1, 'enabled', 1, NULL, NULL, 1, 0, 0, 0, 0, 1, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+('feature_payroll', 'company_seed_default', 'payroll', 'Payroll Management', 1, 'enabled', 1, NULL, NULL, 1, 0, 0, 0, 0, 1, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
 ('feature_payslips', 'company_seed_default', 'payslips', 'Payslips', 1, 'enabled', 1, NULL, NULL, 1, 0, 0, 0, 0, 1, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
 ('feature_holidays', 'company_seed_default', 'holidays', 'Holidays', 1, 'enabled', 1, NULL, NULL, 1, 1, 1, 1, 0, 1, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
 ('feature_roster', 'company_seed_default', 'roster', 'Duty Roster', 1, 'enabled', 1, NULL, NULL, 0, 0, 0, 1, 0, 1, NULL, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),

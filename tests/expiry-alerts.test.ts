@@ -5,6 +5,7 @@ const settingsRows: any[] = [];
 const notifications: any[] = [];
 const audits: any[] = [];
 const sentNotificationKeys = new Set<string>();
+const disabledFeatures = new Set<string>();
 let failNotificationRefUpdate = false;
 
 const actorEmployeeLinks = new Map<string, string | null>([
@@ -190,7 +191,7 @@ vi.mock("../src/services/audit.service", () => ({
 }));
 
 vi.mock("../src/services/settings.service", () => ({
-  isFeatureEnabled: vi.fn(async () => true),
+  isFeatureEnabled: vi.fn(async (_env, _companyId, featureKey) => !disabledFeatures.has(featureKey)),
 }));
 
 import {
@@ -253,6 +254,7 @@ beforeEach(() => {
   notifications.length = 0;
   audits.length = 0;
   sentNotificationKeys.clear();
+  disabledFeatures.clear();
   failNotificationRefUpdate = false;
 });
 
@@ -300,6 +302,28 @@ describe("Phase 10C expiry alerts", () => {
       "employee_passport",
       "employee_work_permit",
       "employee_document",
+      "contract",
+      "probation",
+      "long_leave_return",
+    ]));
+  });
+
+  it("does not collect document expiry sources when Document Tracking is disabled", async () => {
+    disabledFeatures.add("documents");
+    disabledFeatures.add("documents_kyc");
+    const result = await collectExpiryCandidates(env, actor, { as_of_date: "2026-06-08", warning_days: [30, 7, 1] });
+    expect(result.candidates.map((row) => row.source_type)).not.toEqual(expect.arrayContaining([
+      "employee_passport",
+      "employee_work_permit",
+      "employee_document",
+    ]));
+  });
+
+  it("does not collect contract or long-leave expiry sources when those modules are disabled", async () => {
+    disabledFeatures.add("contract_tracking");
+    disabledFeatures.add("long_leave_management");
+    const result = await collectExpiryCandidates(env, actor, { as_of_date: "2026-06-08", warning_days: [30, 7, 1] });
+    expect(result.candidates.map((row) => row.source_type)).not.toEqual(expect.arrayContaining([
       "contract",
       "probation",
       "long_leave_return",

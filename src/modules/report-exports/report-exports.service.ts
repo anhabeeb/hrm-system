@@ -230,8 +230,51 @@ const attendancePayrollDeductionsEnabled = async (env: Env, actor: AuthActor) =>
   return configured !== false;
 };
 
+const payrollEnabled = (env: Env, actor: AuthActor) =>
+  settingsService.isFeatureEnabled(env, actor.companyId, "payroll", actor);
+
+const payrollSubFeatureEnabled = (env: Env, actor: AuthActor, key: settingsService.PayrollSubFeatureKey) =>
+  settingsService.isPayrollSubFeatureEnabled(env, actor.companyId, key);
+
+const requirePayrollEnabled = async (env: Env, actor: AuthActor) => {
+  if (!(await payrollEnabled(env, actor))) {
+    throw new AppError("Payroll Management is disabled. Enable it in Settings to use this module.", "PAYROLL_MANAGEMENT_DISABLED", 403);
+  }
+};
+
+const payrollReportEnabledForKey = async (env: Env, actor: AuthActor, reportKey: string) => {
+  if (!(await payrollEnabled(env, actor))) return false;
+  if (["payroll:monthly-summary", "payroll:employee-detail", "payroll:salary-compensation", "payroll:salary-changes", "payroll:outlet-cost", "payroll:department-cost", "payroll:variance", "payroll:finance-summary"].includes(reportKey)) {
+    return payrollSubFeatureEnabled(env, actor, "payroll.salary_processing_enabled");
+  }
+  if (reportKey === "payroll:deductions") return payrollSubFeatureEnabled(env, actor, "payroll.manual_deductions_enabled");
+  if (reportKey === "payroll:advances") return payrollSubFeatureEnabled(env, actor, "payroll.advances_enabled");
+  if (reportKey === "payroll:salary-loans") return payrollSubFeatureEnabled(env, actor, "payroll.salary_loans_enabled");
+  if (reportKey === "payroll:overtime") return payrollSubFeatureEnabled(env, actor, "payroll.overtime_enabled");
+  if (reportKey === "payroll:payslip-status") return payrollSubFeatureEnabled(env, actor, "payroll.payslips_enabled");
+  if (reportKey === "payroll:approval-finalization") return payrollSubFeatureEnabled(env, actor, "payroll.approvals_enabled");
+  if (reportKey === "payroll:long-leave-deductions") {
+    const [longLeaveEnabled, subFeatureEnabled] = await Promise.all([
+      settingsService.isFeatureEnabled(env, actor.companyId, "long_leave_management", actor),
+      payrollSubFeatureEnabled(env, actor, "payroll.long_leave_deductions_enabled"),
+    ]);
+    return longLeaveEnabled && subFeatureEnabled;
+  }
+  if (reportKey === "payroll:attendance-deductions") {
+    const [attendanceDeductions, subFeatureEnabled] = await Promise.all([
+      attendancePayrollDeductionsEnabled(env, actor),
+      payrollSubFeatureEnabled(env, actor, "payroll.attendance_deductions_enabled"),
+    ]);
+    return attendanceDeductions && subFeatureEnabled;
+  }
+  return true;
+};
+
 const moduleEnabledForCatalogItem = async (env: Env, actor: AuthActor, item: ReportExportCatalogItem) => {
-  if (item.category === "attendance" || item.report_key.startsWith("attendance:") || item.report_key === "payroll:overtime") {
+  if (item.category === "payroll" || item.report_key.startsWith("payroll:")) {
+    return payrollReportEnabledForKey(env, actor, item.report_key);
+  }
+  if (item.category === "attendance" || item.report_key.startsWith("attendance:")) {
     return settingsService.isFeatureEnabled(env, actor.companyId, "attendance", actor);
   }
   if (item.report_key === "payroll:attendance-deductions") {
@@ -240,7 +283,22 @@ const moduleEnabledForCatalogItem = async (env: Env, actor: AuthActor, item: Rep
   if (item.report_key === "hr:contracts") {
     return settingsService.isFeatureEnabled(env, actor.companyId, "contract_tracking", actor);
   }
+  if (["hr:document-compliance", "hr:foreign-compliance"].includes(item.report_key)) {
+    return settingsService.isFeatureEnabled(env, actor.companyId, "documents", actor);
+  }
+  if (item.report_key === "hr:assets-uniforms") {
+    const [assetsEnabled, uniformsEnabled] = await Promise.all([
+      settingsService.isFeatureEnabled(env, actor.companyId, "asset_tracking", actor),
+      settingsService.isFeatureEnabled(env, actor.companyId, "uniform_tracking", actor),
+    ]);
+    return assetsEnabled || uniformsEnabled;
+  }
   return true;
+};
+
+const assertCatalogItemEnabled = async (env: Env, actor: AuthActor, item: ReportExportCatalogItem) => {
+  if (await moduleEnabledForCatalogItem(env, actor, item)) return;
+  throw new AppError("This report is disabled because its module or sub-feature is disabled.", "REPORT_EXPORT_MODULE_DISABLED", 403);
 };
 
 const requireBoundedExport = (reportKey: string, filters: Record<string, unknown>, format: ReportExportFormat): Record<string, unknown> => {
@@ -300,6 +358,12 @@ const runReport = async (
   const filters = requireBoundedExport(item.report_key, filtersInput, format);
   const [namespace, key] = item.report_key.split(":");
   if (namespace === "hr") {
+    if (key === "document-compliance" || key === "foreign-compliance") {
+      const documentsEnabled = await settingsService.isFeatureEnabled(env, actor.companyId, "documents", actor);
+      if (!documentsEnabled) {
+        throw new AppError("Document Tracking is disabled. Enable it in Settings to use this module.", "DOCUMENT_TRACKING_DISABLED", 403);
+      }
+    }
     if (key === "contracts") {
       const contractTrackingEnabled = await settingsService.isFeatureEnabled(env, actor.companyId, "contract_tracking", actor);
       if (!contractTrackingEnabled) {
@@ -323,24 +387,41 @@ const runReport = async (
         settingsService.isFeatureEnabled(env, actor.companyId, "asset_tracking", actor),
         settingsService.isFeatureEnabled(env, actor.companyId, "uniform_tracking", actor),
       ]);
-      if (!assetsEnabled || !uniformsEnabled) {
-        throw new AppError("Asset Tracking and Uniform Tracking must both be enabled before exporting this report.", "ASSETS_UNIFORMS_REPORT_DISABLED", 403);
+      if (!assetsEnabled && !uniformsEnabled) {
+        throw new AppError("Asset Tracking or Uniform Tracking must be enabled before exporting this report.", "ASSETS_UNIFORMS_REPORT_DISABLED", 403);
       }
     }
     const validated = validateHrReportFilters(filters, { historyRequired: /leave-requests|long-leave|lifecycle/.test(key) });
     return normalizeDataResult(item, actor, await hrReports.runReport(env, actor, key, validated), { ...validated });
   }
   if (namespace === "payroll") {
+    await requirePayrollEnabled(env, actor);
+    if (["monthly-summary", "employee-detail", "salary-compensation", "salary-changes", "outlet-cost", "department-cost", "variance", "finance-summary"].includes(key)) {
+      if (!(await payrollSubFeatureEnabled(env, actor, "payroll.salary_processing_enabled"))) {
+        throw new AppError("Salary Processing is disabled. Enable it in Payroll Settings to use this report.", "PAYROLL_SALARY_PROCESSING_DISABLED", 403);
+      }
+    }
+    if (key === "deductions" && !(await payrollSubFeatureEnabled(env, actor, "payroll.manual_deductions_enabled"))) {
+      throw new AppError("Manual Deductions are disabled. Enable them in Payroll Settings to use this report.", "PAYROLL_MANUAL_DEDUCTIONS_DISABLED", 403);
+    }
     if (key === "attendance-deductions") {
+      if (!(await payrollSubFeatureEnabled(env, actor, "payroll.attendance_deductions_enabled"))) {
+        throw new AppError("Attendance Payroll Deductions are disabled. Enable them in Payroll Settings to use this report.", "PAYROLL_ATTENDANCE_DEDUCTIONS_DISABLED", 403);
+      }
       if (!(await attendancePayrollDeductionsEnabled(env, actor))) {
         throw new AppError("Attendance Payroll Deductions are disabled. Enable them in Attendance Settings to use this report.", "ATTENDANCE_PAYROLL_DEDUCTIONS_DISABLED", 403);
       }
     }
     if (key === "overtime") {
-      const attendanceEnabled = await settingsService.isFeatureEnabled(env, actor.companyId, "attendance", actor);
-      if (!attendanceEnabled) {
-        throw new AppError("Attendance Management is disabled. Enable it in Settings to use this module.", "ATTENDANCE_MANAGEMENT_DISABLED", 403);
+      if (!(await payrollSubFeatureEnabled(env, actor, "payroll.overtime_enabled"))) {
+        throw new AppError("Overtime is disabled. Enable it in Payroll Settings to use this report.", "PAYROLL_OVERTIME_DISABLED", 403);
       }
+    }
+    if (key === "advances" && !(await payrollSubFeatureEnabled(env, actor, "payroll.advances_enabled"))) {
+      throw new AppError("Advance Salary is disabled. Enable it in Payroll Settings to use this report.", "PAYROLL_ADVANCES_DISABLED", 403);
+    }
+    if (key === "salary-loans" && !(await payrollSubFeatureEnabled(env, actor, "payroll.salary_loans_enabled"))) {
+      throw new AppError("Salary Loans are disabled. Enable them in Payroll Settings to use this report.", "PAYROLL_SALARY_LOANS_DISABLED", 403);
     }
     if (key === "leave-deductions") {
       const leaveEnabled = await settingsService.isFeatureEnabled(env, actor.companyId, "leave_management", actor);
@@ -349,10 +430,19 @@ const runReport = async (
       }
     }
     if (key === "long-leave-deductions") {
+      if (!(await payrollSubFeatureEnabled(env, actor, "payroll.long_leave_deductions_enabled"))) {
+        throw new AppError("Long Leave Deductions are disabled. Enable them in Payroll Settings to use this report.", "PAYROLL_LONG_LEAVE_DEDUCTIONS_DISABLED", 403);
+      }
       const longLeaveEnabled = await settingsService.isFeatureEnabled(env, actor.companyId, "long_leave_management", actor);
       if (!longLeaveEnabled) {
         throw new AppError("Long Leave Management is disabled. Enable it in Settings to use this module.", "LONG_LEAVE_MANAGEMENT_DISABLED", 403);
       }
+    }
+    if (key === "payslip-status" && !(await payrollSubFeatureEnabled(env, actor, "payroll.payslips_enabled"))) {
+      throw new AppError("Payslips are disabled. Enable them in Payroll Settings to use this report.", "PAYROLL_PAYSLIPS_DISABLED", 403);
+    }
+    if (key === "approval-finalization" && !(await payrollSubFeatureEnabled(env, actor, "payroll.approvals_enabled"))) {
+      throw new AppError("Payroll Approvals are disabled. Enable them in Payroll Settings to use this report.", "PAYROLL_APPROVALS_DISABLED", 403);
     }
     const validated = validatePayrollReportFilters(filters, { periodRequired: /audit|variance|approval-finalization|employee-detail/.test(key) });
     return normalizeDataResult(item, actor, await payrollReports.runReport(env, actor, key, validated), { ...validated });
@@ -422,6 +512,7 @@ export const getExportCatalog = async (env: Env, actor: AuthActor) => {
 export const previewExport = async (env: Env, actor: AuthActor, input: ReportExportPreviewInput) => {
   const item = requireCatalogItem(input.report_key);
   requireExportPermission(actor, item, "preview");
+  await assertCatalogItemEnabled(env, actor, item);
   if (input.format && !item.formats.includes(input.format)) {
     throw new AppError("This export format is not supported for the selected report.", "REPORT_EXPORT_FORMAT_UNSUPPORTED", 400);
   }
@@ -450,6 +541,7 @@ export const previewExport = async (env: Env, actor: AuthActor, input: ReportExp
 export const createExportJob = async (env: Env, actor: AuthActor, input: ReportExportCreateInput) => {
   const item = requireCatalogItem(input.report_key);
   requireExportPermission(actor, item, "create");
+  await assertCatalogItemEnabled(env, actor, item);
   if (!supportedDownloadFormats.has(input.format)) {
     throw new AppError("Only Excel and PDF report exports are supported.", "REPORT_EXPORT_FORMAT_UNSUPPORTED", 400);
   }

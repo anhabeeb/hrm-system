@@ -97,6 +97,7 @@ export interface ExpiryAlertListFilters {
   status?: string;
   severity?: string;
   source_type?: string;
+  source_types?: string[];
   employee_id?: string;
   outlet_id?: string;
   department_id?: string;

@@ -481,8 +481,21 @@ export const listApprovedAttendanceCorrections = (env: Env, companyId: string, e
 export const listApprovedLeaveRequests = (env: Env, companyId: string, employeeId: string, start: string, end: string) =>
   many<any>(
     env,
-    `SELECT r.*, lt.is_paid, lt.affects_payroll FROM leave_requests r
+    `SELECT r.*, lt.is_paid, lt.affects_payroll, lt.leave_name AS leave_type_name,
+       pr.id AS policy_rule_id,
+       pr.paid_status AS policy_paid_status,
+       pr.paid_percentage AS policy_paid_percentage,
+       pr.salary_deduction_enabled AS policy_salary_deduction_enabled,
+       pr.deduction_mode AS policy_deduction_mode,
+       pr.deduction_component AS policy_deduction_component,
+       pr.deduction_component_keys_json AS policy_deduction_component_keys_json,
+       pr.deduction_pay_component_keys AS policy_deduction_pay_component_keys,
+       pr.deduction_daily_rate_method AS policy_deduction_daily_rate_method,
+       pr.deduction_custom_divisor AS policy_deduction_custom_divisor,
+       pr.payroll_source_label AS policy_payroll_source_label
+     FROM leave_requests r
      JOIN leave_types lt ON lt.id = r.leave_type_id
+     LEFT JOIN leave_type_policy_rules pr ON pr.company_id = r.company_id AND pr.leave_type_id = r.leave_type_id AND pr.is_enabled = 1
      WHERE r.company_id = ? AND r.employee_id = ?
        AND r.status IN ('approved', 'direct_approved')
        AND r.start_date <= ? AND r.end_date >= ?`,

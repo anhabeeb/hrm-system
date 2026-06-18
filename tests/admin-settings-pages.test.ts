@@ -54,6 +54,21 @@ describe("structured settings validation", () => {
 
     expect(input.settings["company.profile"].company_email).toBe("admin@example.com");
   });
+
+  it("keeps backend lifecycle dependency checks for parent modules and sub-features", () => {
+    const service = read("src/modules/settings/settings.service.ts");
+    const validators = read("src/modules/settings/settings.validators.ts");
+
+    expect(validators).toContain("validateNoEnabledDependentsBeforeDisable");
+    expect(validators).toContain("FEATURE_DEPENDENCIES");
+    expect(service).toContain("validateFeatureDisableSettingsDependencies");
+    expect(service).toContain("validateFeatureDependencies(featureKey, false, enabledFeatures)");
+    expect(service).toContain("Disable Attendance Payroll Deductions and Payroll Attendance Deductions before disabling Attendance Management.");
+    expect(service).toContain("Disable payroll deduction sub-features before disabling Payroll Management.");
+    expect(service).toContain("Payroll attendance deductions require Attendance Payroll Deductions to be enabled first.");
+    expect(service).toContain("Payroll long leave deductions require Long Leave Management to be enabled first.");
+    expect(service).toContain("Contract document upload requires Contract Tracking and Document Tracking to be enabled first.");
+  });
 });
 
 describe("settings and administration frontend pages", () => {

@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import type { DashboardWidgetDefinition } from "@/config/dashboardWidgets";
 import { useAuth } from "@/features/auth/auth.store";
 import { canShowModuleItem } from "@/lib/moduleAccess";
+import { hasAllAttendanceSubFeatures, hasAllPayrollSubFeatures, hasAttendanceSubFeature, hasPayrollSubFeature } from "@/lib/subfeatures";
 import type { CurrentUser } from "@/types/auth";
 
 import { useDashboardPreferences, useResetDashboardPreferences, useSaveDashboardPreferences } from "./dashboardPreferences.api";
@@ -20,6 +21,10 @@ export const getAllowedDashboardWidgets = (
 ) =>
   definitions.filter((widget) =>
     widget.dashboardType === dashboardType &&
+    hasPayrollSubFeature(user, widget.requiredPayrollSubFeature) &&
+    hasAllPayrollSubFeatures(user, widget.requiredPayrollSubFeaturesAll) &&
+    hasAttendanceSubFeature(user, widget.requiredAttendanceSubFeature) &&
+    hasAllAttendanceSubFeatures(user, widget.requiredAttendanceSubFeaturesAll) &&
     canShowModuleItem(user, widget.moduleCode, widget.requiredPermission, {
       requiredPermissionsAny: widget.requiredPermissionsAny,
       requiredFeaturesAll: widget.requiredFeaturesAll,

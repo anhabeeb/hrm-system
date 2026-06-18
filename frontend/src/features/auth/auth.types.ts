@@ -22,5 +22,7 @@ export interface MeResult {
   roles: string[];
   permissions: string[];
   features?: string[];
+  payroll_subfeatures?: Record<string, boolean | undefined>;
+  attendance_subfeatures?: Record<string, boolean | undefined>;
   outlet_ids: string[];
 }

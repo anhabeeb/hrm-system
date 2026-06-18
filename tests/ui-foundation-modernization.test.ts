@@ -63,7 +63,8 @@ describe("Phase 1 UI foundation and visibility guards", () => {
     const navigation = read("frontend/src/lib/navigation.ts");
 
     expect(navigation).toContain('moduleCode: "payroll"');
-    expect(navigation).toContain('moduleCode: "payslips"');
+    expect(navigation).toContain('moduleCodesAll: ["payroll", "payslips"]');
+    expect(navigation).toContain('requiredPayrollSubFeature: "payslips_enabled"');
     expect(navigation).toContain('label: "My Payslips"');
   });
 

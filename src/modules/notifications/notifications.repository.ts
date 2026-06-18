@@ -94,6 +94,13 @@ const buildListWhere = (companyId: string, userId: string, filters: Notification
   if (filters.category) {
     clauses.push("category = ?");
     values.push(filters.category);
+  } else if (filters.categories) {
+    if (filters.categories.length === 0) {
+      clauses.push("1 = 0");
+    } else {
+      clauses.push(`category IN (${filters.categories.map(() => "?").join(", ")})`);
+      values.push(...filters.categories);
+    }
   }
   if (filters.priority) {
     clauses.push("priority = ?");
@@ -206,7 +213,7 @@ export const markAllRead = (
   env: Env,
   companyId: string,
   userId: string,
-  filters: Pick<NotificationListFilters, "category" | "priority" | "notification_type" | "entity_type" | "entity_id">,
+  filters: Pick<NotificationListFilters, "category" | "categories" | "priority" | "notification_type" | "entity_type" | "entity_id">,
   timestamp: string,
 ) => {
   const built = buildListWhere(companyId, userId, { ...filters, status: "unread", page: 1, page_size: 100 });
@@ -217,8 +224,13 @@ export const markAllRead = (
   );
 };
 
-export const unreadCount = (env: Env, companyId: string, userId: string) =>
-  one<{ unread_count: number; urgent_count: number }>(
+export const unreadCount = (env: Env, companyId: string, userId: string, categories?: string[]) => {
+  const categoryClause = categories
+    ? categories.length === 0
+      ? " AND 1 = 0"
+      : ` AND category IN (${categories.map(() => "?").join(", ")})`
+    : "";
+  return one<{ unread_count: number; urgent_count: number }>(
     env,
     `SELECT
        SUM(CASE WHEN status = 'unread' THEN 1 ELSE 0 END) AS unread_count,
@@ -227,9 +239,10 @@ export const unreadCount = (env: Env, companyId: string, userId: string) =>
       WHERE company_id = ?
         AND COALESCE(recipient_user_id, user_id) = ?
         AND status = 'unread'
-        AND (expires_at IS NULL OR expires_at > ?)`,
-    [companyId, userId, new Date().toISOString()],
+        AND (expires_at IS NULL OR expires_at > ?)${categoryClause}`,
+    [companyId, userId, new Date().toISOString(), ...(categories ?? [])],
   );
+};
 
 export const getPreferences = (env: Env, companyId: string, userId: string) =>
   many<NotificationPreference>(

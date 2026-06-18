@@ -140,6 +140,9 @@ export interface ApprovalEngineRequest {
   subject_employee_name?: string | null;
   department_name?: string | null;
   current_step_name?: string | null;
+  module_enabled?: boolean;
+  disabled_reason?: string | null;
+  read_only?: boolean;
   submitted_at?: string | null;
   updated_at?: string | null;
   created_at?: string | null;

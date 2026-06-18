@@ -4,6 +4,9 @@ const jobs: any[] = [];
 const preferences: any[] = [];
 const settings: any[] = [];
 const deliveryLogs: any[] = [];
+const disabledFeatures = new Set<string>();
+const disabledAttendanceSettings = new Set<string>();
+const disabledPayrollSettings = new Set<string>();
 const users = [
   { id: "user_hr", employee_id: "emp_hr", email: "hr@example.com", full_name: "HR User", status: "active" },
   { id: "user_employee", employee_id: "emp_1", email: "employee@example.com", full_name: "Employee One", status: "active" },
@@ -53,9 +56,13 @@ vi.mock("../src/modules/email-notifications/email-notifications.repository", () 
   }),
   getEmailJob: vi.fn(async (_env, companyId, id) => jobs.find((row) => row.company_id === companyId && row.id === id) ?? null),
   countEmailJobs: vi.fn(async (_env, companyId, filters) =>
-    jobs.filter((row) => row.company_id === companyId && (!filters.recipient_user_id || row.recipient_user_id === filters.recipient_user_id)).length),
+    jobs.filter((row) => row.company_id === companyId &&
+      (!filters.recipient_user_id || row.recipient_user_id === filters.recipient_user_id) &&
+      (!filters.categories || filters.categories.includes(row.category))).length),
   listEmailJobs: vi.fn(async (_env, companyId, filters) =>
-    jobs.filter((row) => row.company_id === companyId && (!filters.recipient_user_id || row.recipient_user_id === filters.recipient_user_id))),
+    jobs.filter((row) => row.company_id === companyId &&
+      (!filters.recipient_user_id || row.recipient_user_id === filters.recipient_user_id) &&
+      (!filters.categories || filters.categories.includes(row.category)))),
   listPendingEmailJobs: vi.fn(async (_env, companyId, limit) =>
     jobs.filter((row) => row.company_id === companyId && ["pending", "queued", "failed"].includes(row.status)).slice(0, limit)),
   updateAttempt: vi.fn(async (_env, companyId, id, timestamp) => {
@@ -116,6 +123,22 @@ vi.mock("../src/modules/email-notifications/email-notifications.repository", () 
 
 vi.mock("../src/services/audit.service", () => ({
   createAuditLog: vi.fn(async () => ({ created: true })),
+}));
+
+vi.mock("../src/services/settings.service", () => ({
+  isFeatureEnabled: vi.fn(async (_env, _companyId, featureKey) => !disabledFeatures.has(featureKey)),
+  getAttendanceSettings: vi.fn(async () => ({
+    "attendance.corrections_enabled": !disabledAttendanceSettings.has("attendance.corrections_enabled"),
+    attendance_correction_enabled: !disabledAttendanceSettings.has("attendance.corrections_enabled"),
+    "attendance.payroll_deductions_enabled": !disabledAttendanceSettings.has("attendance.payroll_deductions_enabled"),
+    absent_day_deduction_enabled: !disabledAttendanceSettings.has("attendance.payroll_deductions_enabled"),
+    deduct_absent_days: !disabledAttendanceSettings.has("attendance.payroll_deductions_enabled"),
+    "attendance.kiosk_enabled": !disabledAttendanceSettings.has("attendance.kiosk_enabled"),
+    kiosk_mode_enabled: !disabledAttendanceSettings.has("attendance.kiosk_enabled"),
+    "attendance.biometric_enabled": !disabledAttendanceSettings.has("attendance.biometric_enabled"),
+    biometric_enabled: !disabledAttendanceSettings.has("attendance.biometric_enabled"),
+  })),
+  isPayrollSubFeatureEnabled: vi.fn(async (_env, _companyId, key) => !disabledPayrollSettings.has(key)),
 }));
 
 import {
@@ -184,6 +207,9 @@ beforeEach(() => {
   preferences.length = 0;
   settings.length = 0;
   deliveryLogs.length = 0;
+  disabledFeatures.clear();
+  disabledAttendanceSettings.clear();
+  disabledPayrollSettings.clear();
   vi.restoreAllMocks();
 });
 
@@ -220,6 +246,103 @@ describe("Phase 10B email notifications", () => {
   it("missing recipient email is skipped safely", async () => {
     const result = await createEmailJob(env(), "company_1", { recipientUserId: "user_no_email", payload });
     expect(result.job).toMatchObject({ status: "skipped_no_email", failure_code: "SKIPPED_NO_EMAIL" });
+  });
+
+  it("does not queue email jobs for disabled module categories", async () => {
+    disabledFeatures.add("leave");
+    disabledFeatures.add("leave_management");
+    const result = await createEmailJob(env(), "company_1", { recipientUserId: "user_hr", payload });
+    expect(result.job).toBeNull();
+    expect(result).toMatchObject({ skipped_disabled_module: true });
+    expect(jobs).toHaveLength(0);
+  });
+
+  it("does not queue payslip email jobs when payslips are disabled", async () => {
+    disabledPayrollSettings.add("payroll.payslips_enabled");
+    const result = await createEmailJob(env(), "company_1", {
+      recipientUserId: "user_hr",
+      payload: {
+        ...payload,
+        notification_type: "payslip_available",
+        category: "payroll",
+        entity_type: "payslip",
+        title: "Payslip available",
+      },
+    });
+    expect(result.job).toBeNull();
+    expect(jobs).toHaveLength(0);
+  });
+
+  it("uses attendance deduction settings for attendance deduction email jobs", async () => {
+    disabledPayrollSettings.add("payroll.attendance_deductions_enabled");
+    const payrollDisabled = await createEmailJob(env(), "company_1", {
+      recipientUserId: "user_hr",
+      payload: { ...payload, notification_type: "attendance_deduction_review", category: "payroll", entity_type: "attendance_deduction" },
+    });
+    expect(payrollDisabled.job).toBeNull();
+
+    disabledPayrollSettings.clear();
+    disabledAttendanceSettings.add("attendance.payroll_deductions_enabled");
+    const attendanceSubFeatureDisabled = await createEmailJob(env(), "company_1", {
+      recipientUserId: "user_hr",
+      payload: { ...payload, notification_type: "attendance_deduction_review", category: "payroll", entity_type: "attendance_deduction" },
+    });
+    expect(attendanceSubFeatureDisabled.job).toBeNull();
+
+    disabledAttendanceSettings.clear();
+    disabledFeatures.add("attendance");
+    const attendanceModuleDisabled = await createEmailJob(env(), "company_1", {
+      recipientUserId: "user_hr",
+      payload: { ...payload, notification_type: "attendance_deduction_review", category: "payroll", entity_type: "attendance_deduction" },
+    });
+    expect(attendanceModuleDisabled.job).toBeNull();
+    expect(jobs).toHaveLength(0);
+  });
+
+  it("does not let manual deduction settings control attendance deduction email jobs", async () => {
+    disabledPayrollSettings.add("payroll.manual_deductions_enabled");
+    const result = await createEmailJob(env(), "company_1", {
+      recipientUserId: "user_hr",
+      payload: { ...payload, notification_type: "attendance_deduction_review", category: "payroll", entity_type: "attendance_deduction" },
+    });
+    expect(result.job).toMatchObject({ category: "payroll", notification_type: "attendance_deduction_review" });
+  });
+
+  it("uses long leave deduction settings for long leave deduction email jobs", async () => {
+    disabledPayrollSettings.add("payroll.long_leave_deductions_enabled");
+    const payrollDisabled = await createEmailJob(env(), "company_1", {
+      recipientUserId: "user_hr",
+      payload: { ...payload, notification_type: "long_leave_deduction_review", category: "payroll", entity_type: "long_leave_deduction" },
+    });
+    expect(payrollDisabled.job).toBeNull();
+
+    disabledPayrollSettings.clear();
+    disabledFeatures.add("long_leave_management");
+    const moduleDisabled = await createEmailJob(env(), "company_1", {
+      recipientUserId: "user_hr",
+      payload: { ...payload, notification_type: "long_leave_deduction_review", category: "payroll", entity_type: "long_leave_deduction" },
+    });
+    expect(moduleDisabled.job).toBeNull();
+    expect(jobs).toHaveLength(0);
+  });
+
+  it("does not let manual deduction settings control long leave deduction email jobs", async () => {
+    disabledPayrollSettings.add("payroll.manual_deductions_enabled");
+    const result = await createEmailJob(env(), "company_1", {
+      recipientUserId: "user_hr",
+      payload: { ...payload, notification_type: "long_leave_deduction_review", category: "payroll", entity_type: "long_leave_deduction" },
+    });
+    expect(result.job).toMatchObject({ category: "payroll", notification_type: "long_leave_deduction_review" });
+  });
+
+  it("uses manual deduction settings for manual deduction email jobs", async () => {
+    disabledPayrollSettings.add("payroll.manual_deductions_enabled");
+    const result = await createEmailJob(env(), "company_1", {
+      recipientUserId: "user_hr",
+      payload: { ...payload, notification_type: "manual_deduction_review", category: "payroll", entity_type: "manual_deduction" },
+    });
+    expect(result.job).toBeNull();
+    expect(jobs).toHaveLength(0);
   });
 
   it("idempotency prevents duplicate email jobs", async () => {

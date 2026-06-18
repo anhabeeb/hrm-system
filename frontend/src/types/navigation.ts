@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 
 import type { FeatureKey, PermissionKey } from "./auth";
+import type { AttendanceSubFeatureKey, PayrollSubFeatureKey } from "@/lib/subfeatures";
 
 export type NavigationBadgeKey = "approvals" | "attendanceCorrections" | "rosterChanges" | "documentExpiry";
 
@@ -16,6 +17,10 @@ export interface NavItem {
   requiredPermissionsAny?: PermissionKey[];
   requiredFeature?: FeatureKey;
   requiredFeaturesAll?: FeatureKey[];
+  requiredPayrollSubFeature?: PayrollSubFeatureKey;
+  requiredPayrollSubFeaturesAll?: PayrollSubFeatureKey[];
+  requiredAttendanceSubFeature?: AttendanceSubFeatureKey;
+  requiredAttendanceSubFeaturesAll?: AttendanceSubFeatureKey[];
   requiresLinkedEmployee?: boolean;
   accountType?: "employee" | "admin" | "any";
   adminOnly?: boolean;

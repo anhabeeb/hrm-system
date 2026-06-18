@@ -4,6 +4,11 @@ import type { AuthActor, PaginationMeta } from "../../types/api.types";
 import { AppError, ConflictError, NotFoundError, PermissionError, ValidationError } from "../../utils/errors";
 import { createPrefixedId } from "../../utils/ids";
 import { resolveApproversForStep } from "./approval-approver-resolver.service";
+import {
+  annotateApprovalModuleState,
+  assertApprovalOperationModuleEnabled,
+  getEnabledApprovalOperationTypes,
+} from "./approval-module-access.service";
 import * as repository from "./approval-workflow-engine.repository";
 import {
   APPROVAL_FALLBACK_BEHAVIORS,
@@ -65,6 +70,23 @@ const pagination = (filters: ApprovalEngineFilters, total: number): PaginationMe
   total,
   total_pages: Math.ceil(total / filters.page_size),
 });
+
+const activeModuleFilter = async (env: Env, context: AuthActor) => {
+  const enabledOperationTypes = await getEnabledApprovalOperationTypes(env, context, APPROVAL_OPERATION_TYPES);
+  if (enabledOperationTypes.length === 0) return { extra: "1 = 0", values: [] as unknown[] };
+  return {
+    extra: `r.operation_type IN (${enabledOperationTypes.map(() => "?").join(", ")})`,
+    values: enabledOperationTypes as unknown[],
+  };
+};
+
+const combineFilters = (...filters: Array<{ extra?: string; values: unknown[] }>) => {
+  const extras = filters.map((filter) => filter.extra).filter((extra): extra is string => Boolean(extra));
+  return {
+    extra: extras.length ? extras.map((extra) => `(${extra})`).join(" AND ") : undefined,
+    values: filters.flatMap((filter) => filter.values),
+  };
+};
 
 const assertAllowedValue = <T extends readonly string[]>(value: string | undefined, allowed: T, field: string) => {
   if (!value || !allowed.includes(value)) throw new ValidationError(`${field} is not valid.`);
@@ -462,11 +484,13 @@ export const reorderWorkflowSteps = async (env: Env, context: AuthActor, workflo
 
 export const listRequests = async (env: Env, context: AuthActor, filters: ApprovalEngineFilters) => {
   const visibility = await buildApprovalRequestVisibilityFilter(env, context);
+  const moduleFilter = await activeModuleFilter(env, context);
+  const combined = combineFilters(visibility, moduleFilter);
   const [total, rows] = await Promise.all([
-    repository.countRequests(env, context.companyId, filters, visibility.extra, visibility.values),
-    repository.listRequests(env, context.companyId, filters, visibility.extra, visibility.values),
+    repository.countRequests(env, context.companyId, filters, combined.extra, combined.values),
+    repository.listRequests(env, context.companyId, filters, combined.extra, combined.values),
   ]);
-  return { rows, pagination: pagination(filters, total) };
+  return { rows: await annotateApprovalModuleState(env, context, rows), pagination: pagination(filters, total) };
 };
 
 const canUseModuleBoundCreateForOthers = (context: AuthActor, input: ApprovalRequestInput, options?: ApprovalDraftOptions) =>
@@ -533,6 +557,7 @@ const canUseModuleBoundCreateForOthers = (context: AuthActor, input: ApprovalReq
 export const createApprovalRequestDraft = async (env: Env, context: AuthActor, input: ApprovalRequestInput, options?: ApprovalDraftOptions) => {
   requireField(input.operation_type, "Operation type");
   assertAllowedValue(input.operation_type, APPROVAL_OPERATION_TYPES, "Operation type");
+  await assertApprovalOperationModuleEnabled(env, context, input.operation_type);
   requireField(input.subject_type, "Subject type");
   requireField(input.subject_id, "Subject");
   requireField(input.title, "Request title");
@@ -610,6 +635,7 @@ export const submitApprovalRequest = async (env: Env, context: AuthActor, reques
   const request = await repository.findRequestById(env, context.companyId, requestId);
   if (!request) throw new NotFoundError("The requested approval request could not be found.");
   if (request.status !== "DRAFT") throw new ConflictError("Only draft approval requests can be submitted.");
+  await assertApprovalOperationModuleEnabled(env, context, request.operation_type);
   await canSubmitApprovalRequest(env, context, request);
   const workflowSteps = (await repository.listWorkflowSteps(env, context.companyId, request.workflow_id)).filter((step) => step.is_active === 1);
   if (workflowSteps.length === 0) throw new ValidationError("This workflow has no active approval steps.");
@@ -702,6 +728,7 @@ const assertGenericActionAllowed = (request: ApprovalRequestEngineRecord, option
 export const approveStep = async (env: Env, context: AuthActor, requestId: string, comment?: string | null, options?: ApprovalEngineActionOptions) => {
   const { request, steps, current } = await ensureActionableRequest(env, context, requestId);
   assertGenericActionAllowed(request, options);
+  await assertApprovalOperationModuleEnabled(env, context, request.operation_type);
   await canActOnApprovalStep(env, context, request, current, "approve");
   await repository.updateRequestStepStatus(env, context.companyId, current.id, { status: "APPROVED", timestampColumn: "approved_at" });
   const next = nextPendingStep(steps.filter((step) => step.id !== current.id));
@@ -731,6 +758,7 @@ export const rejectStep = async (env: Env, context: AuthActor, requestId: string
   if (!reason?.trim()) throw new ValidationError("A rejection reason is required.");
   const { request, current } = await ensureActionableRequest(env, context, requestId);
   assertGenericActionAllowed(request, options);
+  await assertApprovalOperationModuleEnabled(env, context, request.operation_type);
   await canActOnApprovalStep(env, context, request, current, "reject");
   await repository.updateRequestStepStatus(env, context.companyId, current.id, { status: "REJECTED", timestampColumn: "rejected_at" });
   await repository.updateRequestStatus(env, context.companyId, request.id, {
@@ -760,6 +788,7 @@ export const cancelRequest = async (env: Env, context: AuthActor, requestId: str
   if (!request) throw new NotFoundError("The requested approval request could not be found.");
   if (["APPROVED", "REJECTED", "CANCELLED"].includes(request.status)) throw new ConflictError("This approval request is already completed.");
   assertGenericActionAllowed(request, options);
+  await assertApprovalOperationModuleEnabled(env, context, request.operation_type);
   await canCancelApprovalRequest(env, context, request, reason, options);
   await repository.updateRequestStatus(env, context.companyId, request.id, {
     status: "CANCELLED",
@@ -786,6 +815,7 @@ export const assignApprover = async (env: Env, context: AuthActor, requestId: st
   if (!reason?.trim()) throw new ValidationError("A reason is required to assign an approver.");
   const request = await repository.findRequestById(env, context.companyId, requestId);
   if (!request) throw new NotFoundError("The requested approval request could not be found.");
+  await assertApprovalOperationModuleEnabled(env, context, request.operation_type);
   const step = await repository.findRequestStepById(env, context.companyId, requestId, stepId);
   if (!step) throw new NotFoundError("The requested approval step could not be found.");
   const workflowStep = await repository.findWorkflowStepById(env, context.companyId, request.workflow_id, step.workflow_step_id);
@@ -873,11 +903,13 @@ export const getTimeline = async (env: Env, context: AuthActor, requestId: strin
 
 export const getMyPending = async (env: Env, context: AuthActor, filters: ApprovalEngineFilters) => {
   const pending = await buildMyPendingVisibilityFilter(env, context);
+  const moduleFilter = await activeModuleFilter(env, context);
+  const combined = combineFilters(pending, moduleFilter);
   const [total, rows] = await Promise.all([
-    repository.countRequests(env, context.companyId, filters, pending.extra, pending.values),
-    repository.listRequests(env, context.companyId, filters, pending.extra, pending.values),
+    repository.countRequests(env, context.companyId, filters, combined.extra, combined.values),
+    repository.listRequests(env, context.companyId, filters, combined.extra, combined.values),
   ]);
-  return { rows, pagination: pagination(filters, total) };
+  return { rows: await annotateApprovalModuleState(env, context, rows), pagination: pagination(filters, total) };
 };
 
 export const getMyRequests = async (env: Env, context: AuthActor, filters: ApprovalEngineFilters) => {
@@ -887,10 +919,11 @@ export const getMyRequests = async (env: Env, context: AuthActor, filters: Appro
     repository.countRequests(env, context.companyId, filters, extra, values),
     repository.listRequests(env, context.companyId, filters, extra, values),
   ]);
-  return { rows, pagination: pagination(filters, total) };
+  return { rows: await annotateApprovalModuleState(env, context, rows), pagination: pagination(filters, total) };
 };
 
 export const seedDefaultWorkflowTemplate = async (env: Env, context: AuthActor, operationType: "LEAVE_REQUEST" | "ATTENDANCE_CORRECTION" | "ROSTER_CHANGE" | "EMPLOYEE_DOCUMENT_UPDATE") => {
+  await assertApprovalOperationModuleEnabled(env, context, operationType);
   const code = `${operationType}_DEFAULT`;
   const existing = await repository.findWorkflowByCode(env, context.companyId, code);
   if (existing) return existing;

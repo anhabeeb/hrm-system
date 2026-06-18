@@ -106,8 +106,14 @@ export const AssetsPage = () => {
 
   return (
     <div>
-      {has("assets.create") ? <PageActionBar label="Assets page actions"><Button onClick={() => { setEditing(null); setFormOpen(true); }}><Plus className="h-4 w-4" />Create asset</Button></PageActionBar> : null}
+      {has("assets.create") ? <PageActionBar label="Assets page actions"><div data-setup-target="asset-categories"><Button onClick={() => { setEditing(null); setFormOpen(true); }}><Plus className="h-4 w-4" />Create asset</Button></div></PageActionBar> : null}
       <div className="space-y-4 p-4 md:p-6">
+        <div className="rounded-lg border bg-card p-4" data-setup-target="asset-issue-rules">
+          <h2 className="text-sm font-semibold">Asset issue and return rules</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Use this page to create asset categories, assign company assets, process returns, and record responsibility or deduction reviews.
+          </p>
+        </div>
         {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
         {error ? <InlineAlert title={friendlyHrmError(error, "Asset action could not be completed.", "deduction")} variant="error" /> : null}
         <AssetFilters filters={filters} onChange={updateFilters} onClear={() => setSearchParams(new URLSearchParams({ page: "1", page_size: String(filters.page_size), tab: activeTab }))} />

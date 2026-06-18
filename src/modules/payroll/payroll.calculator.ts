@@ -180,6 +180,158 @@ const safeJson = (value: unknown): Record<string, unknown> => {
   }
 };
 
+const leavePolicyDeductionRequired = (leave: any) => {
+  const hasPolicyRule =
+    Boolean(leave.policy_rule_id) ||
+    leave.policy_paid_status !== undefined ||
+    leave.policy_salary_deduction_enabled !== undefined;
+  if (!hasPolicyRule) return false;
+  const paidPercentage = Number(leave.policy_paid_percentage ?? (leave.is_paid === 1 ? 100 : 0));
+  const paidStatus = String(leave.policy_paid_status ?? (leave.is_paid === 1 ? "paid" : "unpaid"));
+  return leave.policy_salary_deduction_enabled === 1 || paidStatus === "unpaid" || paidStatus === "partial_paid" || paidPercentage < 100;
+};
+
+type PayrollComponentBasis = {
+  component: PayrollCompensationComponentRecord;
+  monthly_amount: number;
+};
+
+type LeavePolicyComponentMetadata = {
+  component_id: string;
+  component_definition_id: string | null;
+  component_code: string | null;
+  component_name: string;
+  component_type: PayrollCompensationComponentRecord["component_type"];
+  monthly_amount: number;
+};
+
+type LeavePolicyDeductionBasisResult = {
+  amount: number;
+  daily_rate_method: string;
+  components: LeavePolicyComponentMetadata[];
+  allowance_amount_used?: number;
+  basic_salary_amount_used?: number;
+  unsupported?: boolean;
+};
+
+const normalizeComponentKey = (value: unknown) => String(value ?? "").trim().toLowerCase();
+
+const parsePolicyComponentKeys = (leave: any) => {
+  const keys = new Set<string>();
+  const rawJson = leave.policy_deduction_pay_component_keys ?? leave.policy_deduction_component_keys_json;
+  if (typeof rawJson === "string" && rawJson.trim().length > 0) {
+    try {
+      const parsed = JSON.parse(rawJson);
+      if (Array.isArray(parsed)) {
+        for (const key of parsed) {
+          const normalized = normalizeComponentKey(key);
+          if (normalized) keys.add(normalized);
+        }
+      }
+    } catch {
+      // Ignore malformed historical metadata and fall back to the single component key.
+    }
+  }
+  const single = normalizeComponentKey(leave.policy_deduction_component);
+  if (single && !["leave_policy", "basic_salary", "none"].includes(single)) keys.add(single);
+  return [...keys];
+};
+
+const componentLookupKeys = (component: PayrollCompensationComponentRecord) =>
+  [
+    component.id,
+    component.component_definition_id,
+    component.component_code,
+    component.component_name,
+  ].map(normalizeComponentKey).filter(Boolean);
+
+const findPolicyComponents = (
+  components: PayrollComponentBasis[],
+  leave: any,
+  allowedTypes?: Array<PayrollCompensationComponentRecord["component_type"]>,
+) => {
+  const keys = parsePolicyComponentKeys(leave);
+  if (keys.length === 0) return [];
+  return components.filter(({ component }) => {
+    if (allowedTypes && !allowedTypes.includes(component.component_type)) return false;
+    const componentKeys = componentLookupKeys(component);
+    return keys.some((key) => componentKeys.includes(key));
+  });
+};
+
+const describePolicyComponents = (components: PayrollComponentBasis[]) =>
+  components.map(({ component, monthly_amount }) => ({
+    component_id: component.id,
+    component_definition_id: component.component_definition_id,
+    component_code: component.component_code,
+    component_name: component.component_name,
+    component_type: component.component_type,
+    monthly_amount,
+  }));
+
+const calculateLeavePolicyDeductionAmount = (input: {
+  leave: any;
+  days: number;
+  dailySalary: number;
+  salaryDays: number;
+  deductionPercent: number;
+  policyComponents: PayrollComponentBasis[];
+  settings: PayrollCalculationSettings;
+}): LeavePolicyDeductionBasisResult => {
+  const mode = String(input.leave.policy_deduction_mode ?? "basic_salary");
+  const dailyRateMethod = String(input.leave.policy_deduction_daily_rate_method ?? "payroll_working_days");
+  const divisor = dailyRateMethod === "custom_divisor"
+    ? Number(input.leave.policy_deduction_custom_divisor ?? input.salaryDays)
+    : dailyRateMethod === "fixed_30_days"
+      ? 30
+      : input.salaryDays;
+  const percent = input.deductionPercent / 100;
+  const selectedPayComponents = findPolicyComponents(input.policyComponents, input.leave);
+  const selectedAllowances = findPolicyComponents(input.policyComponents, input.leave, ["allowance"]);
+  const componentAmount = (components: PayrollComponentBasis[]) =>
+    components.reduce((total, entry) => total + ((entry.monthly_amount / Math.max(1, divisor)) * input.days * percent), 0);
+  const basicDailyRate = dailyRateMethod === "payroll_working_days"
+    ? input.dailySalary
+    : input.dailySalary * (input.salaryDays / Math.max(1, divisor));
+  const basicAmount = basicDailyRate * input.days * percent;
+  if (mode === "none") {
+    return { amount: 0, daily_rate_method: "none", components: [] };
+  }
+  if (mode === "selected_allowance") {
+    return {
+      amount: applyPayrollRounding(componentAmount(selectedAllowances), input.settings),
+      daily_rate_method: "selected_allowance",
+      components: describePolicyComponents(selectedAllowances),
+    };
+  }
+  if (mode === "selected_pay_components") {
+    return {
+      amount: applyPayrollRounding(componentAmount(selectedPayComponents), input.settings),
+      daily_rate_method: "selected_pay_components",
+      components: describePolicyComponents(selectedPayComponents),
+    };
+  }
+  if (mode === "allowance_first_then_basic") {
+    const allowanceAmount = componentAmount(selectedAllowances);
+    const spilloverAmount = Math.max(0, basicAmount - allowanceAmount);
+    return {
+      amount: applyPayrollRounding(allowanceAmount + spilloverAmount, input.settings),
+      daily_rate_method: "allowance_first_then_basic",
+      components: describePolicyComponents(selectedAllowances),
+      allowance_amount_used: applyPayrollRounding(allowanceAmount, input.settings),
+      basic_salary_amount_used: applyPayrollRounding(spilloverAmount, input.settings),
+    };
+  }
+  if (mode === "custom") {
+    return { amount: 0, daily_rate_method: "custom_unsupported", components: [], unsupported: true };
+  }
+  return {
+    amount: applyPayrollRounding(basicAmount, input.settings),
+    daily_rate_method: dailyRateMethod === "payroll_working_days" ? "basic_salary" : `basic_salary_${dailyRateMethod}`,
+    components: [],
+  };
+};
+
 const buildDateClassification = (input: {
   periodStart: string;
   periodEnd: string;
@@ -241,7 +393,7 @@ const buildDateClassification = (input: {
     if (!overlap) continue;
     for (const date of listDates(overlap.start, overlap.end)) {
       byDate.set(date, {
-        classification: leave.is_paid === 1 || leave.affects_payroll !== 1 ? "paid_leave" : "unpaid_leave",
+        classification: leavePolicyDeductionRequired(leave) || (leave.is_paid !== 1 && leave.affects_payroll === 1) ? "unpaid_leave" : "paid_leave",
         sources: [leave.id],
       });
     }
@@ -359,6 +511,7 @@ export const calculateEmployeePayroll = async (
     periodEnd,
     periodStart,
   );
+  const policyComponentBasis: PayrollComponentBasis[] = [];
   for (const component of components) {
     if (component.currency !== (input.settings.currency ?? "MVR")) {
       exceptions.push({
@@ -373,6 +526,7 @@ export const calculateEmployeePayroll = async (
     const overlap = overlapRange(component.effective_from, component.effective_to ?? "9999-12-31", periodStart, periodEnd);
     if (!overlap) continue;
     const amount = amountFromComponent(component, payableBasic, overlap.days, salaryDays, input.settings);
+    policyComponentBasis.push({ component, monthly_amount: amount });
     const metadata = {
       component_id: component.id,
       component_definition_id: component.component_definition_id,
@@ -401,6 +555,22 @@ export const calculateEmployeePayroll = async (
           ? component.component_type === "deduction" ? "subtract" : "add"
           : "none",
     });
+    if (component.component_type === "benefit" && input.settings.benefitsEnabled === false) {
+      warnings.push({
+        warning_type: "payroll_benefits_disabled",
+        message: `${component.component_name} was skipped because Payroll Benefits are disabled.`,
+        metadata,
+      });
+      continue;
+    }
+    if (component.component_type === "deduction" && input.settings.manualDeductionsEnabled === false) {
+      warnings.push({
+        warning_type: "manual_deductions_disabled",
+        message: `${component.component_name} was skipped because Manual Deductions are disabled.`,
+        metadata,
+      });
+      continue;
+    }
     if (component.calculation_type === "non_cash_benefit") {
       summary.non_cash_benefits += amount;
       warnings.push({
@@ -472,6 +642,7 @@ export const calculateEmployeePayroll = async (
   const unpaidLeaveDates = [...classifications.entries()]
     .filter(([, value]) => value.classification === "unpaid_leave")
     .map(([date]) => date);
+  const policyDeductedLeaveDates = new Set<string>();
   const incompleteDates = [...classifications.entries()]
     .filter(([, value]) => value.classification === "incomplete")
     .map(([date]) => date);
@@ -507,17 +678,87 @@ export const calculateEmployeePayroll = async (
     });
   }
 
-  if (input.settings.unpaidLeaveDeductionEnabled !== false && unpaidLeaveDates.length > 0 && longLeaveImpacts.length === 0) {
-    const amount = applyPayrollRounding(dailySalary * unpaidLeaveDates.length, input.settings);
+  if (input.settings.unpaidLeaveDeductionEnabled !== false && longLeaveImpacts.length === 0) {
+    for (const leave of leaveRows.filter(leavePolicyDeductionRequired)) {
+      const overlap = overlapRange(leave.start_date, leave.end_date, periodStart, periodEnd);
+      if (!overlap) continue;
+      const dates = listDates(overlap.start, overlap.end);
+      dates.forEach((date) => policyDeductedLeaveDates.add(date));
+      const paidPercentage = Number(leave.policy_paid_percentage ?? (leave.is_paid === 1 ? 100 : 0));
+      const deductionPercent = leave.policy_salary_deduction_enabled === 1 && paidPercentage >= 100
+        ? 100
+        : Math.max(0, Math.min(100, 100 - paidPercentage));
+      const policyDeduction = calculateLeavePolicyDeductionAmount({
+        leave,
+        days: dates.length,
+        dailySalary,
+        salaryDays,
+        deductionPercent,
+        policyComponents: policyComponentBasis,
+        settings: input.settings,
+      });
+      if (policyDeduction.unsupported) {
+        warnings.push({
+          warning_type: "leave_policy_custom_deduction_unsupported",
+          message: `${leave.leave_type_name ?? "Leave"} uses a custom leave deduction policy that is not configured for automatic payroll calculation.`,
+          metadata: {
+            leave_request_id: leave.id,
+            leave_type_id: leave.leave_type_id,
+            deduction_mode: leave.policy_deduction_mode,
+          },
+        });
+        continue;
+      }
+      const amount = policyDeduction.amount;
+      if (amount <= 0) continue;
+      summary.unpaid_leave_deductions += amount;
+      deductions.push({
+        deduction_type: "leave_policy",
+        amount,
+        source_type: "leave_policy",
+        source_id: leave.id,
+        source_reference: `${leave.leave_type_name ?? leave.leave_type_id}:${overlap.start}:${overlap.end}`,
+        calculation_code: "leave_policy_deduction",
+        calculation_description: `${dates.length} approved ${leave.leave_type_name ?? "leave"} day(s) deducted by leave policy.`,
+        calculation_metadata_json: lineMetadata({
+          source_type: "leave_policy",
+          leave_request_id: leave.id,
+          leave_type_id: leave.leave_type_id,
+          leave_type_name: leave.leave_type_name ?? null,
+          deduction_rule_id: leave.policy_rule_id ?? null,
+          deduction_mode: leave.policy_deduction_mode ?? "full_day",
+          deduction_component: leave.policy_deduction_component ?? "leave_policy",
+          payroll_source_label: leave.policy_payroll_source_label ?? "leave_policy",
+          deduction_component_keys: parsePolicyComponentKeys(leave),
+          deduction_daily_rate_method: leave.policy_deduction_daily_rate_method ?? "payroll_working_days",
+          deduction_custom_divisor: leave.policy_deduction_custom_divisor ?? null,
+          component_amount_used: policyDeduction.components,
+          allowance_amount_used: policyDeduction.allowance_amount_used,
+          basic_salary_amount_used: policyDeduction.basic_salary_amount_used,
+          daily_rate_method: policyDeduction.daily_rate_method,
+          deductible_days: dates.length,
+          paid_percentage: paidPercentage,
+          deduction_percent: deductionPercent,
+          dates,
+          daily_salary: dailySalary,
+        }),
+        calculation_version: input.calculationVersion ?? 0,
+      });
+    }
+  }
+
+  const legacyUnpaidLeaveDates = unpaidLeaveDates.filter((date) => !policyDeductedLeaveDates.has(date));
+  if (input.settings.unpaidLeaveDeductionEnabled !== false && legacyUnpaidLeaveDates.length > 0 && longLeaveImpacts.length === 0) {
+    const amount = applyPayrollRounding(dailySalary * legacyUnpaidLeaveDates.length, input.settings);
     summary.unpaid_leave_deductions += amount;
     deductions.push({
       deduction_type: "unpaid_leave",
       amount,
       source_type: "unpaid_leave",
-      source_reference: unpaidLeaveDates.join(","),
+      source_reference: legacyUnpaidLeaveDates.join(","),
       calculation_code: "unpaid_leave_deduction",
-      calculation_description: `${unpaidLeaveDates.length} approved unpaid leave day(s) deducted.`,
-      calculation_metadata_json: lineMetadata({ dates: unpaidLeaveDates, daily_salary: dailySalary }),
+      calculation_description: `${legacyUnpaidLeaveDates.length} approved unpaid leave day(s) deducted.`,
+      calculation_metadata_json: lineMetadata({ dates: legacyUnpaidLeaveDates, daily_salary: dailySalary }),
       calculation_version: input.calculationVersion ?? 0,
     });
   }
@@ -676,10 +917,12 @@ export const parsePayrollSettings = (settings: Record<string, unknown>): Payroll
     currency: String(settings.payroll_currency ?? "MVR"),
     prorateBasicSalaryForMidMonthChanges: boolSetting(settings, "prorate_basic_salary_for_mid_month_changes", true),
     prorateRecurringComponents: boolSetting(settings, "prorate_recurring_components", true),
-    unpaidLeaveDeductionEnabled: boolSetting(settings, "unpaid_leave_deduction_enabled", true),
-    longLeavePayDaysWorkedOnly: boolSetting(settings, "long_leave_pay_days_worked_only", true),
-    automaticAdvanceDeductionEnabled: boolSetting(settings, "automatic_advance_deduction_enabled", true),
-    automaticLoanInstallmentDeductionEnabled: boolSetting(settings, "automatic_loan_installment_deduction_enabled", true),
+    unpaidLeaveDeductionEnabled: boolSetting(settings, "payroll.long_leave_deductions_enabled", boolSetting(settings, "unpaid_leave_deduction_enabled", true)),
+    longLeavePayDaysWorkedOnly: boolSetting(settings, "payroll.long_leave_deductions_enabled", boolSetting(settings, "long_leave_pay_days_worked_only", true)),
+    automaticAdvanceDeductionEnabled: boolSetting(settings, "payroll.advances_enabled", boolSetting(settings, "automatic_advance_deduction_enabled", true)),
+    automaticLoanInstallmentDeductionEnabled: boolSetting(settings, "payroll.salary_loans_enabled", boolSetting(settings, "automatic_loan_installment_deduction_enabled", true)),
+    benefitsEnabled: boolSetting(settings, "payroll.benefits_enabled", true),
+    manualDeductionsEnabled: boolSetting(settings, "payroll.manual_deductions_enabled", true),
     requireCompleteAttendanceBeforeCalculation: boolSetting(settings, "require_complete_attendance_before_calculation", false),
     missingAttendanceCountsAsAbsent: boolSetting(settings, "missing_attendance_counts_as_absent", false),
     absenceDeductionRequiresExplicitAbsentStatus: boolSetting(settings, "absence_deduction_requires_explicit_absent_status", false),
@@ -687,7 +930,7 @@ export const parsePayrollSettings = (settings: Record<string, unknown>): Payroll
     requireActiveSalaryRecord: boolSetting(settings, "require_active_salary_record", true),
     roundingMethod: (["none", "nearest_lari", "nearest_rufiyaa", "round_down", "round_up"].includes(roundingMethod) ? roundingMethod : "none") as PayrollCalculationSettings["roundingMethod"],
     negativeNetPayPolicy: (["block", "allow", "carry_forward_excess_deduction"].includes(negativeNetPayPolicy) ? negativeNetPayPolicy : "block") as PayrollCalculationSettings["negativeNetPayPolicy"],
-    deductAbsentDays: boolSetting(settings, "attendance.payroll_deductions_enabled", boolSetting(settings, "absent_day_deduction_enabled", settings.deduct_absent_days !== false)),
+    deductAbsentDays: boolSetting(settings, "payroll.attendance_deductions_enabled", boolSetting(settings, "attendance.payroll_deductions_enabled", boolSetting(settings, "absent_day_deduction_enabled", settings.deduct_absent_days !== false))),
     deductLateMinutes: settings.deduct_late_minutes === true,
     deductEarlyCheckout: settings.deduct_early_checkout === true,
     allowNegativeSalary: negativeNetPayPolicy === "allow",

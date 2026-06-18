@@ -7,6 +7,7 @@ import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { PageActionBar } from "@/components/layout/PageActionBar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/auth.store";
+import { usePayrollSubFeatures } from "@/features/payroll/usePayrollSubFeatures";
 import { friendlyHrmError } from "@/lib/hrm-errors";
 import { searchParamNumber } from "@/lib/query-string";
 import { GeneratePayslipsDialog } from "./GeneratePayslipsDialog";
@@ -18,6 +19,7 @@ import type { Payslip, PayslipFilters as PayslipFilterValues } from "./payslips.
 
 export const PayslipsPage = () => {
   const auth = useAuth();
+  const payrollSubFeatures = usePayrollSubFeatures();
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selected, setSelected] = useState<Payslip | null>(null);
@@ -39,7 +41,7 @@ export const PayslipsPage = () => {
     if (!("page" in next)) params.set("page", "1");
     setSearchParams(params);
   };
-  const listQuery = useQuery({ queryKey: ["payslips", filters], queryFn: () => payslipsApi.list(filters) });
+  const listQuery = useQuery({ queryKey: ["payslips", filters], queryFn: () => payslipsApi.list(filters), enabled: payrollSubFeatures.payslipsEnabled });
   const generateMutation = useMutation({
     mutationFn: payslipsApi.generateBatch,
     onSuccess: async (response) => {
@@ -56,11 +58,12 @@ export const PayslipsPage = () => {
     },
   });
   const error = listQuery.error ?? generateMutation.error ?? downloadMutation.error;
-  const canDownloadPayslip = auth.isSuperAdmin || auth.hasPermission("payslips.download");
+  const canDownloadPayslip = payrollSubFeatures.payslipsEnabled && (auth.isSuperAdmin || auth.hasPermission("payslips.download"));
   return (
     <div>
-      {auth.hasPermission("payslips.generate") ? <PageActionBar label="Payslips page actions"><Button onClick={() => setGenerateOpen(true)}><FileText className="h-4 w-4" />Generate batch</Button></PageActionBar> : null}
+      {payrollSubFeatures.payslipsEnabled && auth.hasPermission("payslips.generate") ? <PageActionBar label="Payslips page actions"><Button onClick={() => setGenerateOpen(true)}><FileText className="h-4 w-4" />Generate batch</Button></PageActionBar> : null}
       <div className="space-y-4 p-4 md:p-6">
+        {!payrollSubFeatures.payslipsEnabled ? <InlineAlert title="Payslips are disabled. Payslip generation and download actions are hidden." /> : null}
         {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
         {error ? <InlineAlert title={friendlyHrmError(error, "Payslip action could not be completed.", "payroll")} variant="error" /> : null}
         <PayslipFilters filters={filters} onChange={updateFilters} onClear={() => setSearchParams(new URLSearchParams({ page: "1", page_size: String(filters.page_size) }))} />

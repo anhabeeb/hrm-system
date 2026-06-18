@@ -11,6 +11,7 @@ import {
   validateApprovalSettingsInput,
   validateApprovalThresholdInput,
   validateFeatureDependencies,
+  validateNoEnabledDependentsBeforeDisable,
   validateUpdateSettingsGroupInput,
 } from "../src/modules/settings/settings.validators";
 import type { AppContext, AuthActor } from "../src/types/api.types";
@@ -138,27 +139,48 @@ describe("settings validators", () => {
     ).not.toThrow();
   });
 
-  it("blocks enabling long leave until leave management and Payroll are enabled", () => {
+  it("blocks enabling long leave until Leave Management is enabled", () => {
     expect(() =>
-      validateFeatureDependencies("long_leave", true, new Set(["payroll"])),
+      validateFeatureDependencies("long_leave", true, new Set()),
     ).toThrow("This feature cannot be enabled until Leave Management is enabled.");
     expect(() =>
-      validateFeatureDependencies("long_leave_management", true, new Set(["payroll"])),
+      validateFeatureDependencies("long_leave_management", true, new Set()),
     ).toThrow("This feature cannot be enabled until Leave Management is enabled.");
 
     expect(() =>
       validateFeatureDependencies(
         "long_leave",
         true,
-        new Set(["leave_management", "payroll"]),
+        new Set(["leave_management"]),
       ),
     ).not.toThrow();
     expect(() =>
       validateFeatureDependencies(
         "long_leave_management",
         true,
-        new Set(["leave_management", "payroll"]),
+        new Set(["leave_management"]),
       ),
+    ).not.toThrow();
+  });
+
+  it("blocks disabling Leave Management while Long Leave Management is enabled", () => {
+    expect(() =>
+      validateNoEnabledDependentsBeforeDisable(
+        "leave_management",
+        new Set(["leave_management", "long_leave_management"]),
+      ),
+    ).toThrow("Disable Long Leave Management before disabling Leave Management.");
+
+    expect(() =>
+      validateFeatureDependencies(
+        "leave_management",
+        false,
+        new Set(["leave_management", "long_leave_management"]),
+      ),
+    ).toThrow(FeatureDependencyError);
+
+    expect(() =>
+      validateFeatureDependencies("leave_management", false, new Set(["leave_management"])),
     ).not.toThrow();
   });
 

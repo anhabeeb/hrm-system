@@ -133,7 +133,7 @@ export const UsersAccessPage = () => {
         ) : null}
         {successMessage ? <InlineAlert title={successMessage} variant="success" /> : null}
         {error ? <InlineAlert title={friendlyHrmError(error, "Users & Access action could not be completed.")} variant="error" /> : null}
-        <Tabs defaultValue="users" className="space-y-4">
+        <Tabs defaultValue="users" className="space-y-4" data-setup-target="roles-permissions">
           <TabsList>
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="roles">Roles</TabsTrigger>

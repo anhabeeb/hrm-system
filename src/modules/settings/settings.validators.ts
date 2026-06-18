@@ -352,6 +352,7 @@ export const validateFeatureDependencies = (
   enabledFeatures: Set<string>,
 ) => {
   if (!isEnabling) {
+    validateNoEnabledDependentsBeforeDisable(featureKey, enabledFeatures);
     return;
   }
 
@@ -375,6 +376,25 @@ export const validateFeatureDependencies = (
       `This feature cannot be enabled until ${FEATURE_DEPENDENCY_LABELS[missingDependency] ?? missingDependency} is enabled.`,
     );
   }
+};
+
+export const validateNoEnabledDependentsBeforeDisable = (
+  featureKey: string,
+  enabledFeatures: Set<string>,
+) => {
+  const enabledDependent = Object.entries(FEATURE_DEPENDENCIES).find(
+    ([dependentFeature, dependencies]) =>
+      enabledFeatures.has(dependentFeature) &&
+      dependentFeature !== featureKey &&
+      dependencies.includes(featureKey),
+  );
+
+  if (!enabledDependent) return;
+
+  const [dependentFeature] = enabledDependent;
+  throw new FeatureDependencyError(
+    `Disable ${FEATURE_DEPENDENCY_LABELS[dependentFeature] ?? dependentFeature} before disabling ${FEATURE_DEPENDENCY_LABELS[featureKey] ?? featureKey}.`,
+  );
 };
 
 const requiresFeatureEffectiveDate = (input: Partial<UpdateFeatureInput>): boolean =>

@@ -1,8 +1,9 @@
 import { api } from "@/lib/api-client";
 import { buildQueryString } from "@/lib/query-string";
-import type { PayrollAdjustment, PayrollAdjustmentPayload, PayrollCalculatePayload, PayrollException, PayrollFilters, PayrollItem, PayrollRun } from "./payroll.types";
+import type { PayrollAdjustment, PayrollAdjustmentPayload, PayrollCalculatePayload, PayrollException, PayrollFilters, PayrollItem, PayrollRun, PayrollSubFeatureVisibility } from "./payroll.types";
 
 export const payrollApi = {
+  subFeatures: () => api.get<{ subfeatures: PayrollSubFeatureVisibility }>("/payroll/subfeatures"),
   list: (filters: PayrollFilters = {}) => api.get<PayrollRun[]>(`/payroll${buildQueryString(filters)}`),
   get: (id: string) => api.get<{ payroll_run: PayrollRun }>(`/payroll/${id}`),
   calculate: (payload: PayrollCalculatePayload) => api.post<{ payroll_run?: PayrollRun }>("/payroll/calculate", payload),

@@ -33,6 +33,9 @@ export interface FeatureSetting {
   affects_payroll?: number;
   affects_attendance?: number;
   affects_leave?: number;
+  affects_roster?: number;
+  audit_enabled?: number;
+  effective_from?: string | null;
   updated_at?: string;
 }
 
