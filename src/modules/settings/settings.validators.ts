@@ -70,11 +70,13 @@ const requireEffectiveDateForPayrollImpact = (
 };
 
 const ALLOWED_SETTING_KEYS_BY_GROUP: Partial<Record<SettingsGroup, Set<string>>> = {
-  company: new Set(["company.basic", "company.profile"]),
+  company: new Set(["company.basic", "company.profile", "employee.numbering", "self_service.default_rules"]),
   attendance: new Set(["attendance.default_rules", "attendance.roster_rules"]),
   leave: new Set(["leave.default_rules", "long_leave.default_rules", "holiday.default_rules"]),
   payroll: new Set(["payroll.default_rules", "payroll.earnings_toggles"]),
   documents: new Set(["documents.default_rules", "documents.categories", "documents.foreign_employee_expected", "documents.contract_rules"]),
+  assets_uniforms: new Set(["assets.issue_rules", "uniforms.issue_rules"]),
+  approval_workflows: new Set(["approvals.default_rules"]),
   backup_recovery: new Set(["backup.default_rules"]),
   notifications: new Set(["notifications.default_rules"]),
   reports: new Set(["reports.default_rules"]),

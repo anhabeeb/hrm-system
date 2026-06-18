@@ -78,7 +78,7 @@ export const ModuleAvailabilityPanel = ({ featureKey }: { featureKey: string }) 
             <StatusBadge status={isEnabled ? "active" : "disabled"} />
           </div>
           <p className="mt-1 text-sm text-muted-foreground">{metadata.description}</p>
-          <p className="mt-2 text-xs text-muted-foreground">{metadata.warning}</p>
+          <p className="mt-2 text-xs text-muted-foreground">{metadata.warning} Re-enabling restores access to preserved records and settings.</p>
         </div>
         <Button
           type="button"

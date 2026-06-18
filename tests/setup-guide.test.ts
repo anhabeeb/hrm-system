@@ -45,7 +45,7 @@ describe("interactive setup guide", () => {
     expect(registry).toContain("company_profile");
     expect(registry).toContain("outlets");
     expect(registry).toContain("feature_modules");
-    expect(registry).toContain("feature-controls");
+    expect(registry).toContain("module-status-overview");
     expect(registry).toContain("leave_management");
     expect(registry).toContain("long_leave_management");
     expect(registry).toContain("attendance");
@@ -111,7 +111,7 @@ describe("interactive setup guide", () => {
       .join("\n");
 
     for (const target of [
-      "feature-controls",
+      "module-status-overview",
       "feature-document-tracking",
       "feature-asset-tracking",
       "feature-uniform-tracking",

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ModuleAvailabilityPanel } from "../ModuleAvailabilityPanel";
 import { StructuredSettingsPanel } from "../StructuredSettingsPanel";
 import { settingsPageDefinitions } from "../structured-settings";
+import { LeavePolicyRulesSettingsPanel } from "./LeavePolicyRulesSettingsPanel";
 
 export const LeaveSettingsPage = () => (
   <div>
@@ -19,10 +20,11 @@ export const LeaveSettingsPage = () => (
             </p>
           </div>
           <Button asChild variant="outline" size="sm">
-            <Link to="/settings/leave/policy-rules">Open Leave Policy Rules</Link>
+            <Link to="/settings/leave?section=policy-rules&highlight=leave-policy-rules">Open Leave Policy Rules</Link>
           </Button>
         </div>
       </section>
+      <LeavePolicyRulesSettingsPanel />
       <StructuredSettingsPanel definition={settingsPageDefinitions.leave} />
     </div>
   </div>

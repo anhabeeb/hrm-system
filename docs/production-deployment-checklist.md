@@ -187,7 +187,7 @@ Run on a staging clone or a new production tenant before release:
 
 Repeat this flow for Document Tracking, Asset Tracking, Uniform Tracking, Leave Management, Long Leave Management, Duty Roster, Contract Tracking, Attendance Management, and Payroll Management:
 
-1. Disable the module from Feature Controls.
+1. Open the module's own settings page and disable it from the Module Availability section.
 2. Confirm the sidebar hides the module.
 3. Confirm direct route access shows a disabled-module message.
 4. Confirm API actions are blocked for normal users.

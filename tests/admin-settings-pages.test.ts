@@ -101,7 +101,8 @@ describe("settings and administration frontend pages", () => {
 
     expect(settingsHub).toContain("settingsLinks");
     expect(settingsHub).toContain("Open settings");
-    expect(settingsHub).toContain("Open a module settings page to configure availability, effective date, and detailed options.");
+    expect(settingsHub).toContain("Review setup-critical settings and open a module settings page to configure availability, effective date, and detailed module options.");
+    expect(settingsHub).toContain("ModuleStatusOverview");
     expect(settingsHub).toContain("Company Information");
     expect(settingsHub).toContain("Backup & Recovery");
     expect(settingsHub).toContain("Asset Tracking");
@@ -118,7 +119,7 @@ describe("settings and administration frontend pages", () => {
   it("module settings pages expose availability controls with effective dates", () => {
     const availabilityPanel = read("frontend/src/features/settings/ModuleAvailabilityPanel.tsx");
     const featureDialog = read("frontend/src/features/settings/FeatureReasonDialog.tsx");
-    const featurePanel = read("frontend/src/features/settings/FeatureSettingsPanel.tsx");
+    const moduleStatusOverview = read("frontend/src/features/settings/ModuleStatusOverview.tsx");
     const modulePages = read("frontend/src/features/settings/module/ModuleSettingsPages.tsx");
     const router = read("frontend/src/app/router.tsx");
     const navigation = read("frontend/src/lib/navigation.ts");
@@ -130,8 +131,8 @@ describe("settings and administration frontend pages", () => {
     expect(availabilityPanel).toContain("auth.refreshMe()");
     expect(availabilityPanel).toContain('queryKey: ["navigation"]');
     expect(availabilityPanel).toContain('queryKey: ["dashboard"]');
-    expect(featurePanel).toContain("effective_from");
-    expect(featurePanel).toContain("auth.refreshMe()");
+    expect(moduleStatusOverview).toContain("Module Status Overview");
+    expect(moduleStatusOverview).toContain("Open module settings");
     expect(featureDialog).toContain("AppDatePicker");
     expect(featureDialog).toContain("Effective from");
     expect(modulePages).toContain('featureKey="asset_tracking"');

@@ -31,19 +31,28 @@ const mustNotInclude = (label, file, markers) => {
   return text;
 };
 
-const featurePanel = mustInclude("Feature Controls", "frontend/src/features/settings/FeatureSettingsPanel.tsx", [
+if (exists("frontend/src/features/settings/FeatureSettingsPanel.tsx")) {
+  failures.push("Legacy editable FeatureSettingsPanel.tsx should be removed; module availability is managed from module settings pages.");
+}
+const moduleStatusOverview = mustInclude("Module Status Overview", "frontend/src/features/settings/ModuleStatusOverview.tsx", [
   "mainFeatureOrder",
-  "Only the primary optional modules are shown here.",
-  "Sub-feature controls live inside Attendance and Payroll settings.",
+  "Module Status Overview",
+  "Open module settings",
+  "data-setup-target=\"module-status-overview\"",
+]);
+const moduleAvailability = mustInclude("Module Availability Panel", "frontend/src/features/settings/ModuleAvailabilityPanel.tsx", [
+  "ModuleAvailabilityPanel",
   "Dependencies",
-  "Required by:",
+  "Required by",
   "Last changed:",
-  "Audit on",
+  "Audit",
   "missingDependencies",
   "activeDependents",
   "Disable dependent modules first.",
+  "settingsApi.updateFeature",
 ]);
-const featureMetadata = mustInclude("Feature Controls metadata", "frontend/src/features/settings/module-feature-metadata.ts", [
+const featureMetadata = mustInclude("Module metadata", "frontend/src/features/settings/module-feature-metadata.ts", [
+  "mainFeatureOrder",
   "Document Tracking",
   "Asset Tracking",
   "Uniform Tracking",
@@ -55,12 +64,12 @@ const featureMetadata = mustInclude("Feature Controls metadata", "frontend/src/f
   "Payroll Management",
   "Disabling this module hides it from normal use but does not delete existing records.",
 ]);
-const featureControls = `${featurePanel}\n${featureMetadata}`;
-if (featureControls.includes('header: "Key"')) {
-  failures.push("Feature Controls: raw feature keys must not be shown as a normal user-facing column.");
+const moduleAvailabilitySource = `${moduleStatusOverview}\n${moduleAvailability}\n${featureMetadata}`;
+if (moduleAvailabilitySource.includes('header: "Key"')) {
+  failures.push("Module availability UI: raw feature keys must not be shown as a normal user-facing column.");
 }
-if (!featureControls.includes("mainFeatureOrder") || (featureControls.match(/mainFeatureOrder/g) ?? []).length < 2) {
-  failures.push("Feature Controls: primary module list must drive the visible rows.");
+if (!moduleAvailabilitySource.includes("mainFeatureOrder") || (moduleAvailabilitySource.match(/mainFeatureOrder/g) ?? []).length < 2) {
+  failures.push("Module availability UI: primary module list must drive the visible rows.");
 }
 
 const structuredSettings = mustInclude("Structured settings definitions", "frontend/src/features/settings/structured-settings.ts", [
@@ -72,8 +81,8 @@ const structuredSettings = mustInclude("Structured settings definitions", "front
   "Attendance Sub-Features",
   "Payroll Sub-Features",
   "Legacy aliases are kept backend-compatible but hidden from standard settings.",
-  "Duty Roster module availability is controlled from Feature Controls",
-  "Contract Tracking module availability is controlled from Feature Controls.",
+  "Duty Roster module availability is controlled from the Module Availability section",
+  "Contract Tracking module availability is controlled from the Module Availability section",
 ]);
 for (const duplicate of [
   "roster_module_enabled",
@@ -92,7 +101,7 @@ mustInclude("Structured settings panel", "frontend/src/features/settings/Structu
   "parentFeature",
   "parentDisabled",
   "controlsDisabled",
-  "Enable it in Feature Controls before changing its sub-feature settings.",
+  "Enable this module from its Module Availability section before changing sub-feature settings.",
   "Existing settings are preserved and will be restored when the module is re-enabled.",
 ]);
 
@@ -189,11 +198,16 @@ if (/if\s*\(!isEnabling\)\s*{\s*return;\s*}/.test(validators)) {
   failures.push("Settings dependency validator: disabling still returns early without reverse dependency validation.");
 }
 
-mustNotInclude("Settings files", "frontend/src/features/settings/FeatureSettingsPanel.tsx", [
-  "dark:",
-  "window.alert",
-  "window.confirm",
-]);
+if (exists("frontend/src/features/settings/FeatureSettingsPanel.tsx")) {
+  mustNotInclude("Settings files", "frontend/src/features/settings/FeatureSettingsPanel.tsx", [
+    "Switch",
+    "DataTable",
+    "settingsApi.updateFeature",
+    "dark:",
+    "window.alert",
+    "window.confirm",
+  ]);
+}
 mustNotInclude("Settings metadata", "frontend/src/features/settings/module-feature-metadata.ts", [
   "dark:",
   "window.alert",

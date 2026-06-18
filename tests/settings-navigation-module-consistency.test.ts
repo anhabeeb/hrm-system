@@ -60,15 +60,61 @@ describe("settings navigation module consistency", () => {
   it("exposes leave policy rules from settings and leave pages", () => {
     const router = read("frontend/src/app/router.tsx");
     const leaveSettings = read("frontend/src/features/settings/leave/LeaveSettingsPage.tsx");
-    const leavePolicyRulesSettings = read("frontend/src/features/settings/leave/LeavePolicyRulesSettingsPage.tsx");
+    const leavePolicyRulesSettings = read("frontend/src/features/settings/leave/LeavePolicyRulesSettingsPanel.tsx");
     const leaveTypesPanel = read("frontend/src/features/leave/LeaveTypesPanel.tsx");
 
-    expect(router).toContain('path="/settings/leave/policy-rules"');
+    expect(router).not.toContain('path="/settings/leave/policy-rules"');
     expect(leaveSettings).toContain("Open Leave Policy Rules");
     expect(leaveSettings).toContain("Leave Policy Rules");
+    expect(leaveSettings).toContain("LeavePolicyRulesSettingsPanel");
     expect(leavePolicyRulesSettings).toContain("Configure document requirements, salary deduction rules, allowance/pay component deductions, approval behavior, and entitlement rules for each leave type.");
     expect(leavePolicyRulesSettings).toContain("Edit Policy Rules");
     expect(leaveTypesPanel).toContain("Open Leave Policy Settings");
+    expect(leaveTypesPanel).toContain("/settings/leave?section=policy-rules&highlight=leave-policy-rules");
+  });
+
+  it("keeps global settings free of editable all-module feature toggles", () => {
+    const settingsPage = read("frontend/src/features/settings/SettingsPage.tsx");
+    const moduleStatusOverview = read("frontend/src/features/settings/ModuleStatusOverview.tsx");
+
+    expect(settingsPage).not.toContain("<FeatureSettingsPanel");
+    expect(settingsPage).not.toContain("Switch");
+    expect(settingsPage).toContain("<ModuleStatusOverview");
+    expect(moduleStatusOverview).toContain("Module Status Overview");
+    expect(moduleStatusOverview).toContain('data-setup-target="module-status-overview"');
+    expect(moduleStatusOverview).toContain("Open module settings");
+  });
+
+  it("renders real interactable settings sections for setup guide targets", () => {
+    const settingsPage = read("frontend/src/features/settings/SettingsPage.tsx");
+    const structuredSettings = read("frontend/src/features/settings/structured-settings.ts");
+    const modulePages = read("frontend/src/features/settings/module/ModuleSettingsPages.tsx");
+    const setupGuideRegistry = read("src/modules/setup-guide/setup-guide.registry.ts");
+
+    for (const marker of [
+      "Employee Numbering",
+      "employee-numbering",
+      "Self-Service Settings",
+      "self-service-settings",
+      "Approval Workflows",
+      "approval-workflows",
+      "Asset Issue Rules",
+      "asset-issue-rules",
+      "Uniform Issue Rules",
+      "uniform-issue-rules",
+    ]) {
+      expect(`${settingsPage}\n${structuredSettings}\n${modulePages}`).toContain(marker);
+    }
+    expect(modulePages).toContain("StructuredSettingsPanel");
+    expect(modulePages).toContain("additionalSettingsPageDefinitions.assets");
+    expect(modulePages).toContain("additionalSettingsPageDefinitions.uniforms");
+    expect(setupGuideRegistry).toContain("/settings?section=numbering");
+    expect(setupGuideRegistry).toContain("/settings?section=employee-access");
+    expect(setupGuideRegistry).toContain("/settings?section=workflows");
+    expect(setupGuideRegistry).toContain("/settings/assets?section=issue-rules");
+    expect(setupGuideRegistry).toContain("/settings/uniforms?section=issue-rules");
+    expect(setupGuideRegistry).toContain("highlight=module-status-overview");
+    expect(setupGuideRegistry).not.toContain("highlight=feature-controls");
   });
 
   it("shows availability panels on feature-backed settings pages", () => {

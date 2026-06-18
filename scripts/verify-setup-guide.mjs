@@ -71,7 +71,7 @@ const registry = assertFile("src/modules/setup-guide/setup-guide.registry.ts");
 for (const marker of [
   "company_profile",
   "feature_modules",
-  "feature-controls",
+  "module-status-overview",
   "outlets",
   "leave_management",
   "long_leave_management",
@@ -95,7 +95,7 @@ for (const target of targetKeys) {
   }
 }
 for (const target of [
-  "feature-controls",
+  "module-status-overview",
   "feature-document-tracking",
   "feature-asset-tracking",
   "feature-uniform-tracking",
@@ -163,15 +163,17 @@ assertIncludes(shell, "SetupGuideOverlay", "AppShell does not include setup coac
 const dashboard = assertFile("frontend/src/features/dashboard/AdminCommandCenterPage.tsx");
 assertIncludes(dashboard, "SetupIncompleteDashboardBanner", "dashboard setup reminder banner is missing.");
 
-const settings = assertFile("frontend/src/features/settings/FeatureSettingsPanel.tsx") + assertFile("frontend/src/features/settings/StructuredSettingsPanel.tsx");
+const settings =
+  assertFile("frontend/src/features/settings/ModuleStatusOverview.tsx") +
+  assertFile("frontend/src/features/settings/StructuredSettingsPanel.tsx");
 assertIncludes(settings, "data-setup-target", "setup target data attributes are missing from settings surfaces.");
-assertIncludes(settings, 'data-setup-target="feature-controls"', "Feature Controls setup target is missing.");
+assertIncludes(settings, 'data-setup-target="module-status-overview"', "Module Status Overview setup target is missing.");
 
 const tests = assertFile("tests/setup-guide.test.ts");
 for (const marker of [
   "highlight=",
   "feature_modules",
-  "feature-controls",
+  "module-status-overview",
   "disabled_by_choice",
   "needs_setup_after_enable",
   "settingsService.updateFeature",

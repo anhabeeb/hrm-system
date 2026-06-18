@@ -71,7 +71,6 @@ const CompanyInformationPage = lazyNamed(() => import("@/features/settings/compa
 const SecuritySettingsPage = lazyNamed(() => import("@/features/settings/security/SecuritySettingsPage"), "SecuritySettingsPage");
 const AttendanceSettingsPage = lazyNamed(() => import("@/features/settings/attendance/AttendanceSettingsPage"), "AttendanceSettingsPage");
 const LeaveSettingsPage = lazyNamed(() => import("@/features/settings/leave/LeaveSettingsPage"), "LeaveSettingsPage");
-const LeavePolicyRulesSettingsPage = lazyNamed(() => import("@/features/settings/leave/LeavePolicyRulesSettingsPage"), "LeavePolicyRulesSettingsPage");
 const PayrollSettingsPage = lazyNamed(() => import("@/features/settings/payroll/PayrollSettingsPage"), "PayrollSettingsPage");
 const DocumentsSettingsPage = lazyNamed(() => import("@/features/settings/documents/DocumentsSettingsPage"), "DocumentsSettingsPage");
 const AssetsSettingsPage = lazyNamed(() => import("@/features/settings/module/ModuleSettingsPages"), "AssetsSettingsPage");
@@ -201,7 +200,6 @@ export const AppRouter = () => (
         <Route path="/settings/security" element={guarded(<SecuritySettingsPage />, { permissionsAny: ["security.view", "audit_settings.view", "settings.view"], feature: "settings" })} />
         <Route path="/settings/attendance" element={guarded(<AttendanceSettingsPage />, { permissionsAny: ["attendance.settings.view", "attendance_settings.view", "settings.view"], feature: "settings" })} />
         <Route path="/settings/leave" element={guarded(<LeaveSettingsPage />, { permissionsAny: ["leave.settings.view", "leave_settings.view", "settings.view"], feature: "settings" })} />
-        <Route path="/settings/leave/policy-rules" element={guarded(<LeavePolicyRulesSettingsPage />, { permissionsAny: ["leave.settings.view", "leave_settings.view", "leave_policy_rules.manage", "settings.view"], feature: "settings" })} />
         <Route path="/settings/payroll" element={guarded(<PayrollSettingsPage />, { permissionsAny: ["payroll.settings.view", "payroll_settings.view", "settings.view"], feature: "settings" })} />
         <Route path="/settings/documents" element={guarded(<DocumentsSettingsPage />, { permissionsAny: ["documents.settings.view", "documents_settings.manage", "settings.view"], feature: "settings" })} />
         <Route path="/settings/assets" element={guarded(<AssetsSettingsPage />, { permissionsAny: ["assets_settings.manage", "settings.view"], feature: "settings" })} />

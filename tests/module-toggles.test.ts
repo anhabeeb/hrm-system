@@ -109,7 +109,7 @@ describe("operational module toggles", () => {
     expect(read("frontend/src/app/router.tsx")).toContain('requiredAttendanceSubFeature: "corrections_enabled"');
     expect(read("frontend/src/app/router.tsx")).toContain('requiredAttendanceSubFeature: "kiosk_enabled"');
     expect(read("frontend/src/app/router.tsx")).toContain('requiredAttendanceSubFeature: "biometric_enabled"');
-    const featureControlsSource = `${read("frontend/src/features/settings/FeatureSettingsPanel.tsx")}\n${read("frontend/src/features/settings/module-feature-metadata.ts")}`;
+    const featureControlsSource = `${read("frontend/src/features/settings/ModuleStatusOverview.tsx")}\n${read("frontend/src/features/settings/ModuleAvailabilityPanel.tsx")}\n${read("frontend/src/features/settings/module-feature-metadata.ts")}`;
     expect(featureControlsSource).toContain("Disabling this module hides it from normal use but does not delete existing records.");
     expect(featureControlsSource).toContain("Plan employee work schedules, weekly duty rosters, shift assignments, and roster change workflows.");
     expect(featureControlsSource).toContain("Track employee contracts, renewals, probation periods, linked contract documents, and contract expiry alerts.");
@@ -125,7 +125,7 @@ describe("operational module toggles", () => {
     expect(read("frontend/src/features/settings/structured-settings.ts")).not.toContain("contract_tracking_enabled");
     expect(read("frontend/src/features/settings/StructuredSettingsPanel.tsx")).toContain("parentDisabled");
     expect(read("frontend/src/features/settings/StructuredSettingsPanel.tsx")).toContain("effective_date");
-    expect(read("frontend/src/features/settings/StructuredSettingsPanel.tsx")).toContain("Enable it in Feature Controls before changing its sub-feature settings.");
+    expect(read("frontend/src/features/settings/StructuredSettingsPanel.tsx")).toContain("Enable this module from its Module Availability section before changing sub-feature settings.");
     expect(read("frontend/src/features/settings/structured-settings.ts")).not.toContain("Manual attendance allowed");
     expect(read("frontend/src/features/settings/structured-settings.ts")).not.toContain("Attendance correction allowed");
     expect(read("frontend/src/features/settings/structured-settings.ts")).not.toContain("Kiosk attendance enabled");

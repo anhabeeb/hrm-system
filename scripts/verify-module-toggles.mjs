@@ -237,7 +237,7 @@ mustInclude("navigation", "frontend/src/lib/navigation.ts", [
   'requiredFeaturesAll: ["reports", "payroll"]',
 ]);
 
-const featureControlsSource = `${read("frontend/src/features/settings/FeatureSettingsPanel.tsx")}\n${read("frontend/src/features/settings/module-feature-metadata.ts")}`;
+const featureControlsSource = `${read("frontend/src/features/settings/ModuleStatusOverview.tsx")}\n${read("frontend/src/features/settings/ModuleAvailabilityPanel.tsx")}\n${read("frontend/src/features/settings/module-feature-metadata.ts")}`;
 for (const marker of [
   "Leave Management",
   "Long Leave Management",

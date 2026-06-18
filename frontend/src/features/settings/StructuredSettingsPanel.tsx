@@ -131,7 +131,7 @@ export const StructuredSettingsPanel = ({ definition }: { definition: SettingsPa
       ) : null}
       {parentDisabled ? (
         <InlineAlert title={`${definition.parentFeatureLabel ?? definition.title} is disabled`}>
-          Enable it in Feature Controls before changing its sub-feature settings. Existing settings are preserved and will be restored when the module is re-enabled.
+          Enable this module from its Module Availability section before changing sub-feature settings. Existing settings are preserved and will be restored when the module is re-enabled.
         </InlineAlert>
       ) : null}
       {definition.sections.map((section) => (

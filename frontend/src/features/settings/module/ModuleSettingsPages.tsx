@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import { InlineAlert } from "@/components/feedback/InlineAlert";
 import { Button } from "@/components/ui/button";
 import { ModuleAvailabilityPanel } from "../ModuleAvailabilityPanel";
+import { StructuredSettingsPanel } from "../StructuredSettingsPanel";
+import { additionalSettingsPageDefinitions, type SettingsPageDefinition } from "../structured-settings";
 
 const ModuleSettingsShell = ({
   featureKey,
@@ -10,12 +12,14 @@ const ModuleSettingsShell = ({
   description,
   setupTargets,
   managePath,
+  definition,
 }: {
   featureKey: string;
   title: string;
   description: string;
   setupTargets: Array<{ target: string; label: string; description: string }>;
   managePath: string;
+  definition?: SettingsPageDefinition;
 }) => (
   <div className="p-4 md:p-6">
     <div className="space-y-4">
@@ -39,6 +43,7 @@ const ModuleSettingsShell = ({
           </div>
         ))}
       </div>
+      {definition ? <StructuredSettingsPanel definition={definition} /> : null}
       <InlineAlert title="Module settings remain available while disabled">
         Super Admins and authorized settings users can keep this page open to review preserved settings and re-enable the module. Operational module pages stay hidden or blocked while the module is disabled.
       </InlineAlert>
@@ -52,9 +57,9 @@ export const AssetsSettingsPage = () => (
     title="Asset Tracking settings"
     description="Configure asset module availability and review issue/return setup guidance."
     managePath="/assets"
+    definition={additionalSettingsPageDefinitions.assets}
     setupTargets={[
       { target: "asset-categories", label: "Asset categories", description: "Define practical asset categories before assigning company property." },
-      { target: "asset-issue-rules", label: "Asset issue rules", description: "Review issue, return, and audit expectations before rollout." },
     ]}
   />
 );
@@ -65,9 +70,9 @@ export const UniformsSettingsPage = () => (
     title="Uniform Tracking settings"
     description="Configure uniform module availability and review uniform issue/return setup guidance."
     managePath="/uniforms"
+    definition={additionalSettingsPageDefinitions.uniforms}
     setupTargets={[
       { target: "uniform-types", label: "Uniform types", description: "Define uniform types and size options before issuing uniforms." },
-      { target: "uniform-issue-rules", label: "Uniform issue rules", description: "Review issue, return, and replacement expectations before rollout." },
     ]}
   />
 );

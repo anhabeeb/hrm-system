@@ -7,6 +7,7 @@ export type SettingsGroup =
   | "holidays"
   | "payroll"
   | "approval_workflows"
+  | "assets_uniforms"
   | "documents"
   | "backup_recovery"
   | "notifications"

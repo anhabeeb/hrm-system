@@ -128,11 +128,12 @@ const subFeatureKeys = [
 const featureSeed = exists("seeds/feature-settings.seed.sql") ? read("seeds/feature-settings.seed.sql") : "";
 const companySeed = exists("seeds/company-settings.seed.sql") ? read("seeds/company-settings.seed.sql") : "";
 const settingsConstants = exists("src/modules/settings/settings.constants.ts") ? read("src/modules/settings/settings.constants.ts") : "";
-const featurePanel = exists("frontend/src/features/settings/FeatureSettingsPanel.tsx") ? read("frontend/src/features/settings/FeatureSettingsPanel.tsx") : "";
+const moduleStatusOverview = exists("frontend/src/features/settings/ModuleStatusOverview.tsx") ? read("frontend/src/features/settings/ModuleStatusOverview.tsx") : "";
+const moduleAvailabilityPanel = exists("frontend/src/features/settings/ModuleAvailabilityPanel.tsx") ? read("frontend/src/features/settings/ModuleAvailabilityPanel.tsx") : "";
 const structuredSettings = exists("frontend/src/features/settings/structured-settings.ts") ? read("frontend/src/features/settings/structured-settings.ts") : "";
 
 for (const key of moduleKeys) {
-  assert(featureSeed.includes(key) || settingsConstants.includes(key) || featurePanel.includes(key), `optional module key ${key} is missing from settings/seed surfaces.`);
+  assert(featureSeed.includes(key) || settingsConstants.includes(key) || moduleStatusOverview.includes(key) || moduleAvailabilityPanel.includes(key), `optional module key ${key} is missing from settings/seed surfaces.`);
 }
 assert(
   (exists("frontend/src/config/moduleCodes.ts") && read("frontend/src/config/moduleCodes.ts").includes("document_tracking")) ||
@@ -150,7 +151,7 @@ for (const marker of [
   "needs_setup_after_enable",
   "review_recommended",
   "target_highlight_key",
-  "feature-controls",
+  "module-status-overview",
 ]) {
   assert(setupRegistry.includes(marker) || (exists("src/modules/setup-guide/setup-guide.types.ts") && read("src/modules/setup-guide/setup-guide.types.ts").includes(marker)), `setup guide missing marker ${marker}.`);
 }

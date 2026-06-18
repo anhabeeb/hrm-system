@@ -53,7 +53,7 @@ export const LeaveTypesPanel = ({
           </p>
         </div>
         <Button asChild variant="outline" size="sm">
-          <Link to="/settings/leave/policy-rules">Open Leave Policy Settings</Link>
+          <Link to="/settings/leave?section=policy-rules&highlight=leave-policy-rules">Open Leave Policy Settings</Link>
         </Button>
       </div>
       <DataTable

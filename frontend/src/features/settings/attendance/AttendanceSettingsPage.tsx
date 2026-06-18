@@ -14,7 +14,7 @@ export const AttendanceSettingsPage = () => {
         <ModuleAvailabilityPanel featureKey="attendance" />
         {!auth.hasFeature("attendance") ? (
           <InlineAlert title="Attendance Management is currently disabled.">
-            These sub-feature settings are preserved for re-enable review. Enable Attendance Management in Feature Controls before normal attendance pages and actions become available.
+            These sub-feature settings are preserved for re-enable review. Enable Attendance Management from this page&apos;s Module Availability section before normal attendance pages and actions become available.
           </InlineAlert>
         ) : null}
         <StructuredSettingsPanel definition={settingsPageDefinitions.attendance} />
