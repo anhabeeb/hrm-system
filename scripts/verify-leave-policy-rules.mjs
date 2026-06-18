@@ -145,7 +145,7 @@ const leaveDialog = assertFile("frontend/src/features/leave/LeavePolicyRuleDialo
 const frontend = `${leavePage}\n${leaveForm}\n${leavePanel}\n${leaveDialog}`;
 for (const marker of [
   "Leave policy preview",
-  "Leave policy rules",
+  "Leave Policy Rules",
   "salary_deduction_enabled",
   "Deduction mode",
   "Selected pay component keys",

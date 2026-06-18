@@ -36,7 +36,7 @@ mustInclude("module aliases", "frontend/src/lib/features.ts", "MODULE_FEATURE_AL
 mustInclude("module access helper", "frontend/src/lib/features.ts", "isModuleEnabled");
 mustInclude("frontend route guard", "frontend/src/features/auth/route-guards.tsx", "isRouteFeatureAllowed(user, { moduleCode, requiredFeature, moduleCodesAll, requiredFeaturesAll })");
 mustInclude("frontend navigation", "frontend/src/lib/navigation.ts", "canShowModuleItem");
-mustInclude("frontend module access", "frontend/src/lib/moduleAccess.ts", "isModuleEnabled(user, moduleCode)");
+mustInclude("frontend module access", "frontend/src/lib/moduleAccess.ts", "isRouteFeatureAllowed");
 mustInclude("frontend module access", "frontend/src/lib/moduleAccess.ts", "canAccessSelfService(user)");
 mustInclude("backend feature middleware", "src/middleware/feature.middleware.ts", "resolveModuleFeatureAliases");
 mustInclude("backend feature middleware", "src/middleware/feature.middleware.ts", "This module is currently disabled.");
