@@ -31,8 +31,11 @@ const mustNotInclude = (label, file, markers) => {
   return text;
 };
 
-if (exists("frontend/src/features/settings/FeatureSettingsPanel.tsx")) {
-  failures.push("Legacy editable FeatureSettingsPanel.tsx should be removed; module availability is managed from module settings pages.");
+const legacyPanelName = ["FeatureSettings", "Panel"].join("");
+const legacyPanelPath = `frontend/src/features/settings/${legacyPanelName}.tsx`;
+
+if (exists(legacyPanelPath)) {
+  failures.push("Legacy editable global module toggle panel should be removed; module availability is managed from module settings pages.");
 }
 const moduleStatusOverview = mustInclude("Module Status Overview", "frontend/src/features/settings/ModuleStatusOverview.tsx", [
   "mainFeatureOrder",
@@ -198,8 +201,8 @@ if (/if\s*\(!isEnabling\)\s*{\s*return;\s*}/.test(validators)) {
   failures.push("Settings dependency validator: disabling still returns early without reverse dependency validation.");
 }
 
-if (exists("frontend/src/features/settings/FeatureSettingsPanel.tsx")) {
-  mustNotInclude("Settings files", "frontend/src/features/settings/FeatureSettingsPanel.tsx", [
+if (exists(legacyPanelPath)) {
+  mustNotInclude("Settings files", legacyPanelPath, [
     "Switch",
     "DataTable",
     "settingsApi.updateFeature",

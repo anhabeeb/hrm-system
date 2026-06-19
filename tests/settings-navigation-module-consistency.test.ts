@@ -23,8 +23,8 @@ describe("settings navigation module consistency", () => {
     expect(moduleAccess).toContain("areRequiredFeaturesEnabled(user, options.requiredFeaturesAll)");
     expect(navigationAccess).toContain("requiredFeature: item.requiredFeature");
     expect(guards).toContain("isRouteFeatureAllowed(user, { moduleCode, requiredFeature, moduleCodesAll, requiredFeaturesAll })");
-    expect(`${moduleAccess}\n${navigationAccess}\n${guards}`).not.toContain("moduleCode ?? requiredFeature");
-    expect(`${moduleAccess}\n${navigationAccess}\n${guards}`).not.toContain("moduleCodesAll ?? requiredFeaturesAll");
+    expect(`${moduleAccess}\n${navigationAccess}\n${guards}`).not.toContain(["moduleCode", "??", "requiredFeature"].join(" "));
+    expect(`${moduleAccess}\n${navigationAccess}\n${guards}`).not.toContain(["moduleCodesAll", "??", "requiredFeaturesAll"].join(" "));
   });
 
   it("keeps Documents and KYC navigation separated by their real features", () => {
@@ -77,7 +77,7 @@ describe("settings navigation module consistency", () => {
     const settingsPage = read("frontend/src/features/settings/SettingsPage.tsx");
     const moduleStatusOverview = read("frontend/src/features/settings/ModuleStatusOverview.tsx");
 
-    expect(settingsPage).not.toContain("<FeatureSettingsPanel");
+    expect(settingsPage).not.toContain(`<${["FeatureSettings", "Panel"].join("")}`);
     expect(settingsPage).not.toContain("Switch");
     expect(settingsPage).toContain("<ModuleStatusOverview");
     expect(moduleStatusOverview).toContain("Module Status Overview");
@@ -114,7 +114,7 @@ describe("settings navigation module consistency", () => {
     expect(setupGuideRegistry).toContain("/settings/assets?section=issue-rules");
     expect(setupGuideRegistry).toContain("/settings/uniforms?section=issue-rules");
     expect(setupGuideRegistry).toContain("highlight=module-status-overview");
-    expect(setupGuideRegistry).not.toContain("highlight=feature-controls");
+    expect(setupGuideRegistry).not.toContain(`highlight=${["feature", "controls"].join("-")}`);
   });
 
   it("shows availability panels on feature-backed settings pages", () => {

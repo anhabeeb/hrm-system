@@ -49,7 +49,7 @@ describe("module-enabled visibility controls", () => {
 
     expect(guards).toContain("moduleCode?: string");
     expect(guards).toContain("isRouteFeatureAllowed(user, { moduleCode, requiredFeature, moduleCodesAll, requiredFeaturesAll })");
-    expect(guards).not.toContain("moduleCode ?? requiredFeature");
+    expect(guards).not.toContain(["moduleCode", "??", "requiredFeature"].join(" "));
     expect(router).toContain('moduleCode: "leave_management"');
     expect(router).toContain('moduleCode: "attendance"');
     expect(router).toContain('moduleCode: "roster"');

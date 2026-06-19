@@ -15,6 +15,13 @@ const assertFile = (path) => {
   return exists(path) ? read(path) : "";
 };
 
+const legacyPanelName = ["FeatureSettings", "Panel"].join("");
+const legacyPanelPath = `frontend/src/features/settings/${legacyPanelName}.tsx`;
+const staleControlsLabel = ["Feature", "Controls"].join(" ");
+const staleControlsTarget = ["feature", "controls"].join("-");
+const collapsedSingleRequirement = ["moduleCode", "??", "requiredFeature"].join(" ");
+const collapsedAllRequirements = ["moduleCodesAll", "??", "requiredFeaturesAll"].join(" ");
+
 const packageJson = JSON.parse(assertFile("package.json") || "{}");
 assert(
   packageJson.scripts?.["verify:settings-navigation-ux"] === "node scripts/verify-settings-navigation-ux.mjs",
@@ -81,8 +88,8 @@ assert(settingsApi.includes("effective_date"), "settings API must accept effecti
 assert(structuredPanel.includes("AppDatePicker"), "StructuredSettingsPanel must use AppDatePicker for effective dates.");
 assert(structuredPanel.includes("effective_date"), "StructuredSettingsPanel must submit effective_date.");
 assert(structuredPanel.includes("requiresEffectiveDate"), "StructuredSettingsPanel must require effective dates for lifecycle-sensitive groups.");
-assert(!exists("frontend/src/features/settings/FeatureSettingsPanel.tsx"), "unused editable global FeatureSettingsPanel.tsx must be removed.");
-assert(!settingsPage.includes("FeatureSettingsPanel"), "All Settings page must not import/render editable global module toggles.");
+assert(!exists(legacyPanelPath), "unused editable global module toggle panel must be removed.");
+assert(!settingsPage.includes(legacyPanelName), "All Settings page must not import/render editable global module toggles.");
 assert(!settingsPage.includes("Switch"), "All Settings page must not expose direct module toggle switches.");
 assert(settingsPage.includes("<ModuleStatusOverview"), "All Settings page must show a read-only module status overview.");
 assert(moduleStatusOverview.includes("Module Status Overview"), "ModuleStatusOverview must clearly render a read-only module status section.");
@@ -99,11 +106,11 @@ for (const [path, source] of [
   ["production-deployment-checklist.md", deploymentChecklist],
 ]) {
   for (const forbidden of [
-    "Feature Controls",
-    "Enable it in Feature Controls",
-    "controlled from Feature Controls",
-    "reviewed from Feature Controls",
-    "Feature module choices have been reviewed from Feature Controls",
+    staleControlsLabel,
+    `Enable it in ${staleControlsLabel}`,
+    `controlled from ${staleControlsLabel}`,
+    `reviewed from ${staleControlsLabel}`,
+    `Feature module choices have been reviewed from ${staleControlsLabel}`,
   ]) {
     assert(!source.includes(forbidden), `${path} still contains user-facing stale wording: ${forbidden}`);
   }
@@ -114,8 +121,8 @@ for (const [label, source] of [
   ["navigation access", navigationAccess],
   ["route guards", routeGuards],
 ]) {
-  assert(!source.includes("moduleCode ?? requiredFeature"), `${label} must not use moduleCode ?? requiredFeature fallback.`);
-  assert(!source.includes("moduleCodesAll ?? requiredFeaturesAll"), `${label} must not collapse moduleCodesAll and requiredFeaturesAll.`);
+  assert(!source.includes(collapsedSingleRequirement), `${label} must not collapse single module and feature requirements.`);
+  assert(!source.includes(collapsedAllRequirements), `${label} must not collapse all-module and all-feature requirements.`);
 }
 assert(moduleAccess.includes("isRouteFeatureAllowed"), "moduleAccess must expose isRouteFeatureAllowed.");
 assert(moduleAccess.includes("hasFeature(user, options.requiredFeature)"), "moduleAccess must check requiredFeature exactly.");
@@ -212,7 +219,7 @@ assert(validators.includes("feature availability change requires an effective da
 assert(setupGuideService.includes("settingsService.updateFeature"), "setup guide module choice must update real feature settings.");
 assert(setupGuideService.includes("effective_from"), "setup guide module choice must pass an effective_from date.");
 assert(setupGuideRegistry.includes("module-status-overview"), "setup guide must point module review to Module Status Overview.");
-assert(!setupGuideRegistry.includes("highlight=feature-controls"), "setup guide must not point to removed global Feature Controls target.");
+assert(!setupGuideRegistry.includes(`highlight=${staleControlsTarget}`), "setup guide must not point to the removed global module toggle target.");
 for (const marker of [
   "/settings?section=numbering",
   "/settings?section=employee-access",
